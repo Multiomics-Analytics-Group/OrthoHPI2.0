@@ -1,0 +1,24 @@
+urls:
+  string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
+  string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
+  eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
+  string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
+
+hosts:
+  9606: 
+    label: Homo sapiens
+    color: "#525252"
+    tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
+    compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+
+parasites:
+  5759:
+        label: Entamoeba histolytica
+        color: "#b2df8a"
+        tissues:
+            - "BTO:0000648"
+  5741:
+      label: Giardia intestinalis
+      color: "#33a02c"
+      tissues:
+          - "BTO:0000648"

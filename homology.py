@@ -24,7 +24,7 @@ def get_eggnog_groups(filepath, proteins):
     
     return valid_groups
             
-def get_links(filepath, valid_groups, ouput_filepath, config_file):
+def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
     """
     Obtain the transferred interactions at the EggNOG group level from STRING
     Writes into a file 'predictions.tsv' with the list of predicted links based on homology.
@@ -39,7 +39,7 @@ def get_links(filepath, valid_groups, ouput_filepath, config_file):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     first = True
     with open(ouput_filepath, 'w') as out:
-        out.write("\t".join(["taxid1", "source", "taxid2", "target", "experimental_evidence_score", "databases_evidence_score", "average_score", "group1", "group2", "edge_type"])+"\n")
+        out.write("\t".join(["taxid1", "source", "source_name", "taxid2", "target", "target_name", "experimental_evidence_score", "databases_evidence_score", "average_score", "group1", "group2", "edge_type"])+"\n")
         for line in cog_links:
             if first:
                 first = False
@@ -69,7 +69,7 @@ def get_links(filepath, valid_groups, ouput_filepath, config_file):
                                         taxid2 = aux_id
                                         protein2 = aux_prot
                                         group2 = aux_group
-                                    out.write("\t".join([taxid1, protein1, taxid2, protein2, str(experimental_evidence), str(databases_evidence), str(average_score), group1, group2, "inter-species"])+"\n")
+                                    out.write("\t".join([taxid1, protein1, proteins[protein1], taxid2, protein2, proteins[protein2], str(experimental_evidence), str(databases_evidence), str(average_score), group1, group2, "inter-species"])+"\n")
                                     seen.add((protein1, protein2))
                                     seen.add((protein2, protein1))
                                         

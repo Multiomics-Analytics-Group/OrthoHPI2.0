@@ -81,7 +81,7 @@ def parse_gene_ontology(string_file, taxid, valid_proteins):
     
     :return: dictionary with all go terms (description). Key -> Ensembl protein id, value -> go term
     """
-    gos = {}
+    gos = []
     if string_file is not None:
         filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data')
         sp = utils.read_gzipped_file(filename)
@@ -97,7 +97,7 @@ def parse_gene_ontology(string_file, taxid, valid_proteins):
             term = data[2]
             description = data[3]
             if category == 'Biological Process (Gene Ontology)' and identifier in valid_proteins:
-                gos[identifier] = description
+                gos.append((taxid, identifier, 22, description, 1.0))
             
     return gos
 
@@ -134,7 +134,7 @@ def get_host_ppi(config_file, valid_proteins, ouput_filepath):
                             if protein1 in valid_proteins and protein2 in valid_proteins:
                                 if exp_score >= 0.7 or db_score >= 0.7:
                                     if (protein1, protein2) not in seen:
-                                        out.write("\t".join([str(host), protein1, str(host), protein2, str(exp_score), str(db_score), str(avg_score), "", "", "intra-species"])+"\n")
+                                        out.write("\t".join([str(host), protein1, valid_proteins[protein1], str(host), protein2, valid_proteins[protein2], str(exp_score), str(db_score), str(avg_score), "", "", "intra-species"])+"\n")
                                         seen.add((protein1, protein2))
                                         seen.add((protein2, protein1))
 
@@ -157,14 +157,12 @@ def apply_tissue_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     for taxid in hosts:
         proteins = valid_proteins[taxid]
-        #print("T before", len(proteins))
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
             filename = utils.download_file(url=url, data_dir='data')
             tissues, proteins = get_tissues(filename, proteins, cutoff)
     
         valid_proteins[taxid] = proteins
-        #print("T after", len(valid_proteins[taxid]))
 
     return tissues
 
@@ -300,11 +298,11 @@ if __name__ == "__main__":
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     
-    homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups,
+    homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.tsv'), config_file=config_file)
-    get_host_ppi(config_file=config_file, valid_proteins=proteins, ouput_filepath=os.path.join(data_dir, 'predictions.tsv'))
+    #get_host_ppi(config_file=config_file, valid_proteins=proteins, ouput_filepath=os.path.join(data_dir, 'predictions.tsv'))
     graph.generate_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
-                                        tissues=tissues, config_file=config_file, output_dir_path='web/public', n=6)
+                                        tissues=tissues, config_file=config_file, output_dir_path='web/public', n=1)
     graph.generate_common_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
                                         tissues=tissues, config_file=config_file, output_dir_path='web/public', min_common=15)
     graph.generate_gos_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), functions=functions, output_dir_path=data_dir)

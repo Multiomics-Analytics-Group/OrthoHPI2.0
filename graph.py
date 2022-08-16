@@ -44,7 +44,7 @@ def generate_cytoscape_network(edges_file_path, proteins, tissues, config_file, 
     :param int n: number of jobs to generate host-parasite graphs in parallel
     """
     clusters = get_clusters_from_config(config_file)
-    tags = [{"key": "Parasite protein", "image": "concept.svg"}, {"key":"Human protein", "image": "person.svg" }]
+    tags = [{"key": "Parasite protein", "image": "parasite.png"}, {"key":"Human protein", "image": "person.svg" }]
     
     with open(edges_file_path, 'r') as f:
         data = pd.read_csv(f, sep='\t')
@@ -56,7 +56,7 @@ def generate_cytoscape_network(edges_file_path, proteins, tissues, config_file, 
     
 def generate_common_cytoscape_network(edges_file_path, proteins, tissues, config_file, output_dir_path, min_common=2):
     clusters = get_clusters_from_config(config_file)
-    tags = [{"key": "Parasite protein", "image": "concept.svg"}, {"key":"Human protein", "image": "person.svg" }]
+    tags = [{"key": "Parasite protein", "image": "parasite.png"}, {"key":"Human protein", "image": "person.svg" }]
     with open(edges_file_path, 'r') as f:
         data = pd.read_csv(f, sep='\t')
         
@@ -71,25 +71,22 @@ def generate_gos_cytoscape_network(edges_file_path, functions, output_dir_path):
     with open(edges_file_path, 'r') as f:
         data = pd.read_csv(f, sep='\t')
     
-    net = data[[0,1,2,3]]
-    net = net[net['taxid1'] != net['taxid2']]
+    net = data.iloc[:, [0, 2, 3, 5, 8]]
+    net = net[(net['taxid1'] != net['taxid2']) & (net["average_score"]>=0.7)]
+    taxids = net['taxid1'].unique().tolist()
     
     go_net = []
-    for ident in functions:
-        gos = functions[ident]
-        taxid = ident.split('.')[0]
-        for go in gos:
-            go_net.append((taxid, ident, 20, go))
-    go_net = pd.DataFrame(go_net, columns=['taxid1', 'source', 'taxid2', 'target'])
-    net = net.append(go_net)
-    
-    with open(os.path.join(output_dir_path, 'functional_network.tsv'), 'w') as outnet:
-        net.to_csv(outnet, sep='\t', header=True, index=False, doublequote=False)
-        
-    
-    
-        
-        
+    for taxid in taxids:
+        gos = functions[taxid]
+        go_net = net[net['taxid1'] == taxid]
+        hosts = go_net['taxid2'].unique().tolist()
+        for host in hosts:
+            gos.extend(functions[host])
+            full_net = pd.concat([go_net, pd.DataFrame(gos, columns=['taxid1', 'source_name', 'taxid2', 'target_name', 'average_score'])])
+            with open(os.path.join(output_dir_path, str(taxid)+'_'+str(host)+'_functional_network.tsv'), 'w') as outnet:
+                full_net.to_csv(outnet, sep='\t', header=True, index=False, doublequote=False)
+                
+
 def build_graph(data, parasite, hosts, proteins, tissues, clusters, tags, output_dir_path):
     if parasite is not None:
         parasite_dir_path = os.path.join(output_dir_path, str(parasite))
@@ -105,7 +102,7 @@ def build_graph(data, parasite, hosts, proteins, tissues, clusters, tags, output
         d = data.copy()
     net = None
     node_dict = {}
-    edges = d.iloc[:, [1, 3, 6]].values.tolist() 
+    edges = d.iloc[:, [1, 4, 8]].values.tolist() 
     for i, row in d.iterrows():
         source_tissues = []
         target_tissues = []

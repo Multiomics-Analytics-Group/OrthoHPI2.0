@@ -1,10 +1,12 @@
 urls:
     string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
     string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
+    string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/9606.protein.aliases.v11.5.txt.gz
     eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
     string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
     string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
     3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
+    hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 hosts:
     9606: 
@@ -12,6 +14,29 @@ hosts:
         color: "#525252"
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
         compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+
+tissues:
+    "BTO:0000648": intestine
+    "BTO:0001253": skin
+    "BTO:0000089": blood
+    "BTO:0000840": nose
+    "BTO:0001090": mouth
+    "BTO:0001202": saliva
+    "BTO:0000759": liver
+    "BTO:0001281": spleen
+    "BTO:0000141": bone marrow
+    "BTO:0000439": eye
+    "BTO:0000763": lung
+    "BTO:0000887": muscle
+    "BTO:0000142": brain
+    "BTO:0000562": heart
+    "BTO:0001078": placenta
+    "BTO:0003091": urogenital system
+    "BTO:0000784": lymph node
+    "BTO:0001279": spinal cord
+    "BTO:0000511": gastrointestinal tract
+    "BTO:0000671": kidney
+    "BTO:0000123": bladder
 
 parasites:
     5759:
@@ -57,7 +82,7 @@ parasites:
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
-            - "BTO:0000439"
+            - "BTO:0000439" 
     5833: 
         label: Plasmodium falciparum
         color: "#6a3d9a"
@@ -83,11 +108,11 @@ parasites:
         label: Schistosoma mansoni
         color: "#8dd3c7"
         tissues:
-        - "BTO:0001253"
-        - "BTO:0000089"
-        - "BTO:0000759"
-        - "BTO:0000763"
-        - "BTO:0000648"
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0000763"
+            - "BTO:0000648"
     5811: 
         label: Toxoplasma gondii
         color: "#fb8072"
@@ -111,8 +136,7 @@ parasites:
         label: Trichomonas vaginalis
         color: "#b3de69"
         tissues:
-            - "BTO:0004088"
-            - "BTO:0000243"
+            - "BTO:0003091"
     5691: 
         label: Trypanosoma brucei
         color: "#bc80bd"
@@ -162,11 +186,11 @@ parasites:
         label: Schistosoma japonicum
         color: "#bcbddc"
         tissues:
-        - "BTO:0001253"
-        - "BTO:0000089"
-        - "BTO:0000759"
-        - "BTO:0000763"
-        - "BTO:0000648"
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0000763"
+            - "BTO:0000648"
     6248: 
         label: Strongyloides stercoralis
         color: "#3f007d"

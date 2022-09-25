@@ -2,6 +2,8 @@ import os
 import homology
 import utils
 import graph
+import hpa
+import pandas as pd
    
 
 def get_proteins(config_file):
@@ -155,18 +157,19 @@ def setup(config_file, output_file_path):
 
 def apply_tissue_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
+    tissue_mapping = utils.read_config(filepath=config_file, field='tissues')
     for taxid in hosts:
         proteins = valid_proteins[taxid]
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
             filename = utils.download_file(url=url, data_dir='data')
-            tissues, proteins = get_tissues(filename, proteins, cutoff)
+            tissues, proteins = get_tissues(filename, proteins, cutoff, tissue_mapping)
     
         valid_proteins[taxid] = proteins
 
     return tissues
 
-def get_tissues(tissues_file, valid_proteins, cutoff):
+def get_tissues(tissues_file, valid_proteins, cutoff, mapping):
     """
     Get protein tissue expression for relevant tissues in the lifecycle of the
     studied parasites
@@ -201,7 +204,7 @@ def get_tissues(tissues_file, valid_proteins, cutoff):
                 if protein not in tissues:
                     tissues[protein] = []
                 
-                tissues[protein].append(tissue)
+                tissues[protein].append(mapping[tissue])
                 filters[protein] = valid_proteins[protein]
     
     return tissues, filters
@@ -294,18 +297,24 @@ if __name__ == "__main__":
     proteins = get_secretome_predictions(secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
     tissues = apply_tissue_filter(config_file, proteins, cutoff=3.0)
     compartments = apply_compartment_filter(config_file, proteins, cutoff=3.5)
-    functions = get_gene_ontology(config_file, valid_proteins=proteins)
+    #functions = get_gene_ontology(config_file, valid_proteins=proteins)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
-    
+    tissues_df = pd.concat({k: pd.Series(v) for k, v in tissues.items()}).reset_index()
+    tissues_df = tissues_df.iloc[:, [0, 2]]
+    tissues_df.columns = ['Gene', 'Tissue']
+    tissues_df = tissues_df[tissues_df['Gene'].isin(proteins.keys())]
+    hpa_data = hpa.parse_hpa(config_file, valid_proteins=proteins.keys())
+    tissues_df = pd.merge(tissues_df, hpa_data, on=['Gene', 'Tissue'], how='left')
+    tissues_df.to_csv(os.path.join(data_dir, 'tissues_cell_types.tsv'), sep='\t', header=True, index=False, doublequote=None)
     homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.tsv'), config_file=config_file)
-    #get_host_ppi(config_file=config_file, valid_proteins=proteins, ouput_filepath=os.path.join(data_dir, 'predictions.tsv'))
+    """ get_host_ppi(config_file=config_file, valid_proteins=proteins, ouput_filepath=os.path.join(data_dir, 'predictions.tsv'))
     graph.generate_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
                                         tissues=tissues, config_file=config_file, output_dir_path='web/public', n=1)
     graph.generate_common_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
                                         tissues=tissues, config_file=config_file, output_dir_path='web/public', min_common=15)
-    graph.generate_gos_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), functions=functions, output_dir_path=data_dir)
+    graph.generate_gos_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), functions=functions, output_dir_path=data_dir) """
     
     
     

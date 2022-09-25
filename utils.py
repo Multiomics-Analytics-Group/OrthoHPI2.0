@@ -2,7 +2,9 @@ import os
 import yaml
 import requests
 import gzip
+import zipfile
 from Bio import SeqIO
+import pandas as pd
 
 
 def read_fasta(fasta_file_path):
@@ -19,7 +21,32 @@ def filter_sequences(sequences, valid_list):
             filter_out.append(parasite_id)
             
     return filter_out
-        
+
+
+def parse_string_aliases(config_file, sources):
+    '''
+    Parses the alias file from String database and generates a dictionary
+    that can be used to map to the right identifiers
+    :param str config_file: path to the config file where the url to the String alias file should be defined
+    :param list sources: list of sources that should be considered in the mapping (i.e. Ensembl_gene)
+    :return: dictionary with key --> alias, values --> sources identifier
+    '''
+    data_dict = {}
+    urls = read_config(filepath=config_file, field='urls')
+    
+    if 'string_alias_url' in urls:
+        filename = download_file(url=urls['string_alias_url'], data_dir='data')
+    
+    data = pd.read_csv(filename, sep='\t', header=0)
+    if sources is not None:
+        data = data[data['source'].isin(sources)]
+    
+
+    for i, row in data[['#string_protein_id', 'alias']].iterrows():
+        data_dict[row['alias']] = row['#string_protein_id']
+         
+    return data_dict
+
 
 def read_yaml(yaml_file):
     """
@@ -76,6 +103,18 @@ def read_gzipped_file(filepath):
     :return: A bytes sequence that specifies the standard output.
     """
     handle = gzip.open(filepath, "rt", encoding="utf8")
+
+    return handle
+
+def read_zipped_file(filepath):
+    '''
+    Opens a handler to access the content of zip file
+    :param str filepath: path to the zip file
+    :return: A bytes sequence that specifies the standard output
+    '''
+    file_name = filepath.split('/')[-1].split('.')[0]+'.tsv'
+    archive = zipfile.ZipFile(filepath, 'r')
+    handle = archive.open(file_name)
 
     return handle
 

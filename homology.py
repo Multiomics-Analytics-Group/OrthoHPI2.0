@@ -37,9 +37,13 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
     seen = set()
     cog_links = utils.read_gzipped_file(filepath)
     hosts = utils.read_config(filepath=config_file, field='hosts')
+    parasites = utils.read_config(filepath=config_file, field='parasites')
     first = True
     with open(ouput_filepath, 'w') as out:
-        out.write("\t".join(["taxid1", "source", "source_name", "taxid2", "target", "target_name", "experimental_evidence_score", "databases_evidence_score", "average_score", "group1", "group2", "edge_type"])+"\n")
+        out.write("\t".join(["taxid1", "taxid1_label", "source_color", "source_shape", "source", "source_name", \
+                            "taxid2", "taxid2_label", "target_color", "target_shape", "target", "target_name", \
+                            "experimental_evidence_score", "databases_evidence_score", "weight", \
+                            "group1", "group2", "edge_type"])+"\n")
         for line in cog_links:
             if first:
                 first = False
@@ -69,7 +73,9 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
                                         taxid2 = aux_id
                                         protein2 = aux_prot
                                         group2 = aux_group
-                                    out.write("\t".join([taxid1, protein1, proteins[protein1], taxid2, protein2, proteins[protein2], str(experimental_evidence), str(databases_evidence), str(average_score), group1, group2, "inter-species"])+"\n")
+                                    out.write("\t".join([taxid1, parasites[int(taxid1)]['label'], parasites[int(taxid1)]['color'], 'diamond', protein1, proteins[protein1],
+                                                taxid2, hosts[int(taxid2)]['label'], hosts[int(taxid2)]['color'], 'dot', protein2, proteins[protein2],
+                                                str(experimental_evidence), str(databases_evidence), str(average_score), group1, group2, "inter-species"])+"\n")
                                     seen.add((protein1, protein2))
                                     seen.add((protein2, protein1))
                                         

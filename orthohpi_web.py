@@ -1,6 +1,7 @@
-import os
+import utils
 import streamlit as st
 import streamlit.components.v1 as components
+from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
 import pandas as pd
 import networkx as nx
 from pyvis.network import Network
@@ -8,6 +9,7 @@ import plotly.express as px
 import holoviews as hv
 from holoviews import opts, dim
 hv.extension('bokeh')
+
 
 
 st.set_page_config(layout="wide")
@@ -124,13 +126,27 @@ def generate_cell_type_filters(df):
     
     return options
 
+@st.cache(suppress_st_warning=True)
+def get_enrichment(pred_df, gos_df):
+    species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
+    print(species)
+    go_df = gos_df[gos_df['taxid'].isin(species)]
+    print(go_df.shape)
+    enrichment = utils.calculate_enrichment(pred_df, go_df)
+
+    return enrichment
+    
+
 # Read dataset
 predictions = pd.read_csv('data/predictions.tsv', sep='\t', header=0)
+gos = pd.read_csv('data/gos.tsv', sep='\t', header=0)
 tissues = pd.read_csv('data/tissues_cell_types.tsv', sep='\t', header=0)
-pred_tissues = pd.merge(predictions.rename({'target':'Gene'}, axis=1), tissues, on='Gene', how='left')
+pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 
 df_select = None
 net = None
+selected_rows = []
+enrichment_table = None
 
 # Define selection options
 parasite_list = ['<select>'] + predictions['taxid1_label'].unique().tolist()
@@ -233,4 +249,54 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Table of Host-Parasite PPIs")
-        st.dataframe(df_select)
+        table = df_select[df_select['weight'] >= score]
+        gb = GridOptionsBuilder.from_dataframe(table)
+        gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+        gb.configure_side_bar() #Add a sidebar
+        gridOptions = gb.build()
+        grid_response = AgGrid(
+                            table,
+                            gridOptions=gridOptions,
+                            data_return_mode='AS_INPUT', 
+                            fit_columns_on_grid_load=False,
+                            enable_enterprise_modules=True,
+                            height=350, 
+                            reload_data=False
+                        )
+        #st.dataframe()
+
+go1, go2 = st.columns(2)
+with go1:
+    if df_select is not None:
+        st.header("Network Functional Enrichment -- GO Biological Processes")
+        fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
+        enrichment = get_enrichment(df_select[df_select['weight'] >= score], gos)
+        st.text(f"Terms enriched: {len(enrichment[enrichment['fdr_bh'] <= fdr]['go_term'].values.tolist())}")
+        enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][['go_term', 'p_value', 'odds_ratio', 'fdr_bh']]
+        gb = GridOptionsBuilder.from_dataframe(enrichment_table)
+        gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+        gb.configure_side_bar() #Add a sidebar
+        gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children") #Enable multi-row selection
+        gridOptions = gb.build()
+        grid_response = AgGrid(
+                            enrichment_table,
+                            gridOptions=gridOptions,
+                            data_return_mode='AS_INPUT', 
+                            update_mode='MODEL_CHANGED', 
+                            fit_columns_on_grid_load=False,
+                            enable_enterprise_modules=True,
+                            height=350, 
+                            reload_data=False
+                        )
+        selected_rows = grid_response['selected_rows']
+        print(selected_rows)
+        #st.dataframe(enrichment_table)
+with go2:
+    if enrichment_table is not None:
+        enrichment_viz = enrichment_table.copy()
+        if len(selected_rows) > 0:
+            selected_terms = [i['go_term'] for i in selected_rows]
+            enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
+        fig = px.scatter(enrichment_viz, x='fdr_bh', y='odds_ratio', size='odds_ratio', color='go_term', height=450)
+        fig.update_traces(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)

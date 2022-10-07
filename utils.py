@@ -5,7 +5,8 @@ import gzip
 import zipfile
 from Bio import SeqIO
 import pandas as pd
-
+import scipy.stats as stats
+from statsmodels.stats.multitest import multipletests
 
 def read_fasta(fasta_file_path):
     sequences = []
@@ -21,6 +22,31 @@ def filter_sequences(sequences, valid_list):
             filter_out.append(parasite_id)
             
     return filter_out
+
+
+def calculate_enrichment(pred_df, go_df):
+    nodes = pred_df['source'].unique().tolist() + pred_df['target'].unique().tolist()
+    total_nodes = len(nodes)
+    selected_gos = go_df[go_df['#string_protein_id'].isin(nodes)].groupby('description').filter(lambda x: len(x)> 10)['description'].unique().tolist()
+    total_prots = len(go_df['#string_protein_id'].unique().tolist())
+    enrichment = []
+    for term in selected_gos:   
+        members = go_df[(go_df['description'] == term)]['#string_protein_id']
+        #E
+        total_members = len(members)
+        net_members = go_df[(go_df['description'] == term) & (go_df['#string_protein_id'].isin(nodes))]['#string_protein_id']
+        #A
+        total_net_members = len(net_members)
+        
+        odd_ratio, p_value = stats.fisher_exact([[total_net_members, total_nodes - total_net_members],
+                                                [total_members - total_net_members, total_prots - total_members - total_nodes - total_net_members]])
+        enrichment.append([term, total_net_members, total_nodes - total_net_members, total_members - total_net_members,  total_prots - total_members - total_nodes - total_net_members, p_value, odd_ratio, ','.join(net_members)])
+    
+    enrichment = pd.DataFrame(enrichment, columns=['go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes'])
+    enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), alpha=0.01, method='fdr_bh')[1]
+    
+    return enrichment
+
 
 
 def parse_string_aliases(config_file, sources):

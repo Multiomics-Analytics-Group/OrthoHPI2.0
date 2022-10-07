@@ -1,10 +1,12 @@
 urls:
   string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
   string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
+  string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/9606.protein.aliases.v11.5.txt.gz
   eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
   string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
   string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
   3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
+  hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 hosts:
   9606: 

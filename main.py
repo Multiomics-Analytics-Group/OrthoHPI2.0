@@ -1,8 +1,8 @@
 import os
 import homology
 import utils
-import graph
 import hpa
+import go
 import pandas as pd
    
 
@@ -51,57 +51,6 @@ def parse_proteins(string_file, taxid):
             
     return proteins
 
-def get_gene_ontology(config_file, valid_proteins):
-    """
-    Retrieve gene ontology biological processes for all valid proteins
-    :param str config_file: path to config file
-    :param dict valid_proteins: dictionary of valid proteins for each specie. Key -> tax id, value -> dictionary: key -> protein id, value -> protein name
-    
-    :return: dictionary with all biological processes annotated for all proteins for all species. Key -> tax id, value -> dictionary: key -> protein id, value -> go term
-    """
-    
-    gos = {}
-    hosts = utils.read_config(filepath=config_file, field='hosts')
-    parasites = utils.read_config(filepath=config_file, field='parasites')
-    urls = utils.read_config(filepath=config_file, field='urls')
-    if "string_go_url" in urls:
-        string_file = urls['string_go_url']
-        if hosts is not None and parasites is not None:
-            taxids = list(hosts.keys()) + list(parasites.keys())
-            for taxid in taxids:
-                gos[taxid] = parse_gene_ontology(string_file, taxid, valid_proteins[taxid])
-    
-    return gos
-
-
-def parse_gene_ontology(string_file, taxid, valid_proteins):
-    """
-    Retrieve gos for a given specie
-    :param str string_file: url to string PPI file
-    :param int taxid: taxonomic id of the species of interest
-    :param dict valid_proteins: dictionary of valid proteins for the species of interest. key -> protein id, value -> protein name
-    
-    :return: dictionary with all go terms (description). Key -> Ensembl protein id, value -> go term
-    """
-    gos = []
-    if string_file is not None:
-        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data')
-        sp = utils.read_gzipped_file(filename)
-        first = True
-        for line in sp:
-            if first:
-                first = False
-                continue
-            
-            data = line.rstrip().split('\t')
-            identifier = data[0]
-            category = data[1]
-            term = data[2]
-            description = data[3]
-            if category == 'Biological Process (Gene Ontology)' and identifier in valid_proteins:
-                gos.append((taxid, identifier, 22, description, 1.0))
-            
-    return gos
 
 def get_host_ppi(config_file, valid_proteins, ouput_filepath):
     """
@@ -293,11 +242,11 @@ if __name__ == "__main__":
     config_file = 'config.yml'
     
     setup(config_file=config_file, output_file_path=data_dir)
+    go.get_gene_ontology(config_file, output_dir=data_dir)
     proteins = get_proteins(config_file)
     proteins = get_secretome_predictions(secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
     tissues = apply_tissue_filter(config_file, proteins, cutoff=3.0)
     compartments = apply_compartment_filter(config_file, proteins, cutoff=3.5)
-    #functions = get_gene_ontology(config_file, valid_proteins=proteins)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     tissues_df = pd.concat({k: pd.Series(v) for k, v in tissues.items()}).reset_index()
@@ -309,12 +258,3 @@ if __name__ == "__main__":
     tissues_df.to_csv(os.path.join(data_dir, 'tissues_cell_types.tsv'), sep='\t', header=True, index=False, doublequote=None)
     homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.tsv'), config_file=config_file)
-    """ get_host_ppi(config_file=config_file, valid_proteins=proteins, ouput_filepath=os.path.join(data_dir, 'predictions.tsv'))
-    graph.generate_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
-                                        tissues=tissues, config_file=config_file, output_dir_path='web/public', n=1)
-    graph.generate_common_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), proteins=proteins,
-                                        tissues=tissues, config_file=config_file, output_dir_path='web/public', min_common=15)
-    graph.generate_gos_cytoscape_network(edges_file_path=os.path.join(data_dir, 'predictions.tsv'), functions=functions, output_dir_path=data_dir) """
-    
-    
-    

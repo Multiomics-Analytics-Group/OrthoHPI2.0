@@ -242,11 +242,11 @@ if __name__ == "__main__":
     config_file = 'config.yml'
     
     setup(config_file=config_file, output_file_path=data_dir)
-    go.get_gene_ontology(config_file, output_dir=data_dir)
     proteins = get_proteins(config_file)
     proteins = get_secretome_predictions(secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
     tissues = apply_tissue_filter(config_file, proteins, cutoff=2.0)
     compartments = apply_compartment_filter(config_file, proteins, cutoff=2.0)
+    go.get_gene_ontology(config_file, valid_proteins=proteins, output_dir=data_dir)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     tissues_df = pd.concat({k: pd.Series(v) for k, v in tissues.items()}).reset_index()

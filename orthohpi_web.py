@@ -178,7 +178,7 @@ enrichment = None
 
 
 # Define selection options
-parasite_list = ['<select>'] + predictions['taxid1_label'].unique().tolist()
+parasite_list = ['<select>'] + predictions['taxid1_label'].sort_values().unique().tolist()
 
 chart1, chart2 = st.columns(2)
 

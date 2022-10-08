@@ -149,7 +149,7 @@ def get_tissues(tissues_file, valid_proteins, cutoff, mapping):
             tissue = data[2]
             score = float(data[6])
             
-            if protein in valid_proteins and score > cutoff and tissue in valid_tissues:
+            if protein in valid_proteins and score >= cutoff and tissue in valid_tissues:
                 if protein not in tissues:
                     tissues[protein] = []
                 
@@ -208,7 +208,7 @@ def get_compartments(compartments_file, valid_proteins, cutoff):
             protein  = "9606."+data[0]
             compartment = data[2]
             score = float(data[4])
-            if protein in valid_proteins and score > cutoff and compartment in valid_compartments:
+            if protein in valid_proteins and score >= cutoff and compartment in valid_compartments:
                 if protein not in compartments:
                     compartments[protein] = []
                 
@@ -245,8 +245,8 @@ if __name__ == "__main__":
     go.get_gene_ontology(config_file, output_dir=data_dir)
     proteins = get_proteins(config_file)
     proteins = get_secretome_predictions(secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
-    tissues = apply_tissue_filter(config_file, proteins, cutoff=3.0)
-    compartments = apply_compartment_filter(config_file, proteins, cutoff=3.5)
+    tissues = apply_tissue_filter(config_file, proteins, cutoff=2.0)
+    compartments = apply_compartment_filter(config_file, proteins, cutoff=2.0)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     tissues_df = pd.concat({k: pd.Series(v) for k, v in tissues.items()}).reset_index()

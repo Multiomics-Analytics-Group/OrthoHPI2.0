@@ -2,7 +2,9 @@ import os
 import yaml
 import requests
 import gzip
+import itertools
 import zipfile
+import obonet
 from Bio import SeqIO
 import pandas as pd
 import scipy.stats as stats
@@ -27,7 +29,7 @@ def filter_sequences(sequences, valid_list):
 def calculate_enrichment(pred_df, go_df):
     nodes = pred_df['source'].unique().tolist() + pred_df['target'].unique().tolist()
     total_nodes = len(nodes)
-    selected_gos = go_df[go_df['#string_protein_id'].isin(nodes)].groupby('description').filter(lambda x: len(x)> 10)['description'].unique().tolist()
+    selected_gos = go_df[go_df['#string_protein_id'].isin(nodes)].groupby('description').filter(lambda x: (len(x)> 10) & (len(x) < 500))['description'].unique().tolist()
     total_prots = len(go_df['#string_protein_id'].unique().tolist())
     enrichment = []
     for term in selected_gos:   
@@ -43,7 +45,9 @@ def calculate_enrichment(pred_df, go_df):
         enrichment.append([term, total_net_members, total_nodes - total_net_members, total_members - total_net_members,  total_prots - total_members - total_nodes - total_net_members, p_value, odd_ratio, ','.join(net_members)])
     
     enrichment = pd.DataFrame(enrichment, columns=['go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes'])
-    enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), alpha=0.01, method='fdr_bh')[1]
+    if not enrichment.empty:
+        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), alpha=0.01, method='fdr_bh')[1]
+        enrichment = enrichment.sort_values(by='fdr_bh', ascending=True)
     
     return enrichment
 
@@ -150,3 +154,18 @@ def merge_dict_of_dicts(dict_of_dicts):
         dictionary.update(dict_of_dicts[d])
         
     return dictionary
+    
+def merge_list_of_lists(list_of_lists):
+    return list(itertools.chain.from_iterable(list_of_lists))
+
+
+def convertOBOtoNet(ontologyFile):
+    """
+    Takes an .obo file and returns a NetworkX graph representation of the ontology, that holds multiple \
+    edges between two nodes.
+    :param str ontologyFile: path to ontology file.
+    :return: NetworkX graph.
+    """
+    graph = obonet.read_obo(ontologyFile)
+
+    return graph

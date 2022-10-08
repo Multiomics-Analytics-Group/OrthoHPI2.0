@@ -49,8 +49,36 @@ def parse_gene_ontology(string_file, taxid):
     
     return data
 
+def parse_ontology(config_file, output_directory):
+    urls = utils.read_config(filepath=config_file, field='urls')
+
+    terms = {}
+    rels = []
+    if 'go_ontology_url' in urls:
+        filename = utils.download_file(url=urls['go_ontology_url'], data_dir='data')
+        graph = utils.convertOBOtoNet(filename)
+        for term, attr in graph.nodes(data=True):
+            if "name" in attr:
+                terms[term] = attr["name"].capitalize()
+            if "is_a" in attr:
+                for isa in attr["is_a"]:
+                    if isa in terms:
+                        isa = terms[isa]
+                    rels.append([isa, terms[term]])
+    
+    rels = pd.DataFrame(rels, columns=['parent', 'child'])
+    mapped_terms = []
+    for i, row in rels.iterrows():
+        term = row['parent']
+        if term in terms:
+            term = terms[term]
+        mapped_terms.append(term)
+    
+    rels['parent'] = mapped_terms
+    rels.to_csv(os.path.join(output_directory, 'go_ontology.tsv'), sep='\t', header=True, index=False, doublequote=None)
 
 if __name__ == "__main__":
-    config_file = 'config_short.yml'
+    config_file = 'config.yml'
     
-    get_gene_ontology(config_file, output_dir='data/')
+    #get_gene_ontology(config_file, output_dir='data/')
+    parse_ontology(config_file, output_directory='data/')

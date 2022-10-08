@@ -3,7 +3,7 @@ import pandas as pd
 import utils
 
 
-def get_gene_ontology(config_file, valid_proteins, output_dir):
+def get_gene_ontology(config_file, output_dir):
     """
     Retrieve gene ontology biological processes for all valid proteins
     :param str config_file: path to config file
@@ -22,7 +22,7 @@ def get_gene_ontology(config_file, valid_proteins, output_dir):
         if hosts is not None and parasites is not None:
             taxids = list(hosts.keys()) + list(parasites.keys())
             for taxid in taxids:
-                data = parse_gene_ontology(string_file, taxid, valid_proteins[taxid])
+                data = parse_gene_ontology(string_file, taxid)
                 gos.append(data)
     
     gos = pd.concat(gos)
@@ -31,7 +31,7 @@ def get_gene_ontology(config_file, valid_proteins, output_dir):
 
 
 
-def parse_gene_ontology(string_file, taxid, valid_proteins):
+def parse_gene_ontology(string_file, taxid):
     """
     Retrieve gos for a given specie
     :param str string_file: url to string PPI file
@@ -47,7 +47,6 @@ def parse_gene_ontology(string_file, taxid, valid_proteins):
         data = data[data['category'] == 'Biological Process (Gene Ontology)']
         data = data[['#string_protein_id', 'description']]
         data['taxid'] = taxid
-        data = data[data['#string_protein_id'].isin(valid_proteins)]
         
     
     return data

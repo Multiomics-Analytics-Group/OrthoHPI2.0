@@ -17,7 +17,7 @@ st.set_page_config(layout="wide")
 style.load_css()
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Homology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
 
 st.text(" ")
 st.text(" ")

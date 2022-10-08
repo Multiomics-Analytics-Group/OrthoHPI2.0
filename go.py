@@ -13,6 +13,7 @@ def get_gene_ontology(config_file, output_dir):
     """
     
     gos = []
+    parse_ontology(config_file=config_file, output_directory=output_dir)
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
     urls = utils.read_config(filepath=config_file, field='urls')

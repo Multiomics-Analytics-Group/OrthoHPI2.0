@@ -18,12 +18,12 @@ style.load_css()
 
 # Read dataset
 config = utils.read_config('config.yml')
-predictions = utils.read_parquet_file(input_file='data/predictions.parquet.gzip')
+predictions = utils.read_parquet_file(input_file='data/predictions.parquet')
 predictions['weight'] = predictions['weight'].astype(float)
-gos = utils.read_parquet_file(input_file='data/gos.parquet.gzip')
-tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet.gzip')
+gos = utils.read_parquet_file(input_file='data/gos.parquet')
+tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
-ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet.gzip')
+ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet')
 
 #Initialize variables
 df_select = None

@@ -92,14 +92,14 @@ if __name__ == "__main__":
 
     #Apply filters -- secretome, tissue, cellular compartment context
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
-    tissues = filters.apply_tissue_filter(config_file, proteins, cutoff=2.0)
-    compartments = filters.apply_compartment_filter(config_file, proteins, cutoff=2.0)
+    tissues = filters.apply_tissue_filter(config_file, proteins, cutoff=2.5)
+    compartments = filters.apply_compartment_filter(config_file, proteins, cutoff=2.5)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     
     #Annotate tissue and cell type expression
-    get_tissue_cell_type_annotation(tissues, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet.gzip'))
+    get_tissue_cell_type_annotation(tissues, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))
     
     #Get eggnog groups and transfer PPIs
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
-              ouput_filepath=os.path.join(data_dir, 'predictions.parquet.gzip'), config_file=config_file)
+              ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)

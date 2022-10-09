@@ -27,7 +27,7 @@ def get_gene_ontology(config_file, output_dir):
     
     gos = pd.concat(gos)
 
-    utils.save_to_parquet(gos, os.path.join(output_dir, 'gos.parquet.gzip'))
+    utils.save_to_parquet(gos, os.path.join(output_dir, 'gos.parquet'))
 
 
 
@@ -78,7 +78,7 @@ def parse_ontology(config_file, output_directory):
     
     rels['parent'] = mapped_terms
     
-    utils.save_to_parquet(rels, os.path.join(output_directory, 'go_ontology.parquet.gzip'))
+    utils.save_to_parquet(rels, os.path.join(output_directory, 'go_ontology.parquet'))
 
 if __name__ == "__main__":
     config_file = 'config.yml'

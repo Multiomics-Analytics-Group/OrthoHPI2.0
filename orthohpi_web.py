@@ -16,12 +16,28 @@ hv.extension('bokeh')
 st.set_page_config(layout="wide")
 style.load_css()
 
-st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+# Read dataset
+config = utils.read_config('config.yml')
+predictions = utils.read_parquet_file(input_file='data/predictions.parquet.gzip')
+predictions['weight'] = predictions['weight'].astype(float)
+gos = utils.read_parquet_file(input_file='data/gos.parquet.gzip')
+tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet.gzip')
+pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
+ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet.gzip')
 
-st.text(" ")
-st.text(" ")
-st.markdown("---")
+#Initialize variables
+df_select = None
+net = None
+selected_rows = []
+selected_terms = []
+enrichment_table = None
+enrichment = None
+
+@st.cache(suppress_st_warning=True)
+def convert_df(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv(sep='\t', header=True, index=False).encode('utf-8')
+
 
 @st.cache(suppress_st_warning=True, allow_output_mutation=True)
 def generate_graph(df, score):
@@ -140,6 +156,7 @@ def generate_cell_type_filters(df):
 @st.cache(suppress_st_warning=True)
 def get_enrichment(pred_df, gos_df):
     species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
+    species = [int(s) for s in species]
     go_df = gos_df[gos_df['taxid'].isin(species)]
     enrichment = utils.calculate_enrichment(pred_df, go_df)
 
@@ -156,25 +173,18 @@ def get_enrichment_summary(enrichment_df, ontology_df):
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]
     mapped_tissues = config['tissues']
-    tissues = [mapped_tissues[t].lower() for t in config['parasites'][source]['tissues']]
+    tissues = [mapped_tissues[t].lower() for t in config['parasites'][int(source)]['tissues']]
     df = df[df['Tissue'].isin(tissues)]
     
     return df
 
-# Read dataset
-config = utils.read_config('config.yml')
-predictions = pd.read_csv('data/predictions.tsv', sep='\t', header=0)
-gos = pd.read_csv('data/gos.tsv', sep='\t', header=0)
-tissues = pd.read_csv('data/tissues_cell_types.tsv', sep='\t', header=0)
-pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
-ontology = pd.read_csv('data/go_ontology.tsv', sep='\t')
 
-df_select = None
-net = None
-selected_rows = []
-selected_terms = []
-enrichment_table = None
-enrichment = None
+st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+
+st.text(" ")
+st.text(" ")
+st.markdown("---")
 
 
 # Define selection options
@@ -220,7 +230,7 @@ with col2:
 
     # Set info message on initial site load
     if selected_parasite == "<select>":
-        st.text('Choose 1 parasitic specie to visualize the predicted PPI network')
+        st.text('Choose 1 parasite to visualize the predicted PPI network')
     else:        
         df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
         df_select = filter_tissues(config, df_select)
@@ -269,6 +279,12 @@ with st.container():
         
         # Load HTML into HTML component for display on Streamlit
         components.html(HtmlFile.read(), height=1050)
+        st.download_button(
+            label="Download Network as Html",
+            data=HtmlFile,
+            file_name=f'{selected_parasite}_network.html',
+            mime='text/html',
+        )
 
 with st.container():
     if df_select is not None:
@@ -288,7 +304,12 @@ with st.container():
                             height=350, 
                             reload_data=False
                         )
-        #st.dataframe()
+        st.download_button(
+            label="Download Network Table",
+            data=convert_df(table),
+            file_name=f'{selected_parasite}_network_table.tsv',
+            mime='text/csv',
+        )
 
 with st.container():
     if df_select is not None:
@@ -315,6 +336,12 @@ with st.container():
                                 reload_data=False
                             )
             selected_rows = grid_response['selected_rows']
+            st.download_button(
+                label="Download Enrichment Table",
+                data=convert_df(enrichment_table),
+                file_name=f'{selected_parasite}_network_enrichment_table.tsv',
+                mime='text/csv',
+            )
         else:
             st.subheader("No GO terms where found enriched")
 go1, go2 = st.columns(2)

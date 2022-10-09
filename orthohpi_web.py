@@ -23,6 +23,7 @@ predictions['weight'] = predictions['weight'].astype(float)
 gos = utils.read_parquet_file(input_file='data/gos.parquet')
 tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
+tissues = None
 ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet')
 
 #Initialize variables
@@ -347,7 +348,7 @@ with st.container():
 go1, go2 = st.columns(2)
 with st.container():
     if enrichment_table is not None:
-        enrichment_viz = enrichment_table.copy()
+        enrichment_viz = enrichment_table
         if len(selected_rows) > 0:
             selected_terms = [i['go_term'] for i in selected_rows]
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]

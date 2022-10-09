@@ -234,7 +234,7 @@ with col2:
     else:        
         df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
         df_select = filter_tissues(config, df_select)
-        score = st.slider('Confidence score', 0.4, 0.9, 0.4)
+        score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
         tissues_options = generate_tissue_filters(df_select)
         if len(tissues_options) > 0:

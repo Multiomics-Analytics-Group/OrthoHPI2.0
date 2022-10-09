@@ -33,7 +33,23 @@ The **cell type expression** information has been downloaded from:
 
 ## Getting started
 
+### Running the website
+
+All the necessary data (predictions and annotations) have been precalculated so you can run the web server:
+``` 
+$ streamlit run orthohpi_web.py
+```
+
+This will open your browser at http://localhost:8501 with the functionality shown in the video:
+
+
+
+https://user-images.githubusercontent.com/1425851/194722960-e42a191f-1cec-4c49-a96e-5a03b351677d.mp4
+
+
 ### Installation
+
+If you want to rerun the predictions, you can install and run the pipeline following these instructions.
 
 ```
 $ pip install -r requirements.txt
@@ -43,18 +59,5 @@ To obtain the Human-Parasite PPI predictions run:
 ``` 
 $ python main.py
 ```
-
-To run the web server:
-``` 
-$ streamlit run orthohpi_web.py
-```
-
-This will open your browser at http://localhost:8501.
-
-
-
-https://user-images.githubusercontent.com/1425851/194722960-e42a191f-1cec-4c49-a96e-5a03b351677d.mp4
-
-
 
 

@@ -52,6 +52,13 @@ def calculate_enrichment(pred_df, go_df):
     return enrichment
 
 
+def save_to_parquet(df, output_file):
+    df.to_parquet(output_file, compression='gzip', index=False)
+
+def read_parquet_file(input_file):
+    df = pd.read_parquet(input_file)
+
+    return df
 
 def parse_string_aliases(config_file, sources):
     '''
@@ -132,7 +139,7 @@ def read_gzipped_file(filepath):
     :param str filepath: path to gzip file.
     :return: A bytes sequence that specifies the standard output.
     """
-    handle = gzip.open(filepath, "rt", encoding="utf8")
+    handle = gzip.open(filepath, "rb")
 
     return handle
 

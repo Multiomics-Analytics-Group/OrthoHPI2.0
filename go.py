@@ -27,7 +27,7 @@ def get_gene_ontology(config_file, output_dir):
     
     gos = pd.concat(gos)
 
-    gos.to_csv(os.path.join(output_dir, 'gos.tsv'), sep='\t', header=True, index=False, doublequote=None)
+    utils.save_to_parquet(gos, os.path.join(output_dir, 'gos.parquet.gzip'))
 
 
 
@@ -77,10 +77,11 @@ def parse_ontology(config_file, output_directory):
         mapped_terms.append(term)
     
     rels['parent'] = mapped_terms
-    rels.to_csv(os.path.join(output_directory, 'go_ontology.tsv'), sep='\t', header=True, index=False, doublequote=None)
+    
+    utils.save_to_parquet(rels, os.path.join(output_directory, 'go_ontology.parquet.gzip'))
 
 if __name__ == "__main__":
     config_file = 'config.yml'
     
-    #get_gene_ontology(config_file, output_dir='data/')
+    get_gene_ontology(config_file, output_dir='data/')
     parse_ontology(config_file, output_directory='data/')

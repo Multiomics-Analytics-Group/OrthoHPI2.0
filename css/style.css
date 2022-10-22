@@ -4,7 +4,7 @@ div[data-testid="stText"]{
 }
 /* breakline for metric text         */
 div[data-testid="text-container"] > label[data-testid="stMetricLabel"] > div {
-    color: black;
+    color: black; 
 }
 
 /* Hide Streamlit bars */

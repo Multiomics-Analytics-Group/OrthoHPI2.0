@@ -1,1 +1,1 @@
-web: sh setup.sh && streamlit run orthohpi_web.py
+web: sh setup.sh && streamlit run OrthoHPI_Home.py

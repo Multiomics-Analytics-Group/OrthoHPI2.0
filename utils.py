@@ -1,10 +1,12 @@
 import os
 import yaml
+import json
 import requests
 import gzip
 import itertools
 import zipfile
 import obonet
+import networkx as nx
 from Bio import SeqIO
 import pandas as pd
 import scipy.stats as stats
@@ -25,6 +27,17 @@ def filter_sequences(sequences, valid_list):
             
     return filter_out
 
+def convert_df(df):
+    return df.to_csv(sep='\t', header=True, index=False).encode('utf-8')
+
+def export_graph(G, filename, format='graphml', output_dir='tmp'):
+    file_path = os.path.join(output_dir, filename)
+    if format == "graphml":
+        nx.write_graphml_lxml(G, file_path)
+    elif format == "cytoscape":
+        cytoscape_data= nx.cytoscape_data(G)
+        with open(file_path, 'w') as out:
+            out.write(json.dumps(cytoscape_data))
 
 def calculate_enrichment(pred_df, go_df):
     nodes = pred_df['source'].unique().tolist() + pred_df['target'].unique().tolist()

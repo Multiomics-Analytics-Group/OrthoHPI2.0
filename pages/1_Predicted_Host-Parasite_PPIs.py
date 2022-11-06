@@ -21,6 +21,7 @@ selected_rows = []
 selected_terms = []
 enrichment_table = None
 enrichment = None
+path = 'data/tmp'
 
 # Read dataset
 config = utils.read_config('config.yml')
@@ -68,7 +69,6 @@ def get_enrichment_summary(enrichment_df, ontology_df):
 
     return fig
 
-@st.cache(suppress_st_warning=True, allow_output_mutation=True)
 def generate_graph(df, score):
     G = nx.from_pandas_edgelist(df, 'source', 'target', 'weight')
     colors = dict(df[['source', 'source_color']].drop_duplicates().values)
@@ -108,10 +108,6 @@ def generate_graph(df, score):
 
     return G
 
-@st.cache(suppress_st_warning=True)
-def convert_df(df):
-    # IMPORTANT: Cache the conversion to prevent computation on every rerun
-    return df.to_csv(sep='\t', header=True, index=False).encode('utf-8')
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
@@ -164,6 +160,11 @@ with col2:
         net = Network(height='1000px', width="100%", bgcolor='white', font_color='#555555')
         # Take Networkx graph and translate it to a PyVis graph format
         net.from_nx(G)
+        # Save other formats
+        utils.export_graph(G, filename=f'{selected_parasite}.graphml',
+                        format='graphml', output_dir=f'{path}')
+        utils.export_graph(G, filename=f'{selected_parasite}.json',
+                        format='cytoscape', output_dir=f'{path}')
         G = None
 
         # Generate network with specific layout settings
@@ -180,20 +181,39 @@ with col3:
 
 with st.container():
     if net is not None:
+        html_data = ""
         # Save and read graph as HTML file (on Streamlit Sharing)
-        path = 'data/tmp'
         net.save_graph(f'{path}/{selected_parasite}.html')
-        HtmlFile = open(f'{path}/{selected_parasite}.html','r',encoding='utf-8')
-        
+        with open(f'{path}/{selected_parasite}.html','r',encoding='utf-8') as HtmlFile:
+            html_data = HtmlFile.read()
         # Load HTML into HTML component for display on Streamlit
-        components.html(HtmlFile.read(), height=1050)
+        components.html(html_data, height=1050)
         net = None
-        st.download_button(
-            label="Download Network as Html",
-            data=HtmlFile,
-            file_name=f'{selected_parasite}_network.html',
-            mime='text/html',
-        )
+        with st.container():
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                st.download_button(
+                    label="Download Network as Html",
+                    data=html_data,
+                    file_name=f'{selected_parasite}_network.html',
+                    mime='text/html',
+                )
+            with c2:
+                st.download_button(
+                    label="Download Network as GraphML",
+                    data=open(f'{path}/{selected_parasite}.graphml','r',encoding='utf-8'),
+                    file_name=f'{selected_parasite}_network.graphml',
+                    mime='text/plain',
+                )
+            with c3:
+                st.download_button(
+                    label="Download Network as Cytoscape",
+                    data=open(f'{path}/{selected_parasite}.json','r',encoding='utf-8'),
+                    file_name=f'{selected_parasite}_network.json',
+                    mime='text/plain',
+                )
+
 
 with st.container():
     if df_select is not None:
@@ -215,7 +235,7 @@ with st.container():
                         )
         st.download_button(
             label="Download Network Table",
-            data=convert_df(table),
+            data=utils.convert_df(table),
             file_name=f'{selected_parasite}_network_table.tsv',
             mime='text/csv',
         )
@@ -247,7 +267,7 @@ with st.container():
             selected_rows = grid_response['selected_rows']
             st.download_button(
                 label="Download Enrichment Table",
-                data=convert_df(enrichment_table),
+                data=utils.convert_df(enrichment_table),
                 file_name=f'{selected_parasite}_network_enrichment_table.tsv',
                 mime='text/csv',
             )
@@ -285,10 +305,16 @@ with st.container():
                     G = None
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
-                    HtmlFile2 = open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8')
                     st.subheader("Highlighted Nodes for Selected Biological Processes")
-                    # Load HTML into HTML component for display on Streamlit
-                    components.html(HtmlFile2.read(), height=500)
+                    with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
+                        html_data = HtmlFile.read()
+                    components.html(html_data, height=500)
+                    st.download_button(
+                        label="Download Network as Html",
+                        data=html_data,
+                        file_name=f'{selected_parasite}_enrichment_network.html',
+                        mime='text/html',
+                    )
         
         fig = get_enrichment_summary(enrichment_table, ontology)
         st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")

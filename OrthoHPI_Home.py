@@ -31,10 +31,24 @@ enrichment_table = None
 enrichment = None
 
 
+def filter_tissues(config, df):
+    tissue_df = []
+    mapped_tissues = config['tissues']
+    for ident in df['taxid1'].unique():
+        tissues = [mapped_tissues[t].lower() for t in config['parasites'][int(ident)]['tissues']]
+        aux = df[(df['taxid1']==ident) & (df['Tissue'].isin(tissues))]
+        tissue_df.append(aux)
+    
+    tissue_df = pd.concat(tissue_df)
+    
+    return tissue_df
+
+
 @st.cache(suppress_st_warning=True, allow_output_mutation=True)
-def generate_tissue_cell_type_box(df):
+def generate_tissue_cell_type_box(df, config):
     aux = df.copy()
     aux['Cell type'] = aux['Cell type'].fillna("Not available")
+    aux = filter_tissues(config, aux)
     counts_tissues = aux.groupby(['taxid1', 'Tissue']).count()['taxid2'].reset_index()
     counts_tissues = counts_tissues.rename({'taxid2':'edges_tissue'}, axis=1)
     counts_cells = aux.groupby(['taxid1', 'Tissue', 'Cell type']).count()['taxid2'].reset_index()
@@ -43,7 +57,7 @@ def generate_tissue_cell_type_box(df):
     aux = pd.merge(aux, counts_cells, on=['taxid1', 'Tissue', 'Cell type'], how='left')
     fig = px.icicle(aux, path=[px.Constant("Parasites"), 'taxid1_label', 'Tissue', 'Cell type'], values='edges_cell_type',
                   color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', 'pTPM'],
-                  color_continuous_scale='Burgyl', height=900, width=1200)
+                  color_continuous_scale='Burgyl', height=900, width=1200, maxdepth=-1)
 
     return fig
 
@@ -122,7 +136,7 @@ for stats_fig, title in stats_figs:
         st.plotly_chart(stats_fig, use_container_width=True)
     i += 1
 
-fig = generate_tissue_cell_type_box(pred_tissues)
+fig = generate_tissue_cell_type_box(pred_tissues, config)
 with chart2:
     st.subheader("Summary of Interactions per Tissue and Cell type")
     st.plotly_chart(fig, use_container_width=True)

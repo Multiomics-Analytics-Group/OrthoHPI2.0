@@ -33,13 +33,6 @@ tissues = None
 predictions = None
 ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet')
 
-def filter_tissues(config, df):
-    source = df['taxid1'].unique()[0]
-    mapped_tissues = config['tissues']
-    tissues = [mapped_tissues[t].lower() for t in config['parasites'][int(source)]['tissues']]
-    df = df[df['Tissue'].isin(tissues)]
-    
-    return df
 
 def generate_tissue_filters(df):
     options = df['Tissue'].unique().tolist()
@@ -136,7 +129,7 @@ with col2:
     else:        
         df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
         pred_tissues = None
-        df_select = filter_tissues(config, df_select)
+        df_select = web_utils.filter_tissues(config, df_select)
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
         tissues_options = generate_tissue_filters(df_select)

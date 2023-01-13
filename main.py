@@ -86,6 +86,9 @@ if __name__ == "__main__":
     config_file = 'config.yml'
     
     setup(config_file=config_file, output_file_path=data_dir)
+
+    hosts = utils.read_config(filepath=config_file, field='hosts')
+    parasites = utils.read_config(filepath=config_file, field='parasites')
     
     #Get host and parasite proteins
     proteins = get_proteins(config_file)
@@ -103,3 +106,16 @@ if __name__ == "__main__":
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
+
+    predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
+    predictions = utils.annotate_alias_id(predictions_df=predictions, 
+                            taxids=list(parasites.keys()), config_file=config_file, 
+                            sources=['BLAST_UniProt_AC'], new_col="source_uniprot", 
+                            mapping_col="source")
+    
+    predictions = utils.annotate_alias_id(predictions_df=predictions, 
+                            taxids=list(hosts.keys()), config_file=config_file, 
+                            sources=['Ensembl_HGNC_UniProt_ID(supplied_by_UniProt)'], 
+                            new_col="target_uniprot", mapping_col="target")
+    
+    utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'annotated_predictions.parquet'))

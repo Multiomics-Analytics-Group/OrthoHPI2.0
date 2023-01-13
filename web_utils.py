@@ -1,5 +1,13 @@
 import streamlit as st
 
+def filter_tissues(config, df):
+    source = df['taxid1'].unique()[0]
+    mapped_tissues = config['tissues']
+    tissues = [mapped_tissues[t].lower() for t in config['parasites'][int(source)]['tissues']]
+    df = df[df['Tissue'].isin(tissues)]
+    
+    return df
+
 def footer():
     st.write("Developed with data from:")
 

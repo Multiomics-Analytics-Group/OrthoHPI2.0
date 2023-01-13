@@ -68,24 +68,50 @@ def calculate_enrichment(pred_df, go_df):
 def save_to_parquet(df, output_file):
     df.to_parquet(output_file, compression='gzip', index=False)
 
+
 def read_parquet_file(input_file):
     df = pd.read_parquet(input_file)
 
     return df
 
-def parse_string_aliases(config_file, sources):
+
+def annotate_alias_id(predictions_df, taxids, config_file, sources, new_col, mapping_col):
+    '''
+    Adds an extra column to the provided dataframe with the String alias selected (e.g., UniProt id)
+
+    :param DataFrame predictions_df: predictions dataframe to be annotated (requires mapping_col in columns)
+    :param str config_file: path to config file (used to get the aliases for each species)
+    :param list sources: what source ids need to be annotated
+
+    :return DataFrame predictions_df: annotated dataframe with the String aliases of interest
+    '''
+    aliases = {}
+    for taxid in taxids:
+        aliases.update(parse_string_aliases(config_file=config_file, 
+                    sources=sources, taxid=str(taxid), reverse=True))
+    
+    predictions_df[new_col] = predictions_df[mapping_col].map(aliases)
+    #predictions_df['target_uniprot'] = predictions_df['target'].map(aliases)
+    
+    return predictions_df
+
+
+def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     '''
     Parses the alias file from String database and generates a dictionary
     that can be used to map to the right identifiers
     :param str config_file: path to the config file where the url to the String alias file should be defined
     :param list sources: list of sources that should be considered in the mapping (i.e. Ensembl_gene)
-    :return: dictionary with key --> alias, values --> sources identifier
+    :param str taxid: taxonomic identifier of the species for which to parse the aliases file
+    :param bool reverse: whether to store alias --> string_id dictionary (False), or string_id --> alias (True)
+    :return: dictionary with key --> alias, values --> string_id (reverse=False),
+                or key --> string_id, values --> alias
     '''
     data_dict = {}
     urls = read_config(filepath=config_file, field='urls')
-    
+        
     if 'string_alias_url' in urls:
-        filename = download_file(url=urls['string_alias_url'], data_dir='data')
+        filename = download_file(url=urls['string_alias_url'].replace('TAXID', taxid), data_dir='data')
     
     data = pd.read_csv(filename, sep='\t', header=0)
     if sources is not None:
@@ -93,7 +119,10 @@ def parse_string_aliases(config_file, sources):
     
 
     for i, row in data[['#string_protein_id', 'alias']].iterrows():
-        data_dict[row['alias']] = row['#string_protein_id']
+        if not reverse:
+            data_dict[row['alias']] = row['#string_protein_id']
+        else:
+            data_dict[row['#string_protein_id']] = row['alias']
          
     return data_dict
 

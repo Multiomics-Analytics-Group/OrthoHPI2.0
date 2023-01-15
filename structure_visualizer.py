@@ -28,7 +28,7 @@ def generate_mol_structure(pdb_file):
     with open(pdb_file) as ifile:
         content = ifile.read()
 
-    xyzview = makeobj(content, molformat='pdb', style='cartoon', background='white')
+    xyzview = makeobj(content, molformat='pdb', style='cartoon', background='black')
     xyzview.setStyle({'cartoon':{'color':'spectrum'}})
     
     return xyzview

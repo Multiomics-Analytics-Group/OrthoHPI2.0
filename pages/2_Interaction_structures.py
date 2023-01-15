@@ -80,11 +80,23 @@ else:
                 pdb_file, url = structures[protein]
                 with cols[i]:
                     if pdb_file is not None:
-                        st.title("AlphaFold structure " + protein)
+                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
+                        unsafe_allow_html=True)
                         show_structure(pdb_file=pdb_file)
                         st.markdown(f'''
                                 <a href={url}><button>PDB file</button></a>''',
                                 unsafe_allow_html=True)
                     else:
-                        st.title("AlphaFold structure " + protein + "\n NOT FOUND")
+                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
+                        unsafe_allow_html=True)
+                        st.markdown(f'''<h5>AlphaFold prediction Not Available</h5>''',
+                        unsafe_allow_html=True)
                     i += 1
+
+
+st.markdown("---")
+st.markdown("---")
+
+# Footer
+with st.container():
+    web_utils.footer()

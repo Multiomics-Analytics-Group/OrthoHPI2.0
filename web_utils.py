@@ -11,7 +11,7 @@ def filter_tissues(config, df):
 def footer():
     st.write("Developed with data from:")
 
-    cols = st.columns(5)
+    cols = st.columns(6)
     with cols[0]:
         st.image('images/eggnog.png', width=200)
     with cols[1]:
@@ -22,5 +22,7 @@ def footer():
         st.image('images/tissues.png', width=200)
     with cols[4]:
         st.image('images/compartments.png', width=200)
+    with cols[5]:
+        st.image('images/ebi.png', width=200)
 
     st.write("Code available at: https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0")

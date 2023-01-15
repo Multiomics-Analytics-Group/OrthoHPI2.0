@@ -5,6 +5,7 @@ import urllib.request
 def get_alphafold_structure(query_proteins={}):
     structures = {}
     url = 'https://alphafold.ebi.ac.uk/files/AF-query_protein-F1-model_v4.pdb'
+    web_url = 'https://alphafold.ebi.ac.uk/entry/query_protein'
 
     for query_protein in query_proteins:    
         uniprot_id = query_proteins[query_protein]
@@ -20,7 +21,9 @@ def get_alphafold_structure(query_proteins={}):
             pdb_filename = None
             print(e)
 
-        structures[query_protein] = (pdb_filename, url.replace('query_protein', uniprot_id))
+        structures[query_protein] = (pdb_filename, 
+                                        url.replace('query_protein', uniprot_id),
+                                        web_url.replace('query_protein', uniprot_id))
 
     return structures
 

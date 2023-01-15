@@ -77,14 +77,15 @@ else:
             cols = st.columns(2)
             i = 0
             for protein in structures:
-                pdb_file, url = structures[protein]
+                pdb_file, url, website = structures[protein]
                 with cols[i]:
                     if pdb_file is not None:
                         st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
                         unsafe_allow_html=True)
                         show_structure(pdb_file=pdb_file)
                         st.markdown(f'''
-                                <a href={url}><button>PDB file</button></a>''',
+                                <a href={url}><button>PDB file</button></a>
+                                <a href={website}><button>AlphaFold EBI</button></a>''',
                                 unsafe_allow_html=True)
                     else:
                         st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',

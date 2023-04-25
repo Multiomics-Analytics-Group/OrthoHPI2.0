@@ -16,5 +16,8 @@ statsmodels>=0.13.2
 stmol>=0.0.9
 streamlit>=1.14.0
 streamlit-aggrid>=0.3.3
+streamlit_extras>=0.2.7
+streamlit-option-menu>=0.3.2
 stvis>=0.0.2
 urllib3==1.26.12
+

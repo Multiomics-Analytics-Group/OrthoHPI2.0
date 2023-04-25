@@ -1,6 +1,7 @@
 import utils
 import web_utils
 import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
 import pandas as pd
 import plotly.express as px
 import holoviews as hv
@@ -8,10 +9,19 @@ from css import style
 from holoviews import opts, dim
 hv.extension('bokeh')
 
-st.set_page_config(layout="wide", page_title="OrthoHPI Home", menu_items={})
-
+st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
+st.session_state.sidebar_state = 'collapsed'
 style.load_css()
 
+page = web_utils.show_pages_menu(index=0)
+if page == "Predicted Host-parasite PPIs":
+    switch_page("predicted host-parasite ppis")
+elif page == "Predicted PPI structures":
+    switch_page('interaction structures')
+elif page == "About":
+    switch_page('about')
+    
+        
 
 # Read dataset
 config = utils.read_config('config.yml')
@@ -44,7 +54,7 @@ def filter_tissues(config, df):
     return tissue_df
 
 
-@st.cache(suppress_st_warning=True, allow_output_mutation=True)
+@st.cache_data
 def generate_tissue_cell_type_box(df, config):
     aux = df.copy()
     aux['Cell type'] = aux['Cell type'].fillna("Not available")

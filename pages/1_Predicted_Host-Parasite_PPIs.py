@@ -1,6 +1,7 @@
 import utils
 import web_utils
 import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
 import streamlit.components.v1 as components
 from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
@@ -9,9 +10,14 @@ from css import style
 from pyvis.network import Network
 import plotly.express as px
 
-st.set_page_config(layout="wide", page_title="Predicted Host-Parasite PPIs", menu_items={})
 style.load_css()
-
+page = web_utils.show_pages_menu(index=1)
+if page == "Home":
+    switch_page("orthohpi home")
+elif page == "Predicted PPI structures":
+    switch_page('interaction structures')
+elif page == "About":
+    switch_page('about')
 
 
 #Initialize variables
@@ -121,7 +127,7 @@ with col1:
 with col2:
     
     # Implement multiselect dropdown menu for option selection
-    selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list)
+    selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
 
     # Set info message on initial site load
     if selected_parasite == "<select>":

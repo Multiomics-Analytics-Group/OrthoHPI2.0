@@ -3,13 +3,19 @@ import web_utils
 from css import style
 import pandas as pd
 import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
 from stmol import showmol
 import structure_visualizer as strv
 from st_aggrid import GridOptionsBuilder, AgGrid
 
-st.set_page_config(layout="wide", page_title="AlphaFold Predicted Structure Interactors",
-menu_items={})
 style.load_css()
+page = web_utils.show_pages_menu(index=2)
+if page == "Home":
+    switch_page("orthohpi home")
+elif page == "Predicted Host-parasite PPIs":
+    switch_page("predicted host-parasite ppis")
+elif page == "About":
+    switch_page('about')
 
 
 def get_structures(query_proteins):
@@ -36,17 +42,30 @@ st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>",
 st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>AlphaFold Predicted Structure Interactors</h3>", unsafe_allow_html=True)
 
 
+col1, col2, col3 = st.columns(3)
 
-# Implement multiselect dropdown menu for option selection
-selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list)
-if selected_parasite == "<select>":
+with col1:
+    st.write('')
+
+
+with col2:
+    # Implement multiselect dropdown menu for option selection
+    selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="struct_par")
+    if selected_parasite == "<select>":
         st.text('Choose 1 parasite to visualize the predicted PPI network')
-else:
-    with st.container():
+        selected_cols = None
+    else:
         selected_cols = ['taxid1_label', 'source_name', 'source', 'taxid2_label',
         'target_name', 'target', 'experimental_evidence_score', 'databases_evidence_score',
         'weight', 'group1', 'group2', 'source_uniprot', 'target_uniprot']
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
+  
+with col3:
+    st.write('')
+        
+        
+if selected_cols is not None:    
+    with st.container():
         df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
         df_select = web_utils.filter_tissues(config, df_select)
         df_select = df_select[df_select['weight'] >= score]

@@ -15,3 +15,9 @@ div[data-testid="text-container"] > label[data-testid="stMetricLabel"] > div {
 footer {
     visibility: hidden;
 }
+
+section[data-testid="stSidebar"][aria-expanded="true"]{
+    display: none;
+
+}
+

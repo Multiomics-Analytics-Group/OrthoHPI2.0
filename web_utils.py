@@ -1,4 +1,17 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
+
+def show_pages_menu(index=0):
+    selected = option_menu(
+    menu_title=None,  # required
+    options=["Home", "Predicted Host-parasite PPIs", "Predicted PPI structures", "About"],  # required
+    icons=["house", "diagram-3", "cast", "chat-text"],  # optional
+    menu_icon="cast",  # optional
+    default_index=index,  # optional
+    orientation="horizontal",
+    )
+    return selected
+
 
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]

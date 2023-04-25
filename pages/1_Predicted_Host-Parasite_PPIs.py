@@ -44,7 +44,7 @@ def generate_cell_type_filters(df):
     
     return options
 
-@st.cache(suppress_st_warning=True)
+@st.cache_data
 def get_enrichment(pred_df):
     species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
     species = [int(s) for s in species]

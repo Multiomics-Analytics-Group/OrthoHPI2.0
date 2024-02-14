@@ -134,7 +134,7 @@ chart1, chart2 = st.columns(2)
 with chart1:
     st.subheader("Circos Plot of Common Host Interactors")
     circos_plot = generate_circos_plot(predictions)
-    st.bokeh_chart(hv.render(circos_plot, backend='bokeh'), use_container_width=True)
+    st.bokeh_chart(hv.render(circos_plot), use_container_width=True)
 
 stats_figs = generate_stats_plots(predictions)
 predictions = None

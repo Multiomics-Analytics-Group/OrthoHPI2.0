@@ -1,5 +1,5 @@
 biopython==1.79
-bokeh==2.4.3
+bokeh>=2.4.3
 holoviews>=1.15.0
 networkx>=2.8.6
 notebook==6.4.12

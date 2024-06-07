@@ -92,8 +92,8 @@ if selected_cols is not None:
         print(selected_rows)
         print(type(selected_rows))
         if selected_rows is not None and len(selected_rows) > 0:
-            query_proteins = {i['source_name']:i['source_uniprot'] for i in selected_rows}
-            query_proteins.update({i['target_name']:i['target_uniprot'] for i in selected_rows})
+            query_proteins = dict(selected_rows[['source_name', 'source_uniprot']].values)
+            query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))
             structures = get_structures(query_proteins)
             cols = st.columns(2)
             i = 0

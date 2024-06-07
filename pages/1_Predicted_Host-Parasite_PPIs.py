@@ -278,7 +278,7 @@ with st.container():
     if enrichment_table is not None:
         enrichment_viz = enrichment_table
         if selected_rows is not None and len(selected_rows) > 0:
-            selected_terms = selected_rows['source_name'].values.tolist()
+            selected_terms = selected_rows['go_term'].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 
         with go1:

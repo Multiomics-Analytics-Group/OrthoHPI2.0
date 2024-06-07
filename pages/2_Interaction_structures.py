@@ -81,11 +81,11 @@ if selected_cols is not None:
         grid_response = AgGrid(
                             df_select,
                             gridOptions=gridOptions,
-                            data_return_mode='AS_INPUT', 
-                            update_mode='MODEL_CHANGED', 
+                            data_return_mode='AS_INPUT',
+                            update_mode='MODEL_CHANGED',
                             fit_columns_on_grid_load=False,
                             enable_enterprise_modules=True,
-                            height=350, 
+                            height=350,
                             reload_data=False
                         )
         selected_rows = grid_response['selected_rows']

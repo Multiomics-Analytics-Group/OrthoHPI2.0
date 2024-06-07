@@ -8,22 +8,22 @@ def get_alphafold_structure(query_proteins={}):
     url = 'https://alphafold.ebi.ac.uk/files/AF-query_protein-F1-model_v4.pdb'
     web_url = 'https://alphafold.ebi.ac.uk/entry/query_protein'
     for query_protein in query_proteins:
+        pdb_filename = None
         uniprot_id = query_proteins[query_protein]
         try:
-            request = urllib.request.Request(url.replace('query_protein', uniprot_id))
-            pdb_filename = os.path.join('data/tmp', query_protein+'_output_structure.pdb')
-            if not os.path.isfile(pdb_filename):
-                with open(pdb_filename, 'w') as out:
-                    with urllib.request.urlopen(request) as response:
-                        res = response.read().decode('utf-8')
-                        out.write(res)
-        except Exception as e:
-            pdb_filename = None
-            print(e)
-
-        structures[query_protein] = (pdb_filename, 
+            if uniprot_id is not None:
+                request = urllib.request.Request(url.replace('query_protein', uniprot_id))
+                pdb_filename = os.path.join('data/tmp', query_protein+'_output_structure.pdb')
+                if not os.path.isfile(pdb_filename):
+                    with open(pdb_filename, 'w') as out:
+                        with urllib.request.urlopen(request) as response:
+                            res = response.read().decode('utf-8')
+                            out.write(res)
+                structures[query_protein] = (pdb_filename,
                                         url.replace('query_protein', uniprot_id),
                                         web_url.replace('query_protein', uniprot_id))
+        except Exception as e:
+            print(e)
 
     return structures
 

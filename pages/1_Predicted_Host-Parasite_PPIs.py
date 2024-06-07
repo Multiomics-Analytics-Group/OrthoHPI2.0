@@ -277,7 +277,7 @@ go1, go2 = st.columns(2)
 with st.container():
     if enrichment_table is not None:
         enrichment_viz = enrichment_table
-        if len(selected_rows) > 0:
+        if selected_rows is not None and len(selected_rows) > 0:
             selected_terms = [i['go_term'] for i in selected_rows]
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 

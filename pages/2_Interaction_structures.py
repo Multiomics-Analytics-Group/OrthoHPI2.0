@@ -89,7 +89,7 @@ if selected_cols is not None:
                             reload_data=False
                         )
         selected_rows = grid_response['selected_rows']
-        if len(selected_rows) > 0:
+        if selected_rows is not None and len(selected_rows) > 0:
             query_proteins = {i['source_name']:i['source_uniprot'] for i in selected_rows}
             query_proteins.update({i['target_name']:i['target_uniprot'] for i in selected_rows})
             structures = get_structures(query_proteins)

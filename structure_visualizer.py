@@ -1,13 +1,13 @@
 import os
-from stmol import makeobj
 import urllib.request
+from stmol import makeobj
+
 
 def get_alphafold_structure(query_proteins={}):
     structures = {}
     url = 'https://alphafold.ebi.ac.uk/files/AF-query_protein-F1-model_v4.pdb'
     web_url = 'https://alphafold.ebi.ac.uk/entry/query_protein'
-
-    for query_protein in query_proteins:    
+    for query_protein in query_proteins:
         uniprot_id = query_proteins[query_protein]
         try:
             request = urllib.request.Request(url.replace('query_protein', uniprot_id))

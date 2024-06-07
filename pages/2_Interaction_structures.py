@@ -89,8 +89,6 @@ if selected_cols is not None:
                             reload_data=False
                         )
         selected_rows = grid_response['selected_rows']
-        print(selected_rows)
-        print(type(selected_rows))
         if selected_rows is not None and len(selected_rows) > 0:
             query_proteins = dict(selected_rows[['source_name', 'source_uniprot']].values)
             query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))

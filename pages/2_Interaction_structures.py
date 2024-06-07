@@ -90,6 +90,7 @@ if selected_cols is not None:
                         )
         selected_rows = grid_response['selected_rows']
         print(selected_rows)
+        print(type(selected_rows))
         if selected_rows is not None and len(selected_rows) > 0:
             query_proteins = {i['source_name']:i['source_uniprot'] for i in selected_rows}
             query_proteins.update({i['target_name']:i['target_uniprot'] for i in selected_rows})

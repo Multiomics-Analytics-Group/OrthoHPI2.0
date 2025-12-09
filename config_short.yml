@@ -1,28 +1,34 @@
 urls:
-  string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
-  string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
-  string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/9606.protein.aliases.v11.5.txt.gz
-  eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
-  string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
-  string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
-  3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
-  hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
+    string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
+    string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
+    string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/TAXID.protein.aliases.v11.5.txt.gz
+    eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
+    string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
+    string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
+    go_ontology_url: http://current.geneontology.org/ontology/go.obo
+    3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
+    hpa_single_cell_tissue_url: https://v22.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 hosts:
-  9606: 
-    label: Homo sapiens
-    color: "#525252"
-    tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
-    compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+    9606: 
+        label: Homo sapiens
+        color: "#525252"
+        tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+
+tissues:
+    "BTO:0001253": skin
+    "BTO:0000089": blood
+    "BTO:0000648": intestine
 
 parasites:
-  5759:
+    5759:
         label: Entamoeba histolytica
         color: "#b2df8a"
         tissues:
             - "BTO:0000648"
-  5741:
-      label: Giardia intestinalis
-      color: "#33a02c"
-      tissues:
-          - "BTO:0000648"
+    5865:
+        label: Babesia bovis
+        color: "#c51b7d"
+        tissues:
+            - "BTO:0000089"

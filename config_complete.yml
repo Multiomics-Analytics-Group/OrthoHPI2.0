@@ -14,7 +14,23 @@ hosts:
         label: Homo sapiens
         color: "#525252"
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
-        compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv  
+        compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+    10090:
+        label: Mus musculus
+        color: "#4DA3FF"
+        tissues_url: https://download.jensenlab.org/mouse_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/mouse_compartment_integrated_full.tsv
+    10116:
+        label: Rattus norvegicus
+        color: "#FFA857"
+        tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/rat_compartment_experiments_full.tsv
+    9823:
+        label: Sus scrofa
+        color: "#57C785"
+        tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/pig_compartment_experiments_full.tsv
+
 tissues:
     "BTO:0000648": intestine
     "BTO:0001253": skin

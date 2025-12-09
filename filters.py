@@ -44,7 +44,7 @@ def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping):
                 continue
             
             data = line.rstrip().split('\t')
-            protein  = "9606."+data[0]
+            protein = "9606."+data[0]
             tissue = data[2]
             score = float(data[6])
             

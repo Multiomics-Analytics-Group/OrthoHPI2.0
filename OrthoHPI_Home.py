@@ -1,5 +1,4 @@
 import streamlit as st
-st.bokeh_chart(fig)
 import utils
 import web_utils
 import streamlit as st
@@ -17,18 +16,12 @@ style.load_css()
 
 #Updated page scrolling for newest streamlit version 
 page = web_utils.show_pages_menu(index=0)
-
 if page == "Predicted Host-parasite PPIs":
-    st.session_state["page"] = "predicted host-parasite ppis"
-    st.experimental_rerun()
-
+    switch_page("predicted host-parasite ppis")
 elif page == "Predicted PPI structures":
-    st.session_state["page"] = "interaction structures"
-    st.experimental_rerun()
-
+    switch_page('interaction structures')
 elif page == "About":
-    st.session_state["page"] = "about"
-    st.experimental_rerun()
+    switch_page('about')
 
 # Read dataset
 config = utils.read_config('config.yml')

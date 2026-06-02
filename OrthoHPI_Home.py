@@ -1,13 +1,13 @@
 import utils
 import web_utils
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 import pandas as pd
 import plotly.express as px
 import holoviews as hv
 from css import style
 from holoviews import opts, dim
 hv.extension('bokeh')
+from streamlit_bokeh import streamlit_bokeh
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 st.session_state.sidebar_state = 'collapsed'
@@ -15,11 +15,11 @@ style.load_css()
 
 page = web_utils.show_pages_menu(index=0)
 if page == "Predicted Host-parasite PPIs":
-    switch_page("predicted host-parasite ppis")
+    st.switch_page("pages/1_Predicted_Host-Parasite_PPIs.py")
 elif page == "Predicted PPI structures":
-    switch_page('interaction structures')
+    st.switch_page('pages/2_Interaction_structures.py')
 elif page == "About":
-    switch_page('about')
+    st.switch_page('pages/3_About.py')
     
         
 
@@ -134,7 +134,7 @@ chart1, chart2 = st.columns(2)
 with chart1:
     st.subheader("Circos Plot of Common Host Interactors")
     circos_plot = generate_circos_plot(predictions)
-    st.bokeh_chart(hv.render(circos_plot), use_container_width=True)
+    streamlit_bokeh(hv.render(circos_plot), use_container_width=True)
 
 stats_figs = generate_stats_plots(predictions)
 predictions = None

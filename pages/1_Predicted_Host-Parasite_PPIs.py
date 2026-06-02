@@ -1,7 +1,6 @@
 import utils
 import web_utils
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 import streamlit.components.v1 as components
 from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
@@ -13,12 +12,11 @@ import plotly.express as px
 style.load_css()
 page = web_utils.show_pages_menu(index=1)
 if page == "Home":
-    switch_page("orthohpi home")
+    st.switch_page("OrthoHPI_Home.py")
 elif page == "Predicted PPI structures":
-    switch_page('interaction structures')
+    st.switch_page('pages/2_Interaction_structures.py')
 elif page == "About":
-    switch_page('about')
-
+    st.switch_page('pages/3_About.py')
 
 #Initialize variables
 df_select = None

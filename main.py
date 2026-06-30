@@ -82,29 +82,48 @@ def setup(config_file, output_file_path):
 
 
 if __name__ == "__main__":
-    data_dir = 'data'
-    config_file = 'config.yml'
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='config.yml')
+    parser.add_argument('--data-dir', default='data')
+    args = parser.parse_args()
+    data_dir = args.data_dir
+    config_file = args.config
     
+    print("Setup: downloading reference files...")
     setup(config_file=config_file, output_file_path=data_dir)
 
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
-    
-    #Get host and parasite proteins
-    proteins = get_proteins(config_file)
+    urls = utils.read_config(filepath=config_file, field='urls')
 
-    #Apply filters -- secretome, tissue, cellular compartment context
+    print("Getting proteins...")
+    proteins = get_proteins(config_file)
+    total_proteins = sum(len(v) for v in proteins.values())
+    print(f"  {total_proteins} proteins before filtering")
+
+    print("Applying secretome/tissue/compartment filters...")
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file, proteins, cutoff=2.5)
     compartments = filters.apply_compartment_filter(config_file, proteins, cutoff=2.5)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
-    
-    #Annotate tissue and cell type expression
+    print(f"  {len(proteins)} proteins after filtering")
+
+    print("Annotating tissue and cell type expression...")
     get_tissue_cell_type_annotation(tissues, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))
-    
-    #Get eggnog groups and transfer PPIs
+
+    print("Getting EggNOG groups and transferring PPIs...")
+    cog_filename = urls['string_COG_url'].split('/')[-1]
     valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
-    homology.get_links(filepath=os.path.join(data_dir, 'COG.links.detailed.v11.5.txt.gz'), valid_groups=valid_groups, proteins=proteins,
+    print(f"  {len(valid_groups)} valid EggNOG groups")
+    from collections import Counter
+    taxid_counts = Counter()
+    for prots in valid_groups.values():
+        for p in prots:
+            taxid_counts[p.split('.')[0]] += 1
+    for taxid, count in sorted(taxid_counts.items()):
+        print(f"    taxid {taxid}: {count} proteins in EggNOG groups")
+    homology.get_links(filepath=os.path.join(data_dir, cog_filename), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
 
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))

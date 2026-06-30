@@ -24,7 +24,7 @@ elif page == "About":
         
 
 # Read dataset
-config = utils.read_config('config.yml')
+config = utils.read_config('config_short.yml')
 predictions = utils.read_parquet_file(input_file='data/predictions.parquet')
 predictions['weight'] = predictions['weight'].astype(float)
 tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
@@ -66,7 +66,7 @@ def generate_tissue_cell_type_box(df, config):
     aux = pd.merge(aux, counts_tissues, on=['taxid1', 'Tissue'], how='left')
     aux = pd.merge(aux, counts_cells, on=['taxid1', 'Tissue', 'Cell type'], how='left')
     fig = px.icicle(aux, path=[px.Constant("Parasites"), 'taxid1_label', 'Tissue', 'Cell type'], values='edges_cell_type',
-                  color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', 'pTPM'],
+                  color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', 'nTPM'],
                   color_continuous_scale='Burgyl', height=900, width=1200, maxdepth=-1)
 
     return fig

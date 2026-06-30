@@ -3,7 +3,6 @@ import web_utils
 from css import style
 import pandas as pd
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 from stmol import showmol
 import structure_visualizer as strv
 from st_aggrid import GridOptionsBuilder, AgGrid
@@ -11,11 +10,11 @@ from st_aggrid import GridOptionsBuilder, AgGrid
 style.load_css()
 page = web_utils.show_pages_menu(index=2)
 if page == "Home":
-    switch_page("orthohpi home")
+    st.switch_page("OrthoHPI_Home.py")
 elif page == "Predicted Host-parasite PPIs":
-    switch_page("predicted host-parasite ppis")
+    st.switch_page("pages/1_Predicted_Host-Parasite_PPIs.py")
 elif page == "About":
-    switch_page('about')
+    st.switch_page('pages/3_About.py')
 
 
 def get_structures(query_proteins):

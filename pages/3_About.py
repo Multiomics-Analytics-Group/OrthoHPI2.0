@@ -1,16 +1,15 @@
 import web_utils
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 from css import style
 
 style.load_css()
 page = web_utils.show_pages_menu(index=3)
 if page == "Home":
-    switch_page("orthohpi home")
+    st.switch_page("OrthoHPI_Home.py")
 elif page == "Predicted Host-parasite PPIs":
-    switch_page("predicted host-parasite ppis")
+    st.switch_page("pages/1_Predicted_Host-Parasite_PPIs.py")
 elif page == "Predicted PPI structures":
-    switch_page('interaction structures')
+    st.switch_page('pages/2_Interaction_structures.py')
 
 # Footer
 with st.container():

@@ -1,0 +1,203 @@
+urls:
+  string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
+  string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
+  string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/9606.protein.aliases.v11.5.txt.gz
+  eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
+  string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
+  string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
+  3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
+  string_sequences_url: https://stringdb-static.org/download/protein.sequences.v11.5/TAXID.protein.sequences.v11.5.fa.gz
+  hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
+
+hosts:
+    9606:
+        label: Homo sapiens
+        color: "#525252"
+        tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+
+tissues:
+    "BTO:0000648": intestine
+    "BTO:0001253": skin
+    "BTO:0000089": blood
+    "BTO:0000840": nose
+    "BTO:0001090": mouth
+    "BTO:0001202": saliva
+    "BTO:0000759": liver
+    "BTO:0001281": spleen
+    "BTO:0000141": bone marrow
+    "BTO:0000439": eye
+    "BTO:0000763": lung
+    "BTO:0000887": muscle
+    "BTO:0000142": brain
+    "BTO:0000562": heart
+    "BTO:0001078": placenta
+    "BTO:0003091": urogenital system
+    "BTO:0000784": lymph node
+    "BTO:0001279": spinal cord
+    "BTO:0000511": gastrointestinal tract
+    "BTO:0000671": kidney
+    "BTO:0000123": bladder
+
+parasites:
+    5759:
+        label: Entamoeba histolytica
+        color: "#b2df8a"
+        tissues:
+            - "BTO:0000648"
+    5741:
+        label: Giardia lamblia
+        color: "#33a02c"
+        tissues:
+            - "BTO:0000648"
+    5664:
+        label: Leishmania major
+        color: "#fb9a99"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000840"
+            - "BTO:0001090"
+            - "BTO:0001202"
+    5671:
+        label: Leishmania infantum
+        color: "#e31a1c"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0001281"
+            - "BTO:0000141"
+    7209:
+        label: Loa loa
+        color: "#fdbf6f"
+        multicellular: true
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000439"
+    36329:
+        label: Plasmodium falciparum
+        color: "#6a3d9a"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+    126793:
+        label: Plasmodium vivax
+        color: "#b15928"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+    6183:
+        label: Schistosoma mansoni
+        color: "#8dd3c7"
+        multicellular: true
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0000763"
+            - "BTO:0000648"
+    432359:
+        label: Toxoplasma gondii
+        color: "#fb8072"
+        tissues:
+            - "BTO:0000089"
+            - "BTO:0000887"
+            - "BTO:0000439"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0001078"
+    6334:
+        label: Trichinella spiralis
+        color: "#fdb462"
+        multicellular: true
+        tissues:
+            - "BTO:0000887"
+            - "BTO:0000562"
+            - "BTO:0000763"
+            - "BTO:0000648"
+            - "BTO:0000142"
+    5722:
+        label: Trichomonas vaginalis
+        color: "#b3de69"
+        tissues:
+            - "BTO:0003091"
+    185431:
+        label: Trypanosoma brucei
+        color: "#bc80bd"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000784"
+            - "BTO:0001279"
+            - "BTO:0000142"
+    353153:
+        label: Trypanosoma cruzi
+        color: "#01665e"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000562"
+            - "BTO:0000089"
+            - "BTO:0000439"
+    441375:
+        label: Cryptosporidium muris
+        color: "#8c510a"
+        tissues:
+            - "BTO:0000511"
+            - "BTO:0000648"
+    5865:
+        label: Babesia bovis
+        color: "#c51b7d"
+        tissues:
+            - "BTO:0000089"
+    5660:
+        label: Leishmania braziliensis
+        color: "#d6604d"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000840"
+            - "BTO:0001090"
+            - "BTO:0001202"
+    6185:
+        label: Schistosoma haematobium
+        color: "#2166ac"
+        multicellular: true
+        tissues:
+            - "BTO:0000123"
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000671"
+    6182:
+        label: Schistosoma japonicum
+        color: "#bcbddc"
+        multicellular: true
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0000763"
+            - "BTO:0000648"
+    6248:
+        label: Strongyloides stercoralis
+        color: "#3f007d"
+        multicellular: true
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000763"
+            - "BTO:0000648"
+    6211:
+        label: Echinococcus multilocularis
+        color: "#9f5511"
+        multicellular: true
+        tissues:
+            - "BTO:0000648"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0000763"
+            - "BTO:0000142"
+            - "BTO:0000562"

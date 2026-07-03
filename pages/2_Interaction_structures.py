@@ -27,10 +27,11 @@ def show_structure(pdb_file):
     showmol(xyzview, height = 500,width=700)
 
 
-config = utils.read_config('config.yml')
-predictions = utils.read_parquet_file(input_file='data/annotated_predictions.parquet')
+config = utils.read_config(web_utils.get_config_file())
+data_dir = web_utils.get_data_dir()
+predictions = utils.read_parquet_file(input_file=f'{data_dir}/annotated_predictions.parquet')
 predictions['weight'] = predictions['weight'].astype(float)
-tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
+tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 tissues = None
 predictions = None

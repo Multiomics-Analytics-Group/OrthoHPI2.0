@@ -46,11 +46,11 @@ parasites:
         tissues:
             - "BTO:0000648"
     5741:
-        label: Giardia lamblia
+        label: Giardia intestinalis
         color: "#33a02c"
         tissues:
             - "BTO:0000648"
-    5664:
+    5664: 
         label: Leishmania major
         color: "#fb9a99"
         tissues:
@@ -59,7 +59,7 @@ parasites:
             - "BTO:0000840"
             - "BTO:0001090"
             - "BTO:0001202"
-    5671:
+    5671: 
         label: Leishmania infantum
         color: "#e31a1c"
         tissues:
@@ -68,39 +68,53 @@ parasites:
             - "BTO:0000759"
             - "BTO:0001281"
             - "BTO:0000141"
-    7209:
+    5679: 
+        label: Leishmania panamensis
+        color: "#ff7f00"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+            - "BTO:0001281"
+            - "BTO:0000141"
+    7209: 
         label: Loa loa
         color: "#fdbf6f"
-        multicellular: true
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
-            - "BTO:0000439"
-    36329:
+            - "BTO:0000439" 
+    5833: 
         label: Plasmodium falciparum
         color: "#6a3d9a"
+        tissues: 
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000759"
+    5850: 
+        label: Plasmodium knowlesi
+        color: "#ffff99"
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
             - "BTO:0000759"
-    126793:
+    5855: 
         label: Plasmodium vivax
         color: "#b15928"
-        tissues:
+        tissues: 
             - "BTO:0001253"
             - "BTO:0000089"
             - "BTO:0000759"
-    6183:
+    6183: 
         label: Schistosoma mansoni
         color: "#8dd3c7"
-        multicellular: true
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
             - "BTO:0000759"
             - "BTO:0000763"
             - "BTO:0000648"
-    432359:
+    5811: 
         label: Toxoplasma gondii
         color: "#fb8072"
         tissues:
@@ -110,22 +124,21 @@ parasites:
             - "BTO:0000142"
             - "BTO:0000562"
             - "BTO:0001078"
-    6334:
+    6334: 
         label: Trichinella spiralis
         color: "#fdb462"
-        multicellular: true
         tissues:
             - "BTO:0000887"
             - "BTO:0000562"
             - "BTO:0000763"
             - "BTO:0000648"
             - "BTO:0000142"
-    5722:
+    5722: 
         label: Trichomonas vaginalis
         color: "#b3de69"
         tissues:
             - "BTO:0003091"
-    185431:
+    5691: 
         label: Trypanosoma brucei
         color: "#bc80bd"
         tissues:
@@ -134,7 +147,7 @@ parasites:
             - "BTO:0000784"
             - "BTO:0001279"
             - "BTO:0000142"
-    353153:
+    5693: 
         label: Trypanosoma cruzi
         color: "#01665e"
         tissues:
@@ -142,18 +155,18 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000089"
             - "BTO:0000439"
-    441375:
+    5808: 
         label: Cryptosporidium muris
         color: "#8c510a"
         tissues:
             - "BTO:0000511"
             - "BTO:0000648"
-    5865:
+    5865: 
         label: Babesia bovis
         color: "#c51b7d"
         tissues:
             - "BTO:0000089"
-    5660:
+    5660: 
         label: Leishmania braziliensis
         color: "#d6604d"
         tissues:
@@ -162,29 +175,26 @@ parasites:
             - "BTO:0000840"
             - "BTO:0001090"
             - "BTO:0001202"
-    6185:
+    6185: 
         label: Schistosoma haematobium
         color: "#2166ac"
-        multicellular: true
         tissues:
             - "BTO:0000123"
             - "BTO:0001253"
             - "BTO:0000089"
             - "BTO:0000671"
-    6182:
+    6182: 
         label: Schistosoma japonicum
         color: "#bcbddc"
-        multicellular: true
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
             - "BTO:0000759"
             - "BTO:0000763"
             - "BTO:0000648"
-    6248:
+    6248: 
         label: Strongyloides stercoralis
         color: "#3f007d"
-        multicellular: true
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
@@ -193,7 +203,6 @@ parasites:
     6211:
         label: Echinococcus multilocularis
         color: "#9f5511"
-        multicellular: true
         tissues:
             - "BTO:0000648"
             - "BTO:0000089"

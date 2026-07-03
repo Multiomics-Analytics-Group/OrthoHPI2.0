@@ -1,10 +1,7 @@
 import os
-import homology
-import utils
-import filters
-import hpa
-import go
 import pandas as pd
+import utils
+from . import homology, filters, hpa, go
    
 
 def get_proteins(config_file):
@@ -37,7 +34,7 @@ def parse_proteins(string_file, taxid):
     """
     proteins = {}
     if string_file is not None:
-        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data')
+        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data/downloads')
         sp = utils.read_gzipped_file(filename)
         first = True
         for line in sp:
@@ -76,7 +73,7 @@ def setup(config_file, output_file_path):
     for url_name in urls:
         url = urls[url_name]
         if url_name != "string_protein_url" and url_name != "string_ppi_url" and url_name != "string_go_url":
-            filename = utils.download_file(url=url, data_dir=output_file_path)
+            filename = utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
     
     go.get_gene_ontology(config_file, output_dir=output_file_path)
 
@@ -88,8 +85,9 @@ if __name__ == "__main__":
     parser.add_argument('--data-dir', default='data')
     args = parser.parse_args()
     data_dir = args.data_dir
+    downloads_dir = os.path.join(data_dir, 'downloads')
     config_file = args.config
-    
+
     print("Setup: downloading reference files...")
     setup(config_file=config_file, output_file_path=data_dir)
 
@@ -103,7 +101,7 @@ if __name__ == "__main__":
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/compartment filters...")
-    proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir='data/secretome_pred_input_data/input_data', valid_proteins=proteins)
+    proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file, proteins, cutoff=2.5)
     compartments = filters.apply_compartment_filter(config_file, proteins, cutoff=2.5)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
@@ -114,7 +112,7 @@ if __name__ == "__main__":
 
     print("Getting EggNOG groups and transferring PPIs...")
     cog_filename = urls['string_COG_url'].split('/')[-1]
-    valid_groups = homology.get_eggnog_groups(filepath=os.path.join(data_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
+    valid_groups = homology.get_eggnog_groups(filepath=os.path.join(downloads_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
     print(f"  {len(valid_groups)} valid EggNOG groups")
     from collections import Counter
     taxid_counts = Counter()
@@ -123,7 +121,7 @@ if __name__ == "__main__":
             taxid_counts[p.split('.')[0]] += 1
     for taxid, count in sorted(taxid_counts.items()):
         print(f"    taxid {taxid}: {count} proteins in EggNOG groups")
-    homology.get_links(filepath=os.path.join(data_dir, cog_filename), valid_groups=valid_groups, proteins=proteins,
+    homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups, proteins=proteins,
               ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
 
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))

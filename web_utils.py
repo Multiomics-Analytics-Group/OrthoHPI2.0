@@ -12,6 +12,12 @@ def show_pages_menu(index=0):
     )
     return selected
 
+def get_data_dir():
+    return st.session_state.get('data_dir', 'data')
+
+def get_config_file():
+    return st.session_state.get('config_file', 'config.yml')
+
 
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]

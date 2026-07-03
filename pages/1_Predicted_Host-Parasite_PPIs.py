@@ -28,14 +28,15 @@ enrichment = None
 path = 'data/tmp'
 
 # Read dataset
-config = utils.read_config('config.yml')
-predictions = utils.read_parquet_file(input_file='data/predictions.parquet')
+config = utils.read_config(web_utils.get_config_file())
+data_dir = web_utils.get_data_dir()
+predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
 predictions['weight'] = predictions['weight'].astype(float)
-tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
+tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 tissues = None
 predictions = None
-ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet')
+ontology = utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 
 def generate_tissue_filters(df):
@@ -49,10 +50,10 @@ def generate_cell_type_filters(df):
     return options
 
 @st.cache_data
-def get_enrichment(pred_df):
+def get_enrichment(pred_df, data_dir):
     species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
     species = [int(s) for s in species]
-    go_df = utils.read_parquet_file(input_file='data/gos.parquet')
+    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet')
     go_df = go_df[go_df['taxid'].isin(species)]
     enrichment = utils.calculate_enrichment(pred_df, go_df)
 
@@ -240,7 +241,7 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Network Functional Enrichment -- GO Biological Processes")
-        enrichment = get_enrichment(df_select[df_select['weight'] >= score])
+        enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir)
         if not enrichment.empty:
             fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
             st.text(f"Terms enriched: {len(enrichment[enrichment['fdr_bh'] <= fdr]['go_term'].values.tolist())}")

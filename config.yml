@@ -7,10 +7,11 @@ urls:
     string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
     go_ontology_url: http://current.geneontology.org/ontology/go.obo
     3did_domain_pairs_url: https://3did.irbbarcelona.org/download/current/3did_flat.gz
+    string_sequences_url: https://stringdb-static.org/download/protein.sequences.v11.5/TAXID.protein.sequences.v11.5.fa.gz
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 hosts:
-    9606: 
+    9606:
         label: Homo sapiens
         color: "#525252"
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv

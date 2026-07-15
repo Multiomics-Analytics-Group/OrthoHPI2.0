@@ -60,4 +60,6 @@ To obtain the Human-Parasite PPI predictions run:
 $ python main.py
 ```
 
+For a detailed description of the pipeline, see [docs/pipeline.md](docs/pipeline.md).
+
 

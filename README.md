@@ -37,7 +37,7 @@ The **cell type expression** information has been downloaded from:
 
 All the necessary data (predictions and annotations) have been precalculated so you can run the web server:
 ``` 
-$ streamlit run orthohpi_web.py
+$ streamlit run app/OrthoHPI_Home.py
 ```
 
 This will open your browser at http://localhost:8501 with the functionality shown in the video:

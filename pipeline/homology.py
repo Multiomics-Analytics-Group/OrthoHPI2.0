@@ -15,13 +15,9 @@ def get_eggnog_groups(filepath, proteins):
     valid_groups = {}
     protein_set = set(proteins)
     groups = utils.read_gzipped_file(filepath)
-    first = True
     i = 0
     t0 = time.time()
     for line in groups:
-        if first:
-            first = False
-            continue
         i += 1
         if i % 100_000 == 0:
             print(f"    {i:,} groups scanned, {len(valid_groups)} matched ({time.time()-t0:.0f}s)")

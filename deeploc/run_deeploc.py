@@ -10,7 +10,7 @@ Requires deeploc2 installed:
     pip install . (from the deeploc2_package directory)
 
 For each parasite in config:
-  - Downloads protein sequences from STRING (TAXID.protein.sequences.v11.5.fa.gz)
+  - Downloads protein sequences from STRING (TAXID.protein.sequences.v12.0.fa.gz)
   - Runs DeepLoc 2.1 (Fast model) on the full proteome
   - Keeps Extracellular proteins for all parasites, plus Cell membrane for unicellular
   - Writes filtered sequences to data/secretome_pred_input_data/input_data/{taxid}.fasta

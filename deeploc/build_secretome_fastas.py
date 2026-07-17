@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import glob
+import gzip
 import os
 
 import pandas as pd
@@ -46,10 +47,22 @@ def filter_by_localization(df, multicellular):
 
 
 def write_filtered_fasta(source_fasta, valid_ids, output_path):
-    records = [r for r in SeqIO.parse(source_fasta, "fasta") if r.id in valid_ids]
+    opener = gzip.open if source_fasta.endswith(".gz") else open
+    with opener(source_fasta, "rt") as handle:
+        records = [r for r in SeqIO.parse(handle, "fasta") if r.id in valid_ids]
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     SeqIO.write(records, output_path, "fasta")
     return len(records)
+
+
+def source_fasta_path(config_file, data_dir, taxid):
+    """Path to the STRING sequence FASTA for a species, named after string_sequences_url."""
+    urls = utils.read_config(filepath=config_file, field="urls")
+    filename = urls["string_sequences_url"].split("/")[-1].replace("TAXID", str(taxid))
+    species_dir = os.path.join(data_dir, "downloads", "species", str(taxid))
+    uncompressed = os.path.join(species_dir, filename.removesuffix(".gz"))
+
+    return uncompressed if os.path.exists(uncompressed) else os.path.join(species_dir, filename)
 
 
 def main(config_file, data_dir, deeploc_dir):
@@ -72,7 +85,7 @@ def main(config_file, data_dir, deeploc_dir):
         valid_ids = filter_by_localization(df, multicellular)
         print(f"  Proteins passing localization filter: {len(valid_ids)}")
 
-        source_fasta = os.path.join(data_dir, "downloads", "species", str(taxid), f"{taxid}.protein.sequences.v11.5.fa")
+        source_fasta = source_fasta_path(config_file, data_dir, taxid)
         if not os.path.exists(source_fasta):
             print(f"  SKIP: source FASTA not found: {source_fasta}")
             continue

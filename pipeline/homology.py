@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import utils
 
@@ -9,22 +10,29 @@ def get_eggnog_groups(filepath, proteins):
     :param list proteins: list of Ensembl protein identifiers
     :return: dictionary with all the valid EggNOG groups. Key -> group, value -> list proteins in the group
     """
+    print("  Scanning EggNOG groups...")
     sum_prots = 0
     valid_groups = {}
+    protein_set = set(proteins)
     groups = utils.read_gzipped_file(filepath)
     first = True
+    i = 0
+    t0 = time.time()
     for line in groups:
         if first:
             first = False
             continue
+        i += 1
+        if i % 100_000 == 0:
+            print(f"    {i:,} groups scanned, {len(valid_groups)} matched ({time.time()-t0:.0f}s)")
         data = line.decode("utf-8").rstrip().split('\t')
         group = data[1]
         gproteins = data[4].split(',')
-        int_proteins = list(set(proteins).intersection(gproteins))
-        if  len(int_proteins) > 0:
+        int_proteins = list(protein_set.intersection(gproteins))
+        if len(int_proteins) > 0:
             valid_groups[group] = int_proteins
             sum_prots += len(int_proteins)
-    
+
     return valid_groups
 
 
@@ -54,12 +62,22 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
                             "taxid2", "taxid2_label", "target_color", "target_shape", "target", "target_name", \
                             "experimental_evidence_score", "databases_evidence_score", "weight", \
                             "group1", "group2", "edge_type"]
+    print("  Counting COG links...")
+    total_lines = sum(1 for _ in cog_links) - 1
+    cog_links.close()
+    print(f"  {total_lines:,} total lines")
+    cog_links = utils.read_gzipped_file(filepath)
+    first = True
     i = 0
+    t0 = time.time()
+    print("  Scanning COG links...")
     for line in cog_links:
         if first:
             first = False
             continue
         i += 1
+        if i % 1_000_000 == 0:
+            print(f"    {i:,} / {total_lines:,} lines scanned, {len(links)} interactions found ({time.time()-t0:.0f}s)")
         data = line.decode("utf-8").rstrip().split(' ')
         group1 = data[0]
         group2 = data[1]
@@ -102,5 +120,9 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
                                     seen.add((protein1, protein2))
                                     seen.add((protein2, protein1))
     links_df = pd.DataFrame(links, columns=cols)
-    
+    print(f"  {len(links_df)} total interactions")
+    if not links_df.empty:
+        for taxid, count in links_df.groupby('taxid1')['source'].count().items():
+            label = parasites[int(taxid)]['label']
+            print(f"    {label} ({taxid}): {count} interactions")
     utils.save_to_parquet(links_df, ouput_filepath)

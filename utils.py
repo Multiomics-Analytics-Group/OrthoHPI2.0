@@ -111,7 +111,7 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     urls = read_config(filepath=config_file, field='urls')
         
     if 'string_alias_url' in urls:
-        filename = download_file(url=urls['string_alias_url'].replace('TAXID', taxid), data_dir='data')
+        filename = download_file(url=urls['string_alias_url'].replace('TAXID', taxid), data_dir=os.path.join('data/downloads/species', str(taxid)))
     
     data = pd.read_csv(filename, sep='\t', header=0)
     if sources is not None:
@@ -165,6 +165,7 @@ def download_file(url, data_dir='data'):
     :param str data_dir: path to directory where to download the data
     :return: filepath to the downloaded data
     """
+    os.makedirs(data_dir, exist_ok=True)
     header = {'user-agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36'}
     filename = url.split('/')[-1]
     filename = os.path.join(data_dir, filename)

@@ -42,7 +42,7 @@ def parse_gene_ontology(string_file, taxid):
     """
     data = pd.DataFrame()
     if string_file is not None:
-        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data')
+        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
         data = pd.read_csv(filename, sep='\t', compression='gzip')
         data = data[data['category'] == 'Biological Process (Gene Ontology)']
         data = data[['#string_protein_id', 'description']]
@@ -57,7 +57,7 @@ def parse_ontology(config_file, output_directory):
     terms = {}
     rels = []
     if 'go_ontology_url' in urls:
-        filename = utils.download_file(url=urls['go_ontology_url'], data_dir='data')
+        filename = utils.download_file(url=urls['go_ontology_url'], data_dir='data/downloads')
         graph = utils.convertOBOtoNet(filename)
         for term, attr in graph.nodes(data=True):
             if "name" in attr:

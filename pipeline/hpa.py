@@ -13,12 +13,12 @@ def read_cell_types(config_file):
     urls = utils.read_config(filepath=config_file, field='urls')
 
     if 'hpa_single_cell_tissue_url' in urls:
-        filename = utils.download_file(url=urls['hpa_single_cell_tissue_url'], data_dir='data')
+        filename = utils.download_file(url=urls['hpa_single_cell_tissue_url'], data_dir='data/downloads')
 
     hpa_file = utils.read_zipped_file(filepath=filename)
     data = pd.read_csv(hpa_file, sep='\t', header=0)
-    data = data.sort_values(by='pTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
-    data = data[data['pTPM'] > 0.0]
+    data = data.sort_values(by='nTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
+    data = data[data['nTPM'] > 0.0]
     
     return data
 

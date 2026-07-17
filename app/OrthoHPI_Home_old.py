@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import web_utils
 import streamlit as st
@@ -10,7 +12,8 @@ hv.extension('bokeh')
 from streamlit_bokeh import streamlit_bokeh
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
-st.session_state.sidebar_state = 'collapsed'
+st.session_state.data_dir = 'data-old'
+st.session_state.config_file = 'config.yml'
 style.load_css()
 
 page = web_utils.show_pages_menu(index=0)
@@ -21,16 +24,16 @@ elif page == "Predicted PPI structures":
 elif page == "About":
     st.switch_page('pages/3_About.py')
     
-        
 
 # Read dataset
-config = utils.read_config('config.yml')
-predictions = utils.read_parquet_file(input_file='data/predictions.parquet')
+config = utils.read_config(web_utils.get_config_file())
+data_dir = web_utils.get_data_dir()
+predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
 predictions['weight'] = predictions['weight'].astype(float)
-tissues = utils.read_parquet_file(input_file='data/tissues_cell_types.parquet')
+tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 tissues = None
-ontology = utils.read_parquet_file(input_file='data/go_ontology.parquet')
+ontology = utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 #Initialize variables
 df_select = None
@@ -55,7 +58,7 @@ def filter_tissues(config, df):
 
 
 @st.cache_data
-def generate_tissue_cell_type_box(df, config):
+def generate_tissue_cell_type_box(df, config, data_dir):
     aux = df.copy()
     aux['Cell type'] = aux['Cell type'].fillna("Not available")
     aux = filter_tissues(config, aux)
@@ -65,8 +68,9 @@ def generate_tissue_cell_type_box(df, config):
     counts_cells = counts_cells.rename({'taxid2':'edges_cell_type'}, axis=1)
     aux = pd.merge(aux, counts_tissues, on=['taxid1', 'Tissue'], how='left')
     aux = pd.merge(aux, counts_cells, on=['taxid1', 'Tissue', 'Cell type'], how='left')
+    tpm_col = 'nTPM' if 'nTPM' in aux.columns else 'pTPM'
     fig = px.icicle(aux, path=[px.Constant("Parasites"), 'taxid1_label', 'Tissue', 'Cell type'], values='edges_cell_type',
-                  color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', 'pTPM'],
+                  color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', tpm_col],
                   color_continuous_scale='Burgyl', height=900, width=1200, maxdepth=-1)
 
     return fig
@@ -146,7 +150,7 @@ for stats_fig, title in stats_figs:
         st.plotly_chart(stats_fig, use_container_width=True)
     i += 1
 
-fig = generate_tissue_cell_type_box(pred_tissues, config)
+fig = generate_tissue_cell_type_box(pred_tissues, config, data_dir)
 with chart2:
     st.subheader("Summary of Interactions per Tissue and Cell type")
     st.plotly_chart(fig, use_container_width=True)

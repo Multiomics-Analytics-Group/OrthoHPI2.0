@@ -9,7 +9,7 @@ def apply_tissue_filter(config_file, valid_proteins, cutoff):
         proteins = valid_proteins[taxid]
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
-            filename = utils.download_file(url=url, data_dir='data')
+            filename = utils.download_file(url=url, data_dir='data/downloads')
             tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping)
     
         valid_proteins[taxid] = proteins
@@ -65,7 +65,7 @@ def apply_compartment_filter(config_file, valid_proteins, cutoff):
         #print("C before", len(proteins))
         if 'compartments_url' in hosts[taxid]:
             url = hosts[taxid]['compartments_url']
-            filename = utils.download_file(url=url, data_dir='data')
+            filename = utils.download_file(url=url, data_dir='data/downloads')
             compartments, proteins = get_compartments(config_file, filename, proteins, cutoff)
     
         valid_proteins[taxid] = proteins

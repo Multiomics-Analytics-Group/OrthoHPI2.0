@@ -141,3 +141,6 @@ claude/
 
 # macOS
 .DS_Store
+
+# claude
+.claude

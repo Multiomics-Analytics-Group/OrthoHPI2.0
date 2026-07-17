@@ -72,7 +72,7 @@ def main(config_file, data_dir, deeploc_dir):
         valid_ids = filter_by_localization(df, multicellular)
         print(f"  Proteins passing localization filter: {len(valid_ids)}")
 
-        source_fasta = os.path.join(data_dir, "downloads", f"{taxid}.protein.sequences.v11.5.fa")
+        source_fasta = os.path.join(data_dir, "downloads", "species", str(taxid), f"{taxid}.protein.sequences.v11.5.fa")
         if not os.path.exists(source_fasta):
             print(f"  SKIP: source FASTA not found: {source_fasta}")
             continue

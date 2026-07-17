@@ -34,7 +34,7 @@ def parse_proteins(string_file, taxid):
     """
     proteins = {}
     if string_file is not None:
-        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir='data/downloads')
+        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
         sp = utils.read_gzipped_file(filename)
         first = True
         for line in sp:
@@ -61,18 +61,21 @@ def get_tissue_cell_type_annotation(tissues, output_file):
     utils.save_to_parquet(tissues_df, output_file)
 
 
+PER_SPECIES_URLS = {"string_protein_url", "string_ppi_url", "string_go_url", "string_alias_url", "string_sequences_url"}
+
+
 def setup(config_file, output_file_path):
     """
     Downloads all necessary files according to the urls specified in the configuration file
-    except the protein files and host PPIs that are downloaded for each species. The go terms
-    will also be downloaded and formatted.
-    
+    except the ones templated per species (contain a TAXID placeholder), which are
+    downloaded elsewhere once a taxid is known. The go terms will also be downloaded and formatted.
+
     :param str config_file: path to the configuration file
     """
     urls = utils.read_config(filepath=config_file, field='urls')
     for url_name in urls:
         url = urls[url_name]
-        if url_name != "string_protein_url" and url_name != "string_ppi_url" and url_name != "string_go_url":
+        if url_name not in PER_SPECIES_URLS:
             filename = utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
     
     go.get_gene_ontology(config_file, output_dir=output_file_path)

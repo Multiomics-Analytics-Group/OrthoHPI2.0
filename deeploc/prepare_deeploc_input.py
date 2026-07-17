@@ -31,7 +31,7 @@ def main(config_file, data_dir):
         label = info.get("label", str(taxid))
         print(f"[{taxid}] {label}")
 
-        gz_path = utils.download_file(url=seq_url_template.replace("TAXID", str(taxid)), data_dir=os.path.join(data_dir, "downloads"))
+        gz_path = utils.download_file(url=seq_url_template.replace("TAXID", str(taxid)), data_dir=os.path.join(data_dir, "downloads", "species", str(taxid)))
 
         out_path = os.path.join(out_dir, f"{taxid}.fasta")
         print(f"  Decompressing to {out_path}")

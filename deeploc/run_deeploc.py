@@ -90,7 +90,7 @@ def main(config_file, data_dir):
         multicellular = info.get("multicellular", False)
         print(f"\n[{taxid}] {label} ({'multicellular' if multicellular else 'unicellular'})")
 
-        fa_path = download_sequences(taxid, os.path.join(data_dir, "downloads"), seq_url_template)
+        fa_path = download_sequences(taxid, os.path.join(data_dir, "downloads", "species", str(taxid)), seq_url_template)
         csv_path = run_deeploc(fa_path, os.path.join(deeploc_dir, str(taxid)))
 
         valid_ids = filter_by_deeploc(csv_path, multicellular)

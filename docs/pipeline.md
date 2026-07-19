@@ -93,18 +93,18 @@ consumed by the Streamlit app, not a filter.
 
 ### 7. Homology transfer (`homology.get_eggnog_groups`, `homology.get_links`)
 
-This is where predictions actually get made, via **orthology-based transfer
-of STRING interactions**:
+The interaction predictions are made via orthology-based transfer
+of STRING interactions:
 
 1. `get_eggnog_groups` scans the EggNOG `2759_members.tsv.gz` file (level
    2759 = Eukaryota, built in stage 0) and keeps only groups that contain at
    least one of the filtered proteins from step 5.
 2. `get_links` scans STRING's `COG.links.detailed` file, which lists
    experimental/database evidence scores between orthology groups. Note this
-   file only ever names groups as `COG####`/`KOG####`/`NOG####`, while most
-   EggNOG groups at level 2759 have hash-style ids (e.g. `2QPHS`) that appear
-   nowhere in it. Only the ~4.8k `KOG` groups can therefore contribute
-   predictions — the other ~95% of matched groups are silently unusable.
+   file only names groups as `COG####`/`KOG####`/`NOG####`, while most
+   EggNOG groups at level 2759 have hash-style ids (e.g. `2QPHS`) that do not appear
+   in it. Only the ~4.8k `KOG` groups can therefore contribute
+   predictions.
    A link is kept if:
    - both groups are in `valid_groups`,
    - `experimental_evidence >= 0.7` OR `databases_evidence >= 0.7`,
@@ -116,9 +116,9 @@ of STRING interactions**:
    parasite protein always in `source_*` columns and the host protein in
    `target_*` columns.
 
-   In short: **if a parasite protein's orthology group is known to interact
+   In short: if a parasite protein's orthology group is known to interact
    (in STRING) with a human protein's orthology group, that interaction is
-   transferred to this specific parasite–host protein pair.**
+   transferred to this specific parasite–host protein pair.
 
 ### 8. UniProt alias annotation (`main.py` `__main__`, `utils.annotate_alias_id`)
 

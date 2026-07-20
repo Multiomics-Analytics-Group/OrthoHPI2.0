@@ -136,6 +136,9 @@ data/tmp/
 data/*.gz
 data/*.fa
 data-old/
+data-v11.5/
+data/Parasites_db.xlsx
+secretome-backup/
 jobs/
 claude/
 

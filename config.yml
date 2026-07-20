@@ -1,12 +1,12 @@
 urls:
-    string_protein_url: https://stringdb-static.org/download/protein.info.v11.5/TAXID.protein.info.v11.5.txt.gz
-    string_COG_url: https://stringdb-static.org/download/COG.links.detailed.v11.5.txt.gz
-    string_alias_url: https://stringdb-static.org/download/protein.aliases.v11.5/TAXID.protein.aliases.v11.5.txt.gz
-    eggNOG_members_url: http://eggnog5.embl.de/download/eggnog_5.0/per_tax_level/2759/2759_members.tsv.gz
-    string_ppi_url: https://stringdb-static.org/download/protein.links.detailed.v11.5/HOST.protein.links.detailed.v11.5.txt.gz
-    string_go_url: https://stringdb-static.org/download/protein.enrichment.terms.v11.5/TAXID.protein.enrichment.terms.v11.5.txt.gz
+    string_protein_url: https://stringdb-downloads.org/download/protein.info.v12.0/TAXID.protein.info.v12.0.txt.gz
+    string_COG_url: https://stringdb-downloads.org/download/COG.links.detailed.v12.0.txt.gz
+    string_alias_url: https://stringdb-downloads.org/download/protein.aliases.v12.0/TAXID.protein.aliases.v12.0.txt.gz
+    eggNOG_members_url: http://eggnog6.embl.de/download/eggnog_6.0/e6.og2seqs_and_species.tsv
+    string_ppi_url: https://stringdb-downloads.org/download/protein.links.detailed.v12.0/HOST.protein.links.detailed.v12.0.txt.gz
+    string_go_url: https://stringdb-downloads.org/download/protein.enrichment.terms.v12.0/TAXID.protein.enrichment.terms.v12.0.txt.gz
     go_ontology_url: http://current.geneontology.org/ontology/go.obo
-    string_sequences_url: https://stringdb-static.org/download/protein.sequences.v11.5/TAXID.protein.sequences.v11.5.fa.gz
+    string_sequences_url: https://stringdb-downloads.org/download/protein.sequences.v12.0/TAXID.protein.sequences.v12.0.fa.gz
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 hosts:
@@ -38,116 +38,213 @@ tissues:
     "BTO:0000511": gastrointestinal tract
     "BTO:0000671": kidney
     "BTO:0000123": bladder
+    "BTO:0000651": small intestine
+    "BTO:0000122": bile duct
+    "BTO:0001307": stomach
+    "BTO:0000752": lymph vessel
+    "BTO:0001418": urinary bladder
+    "BTO:0001158": rectum
+    "BTO:0000243": urethra
+    "BTO:0001426": vagina
+    "BTO:0000269": colon
 
 parasites:
+    53326:
+        label: Ancylostoma ceylanicum
+        color: "#33a02c"
+        tissues:
+            - "BTO:0000651"
+    6279:
+        label: Brugia malayi
+        color: "#ff7f00"
+        tissues:
+            - "BTO:0000752"
+    42155:
+        label: Brugia timori
+        color: "#fdb462"
+        tissues:
+            - "BTO:0000752"
+    79923:
+        label: Clonorchis sinensis
+        color: "#bc80bd"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0000122"
+    441375:
+        label: Cryptosporidium muris
+        color: "#8c510a"
+        tissues:
+            - "BTO:0001307"
+    318479:
+        label: Dracunculus medinensis
+        color: "#c51b7d"
+        tissues:
+            - "BTO:0001307"
+    6210:
+        label: Echinococcus granulosus
+        color: "#d6604d"
+        tissues:
+            - "BTO:0000651"
+            - "BTO:0000759"
+            - "BTO:0000763"
     5759:
         label: Entamoeba histolytica
         color: "#b2df8a"
         tissues:
-            - "BTO:0000648"
-    5741:
-        label: Giardia intestinalis
-        color: "#33a02c"
+            - "BTO:0000651"
+            - "BTO:0000759"
+            - "BTO:0000142"
+            - "BTO:0000763"
+    51028:
+        label: Enterobius vermicularis
+        color: "#9f5511"
         tissues:
-            - "BTO:0000648"
-    5664: 
+            - "BTO:0000651"
+    6216:
+        label: Hymenolepis diminuta
+        color: "#1f78b4"
+        tissues:
+            - "BTO:0000651"
+    6945:
+        label: Ixodes scapularis
+        color: "#a6cee3"
+        tissues:
+            - "BTO:0001253"
+    5671:
+        label: Leishmania infantum
+        color: "#e31a1c"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0001281"
+            - "BTO:0000141"
+    5664:
         label: Leishmania major
         color: "#fb9a99"
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
-            - "BTO:0000840"
-            - "BTO:0001090"
-            - "BTO:0001202"
-    5671: 
-        label: Leishmania infantum
-        color: "#e31a1c"
-        tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000759"
-            - "BTO:0001281"
-            - "BTO:0000141"
-    5679: 
-        label: Leishmania panamensis
-        color: "#ff7f00"
-        tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000759"
-            - "BTO:0001281"
-            - "BTO:0000141"
-    7209: 
+    7209:
         label: Loa loa
         color: "#fdbf6f"
         tissues:
             - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000439" 
-    5833: 
+    51031:
+        label: Necator americanus
+        color: "#80b1d3"
+        tissues:
+            - "BTO:0000651"
+    6282:
+        label: Onchocerca volvulus
+        color: "#fccde5"
+        tissues:
+            - "BTO:0001253"
+    147828:
+        label: Opisthorchis felineus
+        color: "#ccebc5"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0000651"
+    36329:
         label: Plasmodium falciparum
         color: "#6a3d9a"
-        tissues: 
+        tissues:
             - "BTO:0001253"
-            - "BTO:0000089"
             - "BTO:0000759"
-    5850: 
+            - "BTO:0000089"
+    5851:
         label: Plasmodium knowlesi
         color: "#ffff99"
         tissues:
             - "BTO:0001253"
-            - "BTO:0000089"
             - "BTO:0000759"
-    5855: 
+            - "BTO:0000089"
+    126793:
         label: Plasmodium vivax
         color: "#b15928"
-        tissues: 
+        tissues:
             - "BTO:0001253"
-            - "BTO:0000089"
             - "BTO:0000759"
-    6183: 
+            - "BTO:0000089"
+    6185:
+        label: Schistosoma haematobium
+        color: "#2166ac"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0001418"
+            - "BTO:0001158"
+    6182:
+        label: Schistosoma japonicum
+        color: "#bcbddc"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000759"
+            - "BTO:0000651"
+    6183:
         label: Schistosoma mansoni
         color: "#8dd3c7"
         tissues:
             - "BTO:0001253"
-            - "BTO:0000089"
             - "BTO:0000759"
-            - "BTO:0000763"
             - "BTO:0000648"
-    5811: 
+            - "BTO:0000763"
+            - "BTO:0000089"
+    6248:
+        label: Strongyloides stercoralis
+        color: "#3f007d"
+        tissues:
+            - "BTO:0000651"
+    60517:
+        label: Taenia asiatica
+        color: "#ffed6f"
+        tissues:
+            - "BTO:0000651"
+    432359:
         label: Toxoplasma gondii
         color: "#fb8072"
         tissues:
             - "BTO:0000089"
-            - "BTO:0000887"
-            - "BTO:0000439"
             - "BTO:0000142"
+            - "BTO:0000439"
             - "BTO:0000562"
+            - "BTO:0000887"
             - "BTO:0001078"
-    6334: 
-        label: Trichinella spiralis
-        color: "#fdb462"
+    72359:
+        label: Trachipleistophora hominis
+        color: "#bebada"
         tissues:
             - "BTO:0000887"
-            - "BTO:0000562"
-            - "BTO:0000763"
+            - "BTO:0000439"
+    45882:
+        label: Trichinella britovi
+        color: "#f16913"
+        tissues:
             - "BTO:0000648"
-            - "BTO:0000142"
-    5722: 
+            - "BTO:0000887"
+    6335:
+        label: Trichinella nativa
+        color: "#41ab5d"
+        tissues:
+            - "BTO:0000648"
+            - "BTO:0000887"
+    6336:
+        label: Trichinella nelsoni
+        color: "#807dba"
+        tissues:
+            - "BTO:0000648"
+            - "BTO:0000887"
+    5722:
         label: Trichomonas vaginalis
         color: "#b3de69"
         tissues:
-            - "BTO:0003091"
-    5691: 
-        label: Trypanosoma brucei
-        color: "#bc80bd"
+            - "BTO:0000243"
+            - "BTO:0001426"
+    36087:
+        label: Trichuris trichiura
+        color: "#e7298a"
         tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000784"
-            - "BTO:0001279"
-            - "BTO:0000142"
-    5693: 
+            - "BTO:0000651"
+            - "BTO:0000269"
+    353153:
         label: Trypanosoma cruzi
         color: "#01665e"
         tissues:
@@ -155,58 +252,15 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000089"
             - "BTO:0000439"
-    5808: 
-        label: Cryptosporidium muris
-        color: "#8c510a"
+    993615:
+        label: Vittaforma corneae
+        color: "#66a61e"
         tissues:
-            - "BTO:0000511"
-            - "BTO:0000648"
-    5865: 
-        label: Babesia bovis
-        color: "#c51b7d"
+            - "BTO:0000439"
+    6293:
+        label: Wuchereria bancrofti
+        color: "#e6ab02"
         tissues:
             - "BTO:0000089"
-    5660: 
-        label: Leishmania braziliensis
-        color: "#d6604d"
-        tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000840"
-            - "BTO:0001090"
-            - "BTO:0001202"
-    6185: 
-        label: Schistosoma haematobium
-        color: "#2166ac"
-        tissues:
-            - "BTO:0000123"
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000671"
-    6182: 
-        label: Schistosoma japonicum
-        color: "#bcbddc"
-        tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000759"
-            - "BTO:0000763"
-            - "BTO:0000648"
-    6248: 
-        label: Strongyloides stercoralis
-        color: "#3f007d"
-        tissues:
-            - "BTO:0001253"
-            - "BTO:0000089"
-            - "BTO:0000763"
-            - "BTO:0000648"
-    6211:
-        label: Echinococcus multilocularis
-        color: "#9f5511"
-        tissues:
-            - "BTO:0000648"
-            - "BTO:0000089"
-            - "BTO:0000759"
-            - "BTO:0000763"
-            - "BTO:0000142"
-            - "BTO:0000562"
+            - "BTO:0000784"
+            - "BTO:0000752"

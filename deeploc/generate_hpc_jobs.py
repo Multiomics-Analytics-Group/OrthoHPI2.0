@@ -5,7 +5,7 @@ Usage:
     python generate_hpc_jobs.py --work-dir /work3/idamei/orthohpi
 
 This assumes:
-  - Protein sequence FASTAs are at {work_dir}/data/TAXID.protein.sequences.v11.5.fa
+  - Protein sequence FASTAs are at {work_dir}/data/TAXID.protein.sequences.v12.0.fa
   - DeepLoc venv is at {work_dir}/deeploc_venv
   - Output goes to {work_dir}/data/deeploc_output/TAXID/
 

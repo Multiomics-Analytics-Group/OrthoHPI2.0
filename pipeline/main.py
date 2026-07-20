@@ -63,19 +63,24 @@ def get_tissue_cell_type_annotation(tissues, output_file):
 
 PER_SPECIES_URLS = {"string_protein_url", "string_ppi_url", "string_go_url", "string_alias_url", "string_sequences_url"}
 
+# The EggNOG 6 source file is ~10 GB and covers every tax level; it is streamed and
+# filtered down to level 2759 by pipeline/prepare_eggnog_members.py instead.
+PREPROCESSED_URLS = {"eggNOG_members_url"}
+
 
 def setup(config_file, output_file_path):
     """
     Downloads all necessary files according to the urls specified in the configuration file
     except the ones templated per species (contain a TAXID placeholder), which are
-    downloaded elsewhere once a taxid is known. The go terms will also be downloaded and formatted.
+    downloaded elsewhere once a taxid is known, and the ones prepared by a separate
+    script. The go terms will also be downloaded and formatted.
 
     :param str config_file: path to the configuration file
     """
     urls = utils.read_config(filepath=config_file, field='urls')
     for url_name in urls:
         url = urls[url_name]
-        if url_name not in PER_SPECIES_URLS:
+        if url_name not in PER_SPECIES_URLS and url_name not in PREPROCESSED_URLS:
             filename = utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
     
     go.get_gene_ontology(config_file, output_dir=output_file_path)
@@ -115,7 +120,10 @@ if __name__ == "__main__":
 
     print("Getting EggNOG groups and transferring PPIs...")
     cog_filename = urls['string_COG_url'].split('/')[-1]
-    valid_groups = homology.get_eggnog_groups(filepath=os.path.join(downloads_dir, '2759_members.tsv.gz'), proteins=proteins.keys())
+    members_file = os.path.join(downloads_dir, '2759_members.tsv.gz')
+    if not os.path.isfile(members_file):
+        raise SystemExit(f"{members_file} not found — run 'python -m pipeline.prepare_eggnog_members' first")
+    valid_groups = homology.get_eggnog_groups(filepath=members_file, proteins=proteins.keys())
     print(f"  {len(valid_groups)} valid EggNOG groups")
     from collections import Counter
     taxid_counts = Counter()
@@ -128,14 +136,14 @@ if __name__ == "__main__":
               ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
 
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
-    predictions = utils.annotate_alias_id(predictions_df=predictions, 
-                            taxids=list(parasites.keys()), config_file=config_file, 
-                            sources=['BLAST_UniProt_AC'], new_col="source_uniprot", 
+    predictions = utils.annotate_alias_id(predictions_df=predictions,
+                            taxids=list(parasites.keys()), config_file=config_file,
+                            sources=['Uniprot'], new_col="source_uniprot",
                             mapping_col="source")
-    
-    predictions = utils.annotate_alias_id(predictions_df=predictions, 
-                            taxids=list(hosts.keys()), config_file=config_file, 
-                            sources=['Ensembl_HGNC_UniProt_ID(supplied_by_UniProt)'], 
+
+    predictions = utils.annotate_alias_id(predictions_df=predictions,
+                            taxids=list(hosts.keys()), config_file=config_file,
+                            sources=['Ensembl_HGNC_uniprot_ids'],
                             new_col="target_uniprot", mapping_col="target")
     
     utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'annotated_predictions.parquet'))

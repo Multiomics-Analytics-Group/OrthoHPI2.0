@@ -6,25 +6,37 @@ host-parasite PPI predictions in `data/annotated_predictions.parquet` get
 built. 
 
 Everything is driven by `config.yml`: `urls` (data sources), `hosts` (only
-human, 9606, currently), and `parasites` (24 species, each with a STRING
+human, 9606, currently), and `parasites` (35 species, each with a STRING
 taxid, a display label/color, and the list of BTO tissue codes relevant to
 that parasite's life cycle).
 
+Data sources are STRING v12.0 and EggNOG 6.
+
 ## Stages
+
+### 0. Build the EggNOG members file (`pipeline/prepare_eggnog_members.py`)
+
+Run once, before `main.py`. EggNOG 6 no longer publishes per-tax-level
+downloads, so the Eukaryota (2759) groups have to be extracted from
+`e6.og2seqs_and_species.tsv` (~10 GB, every tax level). The script streams
+and filters that file and writes `data/downloads/2759_members.tsv.gz` in
+EggNOG 5's column layout, so the rest of the pipeline is unchanged. `main.py`
+stops with an error if the file is missing.
 
 ### 1. Setup — download reference files (`main.setup`)
 
-Downloads every URL in `config.yml` except the three that are
-per-species templates (`string_protein_url`, `string_ppi_url`,
-`string_go_url` — these contain a `TAXID` placeholder and are fetched later,
-once per species). Also triggers `go.get_gene_ontology`, which downloads the
-GO OBO ontology and STRING's per-protein GO annotations and writes
-`gos.parquet` / `go_ontology.parquet`.
+Downloads every URL in `config.yml` except the per-species templates
+(`string_protein_url`, `string_ppi_url`, `string_go_url`,
+`string_alias_url`, `string_sequences_url` — these contain a `TAXID`
+placeholder and are fetched later, once per species) and
+`eggNOG_members_url` (handled by stage 0). Also triggers
+`go.get_gene_ontology`, which downloads the GO OBO ontology and STRING's
+per-protein GO annotations and writes `gos.parquet` / `go_ontology.parquet`.
 
 ### 2. Get proteins (`main.get_proteins`)
 
 For every host + parasite taxid, downloads
-`protein.info.v11.5/{taxid}...txt.gz` from STRING and builds
+`protein.info.v12.0/{taxid}...txt.gz` from STRING and builds
 `{taxid: {ensembl_protein_id: protein_name}}`. This is the set of
 candidate proteins that every later filter narrows down.
 
@@ -81,15 +93,19 @@ consumed by the Streamlit app, not a filter.
 
 ### 7. Homology transfer (`homology.get_eggnog_groups`, `homology.get_links`)
 
-This is where predictions actually get made, via **orthology-based transfer
-of STRING interactions**:
+The interaction predictions are made via orthology-based transfer
+of STRING interactions:
 
 1. `get_eggnog_groups` scans the EggNOG `2759_members.tsv.gz` file (level
-   2759 = Eukaryota) and keeps only groups that contain at least one of the
-   filtered proteins from step 5.
+   2759 = Eukaryota, built in stage 0) and keeps only groups that contain at
+   least one of the filtered proteins from step 5.
 2. `get_links` scans STRING's `COG.links.detailed` file, which lists
-   experimental/database evidence scores between EggNOG groups. A link is
-   kept if:
+   experimental/database evidence scores between orthology groups. Note this
+   file only names groups as `COG####`/`KOG####`/`NOG####`, while most
+   EggNOG groups at level 2759 have hash-style ids (e.g. `2QPHS`) that do not appear
+   in it. Only the ~4.8k `KOG` groups can therefore contribute
+   predictions.
+   A link is kept if:
    - both groups are in `valid_groups`,
    - `experimental_evidence >= 0.7` OR `databases_evidence >= 0.7`,
    - one member is a host protein and the other a parasite protein (same
@@ -100,9 +116,9 @@ of STRING interactions**:
    parasite protein always in `source_*` columns and the host protein in
    `target_*` columns.
 
-   In short: **if a parasite protein's orthology group is known to interact
+   In short: if a parasite protein's orthology group is known to interact
    (in STRING) with a human protein's orthology group, that interaction is
-   transferred to this specific parasite–host protein pair.**
+   transferred to this specific parasite–host protein pair.
 
 ### 8. UniProt alias annotation (`main.py` `__main__`, `utils.annotate_alias_id`)
 

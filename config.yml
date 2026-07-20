@@ -17,12 +17,12 @@ hosts:
         compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
     10116:
         label: Rattus norvegicus
-        color: "#969696"
+        color: "#1b7837"
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
         compartments_url: https://download.jensenlab.org/rat_compartment_integrated_full.tsv
     9823:
         label: Sus scrofa
-        color: "#d9d9d9"
+        color: "#762a83"
         tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
         # jensenlab has no integrated compartment file for pig; compartment filter is skipped for this host
 

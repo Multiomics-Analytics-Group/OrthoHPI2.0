@@ -137,6 +137,8 @@ data/*.gz
 data/*.fa
 data-old/
 data-v11.5/
+data-v12-humanonly/
+docs/data_versions.md
 data/Parasites_db.xlsx
 secretome-backup/
 jobs/

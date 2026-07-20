@@ -88,33 +88,31 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
                     taxid1 = protein1.split('.')[0]
                     for protein2 in valid_groups[group2]:
                         taxid2 = protein2.split('.')[0]
-                        if int(taxid1) in hosts or int(taxid2) in hosts:
-                            if taxid1 != taxid2:
-                                if (protein1, protein2) not in seen:
-                                    if int(taxid1) in hosts:
-                                        target_taxid = taxid1
-                                        target_group = group1
-                                        target_protein = protein1
-                                        source_taxid = taxid2
-                                        source_group = group2
-                                        source_protein = protein2
-                                    else:
-                                        target_taxid = taxid2
-                                        target_group = group2
-                                        target_protein = protein2
-                                        source_taxid = taxid1
-                                        source_group = group1
-                                        source_protein = protein1
-                                    links.append([source_taxid, parasites[int(source_taxid)]['label'], 
-                                                parasites[int(source_taxid)]['color'], 'diamond', source_protein, 
-                                                proteins[source_protein],
-                                                target_taxid, hosts[int(target_taxid)]['label'], 
-                                                hosts[int(target_taxid)]['color'], 'dot', target_protein, 
-                                                proteins[target_protein],
-                                                str(experimental_evidence), str(databases_evidence), str(average_score), 
-                                                source_group, target_group, "inter-species"])
-                                    seen.add((protein1, protein2))
-                                    seen.add((protein2, protein1))
+                        taxid1_is_host = int(taxid1) in hosts
+                        taxid2_is_host = int(taxid2) in hosts
+                        # keep only host-parasite pairs; skip host-host and parasite-parasite
+                        if taxid1_is_host != taxid2_is_host and taxid1 != taxid2:
+                            if (protein1, protein2) not in seen:
+                                if taxid1_is_host:
+                                    target_taxid, target_group, target_protein = taxid1, group1, protein1
+                                    source_taxid, source_group, source_protein = taxid2, group2, protein2
+                                else:
+                                    target_taxid, target_group, target_protein = taxid2, group2, protein2
+                                    source_taxid, source_group, source_protein = taxid1, group1, protein1
+                                # restrict to hosts this parasite actually infects
+                                allowed_hosts = parasites[int(source_taxid)].get('hosts')
+                                if allowed_hosts is not None and int(target_taxid) not in allowed_hosts:
+                                    continue
+                                links.append([source_taxid, parasites[int(source_taxid)]['label'],
+                                            parasites[int(source_taxid)]['color'], 'diamond', source_protein,
+                                            proteins[source_protein],
+                                            target_taxid, hosts[int(target_taxid)]['label'],
+                                            hosts[int(target_taxid)]['color'], 'dot', target_protein,
+                                            proteins[target_protein],
+                                            str(experimental_evidence), str(databases_evidence), str(average_score),
+                                            source_group, target_group, "inter-species"])
+                                seen.add((protein1, protein2))
+                                seen.add((protein2, protein1))
     links_df = pd.DataFrame(links, columns=cols)
     print(f"  {len(links_df)} total interactions")
     if not links_df.empty:

@@ -5,18 +5,20 @@ import utils
 def apply_tissue_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     tissue_mapping = utils.read_config(filepath=config_file, field='tissues')
+    tissues = {}
     for taxid in hosts:
         proteins = valid_proteins[taxid]
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
             filename = utils.download_file(url=url, data_dir='data/downloads')
-            tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping)
-    
+            host_tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping, taxid)
+            tissues.update(host_tissues)
+
         valid_proteins[taxid] = proteins
 
     return tissues
 
-def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping):
+def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping, taxid):
     """
     Get protein tissue expression for relevant tissues in the lifecycle of the
     studied parasites
@@ -44,7 +46,7 @@ def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping):
                 continue
             
             data = line.rstrip().split('\t')
-            protein  = "9606."+data[0]
+            protein  = f"{taxid}."+data[0]
             tissue = data[2]
             score = float(data[6])
             
@@ -60,21 +62,23 @@ def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping):
 
 def apply_compartment_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
+    compartments = {}
     for taxid in hosts:
         proteins = valid_proteins[taxid]
         #print("C before", len(proteins))
         if 'compartments_url' in hosts[taxid]:
             url = hosts[taxid]['compartments_url']
             filename = utils.download_file(url=url, data_dir='data/downloads')
-            compartments, proteins = get_compartments(config_file, filename, proteins, cutoff)
-    
+            host_compartments, proteins = get_compartments(config_file, filename, proteins, cutoff, taxid)
+            compartments.update(host_compartments)
+
         valid_proteins[taxid] = proteins
         #print("C after", len(valid_proteins[taxid]))
-    
+
     return compartments
 
 
-def get_compartments(config_file, compartments_file, valid_proteins, cutoff):
+def get_compartments(config_file, compartments_file, valid_proteins, cutoff, taxid):
     """
     Get protein cellular compartment expression relevant in the lifecycle of the
     studied parasites
@@ -105,7 +109,7 @@ def get_compartments(config_file, compartments_file, valid_proteins, cutoff):
                 continue
             
             data = line.rstrip().split('\t')
-            protein  = "9606."+data[0]
+            protein  = f"{taxid}."+data[0]
             compartment = data[2]
             score = float(data[4])
             if protein in valid_proteins and score >= cutoff and compartment in valid_compartments:

@@ -12,8 +12,8 @@ hv.extension('bokeh')
 from streamlit_bokeh import streamlit_bokeh
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
-st.session_state.data_dir = 'data-old'
-st.session_state.config_file = 'config.yml'
+st.session_state.data_dir = 'snapshots/data-old'
+st.session_state.config_file = 'snapshots/config-v11.5.yml'
 style.load_css()
 
 page = web_utils.show_pages_menu(index=0)

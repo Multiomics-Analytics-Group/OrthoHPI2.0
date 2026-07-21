@@ -134,11 +134,11 @@ data/deeploc/
 data/tmp/
 data/*.gz
 data/*.fa
-data-old/
-data-v11.5/
-data-v12-humanonly/
+snapshots/
 docs/data_versions.md
 data/Parasites_db.xlsx
+config-v11.5.yml
+config-v12-humanonly.yml
 secretome-backup/
 jobs/
 claude/

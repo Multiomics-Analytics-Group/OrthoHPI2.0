@@ -30,7 +30,7 @@ TEMPLATE = """\
 #BSUB -R "span[hosts=1]"
 #BSUB -R "rusage[mem=8GB]"
 #BSUB -gpu "num=1:mode=exclusive_process"
-#BSUB -W 04:00
+#BSUB -W 01:00
 #BSUB -B
 #BSUB -N
 #BSUB -o {work_dir}/logs/deeploc_{taxid}_%J.out
@@ -51,13 +51,24 @@ echo "End: $(date)"
 """
 
 
-def main(config_file, work_dir):
-    parasites = utils.read_config(filepath=config_file, field="parasites")
+def select_species(config_file, taxids):
+    """Return {taxid: info} to run for. Defaults to config parasites; if taxids is
+    given, pick those from hosts+parasites (so host taxids can be targeted too)."""
+    hosts = utils.read_config(filepath=config_file, field="hosts") or {}
+    parasites = utils.read_config(filepath=config_file, field="parasites") or {}
+    if taxids is None:
+        return parasites
+    species = {**hosts, **parasites}
+    return {t: species.get(t, {}) for t in taxids}
+
+
+def main(config_file, work_dir, taxids=None):
+    selected = select_species(config_file, taxids)
 
     jobs_dir = "jobs"
     os.makedirs(jobs_dir, exist_ok=True)
 
-    for taxid, info in parasites.items():
+    for taxid, info in selected.items():
         label = info.get("label", str(taxid)).replace(" ", "_")
         script = TEMPLATE.format(taxid=taxid, work_dir=work_dir)
 
@@ -74,5 +85,8 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="config.yml")
     parser.add_argument("--work-dir", default="/work3/idamei/orthohpi",
                         help="Base directory on HPC")
+    parser.add_argument("--taxids", help="comma-separated taxids to run for (default: config parasites); "
+                                         "accepts host taxids too, e.g. 9606,10116,9823")
     args = parser.parse_args()
-    main(args.config, args.work_dir)
+    taxids = [int(t) for t in args.taxids.split(",")] if args.taxids else None
+    main(args.config, args.work_dir, taxids=taxids)

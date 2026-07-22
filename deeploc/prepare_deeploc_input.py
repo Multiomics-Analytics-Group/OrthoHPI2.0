@@ -20,14 +20,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 
 
-def main(config_file, data_dir):
-    parasites = utils.read_config(filepath=config_file, field="parasites")
+def select_species(config_file, taxids):
+    """Return {taxid: info} to run for. Defaults to config parasites; if taxids is
+    given, pick those from hosts+parasites (so host taxids can be targeted too)."""
+    hosts = utils.read_config(filepath=config_file, field="hosts") or {}
+    parasites = utils.read_config(filepath=config_file, field="parasites") or {}
+    if taxids is None:
+        return parasites
+    species = {**hosts, **parasites}
+    return {t: species.get(t, {}) for t in taxids}
+
+
+def main(config_file, data_dir, taxids=None):
+    selected = select_species(config_file, taxids)
     urls = utils.read_config(filepath=config_file, field="urls")
     seq_url_template = urls["string_sequences_url"]
     out_dir = os.path.join(data_dir, "deeploc", "input")
     os.makedirs(out_dir, exist_ok=True)
 
-    for taxid, info in parasites.items():
+    for taxid, info in selected.items():
         label = info.get("label", str(taxid))
         print(f"[{taxid}] {label}")
 
@@ -43,5 +54,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare input FASTAs for DeepLoc 2 on HPC")
     parser.add_argument("--config", default="config.yml")
     parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--taxids", help="comma-separated taxids to run for (default: config parasites); "
+                                         "accepts host taxids too, e.g. 9606,10116,9823")
     args = parser.parse_args()
-    main(args.config, args.data_dir)
+    taxids = [int(t) for t in args.taxids.split(",")] if args.taxids else None
+    main(args.config, args.data_dir, taxids=taxids)

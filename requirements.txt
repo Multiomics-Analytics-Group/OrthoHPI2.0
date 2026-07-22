@@ -1,11 +1,11 @@
 biopython==1.87
-holoviews==1.15.0
+holoviews>=1.20
 networkx>=2.8.6
 notebook==6.4.12
 numpy==1.23.3
 obonet==1.1.1
 pandas>=1.4.4
-plotly==5.10.0
+plotly>=5.23.0,<6
 python-circos==0.3.0
 pyvis==0.3.2 
 PyYAML==6.0

@@ -25,26 +25,26 @@ def get_proteins(config_file):
     if "string_protein_url" not in urls or hosts is None or parasites is None:
         return proteins
 
-    string_file = urls['string_protein_url']
+    string_url = urls['string_protein_url']
     for taxid in list(hosts.keys()) + list(parasites.keys()):
-        proteins[taxid] = get_species_proteins(string_file, taxid)
+        proteins[taxid] = get_species_proteins(string_url, taxid)
 
     return proteins
 
 
-def get_species_proteins(string_file, taxid):
+def get_species_proteins(string_url, taxid):
     """
     Download and parse the STRING protein.info file for a single species.
-    :param str string_file: url template to the STRING protein.info file (contains TAXID)
+    :param str string_url: url template to the STRING protein.info file (contains TAXID)
     :param int taxid: taxonomic id of the species of interest
 
     :return: dictionary with all proteins. Key -> Ensembl protein id, value -> protein name
     """
     proteins = {}
-    if string_file is None:
+    if string_url is None:
         return proteins
 
-    filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
+    filename = utils.download_file(url=string_url.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
     with utils.read_gzipped_file(filename) as handle:
         next(handle, None)  # skip header
         for line in handle:
@@ -96,7 +96,7 @@ def setup(config_file, output_file_path):
         if url_name not in PER_SPECIES_URLS and url_name not in PREPROCESSED_URLS:
             utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
     
-    go.get_gene_ontology(config_file, output_dir=output_file_path)
+    go.get_go_annotations(config_file, output_dir=output_file_path)
 
 
 def print_group_counts(valid_groups):

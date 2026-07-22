@@ -1,8 +1,16 @@
 import os
+from collections import Counter
+
 import pandas as pd
+
 import utils
 from . import homology, filters, hpa, go
-   
+
+# jensenlab confidence score below which a host protein's tissue/compartment
+# evidence is ignored (same scale for both filters).
+TISSUE_CUTOFF = 2.5
+COMPARTMENT_CUTOFF = 2.5
+
 
 def get_proteins(config_file):
     """
@@ -14,50 +22,55 @@ def get_proteins(config_file):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
     urls = utils.read_config(filepath=config_file, field='urls')
-    if "string_protein_url" in urls:
-        string_file = urls['string_protein_url']
-        if hosts is not None and parasites is not None:
-            taxids = list(hosts.keys()) + list(parasites.keys())
-            for taxid in taxids:
-                proteins[taxid] = parse_proteins(string_file, taxid)
-    
+    if "string_protein_url" not in urls or hosts is None or parasites is None:
+        return proteins
+
+    string_url = urls['string_protein_url']
+    for taxid in list(hosts.keys()) + list(parasites.keys()):
+        proteins[taxid] = get_species_proteins(string_url, taxid)
+
     return proteins
 
 
-def parse_proteins(string_file, taxid):
+def get_species_proteins(string_url, taxid):
     """
-    Retrieve proteins for a given specie
-    :param str string_file: url to string PPI file
+    Download and parse the STRING protein.info file for a single species.
+    :param str string_url: url template to the STRING protein.info file (contains TAXID)
     :param int taxid: taxonomic id of the species of interest
-    
+
     :return: dictionary with all proteins. Key -> Ensembl protein id, value -> protein name
     """
     proteins = {}
-    if string_file is not None:
-        filename = utils.download_file(url=string_file.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
-        sp = utils.read_gzipped_file(filename)
-        first = True
-        for line in sp:
-            if first:
-                first = False
-                continue
-            
-            data = line.decode("utf-8").rstrip().split('\t')
-            identifier = data[0]
-            name = data[1]
+    if string_url is None:
+        return proteins
+
+    filename = utils.download_file(url=string_url.replace('TAXID', str(taxid)), data_dir=os.path.join('data/downloads/species', str(taxid)))
+    with utils.read_gzipped_file(filename) as handle:
+        next(handle, None)  # skip header
+        for line in handle:
+            identifier, name = line.decode("utf-8").rstrip().split('\t')[:2]
             proteins[identifier] = name
-            
+
     return proteins
 
 
-def get_tissue_cell_type_annotation(tissues, output_file):
-    tissues_df = pd.concat({k: pd.Series(v) for k, v in tissues.items()}).reset_index()
-    tissues_df = tissues_df.iloc[:, [0, 2]]
-    tissues_df.columns = ['Gene', 'Tissue']
+def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file):
+    """
+    Build the (Gene, Tissue, cell-type) annotation table and write it to parquet.
+    :param dict tissues: {protein_id: [tissue, ...]} from the tissue filter
+    :param dict proteins: valid {protein_id: name} after all filters
+    :param str config_file: path to the configuration file
+    :param str output_file: parquet path to write
+    """
+    tissues_df = pd.DataFrame(
+        [(gene, tissue) for gene, ts in tissues.items() for tissue in ts],
+        columns=['Gene', 'Tissue'],
+    )
     tissues_df = tissues_df[tissues_df['Gene'].isin(proteins.keys())]
+    # HPA cell types are human-only, so non-human host genes stay NaN after this left join
     hpa_data = hpa.parse_hpa(config_file, valid_proteins=proteins.keys())
     tissues_df = pd.merge(tissues_df, hpa_data, on=['Gene', 'Tissue'], how='left')
-    
+
     utils.save_to_parquet(tissues_df, output_file)
 
 
@@ -81,20 +94,49 @@ def setup(config_file, output_file_path):
     for url_name in urls:
         url = urls[url_name]
         if url_name not in PER_SPECIES_URLS and url_name not in PREPROCESSED_URLS:
-            filename = utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
+            utils.download_file(url=url, data_dir=os.path.join(output_file_path, 'downloads'))
     
-    go.get_gene_ontology(config_file, output_dir=output_file_path)
+    go.get_go_annotations(config_file, output_dir=output_file_path)
 
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='config.yml')
-    parser.add_argument('--data-dir', default='data')
-    args = parser.parse_args()
-    data_dir = args.data_dir
+def print_group_counts(valid_groups):
+    """Print how many proteins each species contributes to the matched EggNOG groups."""
+    taxid_counts = Counter()
+    for prots in valid_groups.values():
+        for p in prots:
+            taxid_counts[p.split('.')[0]] += 1
+    for taxid, count in sorted(taxid_counts.items()):
+        print(f"    taxid {taxid}: {count} proteins in EggNOG groups")
+
+
+def annotate_predictions(predictions, hosts, parasites, config_file):
+    """
+    Add source_uniprot / target_uniprot columns by mapping STRING ids to UniProt.
+
+    Parasites and hosts use different STRING alias source names in v12 (the v11.5
+    names BLAST_UniProt_AC / Ensembl_HGNC_UniProt_ID(supplied_by_UniProt) no longer
+    exist).
+    """
+    predictions = utils.annotate_alias_id(predictions_df=predictions,
+                            taxids=list(parasites.keys()), config_file=config_file,
+                            sources=['Uniprot'], new_col="source_uniprot",
+                            mapping_col="source")
+    predictions = utils.annotate_alias_id(predictions_df=predictions,
+                            taxids=list(hosts.keys()), config_file=config_file,
+                            sources=['Ensembl_HGNC_uniprot_ids'],
+                            new_col="target_uniprot", mapping_col="target")
+    return predictions
+
+
+def run(config_file, data_dir, verbose=False):
+    """
+    Run the full prediction pipeline and write the parquet outputs into data_dir.
+
+    :param str config_file: path to the configuration file
+    :param str data_dir: directory for downloads and output parquet files
+    :param bool verbose: print the per-taxid EggNOG protein counts
+    """
     downloads_dir = os.path.join(data_dir, 'downloads')
-    config_file = args.config
 
     print("Setup: downloading reference files...")
     setup(config_file=config_file, output_file_path=data_dir)
@@ -109,41 +151,43 @@ if __name__ == "__main__":
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/compartment filters...")
+    # proteins stays a {taxid: {protein: name}} dict through all three filters,
+    # then is flattened to one {protein: name} dict for the homology transfer
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
-    tissues = filters.apply_tissue_filter(config_file, proteins, cutoff=2.5)
-    compartments = filters.apply_compartment_filter(config_file, proteins, cutoff=2.5)
+    tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
+    # filters proteins in place per host; return value (compartments dict) is unused here
+    filters.apply_compartment_filter(config_file=config_file, valid_proteins=proteins, cutoff=COMPARTMENT_CUTOFF)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 
     print("Annotating tissue and cell type expression...")
-    get_tissue_cell_type_annotation(tissues, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))
+    get_tissue_cell_type_annotation(tissues=tissues, proteins=proteins, config_file=config_file, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))
 
     print("Getting EggNOG groups and transferring PPIs...")
+    # setup() saved the COG links file under its URL basename; rebuild that name to find it
     cog_filename = urls['string_COG_url'].split('/')[-1]
     members_file = os.path.join(downloads_dir, '2759_members.tsv.gz')
     if not os.path.isfile(members_file):
         raise SystemExit(f"{members_file} not found — run 'python -m pipeline.prepare_eggnog_members' first")
     valid_groups = homology.get_eggnog_groups(filepath=members_file, proteins=proteins.keys())
     print(f"  {len(valid_groups)} valid EggNOG groups")
-    from collections import Counter
-    taxid_counts = Counter()
-    for prots in valid_groups.values():
-        for p in prots:
-            taxid_counts[p.split('.')[0]] += 1
-    for taxid, count in sorted(taxid_counts.items()):
-        print(f"    taxid {taxid}: {count} proteins in EggNOG groups")
-    homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups, proteins=proteins,
-              ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
+    if verbose:
+        print_group_counts(valid_groups)
+    predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups,
+              proteins=proteins, config_file=config_file)
 
-    predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
-    predictions = utils.annotate_alias_id(predictions_df=predictions,
-                            taxids=list(parasites.keys()), config_file=config_file,
-                            sources=['Uniprot'], new_col="source_uniprot",
-                            mapping_col="source")
+    print("Annotating predictions with UniProt accessions...")
+    predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)
+    # single output: predictions plus source_uniprot / target_uniprot columns
+    utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'predictions.parquet'))
 
-    predictions = utils.annotate_alias_id(predictions_df=predictions,
-                            taxids=list(hosts.keys()), config_file=config_file,
-                            sources=['Ensembl_HGNC_uniprot_ids'],
-                            new_col="target_uniprot", mapping_col="target")
-    
-    utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'annotated_predictions.parquet'))
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='config.yml')
+    parser.add_argument('--data-dir', default='data')
+    parser.add_argument('--verbose', action='store_true', help='print per-taxid EggNOG protein counts')
+    args = parser.parse_args()
+
+    run(config_file=args.config, data_dir=args.data_dir, verbose=args.verbose)

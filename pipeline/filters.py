@@ -5,126 +5,116 @@ import utils
 def apply_tissue_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     tissue_mapping = utils.read_config(filepath=config_file, field='tissues')
+    tissues = {}
     for taxid in hosts:
         proteins = valid_proteins[taxid]
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
             filename = utils.download_file(url=url, data_dir='data/downloads')
-            tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping)
-    
+            host_tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping, taxid)
+            tissues.update(host_tissues)
+
         valid_proteins[taxid] = proteins
 
     return tissues
 
-def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping):
+
+def _filter_by_annotation(annotation_file, valid_proteins, cutoff, taxid, valid_values, score_col, transform):
     """
-    Get protein tissue expression for relevant tissues in the lifecycle of the
-    studied parasites
-    
+    Scan a jensenlab TSV and keep proteins whose annotation (column 2) is in valid_values
+    with a confidence score (score_col) of at least cutoff.
+
+    :param str annotation_file: path to the jensenlab tissue/compartment TSV
+    :param dict valid_proteins: {protein_id: name} candidates for this host
+    :param float cutoff: minimum confidence score accepted
+    :param taxid: host taxid, used to prefix the file's protein ids into STRING ids
+    :param set valid_values: annotation values (BTO tissue / GO compartment) to keep
+    :param int score_col: column index holding the confidence score
+    :param callable transform: maps a raw annotation value to how it is stored
+    :return: (annotations, kept) where annotations is {protein: [transformed value, ...]}
+             and kept is the {protein: name} subset that passed the filter
+    """
+    annotations = {}
+    kept = {}
+    with open(annotation_file, 'r') as f:
+        next(f, None)  # skip header
+        for line in f:
+            data = line.rstrip().split('\t')
+            protein = f"{taxid}." + data[0]
+            value = data[2]
+            score = float(data[score_col])
+            if protein in valid_proteins and score >= cutoff and value in valid_values:
+                annotations.setdefault(protein, []).append(transform(value))
+                kept[protein] = valid_proteins[protein]
+
+    return annotations, kept
+
+
+def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping, taxid):
+    """
+    Get protein tissue expression for tissues relevant in the lifecycle of the
+    studied parasites.
+
     :param str config_file: path to the configuration file
     :param str tissues_file: path to file with tissue expression (tissues.jensenlab.org)
-    :param list valid_proteins: all proteins studied
+    :param dict valid_proteins: {protein_id: name} candidates for this host
     :param float cutoff: minimum confidence score accepted (tissues.jensenlab.org)
-    
-    :return tissues: dictionary with protein tissue expression
+    :param dict mapping: BTO tissue code -> display name
+    :param taxid: host taxid, used to prefix protein ids into STRING ids
+    :return: (tissues, kept) — {protein: [tissue name, ...]} and the passing {protein: name}
     """
-    tissues = {}
-    filters = {}
-    valid_tissues = set()
     parasites = utils.read_config(filepath=config_file, field='parasites')
-    for parasite in parasites:
-        t = parasites[parasite]['tissues']
-        valid_tissues.update(t)
-    
-    first = True
-    with open(tissues_file, 'r') as f:
-        for line in f:
-            if first:
-                first = False
-                continue
-            
-            data = line.rstrip().split('\t')
-            protein  = "9606."+data[0]
-            tissue = data[2]
-            score = float(data[6])
-            
-            if protein in valid_proteins and score >= cutoff and tissue in valid_tissues:
-                if protein not in tissues:
-                    tissues[protein] = []
-                
-                tissues[protein].append(mapping[tissue])
-                filters[protein] = valid_proteins[protein]
-    
-    return tissues, filters
+    valid_tissues = set()
+    for parasite in parasites.values():
+        valid_tissues.update(parasite['tissues'])
+
+    return _filter_by_annotation(tissues_file, valid_proteins, cutoff, taxid,
+                                 valid_tissues, score_col=6, transform=lambda t: mapping[t])
 
 
 def apply_compartment_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
+    compartments = {}
     for taxid in hosts:
         proteins = valid_proteins[taxid]
-        #print("C before", len(proteins))
         if 'compartments_url' in hosts[taxid]:
             url = hosts[taxid]['compartments_url']
             filename = utils.download_file(url=url, data_dir='data/downloads')
-            compartments, proteins = get_compartments(config_file, filename, proteins, cutoff)
-    
+            host_compartments, proteins = get_compartments(config_file, filename, proteins, cutoff, taxid)
+            compartments.update(host_compartments)
+
         valid_proteins[taxid] = proteins
-        #print("C after", len(valid_proteins[taxid]))
-    
+
     return compartments
 
 
-def get_compartments(config_file, compartments_file, valid_proteins, cutoff):
+def get_compartments(config_file, compartments_file, valid_proteins, cutoff, taxid):
     """
     Get protein cellular compartment expression relevant in the lifecycle of the
-    studied parasites
-    
+    studied parasites.
+
     :param str config_file: path to the configuration file
     :param str compartments_file: path to file with cellular compartment expression (compartments.jensenlab.org)
-    :param dict valid_proteins: dictionary with annotations in valid proteins
-    :param float cutoff: minimum confidence score accepted (tissues.jensenlab.org)
-    
-    :return filtered_dict: dictionary with only proteins in relevant compartments
+    :param dict valid_proteins: {protein_id: name} candidates for this host
+    :param float cutoff: minimum confidence score accepted (compartments.jensenlab.org)
+    :param taxid: host taxid, used to prefix protein ids into STRING ids
+    :return: (compartments, kept) — {protein: [GO compartment, ...]} and the passing {protein: name}
     """
-    compartments = {}
-    filters = {}
-    valid_compartments = set()
     parasites = utils.read_config(filepath=config_file, field='parasites')
-    for parasite in parasites:
-        if "compartments" in parasites[parasite]:
-            t = parasites[parasite]['compartments']
-        else:
-            t = 'GO:0005886'
-        valid_compartments.add(t)
-    
-    first = True
-    with open(compartments_file, 'r') as f:
-        for line in f:
-            if first:
-                first = False
-                continue
-            
-            data = line.rstrip().split('\t')
-            protein  = "9606."+data[0]
-            compartment = data[2]
-            score = float(data[4])
-            if protein in valid_proteins and score >= cutoff and compartment in valid_compartments:
-                if protein not in compartments:
-                    compartments[protein] = []
-                
-                compartments[protein].append(compartment)
-                filters[protein] = valid_proteins[protein]
-  
-    return compartments, filters
+    valid_compartments = {parasites[p].get('compartments', 'GO:0005886') for p in parasites}
+
+    return _filter_by_annotation(compartments_file, valid_proteins, cutoff, taxid,
+                                 valid_compartments, score_col=4, transform=lambda c: c)
+
 
 def get_secretome_predictions(config_file, secretome_dir, valid_proteins):
     """
     Filter out proteins that are not secreted or membrane from the list of parasite proteins
-    
+
     :param str config_file: path to the configuration file
     :param str secretome_dir: path to the directory where the prediction files are
     :param dict valid_proteins: dictionary with annotations in valid proteins
-        
+
     :return filtered_dict: dictionary with only secreted or membrane parasite proteins
     """
     parasites = utils.read_config(filepath=config_file, field='parasites')
@@ -134,5 +124,5 @@ def get_secretome_predictions(config_file, secretome_dir, valid_proteins):
         filter_out_ids = utils.filter_sequences(sequences, valid_proteins[parasite])
         for k in filter_out_ids:
             valid_proteins[parasite].pop(k, None)
-    
+
     return valid_proteins

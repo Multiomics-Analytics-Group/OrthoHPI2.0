@@ -55,9 +55,11 @@ If you want to rerun the predictions, you can install and run the pipeline follo
 $ pip install -r requirements.txt
 ```
 
-To obtain the Human-Parasite PPI predictions run:
-``` 
-$ python main.py
+To obtain the Host-Parasite PPI predictions, first build the EggNOG members
+file (once), then run the pipeline:
+```
+$ python -m pipeline.prepare_eggnog_members
+$ python -m pipeline.main
 ```
 
 For a detailed description of the pipeline, see [docs/pipeline.md](docs/pipeline.md).

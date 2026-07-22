@@ -5,10 +5,15 @@ This document describes what happens when you run `python -m pipeline.main`
 host-parasite PPI predictions in `data/annotated_predictions.parquet` get
 built. 
 
-Everything is driven by `config.yml`: `urls` (data sources), `hosts` (only
-human, 9606, currently), and `parasites` (35 species, each with a STRING
-taxid, a display label/color, and the list of BTO tissue codes relevant to
-that parasite's life cycle).
+Everything is driven by `config.yml`: `urls` (data sources), `hosts` (human
+9606, rat 10116, pig 9823), and `parasites` (40 species, each with a STRING
+taxid, a display label/color, the list of BTO tissue codes relevant to that
+parasite's life cycle, and a `hosts` list of the host taxids it infects).
+
+A parasite is only paired with the hosts named in its `hosts` list
+(`homology.get_links`), so e.g. a pig-only parasite never generates
+human predictions. Pig has no jensenlab compartment file, so the compartment
+filter is skipped for that host.
 
 Data sources are STRING v12.0 and EggNOG 6.
 
@@ -57,18 +62,21 @@ untouched at this stage.
 
 ### 4. Tissue filter (`filters.apply_tissue_filter` → `get_tissues`)
 
-Downloads human tissue expression scores from `hosts_url` (jensenlab
-tissues.jensenlab.org) and keeps a host protein only if:
+Runs once per host: downloads that host's tissue expression scores from its
+`tissues_url` (jensenlab tissues.jensenlab.org) and keeps a host protein only
+if:
 - its expression score in some tissue is `>= cutoff` (2.5 in `main.py`), and
 - that tissue is one of the BTO codes listed under the relevant parasite(s)
   in `config.yml` (i.e. a tissue the parasite actually encounters during its
   life cycle — gut, skin, blood, etc.).
 
-Every match is recorded in a `tissues` dict (`{protein: [tissue, ...]}`)
-which is returned and later joined with HPA cell-type data in
-`main.get_tissue_cell_type_annotation`. Note only the last host processed
-in the loop sets `tissues` in the current implementation — this only works
-correctly because there is exactly one host (human) configured.
+Every match is recorded in a `tissues` dict (`{protein: [tissue, ...]}`),
+aggregated across all hosts, and later joined with HPA cell-type data in
+`main.get_tissue_cell_type_annotation`. HPA is human-only, so non-human host
+proteins get no cell-type resolution (left join → NaN). Note that not every
+BTO tissue exists in every host's jensenlab data (e.g. rat lacks skin and
+blood), so a parasite whose tissues are all absent for its host yields no
+predictions.
 
 ### 5. Compartment filter (`filters.apply_compartment_filter` → `get_compartments`)
 

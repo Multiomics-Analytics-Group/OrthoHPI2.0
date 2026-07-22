@@ -131,13 +131,14 @@ dmypy.json
 # Project-specific
 data/downloads/
 data/deeploc/
-data/secretome/
 data/tmp/
 data/*.gz
 data/*.fa
-data-old/
-data-v11.5/
+snapshots/
+docs/data_versions.md
 data/Parasites_db.xlsx
+config-v11.5.yml
+config-v12-humanonly.yml
 secretome-backup/
 jobs/
 claude/

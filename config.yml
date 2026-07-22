@@ -15,6 +15,16 @@ hosts:
         color: "#525252"
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
         compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
+    10116:
+        label: Rattus norvegicus
+        color: "#1b7837"
+        tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
+        compartments_url: https://download.jensenlab.org/rat_compartment_integrated_full.tsv
+    9823:
+        label: Sus scrofa
+        color: "#762a83"
+        tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
+        # jensenlab has no integrated compartment file for pig; compartment filter is skipped for this host
 
 tissues:
     "BTO:0000648": intestine
@@ -47,6 +57,9 @@ tissues:
     "BTO:0000243": urethra
     "BTO:0001426": vagina
     "BTO:0000269": colon
+    "BTO:0000778": pulmonary artery
+    "BTO:0000779": mesenteric artery
+    "BTO:0000801": macrophage
 
 parasites:
     53326:
@@ -54,32 +67,44 @@ parasites:
         color: "#33a02c"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
     6279:
         label: Brugia malayi
         color: "#ff7f00"
         tissues:
             - "BTO:0000752"
+        hosts:
+            - 9606
     42155:
         label: Brugia timori
         color: "#fdb462"
         tissues:
             - "BTO:0000752"
+        hosts:
+            - 9606
     79923:
         label: Clonorchis sinensis
         color: "#bc80bd"
         tissues:
             - "BTO:0000759"
             - "BTO:0000122"
+        hosts:
+            - 9606
     441375:
         label: Cryptosporidium muris
         color: "#8c510a"
         tissues:
             - "BTO:0001307"
+        hosts:
+            - 9606
     318479:
         label: Dracunculus medinensis
         color: "#c51b7d"
         tissues:
             - "BTO:0001307"
+        hosts:
+            - 9606
     6210:
         label: Echinococcus granulosus
         color: "#d6604d"
@@ -87,6 +112,8 @@ parasites:
             - "BTO:0000651"
             - "BTO:0000759"
             - "BTO:0000763"
+        hosts:
+            - 9606
     5759:
         label: Entamoeba histolytica
         color: "#b2df8a"
@@ -95,21 +122,30 @@ parasites:
             - "BTO:0000759"
             - "BTO:0000142"
             - "BTO:0000763"
+        hosts:
+            - 9606
     51028:
         label: Enterobius vermicularis
         color: "#9f5511"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
     6216:
         label: Hymenolepis diminuta
         color: "#1f78b4"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
+            - 10116
     6945:
         label: Ixodes scapularis
         color: "#a6cee3"
         tissues:
             - "BTO:0001253"
+        hosts:
+            - 9606
     5671:
         label: Leishmania infantum
         color: "#e31a1c"
@@ -117,33 +153,45 @@ parasites:
             - "BTO:0000759"
             - "BTO:0001281"
             - "BTO:0000141"
+        hosts:
+            - 9606
     5664:
         label: Leishmania major
         color: "#fb9a99"
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
+        hosts:
+            - 9606
     7209:
         label: Loa loa
         color: "#fdbf6f"
         tissues:
             - "BTO:0001253"
+        hosts:
+            - 9606
     51031:
         label: Necator americanus
         color: "#80b1d3"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
     6282:
         label: Onchocerca volvulus
         color: "#fccde5"
         tissues:
             - "BTO:0001253"
+        hosts:
+            - 9606
     147828:
         label: Opisthorchis felineus
         color: "#ccebc5"
         tissues:
             - "BTO:0000759"
             - "BTO:0000651"
+        hosts:
+            - 9606
     36329:
         label: Plasmodium falciparum
         color: "#6a3d9a"
@@ -151,6 +199,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000089"
+        hosts:
+            - 9606
     5851:
         label: Plasmodium knowlesi
         color: "#ffff99"
@@ -158,6 +208,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000089"
+        hosts:
+            - 9606
     126793:
         label: Plasmodium vivax
         color: "#b15928"
@@ -165,6 +217,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000089"
+        hosts:
+            - 9606
     6185:
         label: Schistosoma haematobium
         color: "#2166ac"
@@ -172,6 +226,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0001418"
             - "BTO:0001158"
+        hosts:
+            - 9606
     6182:
         label: Schistosoma japonicum
         color: "#bcbddc"
@@ -179,6 +235,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000651"
+        hosts:
+            - 9606
     6183:
         label: Schistosoma mansoni
         color: "#8dd3c7"
@@ -188,16 +246,22 @@ parasites:
             - "BTO:0000648"
             - "BTO:0000763"
             - "BTO:0000089"
+        hosts:
+            - 9606
     6248:
         label: Strongyloides stercoralis
         color: "#3f007d"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
     60517:
         label: Taenia asiatica
         color: "#ffed6f"
         tissues:
             - "BTO:0000651"
+        hosts:
+            - 9606
     432359:
         label: Toxoplasma gondii
         color: "#fb8072"
@@ -208,42 +272,56 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000887"
             - "BTO:0001078"
+        hosts:
+            - 9606
     72359:
         label: Trachipleistophora hominis
         color: "#bebada"
         tissues:
             - "BTO:0000887"
             - "BTO:0000439"
+        hosts:
+            - 9606
     45882:
         label: Trichinella britovi
         color: "#f16913"
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+        hosts:
+            - 9606
     6335:
         label: Trichinella nativa
         color: "#41ab5d"
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+        hosts:
+            - 9606
     6336:
         label: Trichinella nelsoni
         color: "#807dba"
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+        hosts:
+            - 9606
     5722:
         label: Trichomonas vaginalis
         color: "#b3de69"
         tissues:
             - "BTO:0000243"
             - "BTO:0001426"
+        hosts:
+            - 9606
     36087:
         label: Trichuris trichiura
         color: "#e7298a"
         tissues:
             - "BTO:0000651"
             - "BTO:0000269"
+        hosts:
+            - 9606
     353153:
         label: Trypanosoma cruzi
         color: "#01665e"
@@ -252,11 +330,15 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000089"
             - "BTO:0000439"
+        hosts:
+            - 9606
     993615:
         label: Vittaforma corneae
         color: "#66a61e"
         tissues:
             - "BTO:0000439"
+        hosts:
+            - 9606
     6293:
         label: Wuchereria bancrofti
         color: "#e6ab02"
@@ -264,3 +346,50 @@ parasites:
             - "BTO:0000089"
             - "BTO:0000784"
             - "BTO:0000752"
+        hosts:
+            - 9606
+    6313:
+        label: Angiostrongylus cantonensis
+        color: "#a6761d"
+        tissues:
+            - "BTO:0000778"
+            - "BTO:0000142"
+        hosts:
+            - 10116
+    334426:
+        label: Angiostrongylus costaricensis
+        color: "#e6550d"
+        tissues:
+            - "BTO:0000779"
+        hosts:
+            - 10116
+    5660:
+        label: Leishmania braziliensis
+        color: "#31a354"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000840"
+            - "BTO:0001090"
+            - "BTO:0000801"
+            - "BTO:0000089"
+        hosts:
+            - 10116
+    6334:
+        label: Trichinella spiralis
+        color: "#756bb1"
+        tissues:
+            - "BTO:0000648"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0000887"
+            - "BTO:0000763"
+        hosts:
+            - 9823
+    6337:
+        label: Trichinella pseudospiralis
+        color: "#c994c7"
+        tissues:
+            - "BTO:0000648"
+            - "BTO:0000887"
+        hosts:
+            - 9823

@@ -173,12 +173,13 @@ def run(config_file, data_dir, verbose=False):
     print(f"  {len(valid_groups)} valid EggNOG groups")
     if verbose:
         print_group_counts(valid_groups)
-    predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups, proteins=proteins,
-              ouput_filepath=os.path.join(data_dir, 'predictions.parquet'), config_file=config_file)
+    predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups,
+              proteins=proteins, config_file=config_file)
 
     print("Annotating predictions with UniProt accessions...")
     predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)
-    utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'annotated_predictions.parquet'))
+    # single output: predictions plus source_uniprot / target_uniprot columns
+    utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'predictions.parquet'))
 
 
 if __name__ == "__main__":

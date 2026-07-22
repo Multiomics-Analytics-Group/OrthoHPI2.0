@@ -36,17 +36,16 @@ def get_eggnog_groups(filepath, proteins):
     return valid_groups
 
 
-def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
+def get_links(filepath, valid_groups, proteins, config_file):
     """
-    Obtain the transferred interactions at the EggNOG group level from STRING.
-    Writes the predicted links to output_filepath as parquet (columns: LINK_COLUMNS)
-    and returns them as a DataFrame. Each link is a parasite-host protein pair whose
-    orthology groups interact in STRING, restricted to hosts the parasite infects.
+    Obtain the transferred interactions at the EggNOG group level from STRING and
+    return them as a DataFrame (columns: LINK_COLUMNS). Each link is a parasite-host
+    protein pair whose orthology groups interact in STRING, restricted to hosts the
+    parasite infects. The caller is responsible for writing the result.
 
     :param str filepath: path to STRING file with the groups links
     :param dict valid_groups: dictionary with all the valid groups
     :param dict proteins: mapping from ENSP to protein name
-    :param str ouput_filepath: path to output parquet file
     :param str config_file: path to the configuration file
     :return: DataFrame of predicted links (columns: LINK_COLUMNS)
     """
@@ -107,6 +106,5 @@ def get_links(filepath, valid_groups, proteins, ouput_filepath, config_file):
         for taxid, count in links_df.groupby('taxid1')['source'].count().items():
             label = parasites[int(taxid)]['label']
             print(f"    {label} ({taxid}): {count} interactions")
-    utils.save_to_parquet(links_df, ouput_filepath)
 
     return links_df

@@ -70,6 +70,9 @@ def get_enrichment_summary(enrichment_df, ontology_df):
     return fig
 
 def generate_graph(df, score):
+    if df.empty:
+        return nx.Graph()
+
     G = nx.from_pandas_edgelist(df, 'source', 'target', 'weight')
     colors = dict(df[['source', 'source_color']].drop_duplicates().values)
     colors.update(dict(df[['target', 'target_color']].drop_duplicates().values))
@@ -81,10 +84,10 @@ def generate_graph(df, score):
     shapes.update(dict(df[['target', 'target_shape']].drop_duplicates().values))
     nx.set_node_attributes(G, shapes, 'shape')
     centrality = nx.betweenness_centrality(G, weight='weight')
-    max_centrality = max(list(centrality.values()))
+    max_centrality = max(centrality.values(), default=0)
     sizes = {}
     for k,v in centrality.items():
-        value = v*60/max_centrality
+        value = v*60/max_centrality if max_centrality > 0 else 20
         if value < 20:
             value = 20
         sizes[k] =  value
@@ -98,7 +101,7 @@ def generate_graph(df, score):
 
     widths = {}
     for n1,n2,w in df[['source', 'target', 'weight']].values:
-        value = v*0.5/0.9
+        value = w*0.5/0.9
         if value < 0.05:
             value = 0.05
         widths[(n1, n2)] = value

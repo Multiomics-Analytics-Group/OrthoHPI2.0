@@ -40,7 +40,7 @@ def footer():
     with cols[3]:
         st.image('images/tissues.png', width=200)
     with cols[4]:
-        st.image('images/compartments.png', width=200)
+        st.markdown("[DeepLoc 2.0](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/)")
     with cols[5]:
         st.image('images/ebi.png', width=200)
 

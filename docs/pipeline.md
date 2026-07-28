@@ -83,7 +83,7 @@ Keeps only surface-exposed host proteins, using DeepLoc 2 (Accurate)
 subcellular-localization predictions read from
 `data/deeploc/output_accurate/deeploc_output_accurate/<taxid>/results_*.csv`.
 A host protein passes if `P(Extracellular) >= 0.617` or
-`P(Cell membrane) >= 0.524` — i.e. the protein is at the cell surface or
+`P(Cell membrane) >= 0.565` — i.e. the protein is at the cell surface or
 secreted, somewhere the parasite could physically reach it. Hosts without a
 DeepLoc run are left unfiltered (with a warning).
 

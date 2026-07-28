@@ -12,9 +12,10 @@ TISSUE_CUTOFF = 2.5
 # DeepLoc 2 (Accurate) probability cut-offs for keeping a host protein as surface-exposed.
 # Values are DeepLoc's own per-class thresholds for the Accurate (ProtT5) model
 # (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] -> threshold[i+1]).
-# Cell-membrane only for now; set DEEPLOC_EXTRACELLULAR_CUTOFF back to 0.61728516 to also keep secreted.
+# A host protein is kept if it is at the cell membrane or secreted; set
+# DEEPLOC_EXTRACELLULAR_CUTOFF to None to keep only Cell membrane proteins.
 DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')
-DEEPLOC_EXTRACELLULAR_CUTOFF = None  # 0.61728516 when enabled
+DEEPLOC_EXTRACELLULAR_CUTOFF = 0.61728516  # None to disable
 DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
 
 

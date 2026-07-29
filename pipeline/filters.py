@@ -1,4 +1,8 @@
+import glob
 import os
+
+import pandas as pd
+
 import utils
 
 
@@ -72,39 +76,42 @@ def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping, taxi
                                  valid_tissues, score_col=6, transform=lambda t: mapping[t])
 
 
-def apply_compartment_filter(config_file, valid_proteins, cutoff):
-    hosts = utils.read_config(filepath=config_file, field='hosts')
-    compartments = {}
-    for taxid in hosts:
-        proteins = valid_proteins[taxid]
-        if 'compartments_url' in hosts[taxid]:
-            url = hosts[taxid]['compartments_url']
-            filename = utils.download_file(url=url, data_dir='data/downloads')
-            host_compartments, proteins = get_compartments(config_file, filename, proteins, cutoff, taxid)
-            compartments.update(host_compartments)
-
-        valid_proteins[taxid] = proteins
-
-    return compartments
-
-
-def get_compartments(config_file, compartments_file, valid_proteins, cutoff, taxid):
+def apply_deeploc_filter(config_file, valid_proteins, deeploc_dir,
+                         extracellular_cutoff, membrane_cutoff):
     """
-    Get protein cellular compartment expression relevant in the lifecycle of the
-    studied parasites.
+    Filter host proteins to surface-exposed ones using DeepLoc 2 (Accurate) predictions,
+    replacing the COMPARTMENTS plasma-membrane filter.
+
+    A host protein is kept if P(Cell membrane) >= membrane_cutoff, or (when
+    extracellular_cutoff is not None) also if P(Extracellular) >= extracellular_cutoff.
+    DeepLoc Protein_IDs are already STRING ids (taxid.<protein>), so they match the
+    valid_proteins keys directly.
 
     :param str config_file: path to the configuration file
-    :param str compartments_file: path to file with cellular compartment expression (compartments.jensenlab.org)
-    :param dict valid_proteins: {protein_id: name} candidates for this host
-    :param float cutoff: minimum confidence score accepted (compartments.jensenlab.org)
-    :param taxid: host taxid, used to prefix protein ids into STRING ids
-    :return: (compartments, kept) — {protein: [GO compartment, ...]} and the passing {protein: name}
+    :param dict valid_proteins: {taxid: {protein_id: name}}; each host is filtered in place
+    :param str deeploc_dir: directory of DeepLoc results (<deeploc_dir>/<taxid>/results_*.csv)
+    :param extracellular_cutoff: minimum P(Extracellular) to keep a protein, or None to
+                                 keep only Cell membrane proteins
+    :param float membrane_cutoff: minimum P(Cell membrane) to keep a protein
+    :return: valid_proteins with non-surface host proteins removed
     """
-    parasites = utils.read_config(filepath=config_file, field='parasites')
-    valid_compartments = {parasites[p].get('compartments', 'GO:0005886') for p in parasites}
+    hosts = utils.read_config(filepath=config_file, field='hosts')
+    for taxid in hosts:
+        matches = sorted(glob.glob(os.path.join(deeploc_dir, str(taxid), 'results_*.csv')))
+        if not matches:
+            print(f"  WARNING: no DeepLoc results for host {taxid} in {deeploc_dir}; "
+                  "keeping its proteins unfiltered")
+            continue
 
-    return _filter_by_annotation(compartments_file, valid_proteins, cutoff, taxid,
-                                 valid_compartments, score_col=4, transform=lambda c: c)
+        df = pd.read_csv(matches[-1])
+        keep = df['Cell membrane'] >= membrane_cutoff
+        if extracellular_cutoff is not None:
+            keep = keep | (df['Extracellular'] >= extracellular_cutoff)
+        surface_ids = set(df.loc[keep, 'Protein_ID'])
+        valid_proteins[taxid] = {p: n for p, n in valid_proteins[taxid].items()
+                                 if p in surface_ids}
+
+    return valid_proteins
 
 
 def get_secretome_predictions(config_file, secretome_dir, valid_proteins):

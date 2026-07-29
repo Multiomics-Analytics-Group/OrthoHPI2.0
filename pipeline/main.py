@@ -6,10 +6,17 @@ import pandas as pd
 import utils
 from . import homology, filters, hpa, go
 
-# jensenlab confidence score below which a host protein's tissue/compartment
-# evidence is ignored (same scale for both filters).
+# jensenlab confidence score below which a host protein's tissue evidence is ignored.
 TISSUE_CUTOFF = 2.5
-COMPARTMENT_CUTOFF = 2.5
+
+# DeepLoc 2 (Accurate) probability cut-offs for keeping a host protein as surface-exposed.
+# Values are DeepLoc's own per-class thresholds for the Accurate (ProtT5) model
+# (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] -> threshold[i+1]).
+# A host protein is kept if it is at the cell membrane or secreted; set
+# DEEPLOC_EXTRACELLULAR_CUTOFF to None to keep only Cell membrane proteins.
+DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')
+DEEPLOC_EXTRACELLULAR_CUTOFF = 0.61728516  # None to disable
+DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
 
 
 def get_proteins(config_file):
@@ -150,13 +157,16 @@ def run(config_file, data_dir, verbose=False):
     total_proteins = sum(len(v) for v in proteins.values())
     print(f"  {total_proteins} proteins before filtering")
 
-    print("Applying secretome/tissue/compartment filters...")
+    print("Applying secretome/tissue/DeepLoc filters...")
     # proteins stays a {taxid: {protein: name}} dict through all three filters,
     # then is flattened to one {protein: name} dict for the homology transfer
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
-    # filters proteins in place per host; return value (compartments dict) is unused here
-    filters.apply_compartment_filter(config_file=config_file, valid_proteins=proteins, cutoff=COMPARTMENT_CUTOFF)
+    # host proteins kept if DeepLoc calls them Extracellular or Cell membrane (surface-exposed)
+    filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
+                                 deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
+                                 extracellular_cutoff=DEEPLOC_EXTRACELLULAR_CUTOFF,
+                                 membrane_cutoff=DEEPLOC_MEMBRANE_CUTOFF)
     proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 

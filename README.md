@@ -20,11 +20,12 @@ The **homology prediction** has been done using:
 <a src="https://string-db.org/"><img width=100 alt="string" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/string.png"></a>
 
 
-The **tissue and cellular compartment annotation** used to filter the proteomes come from:
-
-<a src="https://compartments.jensenlab.org/"><img width=100 alt="compartments" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/compartments.png"></a>
+The **tissue annotation** used to filter the proteomes comes from:
 
 <a src="https://tissues.jensenlab.org/"><img width=100 alt="tissues" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/tissues.png"></a>
+
+Host proteins are filtered to surface-exposed (extracellular / cell membrane)
+localizations predicted by **[DeepLoc 2.0](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/)**.
 
 
 The **cell type expression** information has been downloaded from:

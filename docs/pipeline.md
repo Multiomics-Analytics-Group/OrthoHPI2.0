@@ -12,8 +12,7 @@ parasite's life cycle, and a `hosts` list of the host taxids it infects).
 
 A parasite is only paired with the hosts named in its `hosts` list
 (`homology.get_links`), so e.g. a pig-only parasite never generates
-human predictions. Pig has no jensenlab compartment file, so the compartment
-filter is skipped for that host.
+human predictions.
 
 Data sources are STRING v12.0 and EggNOG 6.
 
@@ -78,14 +77,15 @@ BTO tissue exists in every host's jensenlab data (e.g. rat lacks skin and
 blood), so a parasite whose tissues are all absent for its host yields no
 predictions.
 
-### 5. Compartment filter (`filters.apply_compartment_filter` → `get_compartments`)
+### 5. DeepLoc host filter (`filters.apply_deeploc_filter`)
 
-Same shape as the tissue filter, but against jensenlab's subcellular
-compartment scores (`compartments.jensenlab.org`) instead of tissues. A host
-protein passes if its compartment score is `>= cutoff` and the compartment
-GO term matches the parasite's configured `compartments` entry (defaulting
-to `GO:0005886`, plasma membrane, if unset) — i.e. the protein needs to be
-somewhere the parasite could physically reach it.
+Keeps only surface-exposed host proteins, using DeepLoc 2 (Accurate)
+subcellular-localization predictions read from
+`data/deeploc/output_accurate/deeploc_output_accurate/<taxid>/results_*.csv`.
+A host protein passes if `P(Extracellular) >= 0.617` or
+`P(Cell membrane) >= 0.565` — i.e. the protein is at the cell surface or
+secreted, somewhere the parasite could physically reach it. Hosts without a
+DeepLoc run are left unfiltered (with a warning).
 
 After steps 3–5, `proteins = utils.merge_dict_of_dicts(proteins)` flattens
 the per-taxid dicts into one `{protein_id: name}` dict for the rest of the

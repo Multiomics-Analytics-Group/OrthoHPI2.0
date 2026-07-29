@@ -14,17 +14,14 @@ hosts:
         label: Homo sapiens
         color: "#525252"
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
-        compartments_url: https://download.jensenlab.org/human_compartment_integrated_full.tsv
     10116:
         label: Rattus norvegicus
         color: "#1b7837"
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
-        compartments_url: https://download.jensenlab.org/rat_compartment_integrated_full.tsv
     9823:
         label: Sus scrofa
         color: "#762a83"
         tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
-        # jensenlab has no integrated compartment file for pig; compartment filter is skipped for this host
 
 tissues:
     "BTO:0000648": intestine
@@ -64,6 +61,7 @@ tissues:
 parasites:
     53326:
         label: Ancylostoma ceylanicum
+        multicellular: true
         color: "#33a02c"
         tissues:
             - "BTO:0000651"
@@ -71,6 +69,7 @@ parasites:
             - 9606
     6279:
         label: Brugia malayi
+        multicellular: true
         color: "#ff7f00"
         tissues:
             - "BTO:0000752"
@@ -78,6 +77,7 @@ parasites:
             - 9606
     42155:
         label: Brugia timori
+        multicellular: true
         color: "#fdb462"
         tissues:
             - "BTO:0000752"
@@ -85,6 +85,7 @@ parasites:
             - 9606
     79923:
         label: Clonorchis sinensis
+        multicellular: true
         color: "#bc80bd"
         tissues:
             - "BTO:0000759"
@@ -100,6 +101,7 @@ parasites:
             - 9606
     318479:
         label: Dracunculus medinensis
+        multicellular: true
         color: "#c51b7d"
         tissues:
             - "BTO:0001307"
@@ -107,6 +109,7 @@ parasites:
             - 9606
     6210:
         label: Echinococcus granulosus
+        multicellular: true
         color: "#d6604d"
         tissues:
             - "BTO:0000651"
@@ -126,6 +129,7 @@ parasites:
             - 9606
     51028:
         label: Enterobius vermicularis
+        multicellular: true
         color: "#9f5511"
         tissues:
             - "BTO:0000651"
@@ -133,6 +137,7 @@ parasites:
             - 9606
     6216:
         label: Hymenolepis diminuta
+        multicellular: true
         color: "#1f78b4"
         tissues:
             - "BTO:0000651"
@@ -141,6 +146,7 @@ parasites:
             - 10116
     6945:
         label: Ixodes scapularis
+        multicellular: true
         color: "#a6cee3"
         tissues:
             - "BTO:0001253"
@@ -165,6 +171,7 @@ parasites:
             - 9606
     7209:
         label: Loa loa
+        multicellular: true
         color: "#fdbf6f"
         tissues:
             - "BTO:0001253"
@@ -172,6 +179,7 @@ parasites:
             - 9606
     51031:
         label: Necator americanus
+        multicellular: true
         color: "#80b1d3"
         tissues:
             - "BTO:0000651"
@@ -179,6 +187,7 @@ parasites:
             - 9606
     6282:
         label: Onchocerca volvulus
+        multicellular: true
         color: "#fccde5"
         tissues:
             - "BTO:0001253"
@@ -186,6 +195,7 @@ parasites:
             - 9606
     147828:
         label: Opisthorchis felineus
+        multicellular: true
         color: "#ccebc5"
         tissues:
             - "BTO:0000759"
@@ -221,6 +231,7 @@ parasites:
             - 9606
     6185:
         label: Schistosoma haematobium
+        multicellular: true
         color: "#2166ac"
         tissues:
             - "BTO:0001253"
@@ -230,6 +241,7 @@ parasites:
             - 9606
     6182:
         label: Schistosoma japonicum
+        multicellular: true
         color: "#bcbddc"
         tissues:
             - "BTO:0001253"
@@ -239,6 +251,7 @@ parasites:
             - 9606
     6183:
         label: Schistosoma mansoni
+        multicellular: true
         color: "#8dd3c7"
         tissues:
             - "BTO:0001253"
@@ -250,6 +263,7 @@ parasites:
             - 9606
     6248:
         label: Strongyloides stercoralis
+        multicellular: true
         color: "#3f007d"
         tissues:
             - "BTO:0000651"
@@ -257,6 +271,7 @@ parasites:
             - 9606
     60517:
         label: Taenia asiatica
+        multicellular: true
         color: "#ffed6f"
         tissues:
             - "BTO:0000651"
@@ -284,6 +299,7 @@ parasites:
             - 9606
     45882:
         label: Trichinella britovi
+        multicellular: true
         color: "#f16913"
         tissues:
             - "BTO:0000648"
@@ -292,6 +308,7 @@ parasites:
             - 9606
     6335:
         label: Trichinella nativa
+        multicellular: true
         color: "#41ab5d"
         tissues:
             - "BTO:0000648"
@@ -300,6 +317,7 @@ parasites:
             - 9606
     6336:
         label: Trichinella nelsoni
+        multicellular: true
         color: "#807dba"
         tissues:
             - "BTO:0000648"
@@ -316,6 +334,7 @@ parasites:
             - 9606
     36087:
         label: Trichuris trichiura
+        multicellular: true
         color: "#e7298a"
         tissues:
             - "BTO:0000651"
@@ -341,6 +360,7 @@ parasites:
             - 9606
     6293:
         label: Wuchereria bancrofti
+        multicellular: true
         color: "#e6ab02"
         tissues:
             - "BTO:0000089"
@@ -350,6 +370,7 @@ parasites:
             - 9606
     6313:
         label: Angiostrongylus cantonensis
+        multicellular: true
         color: "#a6761d"
         tissues:
             - "BTO:0000778"
@@ -358,6 +379,7 @@ parasites:
             - 10116
     334426:
         label: Angiostrongylus costaricensis
+        multicellular: true
         color: "#e6550d"
         tissues:
             - "BTO:0000779"
@@ -376,6 +398,7 @@ parasites:
             - 10116
     6334:
         label: Trichinella spiralis
+        multicellular: true
         color: "#756bb1"
         tissues:
             - "BTO:0000648"
@@ -387,6 +410,7 @@ parasites:
             - 9823
     6337:
         label: Trichinella pseudospiralis
+        multicellular: true
         color: "#c994c7"
         tissues:
             - "BTO:0000648"

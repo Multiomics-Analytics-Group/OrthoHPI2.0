@@ -1,15 +1,17 @@
 """
 Build secretome FASTA files from DeepLoc 2 output.
 
-Reads DeepLoc CSV results and filters proteins to:
-  - Extracellular (all parasites)
-  - Cell membrane (unicellular parasites only)
+Reads DeepLoc CSV results (Accurate model) and filters proteins by per-class
+probability score rather than the assigned Localizations call:
+  - Extracellular P >= extracellular cutoff (all parasites)
+  - Cell membrane P >= membrane cutoff (unicellular parasites only)
 
 Writes filtered FASTAs to data/secretome_pred_input_data/input_data/{taxid}.fasta
 
 Usage:
     python build_secretome_fastas.py [--config config.yml] [--data-dir data]
-        [--deeploc-dir data/deeploc/data/output]
+        [--deeploc-dir data/deeploc/output_accurate/deeploc_output_accurate]
+        [--extracellular-cutoff 0.617] [--membrane-cutoff 0.524]
 """
 
 import argparse
@@ -33,17 +35,16 @@ def load_deeploc_csv(deeploc_dir, taxid):
     return matches[-1]
 
 
-def filter_by_localization(df, multicellular):
-    target_locs = {"Extracellular"}
-    if not multicellular:
-        target_locs.add("Cell membrane")
+def filter_by_score(df, multicellular, extracellular_cutoff, membrane_cutoff):
+    """Keep proteins by per-class DeepLoc probability.
 
-    valid = set()
-    for _, row in df.iterrows():
-        locs = set(str(row["Localizations"]).split("|"))
-        if locs & target_locs:
-            valid.add(row["Protein_ID"])
-    return valid
+    Extracellular P >= extracellular_cutoff for all parasites; Cell membrane
+    P >= membrane_cutoff is additionally kept for unicellular parasites.
+    """
+    keep = df["Extracellular"] >= extracellular_cutoff
+    if not multicellular:
+        keep = keep | (df["Cell membrane"] >= membrane_cutoff)
+    return set(df.loc[keep, "Protein_ID"])
 
 
 def write_filtered_fasta(source_fasta, valid_ids, output_path):
@@ -65,7 +66,7 @@ def source_fasta_path(config_file, data_dir, taxid):
     return uncompressed if os.path.exists(uncompressed) else os.path.join(species_dir, filename)
 
 
-def main(config_file, data_dir, deeploc_dir):
+def main(config_file, data_dir, deeploc_dir, extracellular_cutoff, membrane_cutoff):
     parasites = utils.read_config(filepath=config_file, field="parasites")
     out_dir = os.path.join(data_dir, "secretome")
 
@@ -82,8 +83,10 @@ def main(config_file, data_dir, deeploc_dir):
 
         df = pd.read_csv(csv_path)
         print(f"  Total proteins in DeepLoc output: {len(df)}")
-        valid_ids = filter_by_localization(df, multicellular)
-        print(f"  Proteins passing localization filter: {len(valid_ids)}")
+        valid_ids = filter_by_score(df, multicellular, extracellular_cutoff, membrane_cutoff)
+        print(f"  Proteins passing score filter "
+              f"(Extracellular>={extracellular_cutoff}"
+              f"{'' if multicellular else f', Cell membrane>={membrane_cutoff}'}): {len(valid_ids)}")
 
         source_fasta = source_fasta_path(config_file, data_dir, taxid)
         if not os.path.exists(source_fasta):
@@ -99,6 +102,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build secretome FASTAs from DeepLoc 2 output")
     parser.add_argument("--config", default="config.yml")
     parser.add_argument("--data-dir", default="data")
-    parser.add_argument("--deeploc-dir", default="data/deeploc/output")
+    parser.add_argument("--deeploc-dir",
+                        default="data/deeploc/output_accurate/deeploc_output_accurate")
+    parser.add_argument("--extracellular-cutoff", type=float, default=0.617,
+                        help="Minimum P(Extracellular) to keep a protein. Default: 0.617")
+    parser.add_argument("--membrane-cutoff", type=float, default=0.524,
+                        help="Minimum P(Cell membrane) to keep, unicellular only. Default: 0.524")
     args = parser.parse_args()
-    main(args.config, args.data_dir, args.deeploc_dir)
+    main(args.config, args.data_dir, args.deeploc_dir,
+         args.extracellular_cutoff, args.membrane_cutoff)

@@ -3,7 +3,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import streamlit as st
-import streamlit.components.v1 as components
 from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
 import networkx as nx
@@ -32,13 +31,33 @@ path = 'data/tmp'
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
-predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
-predictions['weight'] = predictions['weight'].astype(float)
-tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
-tissues = None
-predictions = None
-ontology = utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
+
+
+@st.cache_data(show_spinner=False)
+def load_predictions(data_dir):
+    predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
+    predictions['weight'] = predictions['weight'].astype(float)
+
+    return predictions
+
+
+@st.cache_data(show_spinner=False, max_entries=5)
+def get_parasite_tissues(data_dir, parasite):
+    '''
+    Annotates the predictions of one parasite with the tissues and cell types its
+    host targets are expressed in. Selecting the parasite before merging keeps the
+    full predictions x tissues table (~630 MB) out of the app.
+    '''
+    predictions = load_predictions(data_dir)
+    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+    predictions = predictions[predictions['taxid1_label'] == parasite]
+
+    return pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
+
+
+@st.cache_data(show_spinner=False)
+def load_ontology(data_dir):
+    return utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 
 def generate_tissue_filters(df):
@@ -55,7 +74,9 @@ def generate_cell_type_filters(df):
 def get_enrichment(pred_df, data_dir):
     species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
     species = [int(s) for s in species]
-    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet')
+    # the filter is pushed down to the reader (fastparquet prunes row groups only,
+    # so the exact selection is still applied afterwards)
+    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
     enrichment = utils.calculate_enrichment(pred_df, go_df)
 
@@ -117,7 +138,7 @@ st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Predictio
 
 
 # Define selection options
-parasite_list = ['<select>'] + pred_tissues['taxid1_label'].sort_values().unique().tolist()
+parasite_list = ['<select>'] + load_predictions(data_dir)['taxid1_label'].sort_values().unique().tolist()
 
 st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
@@ -137,8 +158,7 @@ with col2:
     if selected_parasite == "<select>":
         st.text('Choose 1 parasite to visualize the predicted PPI network')
     else:        
-        df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
-        pred_tissues = None
+        df_select = get_parasite_tissues(data_dir, selected_parasite)
         df_select = web_utils.filter_tissues(config, df_select)
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
@@ -190,7 +210,7 @@ with st.container():
         with open(f'{path}/{selected_parasite}.html','r',encoding='utf-8') as HtmlFile:
             html_data = HtmlFile.read()
         # Load HTML into HTML component for display on Streamlit
-        components.html(html_data, height=1050)
+        st.iframe(html_data, height=1050)
         net = None
         with st.container():
             c1, c2, c3 = st.columns(3)
@@ -230,11 +250,10 @@ with st.container():
         grid_response = AgGrid(
                             table,
                             gridOptions=gridOptions,
-                            data_return_mode='AS_INPUT', 
+                            data_return_mode='AS_INPUT',
                             fit_columns_on_grid_load=False,
                             enable_enterprise_modules=True,
-                            height=350, 
-                            reload_data=False
+                            height=350
                         )
         st.download_button(
             label="Download Network Table",
@@ -260,12 +279,10 @@ with st.container():
             grid_response = AgGrid(
                                 enrichment_table,
                                 gridOptions=gridOptions,
-                                data_return_mode='AS_INPUT', 
-                                update_mode='MODEL_CHANGED', 
+                                data_return_mode='AS_INPUT',
                                 fit_columns_on_grid_load=False,
                                 enable_enterprise_modules=True,
-                                height=350, 
-                                reload_data=False
+                                height=350
                             )
             selected_rows = grid_response['selected_rows']
             st.download_button(
@@ -291,7 +308,7 @@ with st.container():
                 labels = {'fdr_bh':'FDR BH', 'odds_ratio': 'Odds ratio'})
             fig.update_traces(showlegend=False)
             st.subheader("Enriched Biological Processes -- Odds ratio vs FDR")
-            st.plotly_chart(fig, height=400, use_container_width=True)
+            st.plotly_chart(fig, width='stretch', height=400)
         with go2:
             if len(selected_terms) > 0:
                 if enrichment is not None:
@@ -311,7 +328,7 @@ with st.container():
                     st.subheader("Highlighted Nodes for Selected Biological Processes")
                     with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
                         html_data = HtmlFile.read()
-                    components.html(html_data, height=500)
+                    st.iframe(html_data, height=500)
                     st.download_button(
                         label="Download Network as Html",
                         data=html_data,
@@ -319,9 +336,9 @@ with st.container():
                         mime='text/html',
                     )
         
-        fig = get_enrichment_summary(enrichment_table, ontology)
+        fig = get_enrichment_summary(enrichment_table, load_ontology(data_dir))
         st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")
 st.markdown("---")

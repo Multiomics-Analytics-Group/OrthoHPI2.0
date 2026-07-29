@@ -69,8 +69,12 @@ def save_to_parquet(df, output_file):
     df.to_parquet(output_file, compression='gzip', index=False)
 
 
-def read_parquet_file(input_file):
-    df = pd.read_parquet(input_file)
+def read_parquet_file(input_file, filters=None):
+    '''
+    Reads a parquet file. Optional filters (i.e. [('taxid', 'in', [9606])]) are
+    pushed down to the reader so only the matching row groups are loaded.
+    '''
+    df = pd.read_parquet(input_file, filters=filters)
 
     return df
 

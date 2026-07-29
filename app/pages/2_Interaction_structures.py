@@ -84,11 +84,9 @@ if selected_cols is not None:
                             df_select,
                             gridOptions=gridOptions,
                             data_return_mode='AS_INPUT',
-                            update_mode='MODEL_CHANGED',
                             fit_columns_on_grid_load=False,
                             enable_enterprise_modules=True,
-                            height=350,
-                            reload_data=False
+                            height=350
                         )
         selected_rows = grid_response['selected_rows']
         if selected_rows is not None and len(selected_rows) > 0:

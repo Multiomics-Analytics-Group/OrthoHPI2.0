@@ -5,7 +5,6 @@ import web_utils
 from css import style
 import pandas as pd
 import streamlit as st
-from stmol import showmol
 import structure_visualizer as strv
 from st_aggrid import GridOptionsBuilder, AgGrid
 
@@ -26,7 +25,8 @@ def get_structures(query_proteins):
 
 def show_structure(pdb_file):
     xyzview = strv.generate_mol_structure(pdb_file=pdb_file)
-    showmol(xyzview, height = 500,width=700)
+    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html
+    st.iframe(xyzview._make_html(), height=500, width=700)
 
 
 config = utils.read_config(web_utils.get_config_file())

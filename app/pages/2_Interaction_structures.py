@@ -94,24 +94,20 @@ if selected_cols is not None:
             query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))
             structures = get_structures(query_proteins)
             cols = st.columns(2)
-            i = 0
-            for protein in structures:
+            for i, protein in enumerate(structures):
                 pdb_file, url, website = structures[protein]
-                with cols[i]:
+                with cols[i % len(cols)]:
+                    st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
+                    unsafe_allow_html=True)
                     if pdb_file is not None:
-                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
-                        unsafe_allow_html=True)
                         show_structure(pdb_file=pdb_file)
                         st.markdown(f'''
                                 <a href={url}><button>PDB file</button></a>
                                 <a href={website}><button>AlphaFold EBI</button></a>''',
                                 unsafe_allow_html=True)
                     else:
-                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
-                        unsafe_allow_html=True)
                         st.markdown(f'''<h5>AlphaFold prediction Not Available</h5>''',
                         unsafe_allow_html=True)
-                    i += 1
 
 
 st.markdown("---")

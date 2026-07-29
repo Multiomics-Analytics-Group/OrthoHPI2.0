@@ -28,12 +28,6 @@ elif page == "About":
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
-predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
-predictions['weight'] = predictions['weight'].astype(float)
-tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
-tissues = None
-ontology = utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 #Initialize variables
 df_select = None
@@ -44,62 +38,76 @@ enrichment_table = None
 enrichment = None
 
 
-def filter_tissues(config, df):
-    tissue_df = []
-    mapped_tissues = config['tissues']
-    for ident in df['taxid1'].unique():
-        tissues = [mapped_tissues[t].lower() for t in config['parasites'][int(ident)]['tissues']]
-        aux = df[(df['taxid1']==ident) & (df['Tissue'].isin(tissues))]
-        tissue_df.append(aux)
-    
-    tissue_df = pd.concat(tissue_df)
-    
-    return tissue_df
+@st.cache_data(show_spinner=False)
+def load_predictions(data_dir):
+    predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
+    predictions['weight'] = predictions['weight'].astype(float)
+
+    return predictions
 
 
-@st.cache_data
-def generate_tissue_cell_type_box(df, config, data_dir):
-    aux = df.copy()
+@st.cache_data(show_spinner=False)
+def count_interactions_per_tissue_cell_type(data_dir, config):
+    '''
+    Counts the predicted interactions per parasite, tissue and cell type, keeping
+    only the tissues each parasite is known to infect (config['parasites']).
+    Aggregating here keeps the merged predictions/tissues table out of the app's
+    memory and makes sure each icicle sector is counted once.
+    '''
+    predictions = load_predictions(data_dir)
+    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+    tpm_col = 'nTPM' if 'nTPM' in tissues.columns else 'pTPM'
+    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type', tpm_col]]
+
+    aux = pd.merge(predictions[['taxid1', 'taxid1_label', 'taxid2', 'target']], tissues, on='target', how='left')
+    aux['taxid1'] = aux['taxid1'].astype(str)
     aux['Cell type'] = aux['Cell type'].fillna("Not available")
-    aux = filter_tissues(config, aux)
-    counts_tissues = aux.groupby(['taxid1', 'Tissue']).count()['taxid2'].reset_index()
-    counts_tissues = counts_tissues.rename({'taxid2':'edges_tissue'}, axis=1)
-    counts_cells = aux.groupby(['taxid1', 'Tissue', 'Cell type']).count()['taxid2'].reset_index()
-    counts_cells = counts_cells.rename({'taxid2':'edges_cell_type'}, axis=1)
-    aux = pd.merge(aux, counts_tissues, on=['taxid1', 'Tissue'], how='left')
-    aux = pd.merge(aux, counts_cells, on=['taxid1', 'Tissue', 'Cell type'], how='left')
-    tpm_col = 'nTPM' if 'nTPM' in aux.columns else 'pTPM'
-    fig = px.icicle(aux, path=[px.Constant("Parasites"), 'taxid1_label', 'Tissue', 'Cell type'], values='edges_cell_type',
+
+    mapped_tissues = config['tissues']
+    infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
+                                     for taxid, parasite in config['parasites'].items()
+                                     for t in parasite['tissues']],
+                                    columns=['taxid1', 'Tissue'])
+    aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
+
+    counts = aux.groupby(['taxid1', 'taxid1_label', 'Tissue', 'Cell type'], observed=True).agg(
+        edges_cell_type=('taxid2', 'count'), **{tpm_col: (tpm_col, 'mean')}).reset_index()
+    counts['edges_tissue'] = counts.groupby(['taxid1', 'Tissue'])['edges_cell_type'].transform('sum')
+
+    return counts
+
+
+@st.cache_data(show_spinner=False)
+def generate_tissue_cell_type_box(counts):
+    tpm_col = 'nTPM' if 'nTPM' in counts.columns else 'pTPM'
+    fig = px.icicle(counts, path=[px.Constant("Parasites"), 'taxid1_label', 'Tissue', 'Cell type'], values='edges_cell_type',
                   color='edges_cell_type', hover_data=['edges_tissue', 'edges_cell_type', 'taxid1', 'taxid1_label', tpm_col],
-                  color_continuous_scale='Burgyl', height=900, width=1200, maxdepth=-1)
+                  color_continuous_scale='Burgyl', height=900, maxdepth=-1)
 
     return fig
 
-def generate_circos_plot(df_pred):
-    nodes = set()
-    links = []
-    seen = set()
-    i = 0
-    for g1, df1 in df_pred.groupby('taxid1_label'):
-        j = i + 1
-        for g2, df2 in df_pred.groupby('taxid1_label'):
-            if g1 != g2 and (g1, g2) not in seen:
-                nodes.update([(i, g1[0]+'. '+g1.split(' ')[1]), (j, g2[0]+'. '+g2.split(' ')[1])])
-                links.append((i, j, len(set(df1['target'].tolist()).intersection(df2['target'].tolist()))))
-                seen.update([(g1, g2), (g2, g1)])
-                
-                j += 1
-        i += 1
+@st.cache_data(show_spinner=False)
+def get_common_interactors(df_pred):
+    targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
+    labels = list(targets)
 
-    links = pd.DataFrame(links, columns=['source', 'target', 'value'])
-    nodes = hv.Dataset(pd.DataFrame(list(nodes), columns = ['index', 'name']), 'index')
+    nodes = [(i, g[0]+'. '+g.split(' ')[1]) for i, g in enumerate(labels)]
+    links = [(i, j, len(targets[g1].intersection(targets[labels[j]])))
+             for i, g1 in enumerate(labels) for j in range(i + 1, len(labels))]
 
-    chord = hv.Chord((links, nodes)).select(value=(1, None))
+    return (pd.DataFrame(links, columns=['source', 'target', 'value']),
+            pd.DataFrame(nodes, columns=['index', 'name']))
+
+@st.cache_resource(show_spinner=False)
+def generate_circos_plot(data_dir):
+    links, nodes = get_common_interactors(load_predictions(data_dir))
+
+    chord = hv.Chord((links, hv.Dataset(nodes, 'index'))).select(value=(1, None))
     chord.opts(
-        opts.Chord(width=500, height=700, cmap='Category20', edge_cmap='Category20', edge_color=dim('source').str(), 
+        opts.Chord(width=500, height=700, cmap='Category20', edge_cmap='Category20', edge_color=dim('source').str(),
                labels='name', node_color=dim('index').str()))
 
-    return chord
+    return hv.render(chord)
 
 def generate_boxplot_score_stats(df):
     fig = px.box(df.sort_values("taxid1"), x="taxid1_label", y="weight", color='taxid1', labels={"weight":"score", "taxid1_label": "parasites"})
@@ -112,6 +120,7 @@ def generate_barplot_stats(df):
     fig.update_traces(showlegend=False)
     return fig
 
+@st.cache_data(show_spinner=False)
 def generate_stats_plots(df):
     stats_figures = []
     fig = generate_barplot_stats(df)
@@ -137,24 +146,21 @@ chart1, chart2 = st.columns(2)
 
 with chart1:
     st.subheader("Circos Plot of Common Host Interactors")
-    circos_plot = generate_circos_plot(predictions)
-    streamlit_bokeh(hv.render(circos_plot), use_container_width=True)
+    streamlit_bokeh(generate_circos_plot(data_dir), use_container_width=True)
 
-stats_figs = generate_stats_plots(predictions)
-predictions = None
+stats_figs = generate_stats_plots(load_predictions(data_dir))
 stats_cols = st.columns(len(stats_figs))
 i = 0
 for stats_fig, title in stats_figs:
     with stats_cols[i]:
         st.subheader(title)
-        st.plotly_chart(stats_fig, use_container_width=True)
+        st.plotly_chart(stats_fig, width='stretch')
     i += 1
 
-fig = generate_tissue_cell_type_box(pred_tissues, config, data_dir)
+fig = generate_tissue_cell_type_box(count_interactions_per_tissue_cell_type(data_dir, config))
 with chart2:
     st.subheader("Summary of Interactions per Tissue and Cell type")
-    st.plotly_chart(fig, use_container_width=True)
-    pred_tissues = None
+    st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")
 

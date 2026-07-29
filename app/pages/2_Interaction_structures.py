@@ -5,7 +5,6 @@ import web_utils
 from css import style
 import pandas as pd
 import streamlit as st
-from stmol import showmol
 import structure_visualizer as strv
 from st_aggrid import GridOptionsBuilder, AgGrid
 
@@ -26,7 +25,8 @@ def get_structures(query_proteins):
 
 def show_structure(pdb_file):
     xyzview = strv.generate_mol_structure(pdb_file=pdb_file)
-    showmol(xyzview, height = 500,width=700)
+    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html
+    st.iframe(xyzview._make_html(), height=500, width=700)
 
 
 config = utils.read_config(web_utils.get_config_file())
@@ -84,11 +84,9 @@ if selected_cols is not None:
                             df_select,
                             gridOptions=gridOptions,
                             data_return_mode='AS_INPUT',
-                            update_mode='MODEL_CHANGED',
                             fit_columns_on_grid_load=False,
                             enable_enterprise_modules=True,
-                            height=350,
-                            reload_data=False
+                            height=350
                         )
         selected_rows = grid_response['selected_rows']
         if selected_rows is not None and len(selected_rows) > 0:
@@ -96,24 +94,20 @@ if selected_cols is not None:
             query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))
             structures = get_structures(query_proteins)
             cols = st.columns(2)
-            i = 0
-            for protein in structures:
+            for i, protein in enumerate(structures):
                 pdb_file, url, website = structures[protein]
-                with cols[i]:
+                with cols[i % len(cols)]:
+                    st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
+                    unsafe_allow_html=True)
                     if pdb_file is not None:
-                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
-                        unsafe_allow_html=True)
                         show_structure(pdb_file=pdb_file)
                         st.markdown(f'''
                                 <a href={url}><button>PDB file</button></a>
                                 <a href={website}><button>AlphaFold EBI</button></a>''',
                                 unsafe_allow_html=True)
                     else:
-                        st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
-                        unsafe_allow_html=True)
                         st.markdown(f'''<h5>AlphaFold prediction Not Available</h5>''',
                         unsafe_allow_html=True)
-                    i += 1
 
 
 st.markdown("---")

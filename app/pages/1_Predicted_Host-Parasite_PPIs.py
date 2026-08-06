@@ -42,17 +42,28 @@ def load_predictions(data_dir):
 
 
 @st.cache_data(show_spinner=False, max_entries=5)
-def get_parasite_tissues(data_dir, parasite):
+def get_parasite_tissues(data_dir, parasite, host_taxids):
     '''
-    Annotates the predictions of one parasite with the tissues and cell types its
-    host targets are expressed in. Selecting the parasite before merging keeps the
-    full predictions x tissues table (~630 MB) out of the app.
+    Annotates the predictions of one parasite against the selected host with the
+    tissues and cell types its host targets are expressed in. Selecting the parasite
+    before merging keeps the full predictions x tissues table (~630 MB) out of the app.
     '''
     predictions = load_predictions(data_dir)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    predictions = predictions[predictions['taxid1_label'] == parasite]
+    predictions = predictions[(predictions['taxid1_label'] == parasite)
+                              & (predictions['taxid2'].isin(host_taxids))]
 
     return pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
+
+
+@st.cache_data(show_spinner=False)
+def get_parasite_list(data_dir, host_taxids):
+    '''Parasites with predictions against the selected host, so the parasite
+    selector never offers one that yields an empty network.'''
+    predictions = load_predictions(data_dir)
+    predictions = predictions[predictions['taxid2'].isin(host_taxids)]
+
+    return predictions['taxid1_label'].sort_values().unique().tolist()
 
 
 @st.cache_data(show_spinner=False)
@@ -137,9 +148,6 @@ st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>",
 st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
 
 
-# Define selection options
-parasite_list = ['<select>'] + load_predictions(data_dir)['taxid1_label'].sort_values().unique().tolist()
-
 st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
 
@@ -150,15 +158,27 @@ with col1:
 
 
 with col2:
-    
-    # Implement multiselect dropdown menu for option selection
-    selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
+
+    # the host carries over from whichever page it was last chosen on
+    selected_host, selected_taxids = web_utils.host_selector(
+        config, load_predictions(data_dir), 'Select a host')
+
+    if selected_host == web_utils.NO_HOST:
+        st.text('Choose 1 host to explore the predicted host-parasite interactions')
+        selected_parasite = "<select>"
+    else:
+        # only parasites that infect the selected host
+        parasite_list = ['<select>'] + get_parasite_list(data_dir, selected_taxids)
+        # switching host can leave a parasite selected that the new host does not have
+        if st.session_state.get('net_par') not in parasite_list:
+            st.session_state.pop('net_par', None)
+        selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
 
     # Set info message on initial site load
     if selected_parasite == "<select>":
         st.text('Choose 1 parasite to visualize the predicted PPI network')
-    else:        
-        df_select = get_parasite_tissues(data_dir, selected_parasite)
+    else:
+        df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 

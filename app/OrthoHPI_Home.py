@@ -155,26 +155,24 @@ st.text(" ")
 st.text(" ")
 st.markdown("---")
 
-# Define selection options -- hosts the config groups together (rat + mouse) are one option
-host_groups = web_utils.get_host_groups(config, load_predictions(data_dir))
-host_list = ['<select>'] + list(host_groups)
-
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.write('')
 
 with col2:
-    selected_host = st.selectbox('Select a host to visualize the predicted interactions', host_list, key="home_host")
-    if selected_host == "<select>":
+    # the host applies to every page (web_utils.host_selector), and hosts the config
+    # groups together (rat + mouse) are one option
+    selected_host, selected_taxids = web_utils.host_selector(
+        config, load_predictions(data_dir), 'Select a host to visualize the predicted interactions')
+    if selected_host == web_utils.NO_HOST:
         st.text('Choose 1 host to explore the predicted host-parasite interactions')
 
 with col3:
     st.write('')
 
 
-if selected_host != "<select>":
-    selected_taxids = tuple(host_groups[selected_host])
+if selected_host != web_utils.NO_HOST:
     chart1, chart2 = st.columns(2)
 
     with chart1:

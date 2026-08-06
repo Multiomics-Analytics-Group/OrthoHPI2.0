@@ -37,7 +37,6 @@ tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.par
 pred_tissues = pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 tissues = None
 predictions = None
-parasite_list = ['<select>'] + pred_tissues['taxid1_label'].sort_values().unique().tolist()
 
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
@@ -51,8 +50,21 @@ with col1:
 
 
 with col2:
-    # Implement multiselect dropdown menu for option selection
-    selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="struct_par")
+    # the host carries over from whichever page it was last chosen on
+    selected_host, selected_taxids = web_utils.host_selector(config, pred_tissues, 'Select a host')
+
+    if selected_host == web_utils.NO_HOST:
+        st.text('Choose 1 host to explore the predicted host-parasite interactions')
+        selected_parasite = "<select>"
+    else:
+        # only parasites that infect the selected host
+        host_pred = pred_tissues[pred_tissues['taxid2'].isin(selected_taxids)]
+        parasite_list = ['<select>'] + host_pred['taxid1_label'].sort_values().unique().tolist()
+        # switching host can leave a parasite selected that the new host does not have
+        if st.session_state.get('struct_par') not in parasite_list:
+            st.session_state.pop('struct_par', None)
+        selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="struct_par")
+
     if selected_parasite == "<select>":
         st.text('Choose 1 parasite to visualize the predicted PPI network')
         selected_cols = None
@@ -68,7 +80,7 @@ with col3:
         
 if selected_cols is not None:    
     with st.container():
-        df_select = pred_tissues.loc[pred_tissues['taxid1_label'] == selected_parasite]
+        df_select = host_pred.loc[host_pred['taxid1_label'] == selected_parasite]
         df_select = web_utils.filter_tissues(config, df_select)
         df_select = df_select[df_select['weight'] >= score]
         df_select = df_select[selected_cols].drop_duplicates(['source_name', 'target_name'])

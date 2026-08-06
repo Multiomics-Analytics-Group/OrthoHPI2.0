@@ -47,21 +47,26 @@ def load_predictions(data_dir):
 
 
 @st.cache_data(show_spinner=False)
-def get_host_predictions(data_dir, host):
+def get_host_predictions(data_dir, host_taxids):
+    '''
+    Predictions against one host group. host_taxids is a tuple of taxids (as strings)
+    so grouped hosts -- rat and mouse under Rodent -- are pooled into a single view;
+    the predictions keep their own species label and taxid.
+    '''
     predictions = load_predictions(data_dir)
 
-    return predictions[predictions['taxid2_label'] == host]
+    return predictions[predictions['taxid2'].isin(host_taxids)]
 
 
 @st.cache_data(show_spinner=False)
-def count_interactions_per_tissue_cell_type(data_dir, config, host):
+def count_interactions_per_tissue_cell_type(data_dir, config, host_taxids):
     '''
-    Counts the predicted interactions of a host per parasite, tissue and cell type,
+    Counts the predicted interactions of a host group per parasite, tissue and cell type,
     keeping only the tissues each parasite is known to infect (config['parasites']).
     Aggregating here keeps the merged predictions/tissues table out of the app's
     memory and makes sure each icicle sector is counted once.
     '''
-    predictions = get_host_predictions(data_dir, host)
+    predictions = get_host_predictions(data_dir, host_taxids)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     tpm_col = 'nTPM' if 'nTPM' in tissues.columns else 'pTPM'
     tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type', tpm_col]]
@@ -106,8 +111,8 @@ def get_common_interactors(df_pred):
             pd.DataFrame(nodes, columns=['index', 'name']))
 
 @st.cache_resource(show_spinner=False)
-def generate_circos_plot(data_dir, host):
-    links, nodes = get_common_interactors(get_host_predictions(data_dir, host))
+def generate_circos_plot(data_dir, host_taxids):
+    links, nodes = get_common_interactors(get_host_predictions(data_dir, host_taxids))
     if links.empty or links['value'].max() < 1:
         return None
 
@@ -150,8 +155,9 @@ st.text(" ")
 st.text(" ")
 st.markdown("---")
 
-# Define selection options
-host_list = ['<select>'] + load_predictions(data_dir)['taxid2_label'].sort_values().unique().tolist()
+# Define selection options -- hosts the config groups together (rat + mouse) are one option
+host_groups = web_utils.get_host_groups(config, load_predictions(data_dir))
+host_list = ['<select>'] + list(host_groups)
 
 col1, col2, col3 = st.columns(3)
 
@@ -168,17 +174,18 @@ with col3:
 
 
 if selected_host != "<select>":
+    selected_taxids = tuple(host_groups[selected_host])
     chart1, chart2 = st.columns(2)
 
     with chart1:
         st.subheader("Circos Plot of Common Host Interactors")
-        circos_plot = generate_circos_plot(data_dir, selected_host)
+        circos_plot = generate_circos_plot(data_dir, selected_taxids)
         if circos_plot is not None:
             streamlit_bokeh(circos_plot, use_container_width=True)
         else:
             st.text(f'No host proteins are shared by the parasites infecting {selected_host}')
 
-    stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_host))
+    stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_taxids))
     stats_cols = st.columns(len(stats_figs))
     i = 0
     for stats_fig, title in stats_figs:
@@ -187,7 +194,7 @@ if selected_host != "<select>":
             st.plotly_chart(stats_fig, width='stretch')
         i += 1
 
-    fig = generate_tissue_cell_type_box(count_interactions_per_tissue_cell_type(data_dir, config, selected_host))
+    fig = generate_tissue_cell_type_box(count_interactions_per_tissue_cell_type(data_dir, config, selected_taxids))
     with chart2:
         st.subheader("Summary of Interactions per Tissue and Cell type")
         st.plotly_chart(fig, width='stretch')

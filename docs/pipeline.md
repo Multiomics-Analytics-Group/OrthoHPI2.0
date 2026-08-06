@@ -6,13 +6,22 @@ host-parasite PPI predictions in `data/annotated_predictions.parquet` get
 built. 
 
 Everything is driven by `config.yml`: `urls` (data sources), `hosts` (human
-9606, rat 10116, pig 9823), and `parasites` (40 species, each with a STRING
-taxid, a display label/color, the list of BTO tissue codes relevant to that
-parasite's life cycle, and a `hosts` list of the host taxids it infects).
+9606, rat 10116, mouse 10090, pig 9823), and `parasites` (40 species, each with
+a STRING taxid, a display label/color, the list of BTO tissue codes relevant to
+that parasite's life cycle, and a `hosts` list of the host taxids it infects).
 
 A parasite is only paired with the hosts named in its `hosts` list
 (`homology.get_links`), so e.g. a pig-only parasite never generates
 human predictions.
+
+A host may carry an optional `group`, which only affects the app: hosts sharing
+a group are offered as a single option in the host selector and their
+predictions are pooled, while the predictions themselves keep their own species
+label, taxid and colour. Rat and mouse share `group: Rodent` — `Parasites_db.xlsx`
+only curates rat as a host, and we assume the same parasites infect mouse, so
+every parasite with 10116 in its `hosts` list also lists 10090. Mouse is worth
+having alongside rat because rat's jensenlab tissue data is sparse (no blood,
+skin, macrophage, nose or mouth above the 2.5 cutoff) where mouse's is not.
 
 Data sources are STRING v12.0 and EggNOG 6.
 
@@ -134,6 +143,15 @@ Adds `source_uniprot` / `target_uniprot` columns by mapping STRING protein
 IDs to UniProt accessions via STRING's alias file, for parasites and hosts
 respectively. Final output: `data/annotated_predictions.parquet`, which the
 Streamlit app reads.
+
+The alias `sources` are a preference list — `parse_string_aliases` takes the
+alias of the first source that has one — because STRING's alias files are not
+uniform across species. Parasites use `Uniprot`. Hosts use
+`Ensembl_HGNC_uniprot_ids`, one canonical accession per protein but present
+only in human's file, falling back to `UniProt_AC` for rat, mouse and pig,
+which would otherwise get no accession at all (and so no structures on the
+app's structure page). `Ensembl_UniProt` looks like a third option but must not
+be used: it mixes gene names in among the accessions.
 
 ## DeepLoc secretome prediction
 

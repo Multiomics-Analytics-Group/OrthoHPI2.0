@@ -9,6 +9,10 @@ urls:
     string_sequences_url: https://stringdb-downloads.org/download/protein.sequences.v12.0/TAXID.protein.sequences.v12.0.fa.gz
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
+# `group` (optional) collapses several host species into one option in the app;
+# hosts without it are their own group. Rat and mouse are grouped as Rodent: the
+# Parasites_db curation only records rat hosts, and we assume the same parasites
+# infect mouse (see the `hosts` lists of the parasites below).
 hosts:
     9606:
         label: Homo sapiens
@@ -16,8 +20,14 @@ hosts:
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
     10116:
         label: Rattus norvegicus
+        group: Rodent
         color: "#1b7837"
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
+    10090:
+        label: Mus musculus
+        group: Rodent
+        color: "#1b7837"
+        tissues_url: https://download.jensenlab.org/mouse_tissue_experiments_full.tsv
     9823:
         label: Sus scrofa
         color: "#762a83"
@@ -144,6 +154,7 @@ parasites:
         hosts:
             - 9606
             - 10116
+            - 10090
     6945:
         label: Ixodes scapularis
         multicellular: true
@@ -377,6 +388,7 @@ parasites:
             - "BTO:0000142"
         hosts:
             - 10116
+            - 10090
     334426:
         label: Angiostrongylus costaricensis
         multicellular: true
@@ -385,6 +397,7 @@ parasites:
             - "BTO:0000779"
         hosts:
             - 10116
+            - 10090
     5660:
         label: Leishmania braziliensis
         color: "#31a354"
@@ -396,6 +409,7 @@ parasites:
             - "BTO:0000089"
         hosts:
             - 10116
+            - 10090
     6334:
         label: Trichinella spiralis
         multicellular: true

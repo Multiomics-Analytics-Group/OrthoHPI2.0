@@ -85,7 +85,8 @@ def annotate_alias_id(predictions_df, taxids, config_file, sources, new_col, map
 
     :param DataFrame predictions_df: predictions dataframe to be annotated (requires mapping_col in columns)
     :param str config_file: path to config file (used to get the aliases for each species)
-    :param list sources: what source ids need to be annotated
+    :param list sources: what source ids need to be annotated, in order of preference
+                (see parse_string_aliases)
 
     :return DataFrame predictions_df: annotated dataframe with the String aliases of interest
     '''
@@ -105,7 +106,11 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     Parses the alias file from String database and generates a dictionary
     that can be used to map to the right identifiers
     :param str config_file: path to the config file where the url to the String alias file should be defined
-    :param list sources: list of sources that should be considered in the mapping (i.e. Ensembl_gene)
+    :param list sources: sources to consider (i.e. Ensembl_gene), in order of preference:
+                the alias of the first source that has one for an identifier wins. STRING
+                alias files differ per species -- only human carries
+                Ensembl_HGNC_uniprot_ids -- so listing fallbacks maps the other species
+                without changing the ones that do have the preferred source.
     :param str taxid: taxonomic identifier of the species for which to parse the aliases file
     :param bool reverse: whether to store alias --> string_id dictionary (False), or string_id --> alias (True)
     :return: dictionary with key --> alias, values --> string_id (reverse=False),
@@ -113,14 +118,19 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     '''
     data_dict = {}
     urls = read_config(filepath=config_file, field='urls')
-        
+
     if 'string_alias_url' in urls:
         filename = download_file(url=urls['string_alias_url'].replace('TAXID', taxid), data_dir=os.path.join('data/downloads/species', str(taxid)))
-    
+
     data = pd.read_csv(filename, sep='\t', header=0)
     if sources is not None:
         data = data[data['source'].isin(sources)]
-    
+        # Rows are written into data_dict in order and later ones overwrite earlier
+        # ones, so sorting by descending preference leaves the most preferred source
+        # written last -- and therefore the one that wins. The sort is stable, so
+        # within a single source the file order still decides, as it did before.
+        rank = {source: i for i, source in enumerate(sources)}
+        data = data.sort_values('source', key=lambda s: s.map(rank), ascending=False, kind='stable')
 
     for i, row in data[['#string_protein_id', 'alias']].iterrows():
         if not reverse:

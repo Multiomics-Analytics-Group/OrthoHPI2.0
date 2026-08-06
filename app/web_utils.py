@@ -19,6 +19,27 @@ def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
 
 
+def get_host_groups(config, predictions):
+    '''
+    Maps each host group offered in the app to the taxids it covers. Hosts sharing a
+    `group` in the config (rat and mouse -> Rodent) are presented as one option, hosts
+    without one stand alone under their label. Groups with no predicted interaction are
+    dropped so the selector never offers an empty host.
+
+    :param dict config: parsed configuration
+    :param predictions: predictions dataframe, used to drop groups without predictions
+    :return: {group label: [taxid as str, ...]} sorted by group label
+    '''
+    predicted = set(predictions['taxid2'])
+    groups = {}
+    for taxid, host in config['hosts'].items():
+        taxid = str(taxid)
+        if taxid in predicted:
+            groups.setdefault(host.get('group', host['label']), []).append(taxid)
+
+    return {group: groups[group] for group in sorted(groups)}
+
+
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]
     mapped_tissues = config['tissues']

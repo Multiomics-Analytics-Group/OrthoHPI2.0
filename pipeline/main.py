@@ -123,6 +123,11 @@ def annotate_predictions(predictions, hosts, parasites, config_file):
     Parasites and hosts use different STRING alias source names in v12 (the v11.5
     names BLAST_UniProt_AC / Ensembl_HGNC_UniProt_ID(supplied_by_UniProt) no longer
     exist).
+
+    Host sources are a preference list, because the alias files are not uniform:
+    Ensembl_HGNC_uniprot_ids holds one canonical accession per protein but exists
+    only for human, so rat, mouse and pig fall back to UniProt_AC. Ensembl_UniProt
+    is deliberately not used -- it mixes gene names in with the accessions.
     """
     predictions = utils.annotate_alias_id(predictions_df=predictions,
                             taxids=list(parasites.keys()), config_file=config_file,
@@ -130,7 +135,7 @@ def annotate_predictions(predictions, hosts, parasites, config_file):
                             mapping_col="source")
     predictions = utils.annotate_alias_id(predictions_df=predictions,
                             taxids=list(hosts.keys()), config_file=config_file,
-                            sources=['Ensembl_HGNC_uniprot_ids'],
+                            sources=['Ensembl_HGNC_uniprot_ids', 'UniProt_AC'],
                             new_col="target_uniprot", mapping_col="target")
     return predictions
 

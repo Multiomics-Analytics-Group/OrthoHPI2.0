@@ -29,6 +29,12 @@ elif page == "About":
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
+# fallback for a parasite without a `group` in the config
+UNKNOWN_GROUP = 'Unclassified'
+UNKNOWN_COLOR = '#999999'
+# colour of the chords of the parasite under the cursor in the circos plot
+HOVER_COLOR = '#00A000'
+
 #Initialize variables
 df_select = None
 net = None
@@ -99,29 +105,65 @@ def generate_tissue_cell_type_box(counts):
     return fig
 
 @st.cache_data(show_spinner=False)
-def get_common_interactors(df_pred):
+def get_common_interactors(df_pred, groups, group_order):
+    '''
+    Builds the circos nodes (parasites) and links (host proteins a pair of parasites
+    shares). The parasites are ordered by taxonomic group and then by name so each
+    clade occupies a contiguous arc of the circle, which is what makes the group
+    colouring readable. The groups follow the order they are declared in
+    config['parasite_groups'], so the circle and the legend read the same way.
+    '''
     targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
-    labels = list(targets)
+    labels = sorted(targets, key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
 
-    nodes = [(i, g[0]+'. '+g.split(' ')[1]) for i, g in enumerate(labels)]
+    nodes = [(i, g[0]+'. '+g.split(' ')[1], groups.get(g, UNKNOWN_GROUP)) for i, g in enumerate(labels)]
     links = [(i, j, len(targets[g1].intersection(targets[labels[j]])))
              for i, g1 in enumerate(labels) for j in range(i + 1, len(labels))]
 
     return (pd.DataFrame(links, columns=['source', 'target', 'value']),
-            pd.DataFrame(nodes, columns=['index', 'name']))
+            pd.DataFrame(nodes, columns=['index', 'name', 'group']))
 
 @st.cache_resource(show_spinner=False)
-def generate_circos_plot(data_dir, host_taxids):
-    links, nodes = get_common_interactors(get_host_predictions(data_dir, host_taxids))
+def generate_circos_plot(data_dir, host_taxids, groups, palette):
+    '''
+    The arcs are coloured by taxonomic group (config['parasite_groups']) rather than
+    by species: a per-species palette would have to repeat itself for the 35 parasites
+    infecting human, and the group colour also shows whether the shared host proteins
+    follow the parasite phylogeny. The chords themselves are neutral grey -- nearly
+    every pair of parasites shares something, so colouring them only adds noise --
+    and hovering (or clicking) a parasite draws the chords it belongs to in green.
+    The hover styling has to set the alpha too: inheriting the 0.35 of the resting
+    chords washes the highlight out to the same grey.
+    '''
+    links, nodes = get_common_interactors(get_host_predictions(data_dir, host_taxids), groups,
+                                          {g: i for i, g in enumerate(palette)})
     if links.empty or links['value'].max() < 1:
-        return None
+        return None, []
 
-    chord = hv.Chord((links, hv.Dataset(nodes, 'index'))).select(value=(1, None))
+    palette = {**palette, **{g: UNKNOWN_COLOR for g in set(nodes['group']) if g not in palette}}
+
+    chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group']))).select(value=(1, None))
     chord.opts(
-        opts.Chord(width=500, height=700, cmap='Category20', edge_cmap='Category20', edge_color=dim('source').str(),
-               labels='name', node_color=dim('index').str()))
+        opts.Chord(width=500, height=700, labels='name',
+                   node_color=dim('group').str(), cmap=palette, node_line_color='white',
+                   edge_line_color='#bdbdbd', edge_line_width=0.6, edge_alpha=0.35,
+                   edge_hover_line_color=HOVER_COLOR, edge_hover_line_alpha=1,
+                   edge_hover_line_width=1.4,
+                   edge_selection_line_color=HOVER_COLOR, edge_selection_line_alpha=1,
+                   edge_selection_line_width=1.4, edge_nonselection_line_alpha=0.1,
+                   inspection_policy='nodes'))
 
-    return hv.render(chord)
+    shown = set(nodes['group'])
+
+    return hv.render(chord), [(g, c) for g, c in palette.items() if g in shown]
+
+def show_circos_legend(legend):
+    swatches = ''.join(
+        f"<span style='display:inline-flex;align-items:center;margin:0 12px 4px 0;white-space:nowrap;'>"
+        f"<span style='width:12px;height:12px;border-radius:2px;background:{color};"
+        f"display:inline-block;margin-right:5px;'></span>{group}</span>"
+        for group, color in legend)
+    st.markdown(f"<div style='font-size:0.85em;color:#333333;'>{swatches}</div>", unsafe_allow_html=True)
 
 def generate_boxplot_score_stats(df):
     fig = px.box(df.sort_values("taxid1"), x="taxid1_label", y="weight", color='taxid1', labels={"weight":"score", "taxid1_label": "parasites"})
@@ -138,10 +180,14 @@ def generate_barplot_stats(df):
 def generate_stats_plots(df):
     stats_figures = []
     fig = generate_barplot_stats(df)
-    stats_figures.append((fig, "Number of Interactions"))
+    stats_figures.append((fig, "Number of Interactions",
+                          "How many interactions with the host are predicted for each parasite."))
 
     fig = generate_boxplot_score_stats(df)
-    stats_figures.append((fig, "Boxplot of Confidence scores"))
+    stats_figures.append((fig, "Boxplot of Confidence scores",
+                          "Distribution of the confidence score of each parasite's predicted "
+                          "interactions: the higher the score, the better the evidence "
+                          "transferred from the orthologous interaction."))
 
     return stats_figures
 
@@ -177,8 +223,16 @@ if selected_host != web_utils.NO_HOST:
 
     with chart1:
         st.subheader("Circos Plot of Common Host Interactors")
-        circos_plot = generate_circos_plot(data_dir, selected_taxids)
+        st.caption(f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
+                   'group; a chord joins two parasites that are predicted to interact with the '
+                   'same host proteins, and is the thicker the more proteins they share. Hover a '
+                   'parasite to follow its chords.')
+        circos_plot, circos_legend = generate_circos_plot(
+            data_dir, selected_taxids,
+            {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()},
+            config.get('parasite_groups', {}))
         if circos_plot is not None:
+            show_circos_legend(circos_legend)
             streamlit_bokeh(circos_plot, use_container_width=True)
         else:
             st.text(f'No host proteins are shared by the parasites infecting {selected_host}')
@@ -186,15 +240,19 @@ if selected_host != web_utils.NO_HOST:
     stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_taxids))
     stats_cols = st.columns(len(stats_figs))
     i = 0
-    for stats_fig, title in stats_figs:
+    for stats_fig, title, caption in stats_figs:
         with stats_cols[i]:
             st.subheader(title)
+            st.caption(caption)
             st.plotly_chart(stats_fig, width='stretch')
         i += 1
 
     fig = generate_tissue_cell_type_box(count_interactions_per_tissue_cell_type(data_dir, config, selected_taxids))
     with chart2:
         st.subheader("Summary of Interactions per Tissue and Cell type")
+        st.caption('Where the predicted interactions can take place: each parasite is broken down '
+                   'into the tissues it is known to infect and the cell types of those tissues, '
+                   'sized and coloured by the number of interactions. Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")

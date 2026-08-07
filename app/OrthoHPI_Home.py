@@ -34,6 +34,8 @@ UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
 # colour of the chords of the parasite under the cursor in the circos plot
 HOVER_COLOR = '#00A000'
+# circos view restricted to the host proteins expressed where the parasite is
+IN_TISSUE_VIEW = 'In the infected tissues'
 
 #Initialize variables
 df_select = None
@@ -105,6 +107,33 @@ def generate_tissue_cell_type_box(counts):
     return fig
 
 @st.cache_data(show_spinner=False)
+def get_tissue_expressed_predictions(data_dir, config, host_taxids):
+    '''
+    Predictions restricted to the host proteins that are expressed in a tissue the
+    parasite is known to infect (config['parasites'][taxid]['tissues']), which is the
+    same restriction the tissue/cell type icicle applies. What is left are the
+    interactions that could take place where the parasite actually is, rather than every
+    interaction predicted from orthology. Parasites left without any interactor simply
+    do not appear in what is built from this.
+    '''
+    predictions = get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'target']]
+    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+    expressed = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
+
+    mapped_tissues = config['tissues']
+    infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
+                                     for taxid, parasite in config['parasites'].items()
+                                     for t in parasite['tissues']],
+                                    columns=['taxid1', 'Tissue'])
+
+    aux = predictions.drop_duplicates().astype({'taxid1': str})
+    aux = pd.merge(aux, expressed, on='target')
+    aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
+
+    return aux[['taxid1_label', 'target']].drop_duplicates()
+
+
+@st.cache_data(show_spinner=False)
 def get_common_interactors(df_pred, groups, group_order):
     '''
     Builds the circos nodes (parasites) and links (host proteins a pair of parasites
@@ -124,7 +153,7 @@ def get_common_interactors(df_pred, groups, group_order):
             pd.DataFrame(nodes, columns=['index', 'name', 'group']))
 
 @st.cache_resource(show_spinner=False)
-def generate_circos_plot(data_dir, host_taxids, groups, palette):
+def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_expressed=False):
     '''
     The arcs are coloured by taxonomic group (config['parasite_groups']) rather than
     by species: a per-species palette would have to repeat itself for the 35 parasites
@@ -134,8 +163,13 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette):
     and hovering (or clicking) a parasite draws the chords it belongs to in green.
     The hover styling has to set the alpha too: inheriting the 0.35 of the resting
     chords washes the highlight out to the same grey.
+
+    With only_expressed the interactions are first restricted to the host proteins the
+    parasite could meet in the tissues it infects.
     '''
-    links, nodes = get_common_interactors(get_host_predictions(data_dir, host_taxids), groups,
+    predictions = (get_tissue_expressed_predictions(data_dir, config, host_taxids) if only_expressed
+                   else get_host_predictions(data_dir, host_taxids))
+    links, nodes = get_common_interactors(predictions, groups,
                                           {g: i for i, g in enumerate(palette)})
     if links.empty or links['value'].max() < 1:
         return None, []
@@ -164,6 +198,20 @@ def show_circos_legend(legend):
         f"display:inline-block;margin-right:5px;'></span>{group}</span>"
         for group, color in legend)
     st.markdown(f"<div style='font-size:0.85em;color:#333333;'>{swatches}</div>", unsafe_allow_html=True)
+
+def show_circos_plot(data_dir, host, host_taxids, config, only_expressed, caption, key):
+    st.caption(caption)
+    circos_plot, circos_legend = generate_circos_plot(
+        data_dir, host_taxids,
+        {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()},
+        config.get('parasite_groups', {}), config, only_expressed)
+    if circos_plot is None:
+        where = ' in the tissues they infect' if only_expressed else ''
+        st.text(f'No host proteins are shared by the parasites infecting {host}{where}')
+        return
+
+    show_circos_legend(circos_legend)
+    streamlit_bokeh(circos_plot, use_container_width=True, key=key)
 
 def generate_boxplot_score_stats(df):
     fig = px.box(df.sort_values("taxid1"), x="taxid1_label", y="weight", color='taxid1', labels={"weight":"score", "taxid1_label": "parasites"})
@@ -223,19 +271,24 @@ if selected_host != web_utils.NO_HOST:
 
     with chart1:
         st.subheader("Circos Plot of Common Host Interactors")
-        st.caption(f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
-                   'group; a chord joins two parasites that are predicted to interact with the '
-                   'same host proteins, and is the thicker the more proteins they share. Hover a '
-                   'parasite to follow its chords.')
-        circos_plot, circos_legend = generate_circos_plot(
-            data_dir, selected_taxids,
-            {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()},
-            config.get('parasite_groups', {}))
-        if circos_plot is not None:
-            show_circos_legend(circos_legend)
-            streamlit_bokeh(circos_plot, use_container_width=True)
-        else:
-            st.text(f'No host proteins are shared by the parasites infecting {selected_host}')
+        shared = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
+                  'group; a chord joins two parasites that are predicted to interact with the '
+                  'same host proteins, and is the thicker the more proteins they share. Hover a '
+                  'parasite to follow its chords. ')
+        views = {
+            IN_TISSUE_VIEW: shared + 'Only the host proteins expressed in the tissues each '
+                                     'parasite is known to infect are counted, so what is left '
+                                     'are the interactions that can take place where the '
+                                     'parasite is.',
+            'All predictions': shared + 'Every predicted interaction is counted, whether or not '
+                                        'the host protein is expressed where the parasite is.',
+        }
+        # one view at a time rather than two tabs: the bokeh component sizes itself from the
+        # width of the document, which is 0 while it sits in a tab that is not open
+        view = st.radio('Interactions to count', list(views), horizontal=True,
+                        key='circos_view', label_visibility='collapsed')
+        show_circos_plot(data_dir, selected_host, selected_taxids, config,
+                         view == IN_TISSUE_VIEW, views[view], 'circos')
 
     stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_taxids))
     stats_cols = st.columns(len(stats_figs))

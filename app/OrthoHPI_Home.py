@@ -121,7 +121,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids):
     interaction predicted from orthology. Parasites left without any interactor simply
     do not appear in what is built from this.
     '''
-    predictions = get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'target']]
+    predictions = get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label',
+                                                               'target', 'target_name']]
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     expressed = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
 
@@ -135,7 +136,7 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids):
     aux = pd.merge(aux, expressed, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
 
-    return aux[['taxid1_label', 'target']].drop_duplicates()
+    return aux[['taxid1_label', 'target', 'target_name']].drop_duplicates()
 
 
 @st.cache_data(show_spinner=False)
@@ -263,6 +264,57 @@ def generate_similarity_heatmap(similarity, clades, palette):
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left',
                                      x=0, itemclick=False, itemdoubleclick=False,
                                      font=dict(size=11)))
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
+def get_top_shared_proteins(df_pred, groups, group_order, top=40):
+    '''
+    The host proteins that the most parasites are predicted to interact with. The circos
+    and the heatmap both count how much two parasites have in common but neither says what
+    they have in common, which is what this is for. Proteins only one parasite interacts
+    with are left out: they are not shared by anything.
+    '''
+    pairs = df_pred[['taxid1_label', 'target', 'target_name']].drop_duplicates()
+    counts = pairs.groupby('target_name')['taxid1_label'].nunique()
+    counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
+    if counts.empty:
+        return None
+
+    proteins = list(counts.head(top).index)
+    dots = pairs[pairs['target_name'].isin(proteins)].copy()
+    dots['group'] = dots['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
+    dots['parasites'] = dots['target_name'].map(counts)
+    dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
+    order = sorted(dots['taxid1_label'].unique(),
+                   key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
+
+    return dots, proteins, [f'{p[0]}. {p.split(" ")[1]}' for p in order], int(counts.max())
+
+
+@st.cache_data(show_spinner=False)
+def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
+    '''
+    A dot wherever a parasite is predicted to interact with one of the proteins, the
+    parasites in the order of the circos so the taxonomic groups stay together, and the
+    proteins ordered by how many parasites reach them.
+    '''
+    figure = px.scatter(dots, x='parasite', y='target_name', color='group',
+                        # plotly express flips category_orders on a y axis, so `proteins`
+                        # most-shared first puts the most-shared protein in the top row
+                        color_discrete_map=palette, category_orders={
+                            'parasite': parasites, 'target_name': proteins,
+                            'group': [g for g in palette if g in set(dots['group'])]},
+                        hover_data={'parasites': True, 'parasite': True, 'target_name': True,
+                                    'group': False})
+    figure.update_traces(marker=dict(size=8, line=dict(width=0)))
+    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
+                         margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
+                         legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
+                         xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
+    figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#f0f0f0')
+    figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 
@@ -446,13 +498,17 @@ if selected_host != web_utils.NO_HOST:
         show_circos_plot(data_dir, selected_host, selected_taxids, config,
                          view == IN_TISSUE_VIEW, views[view], 'circos')
 
-    # the heatmap answers the same question as the circos, on the interactions the radio
-    # above selects, but reads where the circos cannot: it normalises for how many
-    # predictions a parasite has, and it has no chords to overlap
-    similarity = get_interactor_similarity(
-        get_tissue_expressed_predictions(data_dir, config, selected_taxids)
-        if view == IN_TISSUE_VIEW else get_host_predictions(data_dir, selected_taxids),
-        {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()})
+    # the heatmap and the dot matrix work on the interactions the radio above selects: the
+    # heatmap reads where the circos cannot, since it normalises for how many predictions a
+    # parasite has and has no chords to overlap, and the dot matrix names the host proteins
+    # that neither of the other two ever shows
+    parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
+                       for p in config['parasites'].values()}
+    group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
+    counted = (get_tissue_expressed_predictions(data_dir, config, selected_taxids)
+               if view == IN_TISSUE_VIEW else get_host_predictions(data_dir, selected_taxids))
+    similarity = get_interactor_similarity(counted, parasite_groups)
+    top_shared = get_top_shared_proteins(counted, parasite_groups, group_order)
 
     stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_taxids))
     stats_cols = st.columns(len(stats_figs))
@@ -481,6 +537,16 @@ if selected_host != web_utils.NO_HOST:
                    'their taxonomic group, so a clade appearing as one block means its parasites '
                    'converge on the same host proteins.')
         st.plotly_chart(generate_similarity_heatmap(*similarity, config.get('parasite_groups', {})),
+                        width='stretch')
+
+    if top_shared is not None:
+        st.subheader("Which Host Proteins the Parasites Have in Common")
+        st.caption('The host proteins reached by the most parasites, with a dot wherever a '
+                   'parasite is predicted to interact with one of them. The parasites are in the '
+                   'order of the circos, so a row of dots across a whole taxonomic group is a '
+                   'protein that group converges on, and a gap is a parasite that does not reach '
+                   'it. Proteins only one parasite interacts with are left out.')
+        st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
                         width='stretch')
 
 st.markdown("---")

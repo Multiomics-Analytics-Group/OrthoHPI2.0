@@ -1,5 +1,7 @@
+import os
 import streamlit as st
 from streamlit_option_menu import option_menu
+import utils
 
 def show_pages_menu(index=0):
     selected = option_menu(
@@ -17,6 +19,24 @@ def get_data_dir():
 
 def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
+
+
+@st.cache_data(show_spinner=False)
+def load_protein_annotations(data_dir):
+    '''
+    Descriptive protein names, keyed by STRING id, written by
+    pipeline/build_protein_annotations.py. The snapshot data directories predate that
+    script, so a missing file only leaves the protein descriptions empty.
+
+    :param str data_dir: directory holding protein_annotations.parquet
+    :return: {STRING id: descriptive protein name}
+    '''
+    input_file = os.path.join(data_dir, 'protein_annotations.parquet')
+    if not os.path.exists(input_file):
+        return {}
+    annotations = utils.read_parquet_file(input_file=input_file)
+
+    return dict(annotations[['protein', 'description']].values)
 
 
 def get_host_groups(config, predictions):

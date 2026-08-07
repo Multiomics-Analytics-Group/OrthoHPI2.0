@@ -1,4 +1,5 @@
 import sys, os
+import textwrap
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import utils
 import web_utils
@@ -27,6 +28,11 @@ selected_terms = []
 enrichment_table = None
 enrichment = None
 path = 'data/tmp'
+# characters per line of a node label, so a long protein name wraps instead of
+# stretching its node across the network
+LABEL_WRAP_WIDTH = 22
+LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
+LABEL_FONT_COLOR = '#555555'
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -71,27 +77,46 @@ def load_ontology(data_dir):
     return utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 
-@st.cache_data(show_spinner=False)
-def load_protein_annotations(data_dir):
+def set_label_font(net):
     '''
-    Descriptive protein names, keyed by STRING id, written by
-    pipeline/build_protein_annotations.py. The snapshot data directories predate that
-    script, so a missing file only leaves the node tooltips without a description.
-    '''
-    input_file = f'{data_dir}/protein_annotations.parquet'
-    if not os.path.exists(input_file):
-        return {}
-    annotations = utils.read_parquet_file(input_file=input_file)
+    Enlarges the node labels of a pyvis network. The size has to be set on the
+    network rather than on each node: pyvis overwrites a node's font with the
+    font_color the network was built with.
 
-    return dict(annotations[['protein', 'description']].values)
+    :param net: pyvis Network whose labels to enlarge
+    '''
+    net.options.nodes = {'font': {'size': LABEL_FONT_SIZE, 'color': LABEL_FONT_COLOR}}
+
+
+def generate_node_labels(df, annotations):
+    '''
+    Draws the descriptive protein name on the node instead of the short name STRING
+    prefers. Proteins STRING has no name for are left with their short name -- an
+    "Uncharacterized protein" label identifies nothing, and most parasite proteins
+    would end up sharing it. The name is wrapped so long ones do not stretch the node
+    across the network.
+
+    :param df: predictions dataframe of the selected parasite
+    :param dict annotations: STRING id --> descriptive protein name
+    :return: {STRING id: label}
+    '''
+    labels = {}
+    for prefix in ['source', 'target']:
+        for protein, name in df[[prefix, f'{prefix}_name']].drop_duplicates(subset=prefix).values:
+            description = annotations.get(protein, '')
+            if not description or description.lower().startswith('uncharacterized'):
+                labels[protein] = str(name)
+            else:
+                labels[protein] = '\n'.join(textwrap.wrap(description, width=LABEL_WRAP_WIDTH))
+
+    return labels
 
 
 def generate_node_titles(df, annotations):
     '''
-    Builds the hover text of each node: the short name drawn on the node, the
-    descriptive protein name and the identifiers needed to look the protein up
-    elsewhere. The node labels have to stay short to keep the network readable, so
-    the full name is only reachable on hover.
+    Builds the hover text of each node: the short name, the descriptive protein name
+    and the identifiers needed to look the protein up elsewhere. The label only shows
+    one of the two names, so the tooltip keeps both.
 
     :param df: predictions dataframe of the selected parasite
     :param dict annotations: STRING id --> descriptive protein name
@@ -159,6 +184,7 @@ def generate_graph(df, score, annotations=None):
     shapes.update(dict(df[['target', 'target_shape']].drop_duplicates().values))
     nx.set_node_attributes(G, shapes, 'shape')
     if annotations is not None:
+        nx.set_node_attributes(G, generate_node_labels(df, annotations), 'label')
         nx.set_node_attributes(G, generate_node_titles(df, annotations), 'title')
     centrality = nx.betweenness_centrality(G, weight='weight')
     max_centrality = max(centrality.values(), default=0)
@@ -240,7 +266,7 @@ with col2:
 
 
         # Create networkx graph object from pandas dataframe
-        G = generate_graph(df_select, score, load_protein_annotations(data_dir))
+        G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir))
             
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
 
@@ -259,6 +285,7 @@ with col2:
         net.repulsion(node_distance=420, central_gravity=0.33,
                         spring_length=110, spring_strength=0.10,
                         damping=0.95)
+        set_label_font(net)
         
         #net.show_buttons(filter_=['nodes'])
         
@@ -389,7 +416,7 @@ with st.container():
                     highlighted_nodes = enrichment[enrichment['go_term'].isin(selected_terms)]['nodes'].values
                     highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
                     highlight_color = {i: '#e7298a' for i in highlighted_nodes}
-                    G = generate_graph(df_select, score, load_protein_annotations(data_dir))
+                    G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir))
                     nx.set_node_attributes(G, "#ddd", 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
                     # Initiate PyVis network object
@@ -397,6 +424,7 @@ with st.container():
                     # Take Networkx graph and translate it to a PyVis graph format
                     net.from_nx(G)
                     G = None
+                    set_label_font(net)
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
                     st.subheader("Highlighted Nodes for Selected Biological Processes")

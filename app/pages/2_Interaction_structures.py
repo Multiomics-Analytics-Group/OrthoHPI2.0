@@ -69,8 +69,9 @@ with col2:
         st.text('Choose 1 parasite to visualize the predicted PPI network')
         selected_cols = None
     else:
-        selected_cols = ['taxid1_label', 'source_name', 'source', 'taxid2_label',
-        'target_name', 'target', 'experimental_evidence_score', 'databases_evidence_score',
+        selected_cols = ['taxid1_label', 'source_name', 'source_full_name', 'source',
+        'taxid2_label', 'target_name', 'target_full_name', 'target',
+        'experimental_evidence_score', 'databases_evidence_score',
         'weight', 'group1', 'group2', 'source_uniprot', 'target_uniprot']
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
   
@@ -83,6 +84,12 @@ if selected_cols is not None:
         df_select = host_pred.loc[host_pred['taxid1_label'] == selected_parasite]
         df_select = web_utils.filter_tissues(config, df_select)
         df_select = df_select[df_select['weight'] >= score]
+        # the descriptive protein name STRING carries, which the predictions only keep
+        # the short version of; empty for the proteins the annotations do not cover
+        annotations = web_utils.load_protein_annotations(data_dir)
+        df_select = df_select.assign(
+            source_full_name=df_select['source'].map(annotations).fillna(''),
+            target_full_name=df_select['target'].map(annotations).fillna(''))
         df_select = df_select[selected_cols].drop_duplicates(['source_name', 'target_name'])
 
 

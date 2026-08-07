@@ -6,7 +6,11 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import holoviews as hv
+from plotly.subplots import make_subplots
+from scipy.cluster.hierarchy import leaves_list, linkage
+from scipy.spatial.distance import squareform
 from css import style
 from holoviews import opts, dim
 hv.extension('bokeh')
@@ -194,6 +198,76 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
     figure = separate_arcs(inset_chord_ends(hv.render(chord)))
 
     return figure, [(g, c) for g, c in palette.items() if g in shown]
+
+@st.cache_data(show_spinner=False)
+def get_interactor_similarity(df_pred, groups):
+    '''
+    Jaccard similarity between the host proteins each pair of parasites is predicted to
+    interact with, ordered by hierarchical clustering. Jaccard rather than the count of
+    shared proteins the circos draws: the parasites have between 12 and 200 predicted
+    interactors, so a raw count mostly reports how many predictions a parasite has.
+    Clustering the parasites on that similarity puts the ones converging on the same host
+    proteins next to each other, whether or not they are related.
+    '''
+    targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
+    targets = {g: t for g, t in targets.items() if t}
+    labels = sorted(targets)
+    if len(labels) < 3:
+        return None
+
+    similarity = np.array([[len(targets[a] & targets[b]) / len(targets[a] | targets[b])
+                            for b in labels] for a in labels])
+    order = leaves_list(linkage(squareform(1 - similarity, checks=False), method='average'))
+    labels = [labels[i] for i in order]
+
+    return (pd.DataFrame(similarity[np.ix_(order, order)], index=labels, columns=labels),
+            [groups.get(g, UNKNOWN_GROUP) for g in labels])
+
+
+@st.cache_data(show_spinner=False)
+def generate_similarity_heatmap(similarity, clades, palette):
+    '''
+    The similarity matrix, with a strip of the taxonomic group of each parasite down the
+    side so it can be read against the clustering. The diagonal is left blank: a parasite
+    shares everything with itself and would take over the colour scale.
+    '''
+    shown = [g for g in palette if g in set(clades)]
+    steps = [[i / len(shown), palette[g]] for i, g in enumerate(shown)]
+    steps += [[(i + 1) / len(shown), palette[g]] for i, g in enumerate(shown)]
+    names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
+
+    figure = make_subplots(rows=1, cols=2, column_widths=[0.03, 0.97],
+                           shared_yaxes=True, horizontal_spacing=0.01)
+    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=names,
+                                text=[[c] for c in clades], hovertemplate='%{text}<extra></extra>',
+                                colorscale=sorted(steps), zmin=-0.5, zmax=len(shown) - 0.5,
+                                showscale=False, xgap=0, ygap=1), row=1, col=1)
+
+    values = similarity.to_numpy().copy()
+    np.fill_diagonal(values, np.nan)
+    figure.add_trace(go.Heatmap(z=values, x=names, y=names, colorscale='Blues', zmin=0, zmax=1,
+                                hovertemplate='%{y} and %{x}<br>Jaccard %{z:.2f}<extra></extra>',
+                                colorbar=dict(title='Shared<br>interactors<br>(Jaccard)',
+                                              thickness=12, len=0.6)), row=1, col=2)
+
+    # the strip is a heatmap and cannot carry a legend of its own, so the groups are named
+    # by empty traces whose only purpose is their legend entry
+    for group in shown:
+        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
+                                    marker=dict(size=10, symbol='square', color=palette[group]),
+                                    hoverinfo='skip', showlegend=True), row=1, col=2)
+
+    figure.update_xaxes(showticklabels=False, row=1, col=1)
+    figure.update_xaxes(tickangle=-60, row=1, col=2)
+    figure.update_yaxes(autorange='reversed')
+    figure.update_layout(height=max(420, 22 * len(names) + 230), plot_bgcolor='white',
+                         margin=dict(l=0, r=0, t=40, b=10),
+                         legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left',
+                                     x=0, itemclick=False, itemdoubleclick=False,
+                                     font=dict(size=11)))
+
+    return figure
+
 
 def spread_chord_strands(values, target=480):
     '''
@@ -413,6 +487,14 @@ if selected_host != web_utils.NO_HOST:
         show_circos_plot(data_dir, selected_host, selected_taxids, config,
                          view == IN_TISSUE_VIEW, views[view], 'circos')
 
+    # the heatmap answers the same question as the circos, on the interactions the radio
+    # above selects, but reads where the circos cannot: it normalises for how many
+    # predictions a parasite has, and it has no chords to overlap
+    similarity = get_interactor_similarity(
+        get_tissue_expressed_predictions(data_dir, config, selected_taxids)
+        if view == IN_TISSUE_VIEW else get_host_predictions(data_dir, selected_taxids),
+        {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()})
+
     stats_figs = generate_stats_plots(get_host_predictions(data_dir, selected_taxids))
     stats_cols = st.columns(len(stats_figs))
     i = 0
@@ -430,6 +512,17 @@ if selected_host != web_utils.NO_HOST:
                    'into the tissues it is known to infect and the cell types of those tissues, '
                    'sized and coloured by the number of interactions. Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
+
+    if similarity is not None:
+        st.subheader("Host Interactors Shared by Each Pair of Parasites")
+        st.caption('How much of their predicted host interactors two parasites have in common, '
+                   'as a share of everything either of them interacts with, so a parasite with '
+                   'many predictions does not look similar to everything. The parasites are '
+                   'ordered by clustering them on that similarity and the strip on the left is '
+                   'their taxonomic group, so a clade appearing as one block means its parasites '
+                   'converge on the same host proteins.')
+        st.plotly_chart(generate_similarity_heatmap(*similarity, config.get('parasite_groups', {})),
+                        width='stretch')
 
 st.markdown("---")
 

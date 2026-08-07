@@ -34,6 +34,16 @@ LABEL_WRAP_WIDTH = 22
 LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
 LABEL_FONT_COLOR = '#555555'
 
+# Columns of the interactions table. The colors and shapes only exist to draw the
+# network, the taxids repeat their labels, the parasite and the edge type are the same
+# on every row, and the STRING source id is the taxid and the UniProt accession joined.
+# The host species is put back when the selected host covers more than one (Rodent is
+# rat and mouse), where it is what tells the rows apart.
+TABLE_COLUMNS = ['source_name', 'source_full_name', 'source_uniprot',
+                 'target_name', 'target_full_name', 'target', 'target_uniprot',
+                 'Tissues', 'experimental_evidence_score',
+                 'databases_evidence_score', 'weight', 'group1', 'group2']
+
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
@@ -137,6 +147,39 @@ def generate_node_titles(df, annotations):
             titles[protein] = '\n'.join(lines)
 
     return titles
+
+
+def generate_interactions_table(df, score, annotations):
+    '''
+    Builds the table of predicted interactions above the chosen score. The predictions
+    are merged with the tissue and cell type annotation to filter them, which repeats
+    every interaction once per tissue and single-cell cluster the host protein was
+    found in -- 39 interactions come out as 820 rows. The tissues are gathered back
+    into one cell so the table holds one row per interaction.
+
+    :param df: predictions dataframe of the selected parasite
+    :param float score: minimum confidence score
+    :param dict annotations: STRING id --> descriptive protein name
+    :return: the table to show and download
+    '''
+    table = df[df['weight'] >= score]
+    if table.empty:
+        return table[TABLE_COLUMNS[:1]]
+
+    tissues = table.groupby(['source', 'target'])['Tissue'].apply(
+        lambda t: ', '.join(sorted(t.dropna().unique()))).rename('Tissues').reset_index()
+    table = pd.merge(table.drop_duplicates(subset=['source', 'target']), tissues,
+                     on=['source', 'target'])
+    # the descriptive protein name, of which the predictions only keep the short version
+    table = table.assign(
+        source_full_name=table['source'].map(annotations).fillna(''),
+        target_full_name=table['target'].map(annotations).fillna(''))
+
+    columns = list(TABLE_COLUMNS)
+    if table['taxid2_label'].nunique() > 1:
+        columns.insert(columns.index('target_name'), 'taxid2_label')
+
+    return table[columns].sort_values(by='weight', ascending=False)
 
 
 def generate_tissue_filters(df):
@@ -339,8 +382,10 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Table of Host-Parasite PPIs")
-        table = df_select[df_select['weight'] >= score]
-        table = table.sort_values(by='weight', ascending=False)
+        table = generate_interactions_table(df_select, score,
+                                            web_utils.load_protein_annotations(data_dir))
+        st.caption('One row per predicted interaction, with the tissues the host protein '
+                   'is expressed in gathered into one cell.')
         gb = GridOptionsBuilder.from_dataframe(table)
         gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
         gb.configure_side_bar() #Add a sidebar

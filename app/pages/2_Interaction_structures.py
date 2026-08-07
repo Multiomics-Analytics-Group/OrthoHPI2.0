@@ -105,6 +105,10 @@ if selected_cols is not None:
             query_proteins = dict(selected_rows[['source_name', 'source_uniprot']].values)
             query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))
             structures = get_structures(query_proteins)
+            st.caption('AlphaFold model of each of the two proteins of the interaction selected '
+                       'above, shown as a cartoon of the backbone and coloured from the N to the '
+                       'C terminus. The two are predicted separately, so the models show the '
+                       'shape of each partner, not how they dock onto each other.')
             cols = st.columns(2)
             for i, protein in enumerate(structures):
                 pdb_file, url, website = structures[protein]

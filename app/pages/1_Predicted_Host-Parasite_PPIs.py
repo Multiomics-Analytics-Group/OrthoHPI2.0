@@ -224,6 +224,12 @@ with col3:
 
 with st.container():
     if net is not None:
+        st.caption('Predicted interactions between the proteins of the parasite and those of the '
+                   'host, above the chosen confidence score. Each node is a protein: diamonds are '
+                   'parasite proteins and circles host proteins, coloured by the organism they '
+                   'belong to and drawn the larger the more central they are to the network. Each '
+                   'edge is a predicted interaction, drawn the thicker the higher its confidence '
+                   'score.')
         html_data = ""
         # Save and read graph as HTML file (on Streamlit Sharing)
         net.save_graph(f'{path}/{selected_parasite}.html')
@@ -328,6 +334,9 @@ with st.container():
                 labels = {'fdr_bh':'FDR BH', 'odds_ratio': 'Odds ratio'})
             fig.update_traces(showlegend=False)
             st.subheader("Enriched Biological Processes -- Odds ratio vs FDR")
+            st.caption('Biological processes over-represented among the host proteins of the '
+                       'network. A process is the more enriched the higher up it sits (odds '
+                       'ratio) and the more significant the further left (FDR).')
             st.plotly_chart(fig, width='stretch', height=400)
         with go2:
             if len(selected_terms) > 0:
@@ -346,6 +355,8 @@ with st.container():
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
                     st.subheader("Highlighted Nodes for Selected Biological Processes")
+                    st.caption('The same network, with the proteins annotated to the biological '
+                               'processes selected in the table above in pink and the rest in grey.')
                     with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
                         html_data = HtmlFile.read()
                     st.iframe(html_data, height=500)
@@ -358,6 +369,9 @@ with st.container():
         
         fig = get_enrichment_summary(enrichment_table, load_ontology(data_dir))
         st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")
+        st.caption('The enriched processes arranged by the Gene Ontology hierarchy, each nested '
+                   'in its parent term and sized by its odds ratio, so related processes are read '
+                   'together rather than as a list. Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")

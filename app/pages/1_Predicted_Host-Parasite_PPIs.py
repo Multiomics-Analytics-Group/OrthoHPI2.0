@@ -71,6 +71,49 @@ def load_ontology(data_dir):
     return utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 
+@st.cache_data(show_spinner=False)
+def load_protein_annotations(data_dir):
+    '''
+    Descriptive protein names, keyed by STRING id, written by
+    pipeline/build_protein_annotations.py. The snapshot data directories predate that
+    script, so a missing file only leaves the node tooltips without a description.
+    '''
+    input_file = f'{data_dir}/protein_annotations.parquet'
+    if not os.path.exists(input_file):
+        return {}
+    annotations = utils.read_parquet_file(input_file=input_file)
+
+    return dict(annotations[['protein', 'description']].values)
+
+
+def generate_node_titles(df, annotations):
+    '''
+    Builds the hover text of each node: the short name drawn on the node, the
+    descriptive protein name and the identifiers needed to look the protein up
+    elsewhere. The node labels have to stay short to keep the network readable, so
+    the full name is only reachable on hover.
+
+    :param df: predictions dataframe of the selected parasite
+    :param dict annotations: STRING id --> descriptive protein name
+    :return: {STRING id: hover text}
+    '''
+    titles = {}
+    for prefix, taxid_col in [('source', 'taxid1_label'), ('target', 'taxid2_label')]:
+        cols = [prefix, f'{prefix}_name', f'{prefix}_uniprot', taxid_col]
+        for protein, name, uniprot, species in df[cols].drop_duplicates(subset=prefix).values:
+            lines = [str(name)]
+            description = annotations.get(protein)
+            if description and description != name:
+                lines.append(description)
+            lines.append(str(species))
+            lines.append(f'STRING: {protein}')
+            if pd.notna(uniprot):
+                lines.append(f'UniProt: {uniprot}')
+            titles[protein] = '\n'.join(lines)
+
+    return titles
+
+
 def generate_tissue_filters(df):
     options = df['Tissue'].unique().tolist()
     
@@ -101,7 +144,7 @@ def get_enrichment_summary(enrichment_df, ontology_df):
 
     return fig
 
-def generate_graph(df, score):
+def generate_graph(df, score, annotations=None):
     if df.empty:
         return nx.Graph()
 
@@ -115,6 +158,8 @@ def generate_graph(df, score):
     shapes = dict(df[['source', 'source_shape']].drop_duplicates().values)
     shapes.update(dict(df[['target', 'target_shape']].drop_duplicates().values))
     nx.set_node_attributes(G, shapes, 'shape')
+    if annotations is not None:
+        nx.set_node_attributes(G, generate_node_titles(df, annotations), 'title')
     centrality = nx.betweenness_centrality(G, weight='weight')
     max_centrality = max(centrality.values(), default=0)
     sizes = {}
@@ -195,7 +240,7 @@ with col2:
 
 
         # Create networkx graph object from pandas dataframe
-        G = generate_graph(df_select, score)
+        G = generate_graph(df_select, score, load_protein_annotations(data_dir))
             
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
 
@@ -229,7 +274,7 @@ with st.container():
                    'parasite proteins and circles host proteins, coloured by the organism they '
                    'belong to and drawn the larger the more central they are to the network. Each '
                    'edge is a predicted interaction, drawn the thicker the higher its confidence '
-                   'score.')
+                   'score. Hover over a node for the full protein name and its identifiers.')
         html_data = ""
         # Save and read graph as HTML file (on Streamlit Sharing)
         net.save_graph(f'{path}/{selected_parasite}.html')
@@ -344,7 +389,7 @@ with st.container():
                     highlighted_nodes = enrichment[enrichment['go_term'].isin(selected_terms)]['nodes'].values
                     highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
                     highlight_color = {i: '#e7298a' for i in highlighted_nodes}
-                    G = generate_graph(df_select, score)
+                    G = generate_graph(df_select, score, load_protein_annotations(data_dir))
                     nx.set_node_attributes(G, "#ddd", 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
                     # Initiate PyVis network object

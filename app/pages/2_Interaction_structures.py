@@ -18,6 +18,16 @@ elif page == "About":
     st.switch_page('pages/3_About.py')
 
 
+# Columns of the interactions table, kept to the ones that say something the table does
+# not already: the parasite is the one selected above, the STRING source id is only the
+# taxid and the UniProt accession joined, and the EggNOG groups behind the prediction are
+# on the predicted PPIs page. The host species is put back when the selected host covers
+# more than one (Rodent is rat and mouse), where it is what tells the rows apart.
+TABLE_COLUMNS = ['source_name', 'source_full_name', 'source_uniprot',
+                 'target_name', 'target_full_name', 'target', 'target_uniprot',
+                 'experimental_evidence_score', 'databases_evidence_score', 'weight']
+
+
 def get_structures(query_proteins):
     structures = strv.get_alphafold_structure(query_proteins=query_proteins)
     
@@ -69,10 +79,7 @@ with col2:
         st.text('Choose 1 parasite to visualize the predicted PPI network')
         selected_cols = None
     else:
-        selected_cols = ['taxid1_label', 'source_name', 'source_full_name', 'source',
-        'taxid2_label', 'target_name', 'target_full_name', 'target',
-        'experimental_evidence_score', 'databases_evidence_score',
-        'weight', 'group1', 'group2', 'source_uniprot', 'target_uniprot']
+        selected_cols = TABLE_COLUMNS
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
   
 with col3:
@@ -90,7 +97,10 @@ if selected_cols is not None:
         df_select = df_select.assign(
             source_full_name=df_select['source'].map(annotations).fillna(''),
             target_full_name=df_select['target'].map(annotations).fillna(''))
-        df_select = df_select[selected_cols].drop_duplicates(['source_name', 'target_name'])
+        columns = list(selected_cols)
+        if df_select['taxid2_label'].nunique() > 1:
+            columns.insert(columns.index('target_name'), 'taxid2_label')
+        df_select = df_select[columns].drop_duplicates(['source_name', 'target_name'])
 
 
         gb = GridOptionsBuilder.from_dataframe(df_select)

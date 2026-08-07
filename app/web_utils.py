@@ -40,11 +40,12 @@ def get_host_groups(config, predictions):
     return {group: groups[group] for group in sorted(groups)}
 
 
-# The host chosen on any page applies to all of them. Streamlit keeps session_state
-# across pages, but widget state is tied to the widget, so the choice is kept in a
-# key of our own and each page's selectbox is seeded from it and writes back. That
-# also means the selectboxes need no key and never collide.
+# The host chosen on any page applies to all of them. Streamlit drops the state of a
+# widget that the current page does not draw, so the choice is kept in a key of our
+# own (HOST_STATE_KEY) that nothing else touches, and the selectbox on each page is
+# seeded from it and writes back.
 HOST_STATE_KEY = 'selected_host'
+HOST_WIDGET_KEY = 'selected_host_widget'
 NO_HOST = '<select>'
 
 
@@ -63,10 +64,18 @@ def host_selector(config, predictions, label='Select a host'):
     current = st.session_state.get(HOST_STATE_KEY, NO_HOST)
     if current not in options:
         # the stored host has no predictions in this data_dir (the snapshot entrypoints
-        # each point at their own), so fall back rather than raise on index()
+        # each point at their own), so fall back rather than raise
         current = NO_HOST
 
-    selected = st.selectbox(label, options, index=options.index(current))
+    # The widget is seeded through its own key rather than through `index`. Streamlit
+    # identifies a keyless widget by its arguments, so a changing `index` makes it a
+    # different widget: it dropped the click that changed the host and re-rendered the
+    # previous one, and the host only changed on the second click. Seeding is skipped
+    # once the widget holds a valid choice, so the user's selection is not overwritten.
+    if st.session_state.get(HOST_WIDGET_KEY) not in options:
+        st.session_state[HOST_WIDGET_KEY] = current
+
+    selected = st.selectbox(label, options, key=HOST_WIDGET_KEY)
     st.session_state[HOST_STATE_KEY] = selected
 
     return selected, tuple(groups.get(selected, ()))

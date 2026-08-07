@@ -176,18 +176,18 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
         return None, []
 
     palette = {**palette, **{g: UNKNOWN_COLOR for g in set(nodes['group']) if g not in palette}}
-    width = chord_line_width(links[links['value'] >= 1]['value'].sum())
+    # drop the pairs sharing nothing before scaling, so none of them is rounded up to a chord
+    links = links[links['value'] >= 1].copy()
+    links['value'] = spread_chord_strands(links['value'].to_numpy())
 
-    chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group']))).select(value=(1, None))
+    chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group'])))
     chord.opts(
         opts.Chord(width=500, height=700, labels='name',
                    node_color=dim('group').str(), cmap=palette, node_line_color='white',
-                   edge_line_color='#bdbdbd', edge_line_width=width, edge_alpha=0.35,
+                   edge_line_color='#bdbdbd', edge_alpha=0.35,
                    edge_hover_line_color=HOVER_COLOR, edge_hover_line_alpha=1,
-                   edge_hover_line_width=width * 2.3,
                    edge_selection_line_color=HOVER_COLOR, edge_selection_line_alpha=1,
-                   edge_selection_line_width=width * 2.3, edge_nonselection_line_alpha=0.1,
-                   inspection_policy='nodes'))
+                   edge_nonselection_line_alpha=0.1, inspection_policy='nodes'))
 
     shown = set(nodes['group'])
 
@@ -195,17 +195,23 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
 
     return figure, [(g, c) for g, c in palette.items() if g in shown]
 
-def chord_line_width(shared_proteins, radius=250):
+def spread_chord_strands(values, target=480):
     '''
-    Holoviews draws a chord as one line per shared host protein rather than as a filled
-    ribbon, and spaces those lines evenly around the circle. Where few parasites share few
-    proteins -- the hosts other than human -- the lines end up degrees apart and one chord
-    reads as a handful of separate links, so widen them until they close into a band. The
-    35 parasites of human put the lines far below a pixel apart and keep the thin default.
-    '''
-    apart = 2 * np.pi * radius / max(2 * shared_proteins, 1)
+    Holoviews draws a chord as one line per unit of its value rather than as a filled
+    ribbon, and spreads those lines evenly around the circle. Where the values are small --
+    the hosts other than human, and any view of few parasites -- the lines end up degrees
+    apart and a single chord reads as a handful of separate links. Scale the values up so
+    that every host draws roughly the same number of lines, close enough together to close
+    into a band. The proportions between the chords, and so the width of each, are kept.
 
-    return float(min(max(apart, 0.6), 3.0))
+    Holoviews scales down anything above its own max_chords of 500 itself, so the target
+    stays below that and large values are left alone.
+    '''
+    total = values.sum()
+    if total >= target:
+        return values
+
+    return np.maximum(1, np.round(values * target / total)).astype('int64')
 
 def arc_angles(data):
     '''Start, end and middle angle of every node arc of a rendered chord.'''
@@ -232,6 +238,7 @@ def inset_chord_ends(figure, keep=0.86):
 
         spans = arc_angles(renderer.node_renderer.data_source.data)
         edges = renderer.edge_renderer.data_source.data
+        placed = [[] for _ in spans]
         all_xs, all_ys = [], []
         for xs, ys, source, target in zip(edges['xs'], edges['ys'], edges['start'], edges['end']):
             xs, ys = np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
@@ -247,6 +254,7 @@ def inset_chord_ends(figure, keep=0.86):
                     angle = np.arctan2(ys[point], xs[point])
                     angle += 2 * np.pi * np.round((middle - angle) / (2 * np.pi))
                     angle = middle + (angle - middle) * keep
+                    placed[node].append(angle)
                     ends.append(np.array([np.cos(angle), np.sin(angle)]))
 
                 steps = np.linspace(0, 1, len(strand))[:, None]
@@ -261,8 +269,27 @@ def inset_chord_ends(figure, keep=0.86):
             all_xs.append(np.array(path_xs))
             all_ys.append(np.array(path_ys))
         edges['xs'], edges['ys'] = all_xs, all_ys
+        set_chord_width(renderer.edge_renderer, placed)
 
     return figure
+
+def set_chord_width(edge_renderer, placed, radius=250):
+    '''
+    Widen each line of a chord until it meets its neighbour, so a chord reads as one band
+    of a width rather than as a row of separate links. The spacing has to be measured from
+    the drawn chords: holoviews scales the values down to its max_chords before deciding
+    how many lines to draw, so it does not follow from the number of shared proteins.
+    '''
+    apart = [np.diff(np.sort(angles)) for angles in placed if len(angles) > 1]
+    if not apart:
+        return
+
+    width = float(min(max(np.median(np.concatenate(apart)) * radius, 0.6), 3.0))
+    edge_renderer.glyph.line_width = width
+    for state in ('hover_glyph', 'selection_glyph'):
+        glyph = getattr(edge_renderer, state, None)
+        if glyph is not None:
+            glyph.line_width = width * 1.6
 
 def separate_arcs(figure):
     '''

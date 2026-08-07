@@ -3,6 +3,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import web_utils
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import holoviews as hv
@@ -189,7 +190,34 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
 
     shown = set(nodes['group'])
 
-    return hv.render(chord), [(g, c) for g, c in palette.items() if g in shown]
+    return separate_arcs(hv.render(chord)), [(g, c) for g, c in palette.items() if g in shown]
+
+def separate_arcs(figure, gap=0.008):
+    '''
+    Holoviews draws each node arc from where the previous one ends, with no gap. Now that
+    neighbouring parasites of the same taxonomic group share a colour, they merge into one
+    band, and a chord landing on either of two neighbours looks like two chords to the same
+    parasite. Trim every arc by a fixed angle, clamped so short arcs are shortened rather
+    than erased, so each parasite reads as its own segment.
+    '''
+    trimmed = set()
+    for renderer in figure.renderers:
+        data = getattr(renderer, 'data_source', None) and renderer.data_source.data
+        if not data or 'arc_xs' not in data or id(data) in trimmed:
+            continue
+        trimmed.add(id(data))
+
+        arc_xs, arc_ys = [], []
+        for xs, ys in zip(data['arc_xs'], data['arc_ys']):
+            angles = np.unwrap(np.arctan2(ys, xs))
+            extent = angles[-1] - angles[0]
+            pad = np.sign(extent) * min(gap, abs(extent) * 0.3)
+            angles = np.linspace(angles[0] + pad, angles[-1] - pad, len(angles))
+            arc_xs.append(np.cos(angles))
+            arc_ys.append(np.sin(angles))
+        data['arc_xs'], data['arc_ys'] = arc_xs, arc_ys
+
+    return figure
 
 def show_circos_legend(legend):
     swatches = ''.join(

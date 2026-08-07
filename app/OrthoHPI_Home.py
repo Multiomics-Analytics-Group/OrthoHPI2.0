@@ -176,46 +176,55 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
         return None, []
 
     palette = {**palette, **{g: UNKNOWN_COLOR for g in set(nodes['group']) if g not in palette}}
+    width = chord_line_width(links[links['value'] >= 1]['value'].sum())
 
     chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group']))).select(value=(1, None))
     chord.opts(
         opts.Chord(width=500, height=700, labels='name',
                    node_color=dim('group').str(), cmap=palette, node_line_color='white',
-                   edge_line_color='#bdbdbd', edge_line_width=0.6, edge_alpha=0.35,
+                   edge_line_color='#bdbdbd', edge_line_width=width, edge_alpha=0.35,
                    edge_hover_line_color=HOVER_COLOR, edge_hover_line_alpha=1,
-                   edge_hover_line_width=1.4,
+                   edge_hover_line_width=width * 2.3,
                    edge_selection_line_color=HOVER_COLOR, edge_selection_line_alpha=1,
-                   edge_selection_line_width=1.4, edge_nonselection_line_alpha=0.1,
+                   edge_selection_line_width=width * 2.3, edge_nonselection_line_alpha=0.1,
                    inspection_policy='nodes'))
 
     shown = set(nodes['group'])
 
     return separate_arcs(hv.render(chord)), [(g, c) for g, c in palette.items() if g in shown]
 
-def separate_arcs(figure, gap=0.008):
+def chord_line_width(shared_proteins, radius=250):
     '''
-    Holoviews draws each node arc from where the previous one ends, with no gap. Now that
-    neighbouring parasites of the same taxonomic group share a colour, they merge into one
-    band, and a chord landing on either of two neighbours looks like two chords to the same
-    parasite. Trim every arc by a fixed angle, clamped so short arcs are shortened rather
-    than erased, so each parasite reads as its own segment.
+    Holoviews draws a chord as one line per shared host protein rather than as a filled
+    ribbon, and spaces those lines evenly around the circle. Where few parasites share few
+    proteins -- the hosts other than human -- the lines end up degrees apart and one chord
+    reads as a handful of separate links, so widen them until they close into a band. The
+    35 parasites of human put the lines far below a pixel apart and keep the thin default.
     '''
-    trimmed = set()
+    apart = 2 * np.pi * radius / max(2 * shared_proteins, 1)
+
+    return float(min(max(apart, 0.6), 3.0))
+
+def separate_arcs(figure):
+    '''
+    Holoviews draws each node arc from where the previous one ends, with no gap, so now
+    that neighbouring parasites of the same taxonomic group share a colour they merge into
+    one band and it is impossible to tell which of two neighbours a chord lands on. Mark
+    every boundary with a white tick instead of shortening the arcs: a chord attaches
+    anywhere along the arc of its parasite, so an arc that no longer covers its own angles
+    leaves the outermost chords starting in mid air.
+    '''
     for renderer in figure.renderers:
         data = getattr(renderer, 'data_source', None) and renderer.data_source.data
-        if not data or 'arc_xs' not in data or id(data) in trimmed:
+        if not data or 'arc_xs' not in data:
             continue
-        trimmed.add(id(data))
 
-        arc_xs, arc_ys = [], []
-        for xs, ys in zip(data['arc_xs'], data['arc_ys']):
-            angles = np.unwrap(np.arctan2(ys, xs))
-            extent = angles[-1] - angles[0]
-            pad = np.sign(extent) * min(gap, abs(extent) * 0.3)
-            angles = np.linspace(angles[0] + pad, angles[-1] - pad, len(angles))
-            arc_xs.append(np.cos(angles))
-            arc_ys.append(np.sin(angles))
-        data['arc_xs'], data['arc_ys'] = arc_xs, arc_ys
+        angles = [np.arctan2(ys[-1], xs[-1]) for xs, ys in zip(data['arc_xs'], data['arc_ys'])]
+        inner, outer = 0.972, 1.028
+        figure.segment(x0=[inner * np.cos(a) for a in angles], y0=[inner * np.sin(a) for a in angles],
+                       x1=[outer * np.cos(a) for a in angles], y1=[outer * np.sin(a) for a in angles],
+                       line_color='white', line_width=2)
+        break
 
     return figure
 

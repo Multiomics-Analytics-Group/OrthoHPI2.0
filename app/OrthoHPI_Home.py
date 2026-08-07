@@ -191,7 +191,9 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_ex
 
     shown = set(nodes['group'])
 
-    return separate_arcs(hv.render(chord)), [(g, c) for g, c in palette.items() if g in shown]
+    figure = separate_arcs(inset_chord_ends(hv.render(chord)))
+
+    return figure, [(g, c) for g, c in palette.items() if g in shown]
 
 def chord_line_width(shared_proteins, radius=250):
     '''
@@ -204,6 +206,63 @@ def chord_line_width(shared_proteins, radius=250):
     apart = 2 * np.pi * radius / max(2 * shared_proteins, 1)
 
     return float(min(max(apart, 0.6), 3.0))
+
+def arc_angles(data):
+    '''Start, end and middle angle of every node arc of a rendered chord.'''
+    spans = []
+    for xs, ys in zip(data['arc_xs'], data['arc_ys']):
+        angles = np.unwrap(np.arctan2(ys, xs))
+        spans.append((angles[0], angles[-1], (angles[0] + angles[-1]) / 2))
+
+    return spans
+
+def inset_chord_ends(figure, keep=0.86):
+    '''
+    Holoviews spreads the ends of a parasite's chords over its arc with a linspace that
+    includes both ends, so the outermost chord of a parasite starts exactly on the boundary
+    with its neighbour. Among the hundreds of chords of the human view that is invisible,
+    but where a parasite carries two or three -- the other hosts -- a chord appears to run
+    from one boundary to another instead of landing on a parasite at all. Pull every chord
+    end towards the middle of the arc it belongs to and redraw the spline holoviews draws:
+    a cubic bezier whose control points sit at half the radius of its ends.
+    '''
+    for renderer in figure.renderers:
+        if not hasattr(renderer, 'node_renderer'):
+            continue
+
+        spans = arc_angles(renderer.node_renderer.data_source.data)
+        edges = renderer.edge_renderer.data_source.data
+        all_xs, all_ys = [], []
+        for xs, ys, source, target in zip(edges['xs'], edges['ys'], edges['start'], edges['end']):
+            xs, ys = np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+            breaks = np.where(np.isnan(xs))[0]
+            path_xs, path_ys = [], []
+            for strand in np.split(np.arange(len(xs)), breaks):
+                strand = strand[~np.isnan(xs[strand])]
+                if len(strand) < 2:
+                    continue
+                ends = []
+                for point, node in ((strand[0], source), (strand[-1], target)):
+                    start, end, middle = spans[node]
+                    angle = np.arctan2(ys[point], xs[point])
+                    angle += 2 * np.pi * np.round((middle - angle) / (2 * np.pi))
+                    angle = middle + (angle - middle) * keep
+                    ends.append(np.array([np.cos(angle), np.sin(angle)]))
+
+                steps = np.linspace(0, 1, len(strand))[:, None]
+                curve = ((1 - steps) ** 3 * ends[0] + 3 * (1 - steps) ** 2 * steps * (ends[0] / 2)
+                         + 3 * (1 - steps) * steps ** 2 * (ends[1] / 2) + steps ** 3 * ends[1])
+                if path_xs:
+                    path_xs.append(np.nan)
+                    path_ys.append(np.nan)
+                path_xs.extend(curve[:, 0])
+                path_ys.extend(curve[:, 1])
+
+            all_xs.append(np.array(path_xs))
+            all_ys.append(np.array(path_ys))
+        edges['xs'], edges['ys'] = all_xs, all_ys
+
+    return figure
 
 def separate_arcs(figure):
     '''

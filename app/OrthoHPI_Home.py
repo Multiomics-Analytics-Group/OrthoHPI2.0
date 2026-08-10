@@ -37,10 +37,15 @@ data_dir = web_utils.get_data_dir()
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
-# colour of the chords of the parasite under the cursor in the circos plot
-HOVER_COLOR = '#00A000'
-# circos view restricted to the host proteins expressed where the parasite is
-IN_TISSUE_VIEW = 'In the infected tissues'
+# colour of the chords at rest, before a parasite is hovered in the circos plot
+REST_COLOR = '#bdbdbd'
+# gradient the chords of the hovered parasite carry the number of shared host proteins
+# on. Plasma reversed rather than a single-hue ramp: the steps of one hue were too close
+# to read off the plot, and running through orange, magenta and purple to navy separates
+# them by hue as well as by lightness. The pale yellow end is cut off, since a hairline
+# in it is invisible against the white background, and the dark end is the many-proteins
+# end so the pairs that share the most are the ones that stand out
+CHORD_CMAP = ['#fb9f3a', '#ea7457', '#d04d73', '#ad2793', '#8104a7', '#4e02a2', '#0d0887']
 
 #Initialize variables
 df_select = None
@@ -147,54 +152,76 @@ def get_common_interactors(df_pred, groups, group_order):
     clade occupies a contiguous arc of the circle, which is what makes the group
     colouring readable. The groups follow the order they are declared in
     config['parasite_groups'], so the circle and the legend read the same way.
+
+    Only the pairs that share something are kept, and every link is given the same
+    weight of 1: holoviews sizes the arc of a parasite from the weights of the chords
+    that end on it, and the number of shared proteins is carried by `shared` for the
+    colour to read instead.
     '''
     targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
     labels = sorted(targets, key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
 
     nodes = [(i, g[0]+'. '+g.split(' ')[1], groups.get(g, UNKNOWN_GROUP)) for i, g in enumerate(labels)]
-    links = [(i, j, len(targets[g1].intersection(targets[labels[j]])))
-             for i, g1 in enumerate(labels) for j in range(i + 1, len(labels))]
+    links = [(i, j, 1, shared)
+             for i, g1 in enumerate(labels) for j in range(i + 1, len(labels))
+             if (shared := len(targets[g1].intersection(targets[labels[j]])))]
 
-    return (pd.DataFrame(links, columns=['source', 'target', 'value']),
+    return (pd.DataFrame(links, columns=['source', 'target', 'value', 'shared']),
             pd.DataFrame(nodes, columns=['index', 'name', 'group']))
 
 @st.cache_resource(show_spinner=False)
-def generate_circos_plot(data_dir, host_taxids, groups, palette, config, only_expressed=False):
+def generate_circos_plot(data_dir, host_taxids, groups, palette, config):
     '''
     The arcs are coloured by taxonomic group (config['parasite_groups']) rather than
     by species: a per-species palette would have to repeat itself for the 35 parasites
     infecting human, and the group colour also shows whether the shared host proteins
-    follow the parasite phylogeny. The chords themselves are neutral grey -- nearly
-    every pair of parasites shares something, so colouring them only adds noise --
-    and hovering (or clicking) a parasite draws the chords it belongs to in green.
-    The hover styling has to set the alpha too: inheriting the 0.35 of the resting
-    chords washes the highlight out to the same grey.
+    follow the parasite phylogeny.
 
-    With only_expressed the interactions are first restricted to the host proteins the
-    parasite could meet in the tissues it infects.
+    The chords carry how many host proteins the two parasites share as a colour along
+    CHORD_CMAP, all of them drawn at the same width. Sizing them instead is what a chord
+    diagram normally does, but a pair sharing one protein and a pair sharing thirty are
+    then a hairline and a band that swamps its neighbours, and with a chord for nearly
+    every pair the thin end of the scale disappears. The colour is only shown for the
+    parasite under the cursor (see gradient_on_hover) -- with all 377 chords of the human
+    view coloured at once the circle is a wash that no scale can be read off. The hover
+    styling has to set the alpha too: inheriting the resting alpha washes it out.
+
+    The interactions are restricted to the host proteins the parasite could meet in the
+    tissues it infects.
     '''
-    predictions = (get_tissue_expressed_predictions(data_dir, config, host_taxids) if only_expressed
-                   else get_host_predictions(data_dir, host_taxids))
+    predictions = get_tissue_expressed_predictions(data_dir, config, host_taxids)
     links, nodes = get_common_interactors(predictions, groups,
                                           {g: i for i, g in enumerate(palette)})
-    if links.empty or links['value'].max() < 1:
+    if links.empty:
         return None, []
 
     palette = {**palette, **{g: UNKNOWN_COLOR for g in set(nodes['group']) if g not in palette}}
-    chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group']))).select(value=(1, None))
+    # a scale needs something to range over: where every pair shares the same number of
+    # proteins (Sus scrofa has a single chord) holoviews drops the mapping and falls back
+    # to drawing the chords black, so those are given the top of the ramp and no colourbar
+    graded = links['shared'].nunique() > 1
+    # edge_color is the slot the colour dimension goes in and a literal colour there is
+    # ignored, which is what edge_line_color takes. On a linear ramp 236 of the 377 human
+    # chords land in the first colour, since half the pairs share fewer than 5 proteins
+    # and one shares 34, so the scale is logarithmic
+    shading = ({'edge_color': dim('shared'), 'edge_cmap': CHORD_CMAP, 'logz': True} if graded
+               else {'edge_line_color': CHORD_CMAP[-1]})
+    chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group'])), vdims=['value', 'shared'])
     chord.opts(
         opts.Chord(width=500, height=700, labels='name',
                    node_color=dim('group').str(), cmap=palette, node_line_color='white',
-                   edge_line_color='#bdbdbd', edge_line_width=0.6, edge_alpha=0.35,
-                   edge_hover_line_color=HOVER_COLOR, edge_hover_line_alpha=1,
-                   edge_hover_line_width=1.4,
-                   edge_selection_line_color=HOVER_COLOR, edge_selection_line_alpha=1,
-                   edge_selection_line_width=1.4, edge_nonselection_line_alpha=0.1,
+                   **shading, edge_line_width=1.1,
+                   edge_alpha=0.35, colorbar=graded,
+                   colorbar_opts={'title': 'shared host proteins', 'title_text_font_style': 'normal',
+                                  'title_text_font_size': '10px', 'width': 10, 'padding': 2},
+                   edge_hover_line_alpha=1, edge_hover_line_width=1.8,
+                   edge_selection_line_alpha=1, edge_selection_line_width=1.8,
+                   edge_nonselection_line_alpha=0.1,
                    inspection_policy='nodes'))
 
     shown = set(nodes['group'])
 
-    figure = separate_arcs(inset_chord_ends(hv.render(chord)))
+    figure = separate_arcs(inset_chord_ends(gradient_on_hover(hv.render(chord))))
 
     return figure, [(g, c) for g, c in palette.items() if g in shown]
 
@@ -376,6 +403,34 @@ def inset_chord_ends(figure, keep=0.86):
 
     return figure
 
+def gradient_on_hover(figure):
+    '''
+    Holds the chords at a neutral grey until a parasite is hovered or clicked, and gives
+    the colour scale to the chords of that parasite only. Colouring all of them at rest
+    puts every pair of the circle on screen at once, which is a wash of crossing lines
+    where no chord can be followed to its ends, let alone have its colour compared with
+    another; a dozen chords lit at a time can be read.
+
+    Bokeh keeps a separate glyph for each state of a renderer, so this swaps what
+    holoviews put on them: the colour mapping (a Field over the shared counts, or the
+    flat colour where there is nothing to grade) moves to the hover and selection glyphs,
+    and the resting and non-selected ones go grey.
+    '''
+    for renderer in figure.renderers:
+        edges = getattr(renderer, 'edge_renderer', None)
+        if edges is None:
+            continue
+
+        shading = edges.glyph.line_color
+        for glyph in (edges.glyph, edges.nonselection_glyph, edges.muted_glyph):
+            if glyph is not None:
+                glyph.line_color = REST_COLOR
+        for glyph in (edges.hover_glyph, edges.selection_glyph):
+            if glyph is not None:
+                glyph.line_color = shading
+
+    return figure
+
 def separate_arcs(figure):
     '''
     Holoviews draws each node arc from where the previous one ends, with no gap, so now
@@ -407,15 +462,15 @@ def show_circos_legend(legend):
         for group, color in legend)
     st.markdown(f"<div style='font-size:0.85em;color:#333333;'>{swatches}</div>", unsafe_allow_html=True)
 
-def show_circos_plot(data_dir, host, host_taxids, config, only_expressed, caption, key):
+def show_circos_plot(data_dir, host, host_taxids, config, caption, key):
     st.caption(caption)
     circos_plot, circos_legend = generate_circos_plot(
         data_dir, host_taxids,
         {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()},
-        config.get('parasite_groups', {}), config, only_expressed)
+        config.get('parasite_groups', {}), config)
     if circos_plot is None:
-        where = ' in the tissues they infect' if only_expressed else ''
-        st.text(f'No host proteins are shared by the parasites infecting {host}{where}')
+        st.text(f'No host proteins are shared by the parasites infecting {host} '
+                'in the tissues they infect')
         return
 
     show_circos_legend(circos_legend)
@@ -479,34 +534,23 @@ if selected_host != web_utils.NO_HOST:
 
     with chart1:
         st.subheader("Circos Plot of Common Host Interactors")
-        shared = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
-                  'group; a chord joins two parasites that are predicted to interact with the '
-                  'same host proteins, and is the thicker the more proteins they share. Hover a '
-                  'parasite to follow its chords. ')
-        views = {
-            IN_TISSUE_VIEW: shared + 'Only the host proteins expressed in the tissues each '
-                                     'parasite is known to infect are counted, so what is left '
-                                     'are the interactions that can take place where the '
-                                     'parasite is.',
-            'All predictions': shared + 'Every predicted interaction is counted, whether or not '
-                                        'the host protein is expressed where the parasite is.',
-        }
-        # one view at a time rather than two tabs: the bokeh component sizes itself from the
-        # width of the document, which is 0 while it sits in a tab that is not open
-        view = st.radio('Interactions to count', list(views), horizontal=True,
-                        key='circos_view', label_visibility='collapsed')
-        show_circos_plot(data_dir, selected_host, selected_taxids, config,
-                         view == IN_TISSUE_VIEW, views[view], 'circos')
+        caption = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
+                   'group; a chord joins two parasites that are predicted to interact with the '
+                   'same host proteins. Hover (or click) a parasite to pick out its chords, which '
+                   'are then coloured by how many host proteins each pair shares, on the scale to '
+                   'the right. Only the host proteins expressed in the tissues each parasite is '
+                   'known to infect are counted, so what is left are the interactions that can '
+                   'take place where the parasite is.')
+        show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos')
 
-    # the heatmap and the dot matrix work on the interactions the radio above selects: the
-    # heatmap reads where the circos cannot, since it normalises for how many predictions a
-    # parasite has and has no chords to overlap, and the dot matrix names the host proteins
-    # that neither of the other two ever shows
+    # the heatmap and the dot matrix count the same interactions as the circos: the heatmap
+    # reads where the circos cannot, since it normalises for how many predictions a parasite
+    # has and has no chords to overlap, and the dot matrix names the host proteins that
+    # neither of the other two ever shows
     parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
                        for p in config['parasites'].values()}
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
-    counted = (get_tissue_expressed_predictions(data_dir, config, selected_taxids)
-               if view == IN_TISSUE_VIEW else get_host_predictions(data_dir, selected_taxids))
+    counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids)
     similarity = get_interactor_similarity(counted, parasite_groups)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order)
 

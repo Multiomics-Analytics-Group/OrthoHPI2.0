@@ -2,7 +2,7 @@ import os
 import json
 import urllib.request
 from functools import lru_cache
-from stmol import makeobj
+import py3Dmol
 
 
 api_url = 'https://alphafold.ebi.ac.uk/api/prediction/query_protein'
@@ -77,11 +77,26 @@ def get_alphafold_structure(query_proteins={}, output_dir='data/tmp'):
 
     return structures
 
-def generate_mol_structure(pdb_file):
+def generate_mol_structure(pdb_file, height=460):
+    '''
+    Builds the 3Dmol viewer of a structure. The viewer is built to fill the width it is
+    given rather than the fixed 640px py3Dmol defaults to, so that it is not cut off when
+    embedded in a column narrower than that. The view is also zoomed out a little from
+    the fit 3Dmol computes, which otherwise leaves elongated proteins touching the edges
+    of the canvas.
+
+    :param str pdb_file: path of the pdb file to show
+    :param int height: height of the viewer in pixels
+    :return: py3Dmol view of the structure
+    '''
     with open(pdb_file) as ifile:
         content = ifile.read()
 
-    xyzview = makeobj(content, molformat='pdb', style='cartoon', background='black')
-    xyzview.setStyle({'cartoon':{'color':'spectrum'}})
+    xyzview = py3Dmol.view(width='100%', height=height)
+    xyzview.addModel(content, 'pdb')
+    xyzview.setStyle({'cartoon': {'color': 'spectrum'}})
+    xyzview.setBackgroundColor('black')
+    xyzview.zoomTo()
+    xyzview.zoom(0.85)
 
     return xyzview

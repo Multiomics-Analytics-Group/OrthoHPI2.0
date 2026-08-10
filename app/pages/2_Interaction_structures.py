@@ -33,10 +33,14 @@ def get_structures(query_proteins):
     
     return structures
 
+VIEWER_HEIGHT = 460
+
+
 def show_structure(pdb_file):
-    xyzview = strv.generate_mol_structure(pdb_file=pdb_file)
-    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html
-    st.iframe(xyzview._make_html(), height=500, width=700)
+    xyzview = strv.generate_mol_structure(pdb_file=pdb_file, height=VIEWER_HEIGHT)
+    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html.
+    # the width is left to stretch so the viewer follows the column it sits in
+    st.iframe(xyzview._make_html(), height=VIEWER_HEIGHT + 20)
 
 
 config = utils.read_config(web_utils.get_config_file())
@@ -73,10 +77,10 @@ with col2:
         # switching host can leave a parasite selected that the new host does not have
         if st.session_state.get('struct_par') not in parasite_list:
             st.session_state.pop('struct_par', None)
-        selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="struct_par")
+        selected_parasite = st.selectbox('Select a parasite to explore its predicted interactions', parasite_list, key="struct_par")
 
     if selected_parasite == "<select>":
-        st.text('Choose 1 parasite to visualize the predicted PPI network')
+        st.text('Choose 1 parasite, then select an interaction below to see the AlphaFold structures of the two proteins')
         selected_cols = None
     else:
         selected_cols = TABLE_COLUMNS
@@ -121,6 +125,10 @@ if selected_cols is not None:
         if selected_rows is not None and len(selected_rows) > 0:
             query_proteins = dict(selected_rows[['source_name', 'source_uniprot']].values)
             query_proteins.update(dict(selected_rows[['target_name', 'target_uniprot']].values))
+            # the descriptive name to put under each structure, empty for the proteins
+            # the STRING annotations do not cover
+            full_names = dict(selected_rows[['source_name', 'source_full_name']].values)
+            full_names.update(dict(selected_rows[['target_name', 'target_full_name']].values))
             structures = get_structures(query_proteins)
             st.caption('AlphaFold model of each of the two proteins of the interaction selected '
                        'above, shown as a cartoon of the backbone and coloured from the N to the '
@@ -130,14 +138,17 @@ if selected_cols is not None:
             for i, protein in enumerate(structures):
                 pdb_file, url, website = structures[protein]
                 with cols[i % len(cols)]:
-                    st.markdown(f'''<h4>AlphaFold structure {protein}</h4>''',
-                    unsafe_allow_html=True)
+                    st.markdown(f'''<h4>{protein}</h4>''', unsafe_allow_html=True)
+                    full_name = full_names.get(protein, '')
+                    subtitle = f'{full_name} · {query_proteins[protein]}' if full_name else str(query_proteins[protein])
+                    st.caption(subtitle)
                     if pdb_file is not None:
                         show_structure(pdb_file=pdb_file)
-                        st.markdown(f'''
-                                <a href={url}><button>PDB file</button></a>
-                                <a href={website}><button>AlphaFold EBI</button></a>''',
-                                unsafe_allow_html=True)
+                        bcol1, bcol2 = st.columns(2)
+                        with bcol1:
+                            st.link_button('PDB file', url)
+                        with bcol2:
+                            st.link_button('AlphaFold EBI', website)
                     else:
                         st.markdown(f'''<h5>AlphaFold prediction Not Available</h5>''',
                         unsafe_allow_html=True)

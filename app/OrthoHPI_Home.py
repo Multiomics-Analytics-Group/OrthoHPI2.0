@@ -125,8 +125,12 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids):
     interactions that could take place where the parasite actually is, rather than every
     interaction predicted from orthology. Parasites left without any interactor simply
     do not appear in what is built from this.
+
+    One row is one predicted interaction, parasite protein (`source`) included: the circos
+    and the heatmap only ever look at which host proteins are reached, but the dot matrix
+    sizes its dots by how many parasite proteins reach each one.
     '''
-    predictions = get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label',
+    predictions = get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'source',
                                                                'target', 'target_name']]
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     expressed = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
@@ -141,7 +145,7 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids):
     aux = pd.merge(aux, expressed, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
 
-    return aux[['taxid1_label', 'target', 'target_name']].drop_duplicates()
+    return aux[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
 
 
 @st.cache_data(show_spinner=False)
@@ -338,17 +342,28 @@ def get_top_shared_proteins(df_pred, groups, group_order, top=40):
     and the heatmap both count how much two parasites have in common but neither says what
     they have in common, which is what this is for. Proteins only one parasite interacts
     with are left out: they are not shared by anything.
+
+    Each dot also carries `degree`, the number of proteins of that parasite predicted to
+    interact with that host protein -- the degree of the host protein in the network of
+    that one parasite. A dot is otherwise only a yes, and one parasite protein reaching a
+    host protein is a thinner prediction than eighty-six of them.
     '''
-    pairs = df_pred[['taxid1_label', 'target', 'target_name']].drop_duplicates()
+    edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
+    # one row per dot, which is a name and not a protein id: a host group covering two
+    # species (Rodent is rat and mouse) has the same gene under an id of each, and those
+    # are one row of the matrix, not two dots on top of each other
+    pairs = edges[['taxid1_label', 'target_name']].drop_duplicates()
     counts = pairs.groupby('target_name')['taxid1_label'].nunique()
     counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
     if counts.empty:
         return None
 
     proteins = list(counts.head(top).index)
+    degree = edges.groupby(['taxid1_label', 'target_name'])['source'].nunique()
     dots = pairs[pairs['target_name'].isin(proteins)].copy()
     dots['group'] = dots['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     dots['parasites'] = dots['target_name'].map(counts)
+    dots['degree'] = pd.MultiIndex.from_frame(dots[['taxid1_label', 'target_name']]).map(degree)
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     order = sorted(dots['taxid1_label'].unique(),
                    key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
@@ -361,7 +376,12 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
     '''
     A dot wherever a parasite is predicted to interact with one of the proteins, the
     parasites in the order of the circos so the taxonomic groups stay together, and the
-    proteins ordered by how many parasites reach them.
+    proteins ordered by how many parasites reach them. The dot is sized by how many
+    proteins of that parasite reach that host protein.
+
+    The area of the dot is what carries the degree (plotly's default), since that is the
+    channel size is read on, and sizemin keeps the single-protein dots -- the largest group
+    of them -- from collapsing to a speck next to a degree of eighty-six.
     '''
     figure = px.scatter(dots, x='parasite', y='target_name', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`
@@ -369,9 +389,10 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
                         color_discrete_map=palette, category_orders={
                             'parasite': parasites, 'target_name': proteins,
                             'group': [g for g in palette if g in set(dots['group'])]},
+                        size='degree', size_max=15,
                         hover_data={'parasites': True, 'parasite': True, 'target_name': True,
-                                    'group': False})
-    figure.update_traces(marker=dict(size=8, line=dict(width=0)))
+                                    'degree': True, 'group': False})
+    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)))
     figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
@@ -626,10 +647,11 @@ if selected_host != web_utils.NO_HOST:
     if top_shared is not None:
         st.subheader("Which Host Proteins the Parasites Have in Common")
         st.caption('The host proteins reached by the most parasites, with a dot wherever a '
-                   'parasite is predicted to interact with one of them. The parasites are in the '
-                   'order of the circos, so a row of dots across a whole taxonomic group is a '
-                   'protein that group converges on, and a gap is a parasite that does not reach '
-                   'it. Proteins only one parasite interacts with are left out.')
+                   'parasite is predicted to interact with one of them, sized by how many of '
+                   'that parasite\'s proteins reach it. The parasites are in the order of the '
+                   'circos, so a row of dots across a whole taxonomic group is a protein that '
+                   'group converges on, and a gap is a parasite that does not reach it. Proteins '
+                   'only one parasite interacts with are left out.')
         st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
                         width='stretch')
 

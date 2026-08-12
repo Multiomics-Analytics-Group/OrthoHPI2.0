@@ -15,6 +15,10 @@ import pandas as pd
 import streamlit as st
 
 import utils
+# the same BTO code -> organ map the annotation was built with, rather than a second copy
+# of it here: the two have to name the 21 organs identically or the shading silently
+# misses some
+from scripts.build_figure_tissues import FIGURE_ORGANS
 
 SVG_NS = 'http://www.w3.org/2000/svg'
 ET.register_namespace('', SVG_NS)
@@ -38,6 +42,26 @@ LEGEND_ID = 'Legend'
 
 # drawing units left between the bottom of the body and the edge of the cropped figure
 CROP_MARGIN = 10
+
+# The tissues a parasite infects are the 33 fine-grained BTO terms of config['tissues'];
+# the figure draws 21 coarser organs. Twelve of the terms the parasites actually use are
+# drawn as themselves and come straight out of FIGURE_ORGANS. These are the rest of the
+# ones that have an organ containing them on the figure -- seven parasites are recorded
+# only in `small intestine`, which the figure draws as `intestine`, and would otherwise
+# shade nothing at all.
+#
+# Four terms still have nothing standing for them: `lymph vessel` (Brugia malayi and
+# B. timori), `urethra` and `vagina` (Trichomonas vaginalis) and `mesenteric artery`
+# (Angiostrongylus costaricensis). Those parasites shade no organ rather than being shaded
+# onto a neighbouring one, which would be inventing a location for them.
+ORGAN_PARENTS = {
+    'BTO:0000142': 'nervous system',      # brain
+    'BTO:0001279': 'nervous system',      # spinal cord
+    'BTO:0000651': 'intestine',           # small intestine
+    'BTO:0000269': 'intestine',           # colon
+    'BTO:0001158': 'intestine',           # rectum
+    'BTO:0000511': 'intestine',           # gastrointestinal tract
+}
 
 
 @st.cache_data(show_spinner=False)
@@ -149,6 +173,33 @@ def load_figure(species):
               for element in root.iter() if element.get('title')}
 
     return ET.tostring(root, encoding='unicode'), organs
+
+
+def infected_organs(config, taxid):
+    '''
+    The organs of the body figure that a parasite is recorded as infecting.
+
+    The tissue filter that decides which predictions are shown at all keeps a host protein
+    expressed in one of those tissues, but TISSUES then annotates that protein to about
+    three organs, most of which the parasite never reaches: a Loa loa protein selected for
+    being expressed in skin also comes annotated to the nervous system, and the figure drew
+    the brain as the darkest organ on the page. Restricting the shading to the organs the
+    parasite actually infects is what keeps the figure about the parasite rather than about
+    how broadly its targets happen to be expressed.
+
+    :param dict config: parsed configuration
+    :param taxid: parasite taxid, as a string or an int
+    :return: set of organ names as the figures label them, possibly empty
+    '''
+    tissues = config['parasites'].get(int(taxid), {}).get('tissues', [])
+
+    organs = set()
+    for code in tissues:
+        organ = FIGURE_ORGANS.get(code, ORGAN_PARENTS.get(code))
+        if organ is not None:
+            organs.add(ORGAN_ALIASES.get(organ, organ))
+
+    return organs
 
 
 def count_interactions(df, figure_tissues):
@@ -306,7 +357,16 @@ def show_body_figure(config, data_dir, df, taxids):
     if not drawn:
         return
 
-    st.markdown('##### Where the targeted host proteins are found')
+    # every row of df is the same parasite, which is what the page selected before
+    # filtering; filter_tissues in web_utils reads it the same way
+    infected = infected_organs(config, df['taxid1'].unique()[0])
+    if not infected:
+        st.markdown('##### Where the predicted interactions can take place')
+        st.caption('The figure draws none of the tissues this parasite is recorded as '
+                   'infecting, so there is nothing to shade.')
+        return
+
+    st.markdown('##### Where the predicted interactions can take place')
     columns = st.columns(len(drawn))
     for column, (taxid, species) in zip(columns, drawn):
         svg, organs = load_figure(species)
@@ -316,8 +376,10 @@ def show_body_figure(config, data_dir, df, taxids):
         host_df = df[df['taxid2'] == str(taxid)]
         counts = count_interactions(host_df, figure_tissues)
         # an organ the annotation knows but this figure does not draw would otherwise
-        # stretch the colour scale to a range nothing on the figure can reach
-        counts = {organ: count for organ, count in counts.items() if organ in organs}
+        # stretch the colour scale to a range nothing on the figure can reach, and an
+        # organ the parasite does not infect is not somewhere the interaction can happen
+        counts = {organ: count for organ, count in counts.items()
+                  if organ in organs and organ in infected}
         bounds, highest = color_scale(counts)
 
         with column:
@@ -328,9 +390,10 @@ def show_body_figure(config, data_dir, df, taxids):
                 st.markdown(legend_html(bounds), unsafe_allow_html=True)
             else:
                 st.caption('None of the host proteins of this network are annotated to '
-                           'an organ of the figure.')
+                           'an organ this parasite infects.')
 
     st.caption('Predicted interactions whose host protein is expressed in each organ, '
-               'after the confidence score and the tissue filters. TISSUES annotates a '
-               'host protein to about three organs, so an interaction is counted in each '
-               'of them and the organs add up to more than the network.')
+               'after the confidence score and the tissue filters, and only in the organs '
+               'this parasite is recorded as infecting. TISSUES annotates a host protein '
+               'to about three organs, so an interaction is counted in each of the ones '
+               'shown and the organs can add up to more than the network.')

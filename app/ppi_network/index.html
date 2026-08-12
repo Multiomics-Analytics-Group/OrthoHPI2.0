@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- the same vis-network 9.1.2 pyvis draws with, served next to this file rather
+         than fetched from a CDN: the network is the page, so it should not stop working
+         where cdnjs is unreachable, and the version cannot drift under us -->
+    <script src="./vis-network.min.js"></script>
+    <style>
+      /* the one rule of vis-network.css the network needs, copied from it verbatim:
+         the tooltip that shows the protein names and identifiers on hover. The rest of
+         that stylesheet is 220 kB of timeline and manipulation widgets. */
+      div.vis-tooltip {
+        background-color: #ffffff;
+        border: 1px solid #d8dee6;
+        border-radius: 6px;
+        box-shadow: 0 4px 14px rgba(15, 40, 70, 0.14);
+        color: #1f2937;
+        font-family: 'Source Sans Pro', -apple-system, 'Segoe UI', sans-serif;
+        font-size: 13px;
+        line-height: 1.45;
+        padding: 8px 10px;
+        pointer-events: none;
+        position: absolute;
+        visibility: hidden;
+        white-space: nowrap;
+        z-index: 5;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      #mynetwork {
+        width: 100%;
+        /* a barely-there tint rather than white: it separates the network from the
+           page around it without a hard frame, and the nodes read warmer on it */
+        background-color: #fbfcfd;
+        border: 1px solid #e4e8ee;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      /* the pointer is the only hint that the edges can be clicked */
+      #mynetwork canvas {
+        cursor: default;
+      }
+      #unavailable {
+        font-family: sans-serif;
+        color: #555555;
+        padding: 1em;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="mynetwork"></div>
+    <div id="unavailable" hidden>
+      The network could not be drawn: vis-network.min.js did not load.
+    </div>
+
+    <script>
+      (function () {
+        var container = document.getElementById('mynetwork');
+        var unavailable = document.getElementById('unavailable');
+        var network = null;
+        // the graph the network currently shows. Streamlit re-fires the render event on
+        // every rerun of the page -- moving the confidence slider, paging the table,
+        // closing the dialog -- and rebuilding the network on each of those would
+        // restart the physics and throw away the pan and zoom the user had set up.
+        var drawnGraph = null;
+        var frameHeight = null;
+
+        function send(type, data) {
+          data = data || {};
+          data.isStreamlitMessage = true;
+          data.type = type;
+          window.parent.postMessage(data, '*');
+        }
+
+        function setFrameHeight(height) {
+          if (height !== frameHeight) {
+            frameHeight = height;
+            send('streamlit:setFrameHeight', { height: height });
+          }
+        }
+
+        function setComponentValue(value) {
+          send('streamlit:setComponentValue', { value: value, dataType: 'json' });
+        }
+
+        function onClick(params) {
+          // a click that landed on a node is a node click, even if an edge passes under it
+          if (params.nodes.length > 0) {
+            return;
+          }
+          // getEdgeAt is more forgiving than the selectEdge event: the edges are drawn
+          // about a pixel wide, which is close to unclickable when hit exactly
+          var edgeId = network.getEdgeAt(params.pointer.DOM);
+          if (edgeId === undefined || edgeId === null) {
+            return;
+          }
+          var edge = network.body.data.edges.get(edgeId);
+          if (!edge) {
+            return;
+          }
+          // the timestamp is what tells one click from the next: without it, clicking
+          // the same edge twice sends an identical value, Streamlit does not rerun and
+          // the structures never reopen
+          setComponentValue({ nonce: Date.now(), edge: edge });
+        }
+
+        function onHover() {
+          container.querySelector('canvas').style.cursor = 'pointer';
+        }
+
+        function onBlur() {
+          container.querySelector('canvas').style.cursor = 'default';
+        }
+
+        // room left around the network for the things the node positions do not account
+        // for: the nodes have a radius, and the protein names stick out beyond it. Kept
+        // small, because every pixel of it is paid for by zooming the network out, which
+        // shrinks the protein names along with everything else
+        var FIT_PADDING = 70;
+        // a network of five proteins would otherwise be blown up until they filled the
+        // canvas. vis' own fit() stops at 1, which leaves the small networks -- most of
+        // them -- as a clump in the middle instead
+        var MAX_FIT_SCALE = 1.35;
+
+        // vis.js leaves the network wherever the physics put it, which is a clump in the
+        // middle of whatever canvas it was given. Zooming to the extent of the nodes once
+        // they have settled is what makes the network fill the space instead.
+        function fitWhenSettled(net) {
+          var fitted = false;
+
+          function fit() {
+            // the timeout can outlive the network it was set up for, and moving one that
+            // has been destroyed throws
+            if (fitted || network !== net) {
+              return;
+            }
+            fitted = true;
+
+            var positions = net.getPositions();
+            var ids = Object.keys(positions);
+            if (ids.length === 0) {
+              return;
+            }
+            var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            ids.forEach(function (id) {
+              var p = positions[id];
+              minX = Math.min(minX, p.x);
+              maxX = Math.max(maxX, p.x);
+              minY = Math.min(minY, p.y);
+              maxY = Math.max(maxY, p.y);
+            });
+
+            var box = container.getBoundingClientRect();
+            var scale = Math.min(
+              Math.max(box.width - FIT_PADDING, 100) / Math.max(maxX - minX, 1),
+              Math.max(box.height - FIT_PADDING, 100) / Math.max(maxY - minY, 1)
+            );
+            net.moveTo({
+              position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+              scale: Math.max(0.12, Math.min(scale, MAX_FIT_SCALE)),
+              animation: false
+            });
+          }
+
+          net.once('stabilizationIterationsDone', fit);
+          // physics can be switched off, in which case the event above never fires
+          setTimeout(fit, 4000);
+        }
+
+        function onRender(event) {
+          if (!event.data || event.data.type !== 'streamlit:render') {
+            return;
+          }
+          var args = event.data.args;
+          var height = args.height || 600;
+          container.style.height = height + 'px';
+          setFrameHeight(height + 4);
+
+          if (typeof vis === 'undefined') {
+            container.hidden = true;
+            unavailable.hidden = false;
+            setFrameHeight(80);
+            return;
+          }
+
+          var graph = JSON.stringify([args.nodes, args.edges, args.options]);
+          if (graph === drawnGraph) {
+            return;
+          }
+          drawnGraph = graph;
+
+          if (network !== null) {
+            network.destroy();
+          }
+          network = new vis.Network(
+            container,
+            { nodes: new vis.DataSet(args.nodes), edges: new vis.DataSet(args.edges) },
+            args.options
+          );
+          network.on('click', onClick);
+          // only the edges open anything, so only they get the pointer
+          network.on('hoverEdge', onHover);
+          network.on('blurEdge', onBlur);
+          fitWhenSettled(network);
+        }
+
+        window.addEventListener('message', onRender);
+        send('streamlit:componentReady', { apiVersion: 1 });
+      })();
+    </script>
+  </body>
+</html>

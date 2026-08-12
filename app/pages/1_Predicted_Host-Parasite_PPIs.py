@@ -1,4 +1,5 @@
 import sys, os
+import json
 import textwrap
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import utils
@@ -10,15 +11,12 @@ import networkx as nx
 from css import style
 from pyvis.network import Network
 import plotly.express as px
+import structure_visualizer as strv
+import body_figure
+from ppi_network import ppi_network
 
 style.load_css()
-page = web_utils.show_pages_menu(index=1)
-if page == "Home":
-    st.switch_page("OrthoHPI_Home.py")
-elif page == "Predicted PPI structures":
-    st.switch_page('pages/2_Interaction_structures.py')
-elif page == "About":
-    st.switch_page('pages/3_About.py')
+web_utils.show_pages_menu('Predicted Host-parasite PPIs')
 
 #Initialize variables
 df_select = None
@@ -28,11 +26,39 @@ selected_terms = []
 enrichment_table = None
 enrichment = None
 path = 'data/tmp'
+# where the network is written for the download buttons; not in the repository, so it
+# has to be created on a fresh checkout
+os.makedirs(path, exist_ok=True)
 # characters per line of a node label, so a long protein name wraps instead of
 # stretching its node across the network
 LABEL_WRAP_WIDTH = 22
 LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
-LABEL_FONT_COLOR = '#555555'
+LABEL_FONT_COLOR = '#2f3a46'
+LABEL_FONT_FACE = "'Source Sans Pro', -apple-system, 'Segoe UI', sans-serif"
+# the labels are drawn over the edges, so they are given a halo of the network
+# background to sit in rather than being read through the lines
+NETWORK_BACKGROUND = '#fbfcfd'
+# how far toward white a node's species colour is washed out to fill it. A saturated
+# fill of the colours the parasites are identified by leaves the label on top of it
+# unreadable; a wash of the same colour still says which organism the protein is from
+NODE_FILL_TINT = 0.74
+NODE_HIGHLIGHT_TINT = 0.5
+# edges are the background of the picture until one is pointed at: neutral and light
+# enough to read the nodes through them, and the accent of the page when hovered
+EDGE_COLOR = '#c7cfd9'
+EDGE_ACCENT_COLOR = '#2b8cbe'
+# the enrichment view below the table, where the proteins of the selected processes are
+# picked out of a network that is otherwise pushed into the background
+HIGHLIGHT_COLOR = '#e7298a'
+MUTED_COLOR = '#c8ced6'
+# height of the network. The layout spaces the proteins widely so that their names can be
+# read, and the view is zoomed to fit whatever it is given: a shorter canvas does not
+# remove the space between the proteins, it only shrinks the whole network, names and all.
+# The empty space around a small network is taken out by the zoom (see index.html), not
+# by making the canvas smaller.
+NETWORK_HEIGHT = 1000
+# height of each of the two structure viewers in the dialog an interaction opens
+VIEWER_HEIGHT = 400
 
 # Columns of the interactions table. The colors and shapes only exist to draw the
 # network, the taxids repeat their labels, the parasite and the edge type are the same
@@ -49,12 +75,9 @@ config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-@st.cache_data(show_spinner=False)
-def load_predictions(data_dir):
-    predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
-    predictions['weight'] = predictions['weight'].astype(float)
-
-    return predictions
+# the predictions themselves are loaded by web_utils, so the three pages share one
+# cached copy of them however the app is navigated
+load_predictions = web_utils.load_predictions
 
 
 @st.cache_data(show_spinner=False, max_entries=5)
@@ -87,15 +110,79 @@ def load_ontology(data_dir):
     return utils.read_parquet_file(input_file=f'{data_dir}/go_ontology.parquet')
 
 
-def set_label_font(net):
+def tint(color, amount):
     '''
-    Enlarges the node labels of a pyvis network. The size has to be set on the
-    network rather than on each node: pyvis overwrites a node's font with the
-    font_color the network was built with.
+    Mixes a colour toward white, so the colour a species is identified by can also be
+    used as a fill light enough to write on.
 
-    :param net: pyvis Network whose labels to enlarge
+    :param str color: '#rrggbb'
+    :param float amount: 0 leaves the colour alone, 1 turns it white
+    :return: the mixed colour, or the colour unchanged if it is not a hex triplet
     '''
-    net.options.nodes = {'font': {'size': LABEL_FONT_SIZE, 'color': LABEL_FONT_COLOR}}
+    color = str(color)
+    if not color.startswith('#') or len(color) != 7:
+        return color
+    channels = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+
+    return '#%02x%02x%02x' % tuple(round(c + (255 - c) * amount) for c in channels)
+
+
+def node_color(color):
+    '''
+    The fill, border and hover colours of a node from the one colour its species is
+    drawn in: a wash of the colour inside a border of the colour itself, which reads as
+    a group at a glance and keeps the protein name on top of it legible. Hovering and
+    selecting deepen the fill rather than change the colour, so a node stays
+    recognisable as its species while it is pointed at.
+
+    :param str color: the species colour
+    :return: a vis.js node colour dictionary
+    '''
+    return {'background': tint(color, NODE_FILL_TINT),
+            'border': color,
+            'highlight': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color},
+            'hover': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color}}
+
+
+def style_network(net):
+    '''
+    Applies the look of the network: the label font, the node fills and the edge
+    colours. The font has to be set on the network rather than on each node, as pyvis
+    overwrites a node's font with the font_color the network was built with. The colours
+    are set on the nodes and edges pyvis built rather than on the networkx graph they
+    came from, because a colour dictionary is not something GraphML can hold and the
+    same graph is exported for download.
+
+    :param net: pyvis Network to style
+    '''
+    net.options.nodes = {
+        'font': {'size': LABEL_FONT_SIZE, 'color': LABEL_FONT_COLOR,
+                 'face': LABEL_FONT_FACE,
+                 # the halo that lifts the label off the edges running under it
+                 'strokeWidth': 4, 'strokeColor': NETWORK_BACKGROUND},
+        'borderWidth': 2, 'borderWidthSelected': 3}
+    net.options.edges = {
+        # vis.js spreads the confidence scores over its default 1-15 px, which turns the
+        # best-supported interactions into bars. A narrower range still ranks them by
+        # confidence while leaving the network something to be read through
+        'scaling': {'min': 1, 'max': 6},
+        # pyvis asks for dynamic curves, which hang an invisible support node off every
+        # edge for the physics to solve: the same curve without the cost, and shallow
+        # enough that two proteins still read as joined by a line
+        'smooth': {'enabled': True, 'type': 'continuous', 'roundness': 0.15},
+        # the edges are thin, which is close to unclickable, so pointing at one or
+        # picking it thickens it as well as colouring it
+        'hoverWidth': 2, 'selectionWidth': 3}
+    net.options.interaction = {'hover': True, 'selectConnectedEdges': False,
+                               'tooltipDelay': 120}
+    for node in net.nodes:
+        node['color'] = node_color(node.get('color', '#8899aa'))
+    for edge in net.edges:
+        # as an object rather than pyvis' plain string: vis.js reads a string as "this
+        # colour whatever happens to the edge", which loses the hover and the selection
+        edge['color'] = {'color': EDGE_COLOR,
+                         'highlight': EDGE_ACCENT_COLOR,
+                         'hover': EDGE_ACCENT_COLOR}
 
 
 def generate_node_labels(df, annotations):
@@ -252,10 +339,132 @@ def generate_graph(df, score, annotations=None):
             value = 0.05
         widths[(n1, n2)] = value
     nx.set_edge_attributes(G, widths, 'value')
-    nx.set_edge_attributes(G, '#999999', 'color')
-    
+    nx.set_edge_attributes(G, EDGE_COLOR, 'color')
+
 
     return G
+
+
+def annotate_edges(edges, df, annotations):
+    '''
+    Writes the two proteins of an interaction onto the edge that draws it, so that a
+    click on the edge carries everything needed to show their structures. The graph is
+    undirected, which leaves the orientation of an edge up to networkx -- some come out
+    host to parasite -- so the pair is looked up unordered and written back with the
+    parasite protein always first.
+
+    :param list edges: vis.js edge dictionaries, as pyvis built them
+    :param df: predictions dataframe of the selected parasite
+    :param dict annotations: STRING id --> descriptive protein name
+    :return: the same edges, each with the proteins of its interaction added
+    '''
+    # the species travels with the edge as well, so the dialog can name it beside each
+    # protein and say which of the two models is the parasite's and which the host's
+    cols = ['source', 'source_name', 'source_uniprot', 'taxid1_label',
+            'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight']
+    pairs = {}
+    for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
+        pairs[frozenset((row.source, row.target))] = {
+            'parasite': str(row.source_name),
+            # a protein UniProt has no accession for has no AlphaFold model either,
+            # and NaN does not survive the trip to the browser
+            'parasite_uniprot': None if pd.isna(row.source_uniprot) else str(row.source_uniprot),
+            'parasite_full': annotations.get(row.source, ''),
+            'parasite_species': str(row.taxid1_label),
+            'host': str(row.target_name),
+            'host_uniprot': None if pd.isna(row.target_uniprot) else str(row.target_uniprot),
+            'host_full': annotations.get(row.target, ''),
+            'host_species': str(row.taxid2_label),
+            'weight': float(row.weight)}
+
+    annotated = []
+    for edge in edges:
+        edge = dict(edge)
+        interaction = pairs.get(frozenset((edge['from'], edge['to'])))
+        if interaction is not None:
+            edge.update(interaction)
+            # nothing else says the edges can be clicked
+            edge['title'] = (f"{interaction['parasite']} -- {interaction['host']}\n"
+                             f"confidence {interaction['weight']:.3f}\n"
+                             'click to see the AlphaFold models')
+        annotated.append(edge)
+
+    return annotated
+
+
+def network_options(net):
+    '''
+    The vis.js options pyvis built, which style_network has already filled in. The
+    downloaded HTML is drawn from the same options, so the network that is saved looks
+    like the one on the page.
+
+    :param net: pyvis Network the options come from
+    :return: options dictionary to hand to the network component
+    '''
+    return json.loads(net.get_network_data()[5])
+
+
+@st.cache_data(show_spinner=False)
+def get_structures(query_proteins):
+    '''
+    The AlphaFold model of each of the two proteins. Cached so that reopening a pair is
+    immediate and a rerun of the page never downloads anything again.
+
+    :param dict query_proteins: protein name --> UniProt accession
+    :return: dict protein name --> (pdb file, pdb url, AlphaFold entry url)
+    '''
+    return strv.get_alphafold_structure(query_proteins=query_proteins)
+
+
+def show_structure(pdb_file):
+    xyzview = strv.generate_mol_structure(pdb_file=pdb_file, height=VIEWER_HEIGHT)
+    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html.
+    # the width is left to stretch so the viewer follows the column it sits in
+    st.iframe(xyzview._make_html(), height=VIEWER_HEIGHT + 20)
+
+
+@st.dialog('AlphaFold models of the interacting proteins', width='large')
+def show_structures_dialog(edge):
+    '''
+    Shows the AlphaFold model of each of the two proteins of the interaction that was
+    clicked in the network. Opened over the network rather than placed under it so that
+    the table and the enrichment plots below do not move on every click.
+
+    :param dict edge: the clicked edge, as annotated by annotate_edges
+    '''
+    st.markdown(f"**{edge['parasite']}** ({edge['parasite_species']}) &ndash; "
+                f"**{edge['host']}** ({edge['host_species']}) &nbsp;·&nbsp; "
+                f"interaction confidence score {edge['weight']:.2f}", unsafe_allow_html=True)
+    st.markdown(strv.plddt_legend(), unsafe_allow_html=True)
+
+    # one entry per protein rather than a dict keyed by protein name, so the species stays
+    # attached to the right panel even if the two proteins happen to share a name
+    proteins = [(edge['parasite'], edge['parasite_uniprot'],
+                 edge['parasite_full'], edge['parasite_species']),
+                (edge['host'], edge['host_uniprot'],
+                 edge['host_full'], edge['host_species'])]
+    query_proteins = {edge['parasite']: edge['parasite_uniprot'],
+                      edge['host']: edge['host_uniprot']}
+    with st.spinner('Fetching the AlphaFold models...'):
+        structures = get_structures(query_proteins)
+
+    cols = st.columns(2)
+    for i, (protein, uniprot, full_name, species) in enumerate(proteins):
+        pdb_file, url, website, reason = structures[protein]
+        with cols[i % len(cols)]:
+            st.markdown(f'''<h4>{protein} ({species})</h4>''', unsafe_allow_html=True)
+            subtitle = f'{full_name} · {uniprot}' if full_name else str(uniprot)
+            st.caption(subtitle)
+            if pdb_file is not None:
+                show_structure(pdb_file=pdb_file)
+                bcol1, bcol2 = st.columns(2)
+                with bcol1:
+                    st.link_button('PDB file', url)
+                with bcol2:
+                    st.link_button('AlphaFold EBI', website)
+            else:
+                st.markdown('''<h5>No AlphaFold model</h5>''', unsafe_allow_html=True)
+                st.caption(reason)
 
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
@@ -265,11 +474,8 @@ st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Predictio
 st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
 
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.write('')
-
+# the body figure beside the selectors rather than a third of the row left empty
+col1, col2 = st.columns([1, 1], gap='large')
 
 with col2:
 
@@ -314,7 +520,8 @@ with col2:
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
 
         # Initiate PyVis network object
-        net = Network(height='1000px', width="100%", bgcolor='white', font_color='#555555')
+        net = Network(height=f'{NETWORK_HEIGHT}px', width="100%",
+                      bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
         # Take Networkx graph and translate it to a PyVis graph format
         net.from_nx(G)
         # Save other formats
@@ -324,17 +531,24 @@ with col2:
                         format='cytoscape', output_dir=f'{path}')
         G = None
 
-        # Generate network with specific layout settings
+        # Generate network with specific layout settings. The repulsion solver rather
+        # than force atlas: it spaces the proteins far enough apart that the names on
+        # them can be read, which is worth more than the tighter, rounder shape the
+        # force atlas layout draws.
         net.repulsion(node_distance=420, central_gravity=0.33,
                         spring_length=110, spring_strength=0.10,
                         damping=0.95)
-        set_label_font(net)
+        style_network(net)
         
         #net.show_buttons(filter_=['nodes'])
         
         
-with col3:
-    st.write('')
+# drawn after the column that holds the selectors, which is where the predictions the
+# figure counts are read and filtered
+with col1:
+    if df_select is not None:
+        body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
+                                     selected_taxids)
 
 
 with st.container():
@@ -344,15 +558,34 @@ with st.container():
                    'parasite proteins and circles host proteins, coloured by the organism they '
                    'belong to and drawn the larger the more central they are to the network. Each '
                    'edge is a predicted interaction, drawn the thicker the higher its confidence '
-                   'score. Hover over a node for the full protein name and its identifiers.')
+                   'score. Hover over a node for the full protein name and its identifiers, and '
+                   'click an interaction to see the AlphaFold model of each of its two proteins.')
         html_data = ""
-        # Save and read graph as HTML file (on Streamlit Sharing)
+        # Save and read graph as HTML file, which is what the download button hands out.
+        # The network on the page is drawn by the component instead: an embedded HTML
+        # file has no way of telling Python which interaction was clicked.
         net.save_graph(f'{path}/{selected_parasite}.html')
         with open(f'{path}/{selected_parasite}.html','r',encoding='utf-8') as HtmlFile:
             html_data = HtmlFile.read()
-        # Load HTML into HTML component for display on Streamlit
-        st.iframe(html_data, height=1050)
+        nodes, edges = net.get_network_data()[:2]
+        # no widget key on purpose: Streamlit then identifies the component by its
+        # arguments, so choosing another parasite or moving the score slider makes it a
+        # different widget and the interaction selected in the previous network is
+        # dropped rather than carried over to one that no longer contains it
+        selected_edge = ppi_network(
+            nodes=nodes,
+            edges=annotate_edges(edges, df_select, web_utils.load_protein_annotations(data_dir)),
+            options=network_options(net),
+            height=NETWORK_HEIGHT)
         net = None
+
+        # Closing the dialog reruns the page with the component still holding the edge
+        # that opened it, so the click is remembered to keep it from opening again. The
+        # nonce changes on every click, which is what makes clicking the same edge twice
+        # open the dialog again.
+        if selected_edge is not None and selected_edge['nonce'] != st.session_state.get('shown_edge'):
+            st.session_state['shown_edge'] = selected_edge['nonce']
+            show_structures_dialog(selected_edge['edge'])
         with st.container():
             c1, c2, c3 = st.columns(3)
 
@@ -460,16 +693,17 @@ with st.container():
                 if enrichment is not None:
                     highlighted_nodes = enrichment[enrichment['go_term'].isin(selected_terms)]['nodes'].values
                     highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
-                    highlight_color = {i: '#e7298a' for i in highlighted_nodes}
+                    highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
                     G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir))
-                    nx.set_node_attributes(G, "#ddd", 'color')
+                    nx.set_node_attributes(G, MUTED_COLOR, 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
                     # Initiate PyVis network object
-                    net = Network(height="450px", width="100%", bgcolor='white', font_color='#555555')
+                    net = Network(height="450px", width="100%",
+                                  bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
                     # Take Networkx graph and translate it to a PyVis graph format
                     net.from_nx(G)
                     G = None
-                    set_label_font(net)
+                    style_network(net)
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
                     st.subheader("Highlighted Nodes for Selected Biological Processes")

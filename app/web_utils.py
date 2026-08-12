@@ -3,15 +3,46 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 import utils
 
-def show_pages_menu(index=0):
+# The pages of the app in the order they are offered, each as (label, bootstrap icon,
+# path to switch to). The app reads at three levels -- every host, one host, one
+# host and one parasite -- and the menu follows that order. The paths are relative to
+# the app root, which is what st.switch_page takes; the file numbers of the pages no
+# longer match this order (the network page keeps the URL it was published under) and
+# nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
+PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
+         ('Parasites in a host', 'diagram-2', 'pages/2_Compare_Parasites.py'),
+         ('Predicted Host-parasite PPIs', 'diagram-3', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
+         ('About', 'chat-text', 'pages/3_About.py')]
+
+
+def show_pages_menu(current=None, index=None):
+    '''
+    Draws the menu across the top of every page and switches to whichever entry is
+    picked, so that a page only has to say which one it is.
+
+    :param str current: label of the page drawing the menu; the entry it highlights and
+                        the one click that is not a navigation
+    :param int index: position of that page in PAGES, for the snapshot entrypoints that
+                      predate the labels
+    :return: the label selected, which is `current` unless the page is being left
+    '''
+    labels = [label for label, _, _ in PAGES]
+    if index is None:
+        index = labels.index(current) if current in labels else 0
+
     selected = option_menu(
-    menu_title=None,  # required
-    options=["Home", "Predicted Host-parasite PPIs", "Predicted PPI structures", "About"],  # required
-    icons=["house", "diagram-3", "cast", "chat-text"],  # optional
-    menu_icon="cast",  # optional
-    default_index=index,  # optional
-    orientation="horizontal",
+        menu_title=None,
+        options=labels,
+        icons=[icon for _, icon, _ in PAGES],
+        menu_icon="cast",
+        default_index=index,
+        orientation="horizontal",
     )
+
+    for label, _, path in PAGES:
+        if selected == label and selected != labels[index]:
+            st.switch_page(path)
+
     return selected
 
 def get_data_dir():
@@ -19,6 +50,38 @@ def get_data_dir():
 
 def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
+
+
+@st.cache_data(show_spinner=False)
+def load_predictions(data_dir):
+    '''
+    Every predicted interaction. Shared by the three pages rather than reloaded on each
+    of them: the cache is keyed by the data directory, so the parquet is read once
+    however the app is navigated.
+
+    :param str data_dir: directory holding predictions.parquet
+    :return: predictions dataframe
+    '''
+    predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
+    predictions['weight'] = predictions['weight'].astype(float)
+
+    return predictions
+
+
+@st.cache_data(show_spinner=False)
+def get_host_predictions(data_dir, host_taxids):
+    '''
+    Predictions against one host group. host_taxids is a tuple of taxids (as strings)
+    so grouped hosts -- rat and mouse under Rodent -- are pooled into a single view;
+    the predictions keep their own species label and taxid.
+
+    :param str data_dir: directory holding predictions.parquet
+    :param tuple host_taxids: taxids of the selected host group, as strings
+    :return: predictions dataframe of that host group
+    '''
+    predictions = load_predictions(data_dir)
+
+    return predictions[predictions['taxid2'].isin(host_taxids)]
 
 
 @st.cache_data(show_spinner=False)

@@ -10,9 +10,7 @@ urls:
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
 # `group` (optional) collapses several host species into one option in the app;
-# hosts without it are their own group. Rat and mouse are grouped as Rodent: the
-# Parasites_db curation only records rat hosts, and we assume the same parasites
-# infect mouse (see the `hosts` lists of the parasites below).
+# hosts without it are their own group. Rat and mouse are grouped as Rodent.
 hosts:
     9606:
         label: Homo sapiens
@@ -90,6 +88,8 @@ parasites:
         multicellular: true
         color: "#33a02c"
         tissues:
+            - "BTO:0001253"
+            - "BTO:0000763"
             - "BTO:0000651"
         hosts:
             - 9606
@@ -100,6 +100,7 @@ parasites:
         color: "#ff7f00"
         tissues:
             - "BTO:0000752"
+            - "BTO:0000784"
             - "BTO:0000089"
         hosts:
             - 9606
@@ -110,6 +111,7 @@ parasites:
         color: "#fdb462"
         tissues:
             - "BTO:0000752"
+            - "BTO:0000784"
             - "BTO:0000089"
         hosts:
             - 9606
@@ -132,13 +134,15 @@ parasites:
             - "BTO:0000648"
         hosts:
             - 9606
+            - 10116
+            - 10090
     318479:
         label: Dracunculus medinensis
         group: Nematoda
         multicellular: true
         color: "#c51b7d"
         tissues:
-            - "BTO:0001307"
+            - "BTO:0000651"
             - "BTO:0001253"
         hosts:
             - 9606
@@ -170,6 +174,7 @@ parasites:
         color: "#9f5511"
         tissues:
             - "BTO:0000269"
+            - "BTO:0001253"
         hosts:
             - 9606
     6216:
@@ -200,8 +205,10 @@ parasites:
             - "BTO:0000759"
             - "BTO:0001281"
             - "BTO:0000141"
+            - "BTO:0000784"
             - "BTO:0001253"
             - "BTO:0000089"
+            - "BTO:0000801"
         hosts:
             - 9606
     5664:
@@ -211,8 +218,7 @@ parasites:
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
-            - "BTO:0000840"
-            - "BTO:0001090"
+            - "BTO:0000801"
         hosts:
             - 9606
     7209:
@@ -223,7 +229,6 @@ parasites:
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
-            - "BTO:0000763"
             - "BTO:0000439"
         hosts:
             - 9606
@@ -233,6 +238,8 @@ parasites:
         multicellular: true
         color: "#80b1d3"
         tissues:
+            - "BTO:0001253"
+            - "BTO:0000763"
             - "BTO:0000651"
         hosts:
             - 9606
@@ -243,6 +250,7 @@ parasites:
         color: "#fccde5"
         tissues:
             - "BTO:0001253"
+            - "BTO:0000439"
         hosts:
             - 9606
     147828:
@@ -264,6 +272,8 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000089"
+            - "BTO:0000142"
+            - "BTO:0001281"
         hosts:
             - 9606
     5851:
@@ -309,6 +319,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000651"
+            - "BTO:0000763"
             - "BTO:0000089"
         hosts:
             - 9606
@@ -321,6 +332,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000648"
+            - "BTO:0001281"
             - "BTO:0000763"
             - "BTO:0000089"
         hosts:
@@ -331,6 +343,8 @@ parasites:
         multicellular: true
         color: "#3f007d"
         tissues:
+            - "BTO:0001253"
+            - "BTO:0000763"
             - "BTO:0000651"
         hosts:
             - 9606
@@ -354,6 +368,7 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000887"
             - "BTO:0001078"
+            - "BTO:0000784"
         hosts:
             - 9606
     72359:
@@ -373,6 +388,9 @@ parasites:
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0000763"
         hosts:
             - 9606
     6335:
@@ -383,6 +401,9 @@ parasites:
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0000763"
         hosts:
             - 9606
     6336:
@@ -393,6 +414,9 @@ parasites:
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0000763"
         hosts:
             - 9606
     5722:
@@ -410,7 +434,6 @@ parasites:
         multicellular: true
         color: "#e7298a"
         tissues:
-            - "BTO:0000651"
             - "BTO:0000269"
         hosts:
             - 9606
@@ -421,6 +444,8 @@ parasites:
         tissues:
             - "BTO:0001253"
             - "BTO:0000562"
+            - "BTO:0000269"
+            - "BTO:0000887"
             - "BTO:0000089"
             - "BTO:0000439"
         hosts:
@@ -491,6 +516,7 @@ parasites:
             - "BTO:0000887"
             - "BTO:0000763"
         hosts:
+            - 9606
             - 9823
     6337:
         label: Trichinella pseudospiralis
@@ -504,6 +530,7 @@ parasites:
             - "BTO:0000562"
             - "BTO:0000763"
         hosts:
+            - 9606
             - 9823
     6198:
         label: Opisthorchis viverrini

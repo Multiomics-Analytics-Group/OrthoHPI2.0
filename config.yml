@@ -61,8 +61,8 @@ tissues:
     "BTO:0000752": lymph vessel
     "BTO:0001418": urinary bladder
     "BTO:0001158": rectum
-    "BTO:0000243": urethra
-    "BTO:0001426": vagina
+    "BTO:0000243": vagina
+    "BTO:0001426": urethra
     "BTO:0000269": colon
     "BTO:0000778": pulmonary artery
     "BTO:0000779": mesenteric artery
@@ -100,6 +100,7 @@ parasites:
         color: "#ff7f00"
         tissues:
             - "BTO:0000752"
+            - "BTO:0000089"
         hosts:
             - 9606
     42155:
@@ -109,6 +110,7 @@ parasites:
         color: "#fdb462"
         tissues:
             - "BTO:0000752"
+            - "BTO:0000089"
         hosts:
             - 9606
     79923:
@@ -127,6 +129,7 @@ parasites:
         color: "#8c510a"
         tissues:
             - "BTO:0001307"
+            - "BTO:0000648"
         hosts:
             - 9606
     318479:
@@ -136,6 +139,7 @@ parasites:
         color: "#c51b7d"
         tissues:
             - "BTO:0001307"
+            - "BTO:0001253"
         hosts:
             - 9606
     6210:
@@ -144,7 +148,6 @@ parasites:
         multicellular: true
         color: "#d6604d"
         tissues:
-            - "BTO:0000651"
             - "BTO:0000759"
             - "BTO:0000763"
         hosts:
@@ -154,7 +157,7 @@ parasites:
         group: Other protozoa
         color: "#b2df8a"
         tissues:
-            - "BTO:0000651"
+            - "BTO:0000269"
             - "BTO:0000759"
             - "BTO:0000142"
             - "BTO:0000763"
@@ -166,7 +169,7 @@ parasites:
         multicellular: true
         color: "#9f5511"
         tissues:
-            - "BTO:0000651"
+            - "BTO:0000269"
         hosts:
             - 9606
     6216:
@@ -197,6 +200,8 @@ parasites:
             - "BTO:0000759"
             - "BTO:0001281"
             - "BTO:0000141"
+            - "BTO:0001253"
+            - "BTO:0000089"
         hosts:
             - 9606
     5664:
@@ -206,6 +211,8 @@ parasites:
         tissues:
             - "BTO:0001253"
             - "BTO:0000089"
+            - "BTO:0000840"
+            - "BTO:0001090"
         hosts:
             - 9606
     7209:
@@ -215,6 +222,9 @@ parasites:
         color: "#fdbf6f"
         tissues:
             - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000763"
+            - "BTO:0000439"
         hosts:
             - 9606
     51031:
@@ -242,6 +252,7 @@ parasites:
         color: "#ccebc5"
         tissues:
             - "BTO:0000759"
+            - "BTO:0000122"
             - "BTO:0000651"
         hosts:
             - 9606
@@ -284,6 +295,9 @@ parasites:
             - "BTO:0001253"
             - "BTO:0001418"
             - "BTO:0001158"
+            - "BTO:0000759"
+            - "BTO:0000089"
+            - "BTO:0000763"
         hosts:
             - 9606
     6182:
@@ -295,6 +309,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000651"
+            - "BTO:0000089"
         hosts:
             - 9606
     6183:
@@ -435,7 +450,7 @@ parasites:
         multicellular: true
         color: "#a6761d"
         tissues:
-            - "BTO:0000778"
+            - "BTO:0000763"
             - "BTO:0000142"
         hosts:
             - 10116
@@ -447,6 +462,7 @@ parasites:
         color: "#e6550d"
         tissues:
             - "BTO:0000779"
+            - "BTO:0000089"
         hosts:
             - 10116
             - 10090
@@ -484,5 +500,70 @@ parasites:
         tissues:
             - "BTO:0000648"
             - "BTO:0000887"
+            - "BTO:0000142"
+            - "BTO:0000562"
+            - "BTO:0000763"
         hosts:
             - 9823
+    6198:
+        label: Opisthorchis viverrini
+        group: Trematoda
+        multicellular: true
+        color: "#67001f"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0000122"
+        hosts:
+            - 9606
+    6211:
+        label: Echinococcus multilocularis
+        group: Cestoda
+        multicellular: true
+        color: "#276419"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0000763"
+        hosts:
+            - 9606
+    6265:
+        label: Toxocara canis
+        group: Nematoda
+        multicellular: true
+        color: "#023858"
+        tissues:
+            - "BTO:0000759"
+            - "BTO:0000562"
+            - "BTO:0000763"
+            - "BTO:0000142"
+            - "BTO:0000887"
+            - "BTO:0000439"
+        hosts:
+            - 9606
+    185431:
+        label: Trypanosoma brucei
+        group: Kinetoplastida
+        color: "#543005"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000142"
+            - "BTO:0000784"
+            - "BTO:0001279"
+        hosts:
+            - 9606
+    184922:
+        label: Giardia lamblia
+        group: Other protozoa
+        color: "#4d4d4d"
+        tissues:
+            - "BTO:0000651"
+        hosts:
+            - 9606
+    353152:
+        label: Cryptosporidium parvum
+        group: Apicomplexa
+        color: "#99000d"
+        tissues:
+            - "BTO:0000651"
+        hosts:
+            - 9606

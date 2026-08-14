@@ -7,10 +7,12 @@ import web_utils
 import streamlit as st
 from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
+import numpy as np
 import networkx as nx
 from css import style
 from pyvis.network import Network
 import plotly.express as px
+import plotly.graph_objects as pgo
 import structure_visualizer as strv
 import body_figure
 from ppi_network import ppi_network
@@ -51,6 +53,23 @@ EDGE_ACCENT_COLOR = '#2b8cbe'
 # picked out of a network that is otherwise pushed into the background
 HIGHLIGHT_COLOR = '#e7298a'
 MUTED_COLOR = '#c8ced6'
+# the enrichment figures. Significance is a magnitude, so it is drawn on a single hue
+# running light to dark rather than on a set of unrelated colours
+GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
+GO_AXIS_COLOR = '#8d97a3'
+GO_GRID_COLOR = '#e6eaef'
+# how many processes the ranked plot shows. Beyond this the term names stop being
+# readable, and the table above is the place to see the rest
+GO_TOP_N = 20
+# characters per line of a GO term name on the y axis of the ranked plot
+GO_LABEL_WRAP_WIDTH = 42
+# an FDR that underflows to 0 would be an infinite -log10. It is read as the smallest
+# FDR the rest of the table holds instead, so one term cannot stretch the colour scale
+GO_MIN_FDR = 1e-300
+# the block all the others are nested in. It is in the data rather than left to plotly,
+# which paints a sector it has no colour value for in a hard grey (see the treemap below)
+GO_TREEMAP_ROOT_ID = '__all_enriched_processes__'
+GO_TREEMAP_ROOT_LABEL = 'All enriched processes'
 # height of the network. The layout spaces the proteins widely so that their names can be
 # read, and the view is zoomed to fit whatever it is given: a shorter canvas does not
 # remove the space between the proteins, it only shrinks the whole network, names and all.
@@ -209,16 +228,46 @@ def generate_node_labels(df, annotations):
     return labels
 
 
-def generate_node_titles(df, annotations):
+@st.cache_data(show_spinner=False)
+def get_surface_calls(data_dir):
     '''
-    Builds the hover text of each node: the short name, the descriptive protein name
-    and the identifiers needed to look the protein up elsewhere. The label only shows
-    one of the two names, so the tooltip keeps both.
+    What DeepLoc 2 called each protein and how sure it was of that call, keyed by STRING
+    id. Both sides of the interactions are in it: every protein of the predictions went
+    through a localisation filter to get here, the host proteins for being surface-exposed
+    and the parasite proteins for being secreted, and this is what those filters read.
+
+    The score kept beside the class is the probability of that class -- the one the call
+    was made on -- and not both probabilities, since it is the one a tooltip has room for.
+
+    :param str data_dir: directory holding deeploc_localisations.parquet
+    :return: dataframe of surface and score, indexed by STRING id; empty without the file
+    '''
+    localisations = web_utils.load_deeploc_localisations(data_dir)
+    if localisations.empty:
+        return pd.DataFrame(columns=['surface', 'score'])
+
+    surface = web_utils.classify_surface(localisations)
+
+    return pd.DataFrame({
+        'surface': surface.values,
+        'score': np.where(surface == web_utils.EXTRACELLULAR, localisations['extracellular'],
+                          localisations['cell_membrane'])},
+        index=localisations['protein'].values)
+
+
+def generate_node_titles(df, annotations, surface_calls=None):
+    '''
+    Builds the hover text of each node: the short name, the descriptive protein name,
+    where DeepLoc puts the protein and the identifiers needed to look it up elsewhere.
+    The label only shows one of the two names, so the tooltip keeps both.
 
     :param df: predictions dataframe of the selected parasite
     :param dict annotations: STRING id --> descriptive protein name
+    :param surface_calls: DeepLoc calls, as get_surface_calls returns them, or None for a
+                          data directory with no localisations to show
     :return: {STRING id: hover text}
     '''
+    calls = {} if surface_calls is None or surface_calls.empty else surface_calls.to_dict('index')
     titles = {}
     for prefix, taxid_col in [('source', 'taxid1_label'), ('target', 'taxid2_label')]:
         cols = [prefix, f'{prefix}_name', f'{prefix}_uniprot', taxid_col]
@@ -228,6 +277,9 @@ def generate_node_titles(df, annotations):
             if description and description != name:
                 lines.append(description)
             lines.append(str(species))
+            call = calls.get(protein)
+            if call:
+                lines.append(f"DeepLoc: {call['surface']} (p={call['score']:.2f})")
             lines.append(f'STRING: {protein}')
             if pd.notna(uniprot):
                 lines.append(f'UniProt: {uniprot}')
@@ -265,19 +317,36 @@ def generate_interactions_table(df, score, annotations):
     columns = list(TABLE_COLUMNS)
     if table['taxid2_label'].nunique() > 1:
         columns.insert(columns.index('target_name'), 'taxid2_label')
+    # where DeepLoc puts the host protein, which is why it is in the network at all. Only
+    # when the data directory has the localisations, since the snapshot ones do not
+    if 'target_surface' in table.columns:
+        columns.insert(columns.index('Tissues'), 'target_surface')
 
     return table[columns].sort_values(by='weight', ascending=False)
 
 
 def generate_tissue_filters(df):
     options = df['Tissue'].unique().tolist()
-    
+
     return options
 
 def generate_cell_type_filters(df):
     options = df['Cell type'].dropna().unique().tolist()
-    
+
     return options
+
+def generate_surface_filters(df):
+    '''
+    The DeepLoc classes the host proteins of this parasite fall in, in the order they are
+    offered: the surface of the host cell first and the space around it second, which is
+    the order the home page splits its columns in. A class no host protein of this parasite
+    is in is left out, as an empty option filters to an empty network.
+    '''
+    if 'target_surface' not in df.columns:
+        return []
+    present = set(df['target_surface'].dropna())
+
+    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR) if c in present]
 
 @st.cache_data(max_entries=3, ttl=1800)
 def get_enrichment(pred_df, data_dir):
@@ -288,18 +357,259 @@ def get_enrichment(pred_df, data_dir):
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
     enrichment = utils.calculate_enrichment(pred_df, go_df)
+    # A is the number of proteins of the network annotated to the term, which is what
+    # every figure below sizes its marks by
+    enrichment = enrichment.rename(columns={'A': 'n_proteins'})
 
     return enrichment
 
 
-def get_enrichment_summary(enrichment_df, ontology_df):
-    df = ontology_df[(ontology_df['parent'].isin(enrichment_df['go_term'])) & (ontology_df['child'].isin(enrichment_df['go_term']))]
-    df = pd.merge(df.rename({'child':'go_term'}, axis=1), enrichment_df[['go_term', 'odds_ratio', 'fdr_bh']], on='go_term')
-    fig = px.treemap(df, path=['parent', 'go_term'], values='odds_ratio', height=900, hover_data=['fdr_bh', 'odds_ratio'])
+def prepare_enrichment_view(enrichment_df):
+    '''
+    The columns the enrichment figures are drawn from: a plottable odds ratio (Fisher's
+    exact test returns an infinite ratio for a term whose proteins are all in the
+    network) and significance as -log10(FDR), which is what makes the significant terms
+    spread out instead of piling up against zero.
+    '''
+    view = enrichment_df.copy()
+    odds = pd.to_numeric(view['odds_ratio'], errors='coerce')
+    finite = odds[np.isfinite(odds)]
+    # an infinite ratio is drawn at the largest one that can be drawn, and said so in
+    # the hover, rather than dropped: those terms are the strongest results
+    cap = finite.max() if not finite.empty else 1.0
+    view['capped'] = ~np.isfinite(odds)
+    view['odds_ratio_plot'] = odds.where(np.isfinite(odds), cap).clip(lower=np.nextafter(0, 1))
+    fdr = pd.to_numeric(view['fdr_bh'], errors='coerce')
+    smallest = fdr[fdr > 0].min()
+    floor = smallest if pd.notna(smallest) else GO_MIN_FDR
+    view['significance'] = -np.log10(fdr.clip(lower=max(floor, GO_MIN_FDR)))
+
+    return view
+
+
+def wrap_term(term):
+    '''A GO term name broken over as many lines as it takes to fit beside an axis.'''
+    return '<br>'.join(textwrap.wrap(str(term), width=GO_LABEL_WRAP_WIDTH)) or str(term)
+
+
+def style_go_axes(fig):
+    '''The grid and axes of the enrichment figures are a background to read the marks
+    against, not lines to be read themselves.'''
+    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                      font_color=LABEL_FONT_COLOR,
+                      margin=dict(l=10, r=10, t=10, b=40), hovermode='closest')
+    fig.update_xaxes(gridcolor=GO_GRID_COLOR, zeroline=False, linecolor=GO_AXIS_COLOR,
+                     ticks='outside', tickcolor=GO_AXIS_COLOR, automargin=True)
+    fig.update_yaxes(gridcolor=GO_GRID_COLOR, zeroline=False, linecolor=GO_AXIS_COLOR,
+                     automargin=True)
 
     return fig
 
-def generate_graph(df, score, annotations=None):
+
+def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
+    '''
+    The enriched processes as a ranked dot plot: the most significant terms, named on
+    the axis, placed by odds ratio, sized by how many proteins of the network carry
+    them and shaded by significance.
+    '''
+    view = prepare_enrichment_view(enrichment_df)
+    view = view.nsmallest(top_n, 'fdr_bh').sort_values('odds_ratio_plot')
+    view['label'] = view['go_term'].map(wrap_term)
+    view['odds_ratio_text'] = np.where(view['capped'], 'infinite (all proteins in the network)',
+                                       view['odds_ratio_plot'].map('{:.1f}'.format))
+
+    fig = px.scatter(view, x='odds_ratio_plot', y='label', size='n_proteins',
+                     color='significance', color_continuous_scale=GO_SEQUENTIAL,
+                     size_max=26,
+                     custom_data=['go_term', 'odds_ratio_text', 'n_proteins', 'fdr_bh'])
+    fig.update_traces(marker=dict(line=dict(color=NETWORK_BACKGROUND, width=1.5)),
+                      hovertemplate='<b>%{customdata[0]}</b><br>'
+                                    'Odds ratio: %{customdata[1]}<br>'
+                                    'Proteins in the network: %{customdata[2]}<br>'
+                                    'FDR: %{customdata[3]:.2e}<extra></extra>')
+    fig.update_xaxes(type='log', title='Odds ratio')
+    fig.update_yaxes(title=None, showgrid=True, ticksuffix='  ')
+    fig.update_coloraxes(colorbar=dict(title='-log<sub>10</sub> FDR', thickness=12,
+                                       outlinewidth=0, len=0.6))
+    # one row of the plot is one process, so the canvas grows with the number of them
+    # instead of squeezing the names together
+    fig.update_layout(height=max(260, 90 + 34 * len(view)))
+
+    return style_go_axes(fig)
+
+
+def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
+    '''
+    Every tested process, significant or not: effect size against significance, with
+    the terms that pass the chosen FDR picked out of the ones that do not.
+    '''
+    selected_terms = set(selected_terms or [])
+    view = prepare_enrichment_view(enrichment_df)
+    view['log2_odds'] = np.log2(view['odds_ratio_plot'])
+    view['significant'] = view['fdr_bh'] <= fdr
+    view['odds_ratio_text'] = np.where(view['capped'], 'infinite (all proteins in the network)',
+                                       view['odds_ratio_plot'].map('{:.1f}'.format))
+
+    fig = pgo.Figure()
+    # the marks are scaled by area from a reference shared by the three groups, so a dot
+    # means the same number of proteins wherever it sits
+    sizeref = 2.0 * view['n_proteins'].max() / (17.0 ** 2)
+    groups = [('Not significant', view[~view['significant']], MUTED_COLOR),
+              ('Significant', view[view['significant'] & ~view['go_term'].isin(selected_terms)],
+               EDGE_ACCENT_COLOR),
+              ('Selected', view[view['go_term'].isin(selected_terms)], HIGHLIGHT_COLOR)]
+    for name, group, color in groups:
+        if group.empty:
+            continue
+        fig.add_trace(pgo.Scatter(
+            x=group['log2_odds'], y=group['significance'], mode='markers', name=name,
+            marker=dict(color=color, size=group['n_proteins'], sizemode='area',
+                        sizeref=sizeref, sizemin=4,
+                        line=dict(color=NETWORK_BACKGROUND, width=1.2)),
+            customdata=np.stack([group['go_term'], group['odds_ratio_text'],
+                                 group['n_proteins'], group['fdr_bh']], axis=-1),
+            hovertemplate='<b>%{customdata[0]}</b><br>'
+                          'Odds ratio: %{customdata[1]}<br>'
+                          'Proteins in the network: %{customdata[2]}<br>'
+                          'FDR: %{customdata[3]:.2e}<extra></extra>'))
+
+    # the few most significant terms are named on the plot, so the shape of the cloud
+    # can be read without pointing at it
+    labelled = view[view['go_term'].isin(selected_terms)] if selected_terms else \
+        view[view['significant']].nsmallest(label_n, 'fdr_bh')
+    for i, (_, row) in enumerate(labelled.head(label_n).iterrows()):
+        # the labels are staggered left and right so that the names of two terms of
+        # nearly the same significance do not land on top of each other
+        side = 1 if i % 2 == 0 else -1
+        fig.add_annotation(x=row['log2_odds'], y=row['significance'],
+                           text=textwrap.shorten(row['go_term'], width=34, placeholder='…'),
+                           showarrow=True, arrowhead=0, arrowwidth=1,
+                           arrowcolor=GO_AXIS_COLOR, ax=24 * side, ay=-16 - 12 * (i % 3),
+                           xanchor='left' if side > 0 else 'right',
+                           font=dict(size=11, color=LABEL_FONT_COLOR), align='left')
+
+    fig.add_hline(y=-np.log10(fdr), line_dash='dot', line_color=GO_AXIS_COLOR,
+                  annotation_text=f'FDR {fdr}', annotation_position='top left',
+                  annotation_font=dict(size=11, color=GO_AXIS_COLOR))
+    fig.update_xaxes(title='log<sub>2</sub> odds ratio')
+    fig.update_yaxes(title='-log<sub>10</sub> FDR', rangemode='nonnegative')
+    fig.update_layout(height=450, legend=dict(orientation='h', yanchor='bottom', y=1.02,
+                                              x=0, title=None))
+
+    return style_go_axes(fig)
+
+
+@st.cache_data(show_spinner=False)
+def load_ontology_parents(data_dir):
+    '''child term -> its parent terms, the shape the ontology is walked upward in.'''
+    ontology = load_ontology(data_dir)
+
+    return ontology.groupby('child')['parent'].apply(list).to_dict()
+
+
+def nearest_enriched_ancestors(terms, parents_of):
+    '''
+    For each enriched term, the closest term above it in the ontology that is also
+    enriched, so the processes can be nested in each other. Terms with no enriched
+    ancestor sit at the top level. The ontology is a graph rather than a tree -- a term
+    can have several parents -- so it is walked breadth-first and the first enriched
+    level reached wins.
+    '''
+    enriched = set(terms)
+    ancestors = {}
+    for term in terms:
+        seen = {term}
+        frontier = [p for p in parents_of.get(term, []) if p != term]
+        found = ''
+        while frontier:
+            hits = sorted({p for p in frontier if p in enriched})
+            if hits:
+                found = hits[0]
+                break
+            next_frontier = []
+            for node in frontier:
+                if node in seen:
+                    continue
+                seen.add(node)
+                next_frontier.extend(parents_of.get(node, []))
+            frontier = [n for n in next_frontier if n not in seen]
+        ancestors[term] = found
+
+    # two terms can end up as each other's ancestor if the ontology holds a cycle;
+    # a treemap cannot be drawn from one, so the loop is cut at the top
+    for term in terms:
+        walked = {term}
+        node = ancestors[term]
+        while node:
+            if node in walked:
+                ancestors[term] = ''
+                break
+            walked.add(node)
+            node = ancestors.get(node, '')
+
+    return ancestors
+
+
+def get_enrichment_summary(enrichment_df, parents_of):
+    '''
+    The enriched processes nested in the ontology: each term sits inside the closest
+    enriched term above it, and the area of a block is the number of proteins of the
+    network annotated to it.
+    '''
+    view = prepare_enrichment_view(enrichment_df).drop_duplicates(subset='go_term')
+    terms = view['go_term'].tolist()
+    ancestors = nearest_enriched_ancestors(terms, parents_of)
+    odds_text = np.where(view['capped'], 'infinite',
+                         view['odds_ratio_plot'].map('{:.1f}'.format))
+    fdr_text = view['fdr_bh'].map('{:.2e}'.format)
+    significance = view['significance']
+    # the darker half of the colour ramp is too dark to write the term name on in ink
+    span = significance.max() - significance.min()
+    midpoint = significance.min() + span / 2 if span > 0 else np.inf
+    text_colors = np.where(significance > midpoint, '#ffffff', LABEL_FONT_COLOR)
+
+    # the root is drawn behind every block, and plotly paints a sector it has no colour
+    # value for in a hard grey -- the frame that used to sit around the whole treemap.
+    # It is given the palest step of the ramp, and the scale is pinned to the terms so
+    # that the root cannot shift it
+    fig = pgo.Figure(pgo.Treemap(
+        ids=[GO_TREEMAP_ROOT_ID] + terms,
+        # unwrapped: a block draws its name on one line and drops it when it does not
+        # fit, which keeps the header of a group readable instead of hiding it
+        labels=[GO_TREEMAP_ROOT_LABEL] + terms,
+        parents=[''] + [ancestors[t] or GO_TREEMAP_ROOT_ID for t in terms],
+        values=[0] + view['n_proteins'].tolist(),
+        # a parent term keeps its own proteins on top of those of the terms nested in it
+        branchvalues='remainder',
+        marker=dict(colors=[significance.min()] + significance.tolist(),
+                    colorscale=GO_SEQUENTIAL,
+                    cmin=significance.min(), cmax=significance.max(),
+                    line=dict(color=NETWORK_BACKGROUND, width=2),
+                    colorbar=dict(title='-log<sub>10</sub> FDR', thickness=12,
+                                  outlinewidth=0, len=0.6)),
+        customdata=[[GO_TREEMAP_ROOT_LABEL, '--', '--', '--']] +
+                   np.stack([view['go_term'], odds_text,
+                             view['n_proteins'].astype(str), fdr_text], axis=-1).tolist(),
+        hovertemplate='<b>%{customdata[0]}</b><br>'
+                      'Odds ratio: %{customdata[1]}<br>'
+                      'Proteins in the network: %{customdata[2]}<br>'
+                      'FDR: %{customdata[3]}<extra></extra>',
+        insidetextfont=dict(color=[LABEL_FONT_COLOR] + text_colors.tolist()),
+        # a network can be enriched for several hundred terms, which at full depth are
+        # slivers too small to read. Three levels of processes are drawn at a time (the
+        # root is the fourth) and the rest is reached by clicking into a block
+        maxdepth=4,
+        pathbar=dict(visible=True, side='top', thickness=22),
+        tiling=dict(pad=2)))
+    fig.update_layout(height=700, margin=dict(l=0, r=0, t=10, b=10),
+                      font_color=LABEL_FONT_COLOR, paper_bgcolor='rgba(0,0,0,0)',
+                      # a name that does not fit its block is left out rather than
+                      # shrunk to an unreadable size
+                      uniformtext=dict(minsize=9, mode='hide'))
+
+    return fig
+
+def generate_graph(df, score, annotations=None, surface_calls=None):
     if df.empty:
         return nx.Graph()
 
@@ -315,7 +625,7 @@ def generate_graph(df, score, annotations=None):
     nx.set_node_attributes(G, shapes, 'shape')
     if annotations is not None:
         nx.set_node_attributes(G, generate_node_labels(df, annotations), 'label')
-        nx.set_node_attributes(G, generate_node_titles(df, annotations), 'title')
+        nx.set_node_attributes(G, generate_node_titles(df, annotations, surface_calls), 'title')
     centrality = nx.betweenness_centrality(G, weight='weight')
     max_centrality = max(centrality.values(), default=0)
     sizes = {}
@@ -500,6 +810,12 @@ with col2:
     else:
         df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
+        # where DeepLoc puts each host protein, carried on the predictions so the filter
+        # below, the table and the network all read the same call
+        surface_calls = get_surface_calls(data_dir)
+        if not surface_calls.empty:
+            df_select = df_select.assign(
+                target_surface=df_select['target'].map(surface_calls['surface']))
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
         tissues_options = generate_tissue_filters(df_select)
@@ -507,15 +823,40 @@ with col2:
             selected_tissues = st.multiselect('Select tissues to filter the predicted PPI', tissues_options)
             if len(selected_tissues) > 0:
                 df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
-                cell_type_options = generate_cell_type_filters(df_select)
-                if len(cell_type_options) > 0:
-                    selected_cell_types = st.multiselect('Select cell type to filter the predicted PPI', cell_type_options)
-                    if len(selected_cell_types) > 0 :
-                        df_select = df_select[df_select['Cell type'].isin(selected_cell_types)]
 
+        # the cell types are offered on their own rather than only after a tissue has been
+        # picked: a cell type belongs to one tissue anyway, so choosing one is choosing its
+        # tissue as well, and someone after a cell type had to find its tissue first to be
+        # allowed to ask for it. Picking tissues first narrows what is offered here, since
+        # the options are read off whatever is left of the predictions
+        cell_type_options = generate_cell_type_filters(df_select)
+        if len(cell_type_options) > 0:
+            selected_cell_types = st.multiselect(
+                'Select cell types to filter the predicted PPI', cell_type_options,
+                help='The single cell annotation is human, so this is offered for human '
+                     'host proteins alone. A host protein with no cell type annotation is '
+                     'left out once a cell type is chosen.')
+            if len(selected_cell_types) > 0:
+                df_select = df_select[df_select['Cell type'].isin(selected_cell_types)]
+
+        # localisation is independent of the tissue, so it filters beside the tissues
+        # rather than inside them: a host protein is on the cell surface or in the space
+        # around it wherever it is expressed
+        surface_options = generate_surface_filters(df_select)
+        if len(surface_options) > 0:
+            selected_surface = st.multiselect(
+                'Select where DeepLoc places the host proteins', surface_options,
+                help='The host proteins are in the predictions because DeepLoc called them '
+                     'surface-exposed: on the membrane of the host cell, or extracellular -- '
+                     'in the matrix and the fluid around it. Filtering to one of the two '
+                     'leaves the interactions that can take place there, and drops any '
+                     'parasite protein left with nothing to bind.')
+            if len(selected_surface) > 0:
+                df_select = df_select[df_select['target_surface'].isin(selected_surface)]
 
         # Create networkx graph object from pandas dataframe
-        G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir))
+        G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir),
+                           surface_calls)
             
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
 
@@ -618,7 +959,8 @@ with st.container():
         table = generate_interactions_table(df_select, score,
                                             web_utils.load_protein_annotations(data_dir))
         st.caption('One row per predicted interaction, with the tissues the host protein '
-                   'is expressed in gathered into one cell.')
+                   'is expressed in gathered into one cell and the DeepLoc class it was '
+                   'kept in the predictions for beside them.')
         gb = GridOptionsBuilder.from_dataframe(table)
         gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
         gb.configure_side_bar() #Add a sidebar
@@ -646,7 +988,7 @@ with st.container():
             fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
             st.text(f"Terms enriched: {len(enrichment[enrichment['fdr_bh'] <= fdr]['go_term'].values.tolist())}")
             st.text("Select GO terms to get more details")
-            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][['go_term', 'p_value', 'odds_ratio', 'fdr_bh']]
+            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][['go_term', 'n_proteins', 'odds_ratio', 'p_value', 'fdr_bh']]
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
             gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
             gb.configure_side_bar() #Add a sidebar
@@ -670,31 +1012,41 @@ with st.container():
         else:
             st.subheader("No GO terms where found enriched")
 
-go1, go2 = st.columns(2)
 with st.container():
-    if enrichment_table is not None:
+    if enrichment_table is not None and enrichment_table.empty:
+        st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
+                "to see the processes that are enriched less strongly.")
+    elif enrichment_table is not None:
         enrichment_viz = enrichment_table
         if selected_rows is not None and len(selected_rows) > 0:
             selected_terms = selected_rows['go_term'].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 
-        with go1:
-            fig = px.scatter(enrichment_viz, x='fdr_bh', y='odds_ratio', 
-                size='odds_ratio', color='go_term', height=450, 
-                labels = {'fdr_bh':'FDR BH', 'odds_ratio': 'Odds ratio'})
-            fig.update_traces(showlegend=False)
-            st.subheader("Enriched Biological Processes -- Odds ratio vs FDR")
-            st.caption('Biological processes over-represented among the host proteins of the '
-                       'network. A process is the more enriched the higher up it sits (odds '
-                       'ratio) and the more significant the further left (FDR).')
-            st.plotly_chart(fig, width='stretch', height=400)
-        with go2:
+        st.subheader("Enriched Biological Processes")
+        ranked_tab, volcano_tab = st.tabs(["Ranked processes", "All tested processes"])
+        with ranked_tab:
+            st.caption(f'The {GO_TOP_N} most significant biological processes over-represented '
+                       'among the host proteins of the network, placed by how strongly they are '
+                       'over-represented (odds ratio), sized by how many proteins of the network '
+                       'carry them and shaded by significance. Select rows in the table above to '
+                       'narrow this down to the processes of interest.')
+            st.plotly_chart(get_enrichment_dotplot(enrichment_viz), width='stretch')
+        with volcano_tab:
+            st.caption('Every process tested against the network, significant or not: effect '
+                       'size to the right, significance upward, and the processes passing the '
+                       'chosen FDR picked out of the ones that do not.')
+            st.plotly_chart(get_enrichment_volcano(enrichment, fdr, selected_terms),
+                            width='stretch')
+
+        with st.container():
             if len(selected_terms) > 0:
                 if enrichment is not None:
                     highlighted_nodes = enrichment[enrichment['go_term'].isin(selected_terms)]['nodes'].values
                     highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
                     highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
-                    G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir))
+                    G = generate_graph(df_select, score,
+                                       web_utils.load_protein_annotations(data_dir),
+                                       surface_calls)
                     nx.set_node_attributes(G, MUTED_COLOR, 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
                     # Initiate PyVis network object
@@ -719,11 +1071,13 @@ with st.container():
                         mime='text/html',
                     )
         
-        fig = get_enrichment_summary(enrichment_table, load_ontology(data_dir))
+        fig = get_enrichment_summary(enrichment_table, load_ontology_parents(data_dir))
         st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")
-        st.caption('The enriched processes arranged by the Gene Ontology hierarchy, each nested '
-                   'in its parent term and sized by its odds ratio, so related processes are read '
-                   'together rather than as a list. Click a block to zoom in.')
+        st.caption('All the enriched processes arranged by the Gene Ontology hierarchy: each one '
+                   'sits inside the closest process above it that is also enriched, its area is '
+                   'the number of proteins of the network annotated to it and its shade is its '
+                   'significance, so related processes are read together rather than as a list. '
+                   'Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")

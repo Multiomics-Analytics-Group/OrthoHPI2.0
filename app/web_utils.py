@@ -1,4 +1,6 @@
 import os
+import numpy as np
+import pandas as pd
 import streamlit as st
 from streamlit_option_menu import option_menu
 import utils
@@ -102,6 +104,58 @@ def load_protein_annotations(data_dir):
     return dict(annotations[['protein', 'description']].values)
 
 
+@st.cache_data(show_spinner=False)
+def load_deeploc_localisations(data_dir):
+    '''
+    Where DeepLoc 2 predicts each protein of the predictions sits, keyed by STRING id,
+    written by pipeline/build_deeploc_localisations.py. The pipeline reads the same
+    predictions as a filter and keeps only the verdict, so this is what is left of the
+    probabilities behind it. The snapshot data directories predate that script, so a
+    missing file only leaves the localisations out of the figures that show them.
+
+    :param str data_dir: directory holding deeploc_localisations.parquet
+    :return: dataframe of protein, localizations, signals, membrane_types,
+             extracellular, cell_membrane; empty if the file is not there
+    '''
+    input_file = os.path.join(data_dir, 'deeploc_localisations.parquet')
+    if not os.path.exists(input_file):
+        return pd.DataFrame(columns=['protein', 'localizations', 'signals', 'membrane_types',
+                                     'extracellular', 'cell_membrane'])
+
+    return utils.read_parquet_file(input_file=input_file)
+
+
+# the DeepLoc 2 (Accurate) probabilities a host protein is kept as surface-exposed on,
+# the same cut-offs the pipeline filters with (pipeline/main.py). They are read in the app
+# to say which of the two reasons a protein was kept for, not to filter anything again
+DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
+DEEPLOC_EXTRACELLULAR_CUTOFF = 0.61728516
+# the two ways of being surface-exposed, and what a protein over neither cut-off is called
+CELL_MEMBRANE = 'Cell membrane'
+EXTRACELLULAR = 'Extracellular'
+NOT_SURFACE = 'Neither'
+
+
+def classify_surface(localisations):
+    '''
+    Which of the two surface classes DeepLoc puts each protein in.
+
+    A protein over both cut-offs is called extracellular: the few there are (two of the
+    human ones, the laminins LAMA1 and LAMB2, each barely over the membrane cut-off) do
+    not earn a third class in every figure that shows one. A protein over neither is
+    NOT_SURFACE -- on the host side that is a host the filter was never run for, or a
+    data directory built with other cut-offs; on the parasite side it is ordinary, since
+    parasite proteins are selected by the secretome filter and not by DeepLoc.
+
+    :param localisations: DeepLoc table, as load_deeploc_localisations returns it
+    :return: series of class names, aligned to the rows of the table
+    '''
+    return pd.Series(np.select([localisations['extracellular'] >= DEEPLOC_EXTRACELLULAR_CUTOFF,
+                                localisations['cell_membrane'] >= DEEPLOC_MEMBRANE_CUTOFF],
+                               [EXTRACELLULAR, CELL_MEMBRANE], default=NOT_SURFACE),
+                     index=localisations.index)
+
+
 def get_host_groups(config, predictions):
     '''
     Maps each host group offered in the app to the taxids it covers. Hosts sharing a
@@ -175,7 +229,7 @@ def filter_tissues(config, df):
 def footer():
     st.write("Developed with data from:")
 
-    cols = st.columns(6)
+    cols = st.columns(5)
     with cols[0]:
         st.image('images/eggnog.png', width=200)
     with cols[1]:
@@ -185,8 +239,6 @@ def footer():
     with cols[3]:
         st.image('images/tissues.png', width=200)
     with cols[4]:
-        st.markdown("[DeepLoc 2.0](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/)")
-    with cols[5]:
         st.image('images/ebi.png', width=200)
 
     st.write("Code available at: https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0")

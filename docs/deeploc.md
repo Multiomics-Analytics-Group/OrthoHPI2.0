@@ -3,6 +3,9 @@
 DeepLoc predicts subcellular localization and is run on a GPU, outside
 `pipeline/main.py`, in its own venv. Two consumers: the parasite secretome
 filter and the host surface filter ([pipeline.md](pipeline.md) steps 3 and 5).
+A third keeps the probabilities for the app — `build_deeploc_localisations.py`,
+run after the main pipeline, which is where the shape of the dots in the
+shared-interactors matrix of the "Parasites in a host" page comes from.
 
 ## Scripts
 
@@ -12,6 +15,7 @@ filter and the host surface filter ([pipeline.md](pipeline.md) steps 3 and 5).
 | `deeploc/generate_hpc_jobs.py` | `config.yml` | `jobs/{fast,accurate}/{taxid}_{label}.sh` |
 | *(DeepLoc on the HPC)* | `WORK_DIR/data/{taxid}.fasta` | `WORK_DIR/data/deeploc_output_accurate/{taxid}/results_*.csv` |
 | `deeploc/build_secretome_fastas.py` | results CSVs | `data/secretome/{taxid}.fasta` (parasites) |
+| `pipeline/build_deeploc_localisations.py` | results CSVs + `predictions.parquet` | `data/deeploc_localisations.parquet` (app) |
 
 Host results need no post-processing — copy the output dirs to
 `data/deeploc/output_accurate/deeploc_output_accurate/{taxid}/` and

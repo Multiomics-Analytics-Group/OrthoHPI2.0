@@ -3,6 +3,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import web_utils
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -26,6 +27,20 @@ UNKNOWN_COLOR = '#999999'
 # are sized as if every host had at least this many parasites. Human has 35 against the
 # two of pig, and strictly proportional columns leave pig a strip its labels overrun.
 MIN_COLUMN = 4
+# share of the height of a figure taken by the strip of taxonomic group under its columns.
+# Enough to read as a band of colour, not enough to be read as a quantity of its own
+BAND_HEIGHT = 0.06
+# and the share of it left blank between the columns and that strip
+BAND_GAP = 0.04
+# the two surface classes of the secretion figure, as two shades of the blue the page is
+# headed in: the bar is one whole split in two, which two shades of a hue say and two
+# hues do not. They are also outside the palette of the taxonomic groups in the strip
+# under the columns, so neither is read as a clade
+SURFACE_COLORS = {'Extracellular': '#a6bddb', 'Cell membrane': '#045a8d'}
+# and what to outline a box of that class in, where the class is drawn as a box rather than
+# as a bar: the pale shade is a fill and an outline drawn in it on a white background is an
+# outline the reader has to look for
+SURFACE_LINE_COLORS = {'Extracellular': '#3690c0', 'Cell membrane': '#045a8d'}
 
 
 def short_name(parasite):
@@ -67,13 +82,16 @@ def get_overview_predictions(data_dir, config):
     return df
 
 
-def host_columns(df):
+def host_columns(df, band=False):
     '''
-    The skeleton both figures are drawn on: one column per host, as wide as the number of
+    The skeleton the figures are drawn on: one column per host, as wide as the number of
     parasites infecting it, sharing a y axis so a bar or a box can be compared straight
     across the hosts rather than only within one.
 
     :param df: overview predictions, as get_overview_predictions builds them
+    :param bool band: leave a shallow row under the columns for a strip of the taxonomic
+                      group of each parasite, for a figure whose bars carry a colour of
+                      their own and cannot also carry the group
     :return: (figure, [(host, its predictions, its parasites in axis order), ...])
     '''
     hosts = []
@@ -84,12 +102,45 @@ def host_columns(df):
         hosts.append((host, host_df, parasites['name'].tolist()))
 
     widths = [max(len(names), MIN_COLUMN) for _, _, names in hosts]
-    figure = make_subplots(rows=1, cols=len(hosts), shared_yaxes=True,
+    figure = make_subplots(rows=2 if band else 1, cols=len(hosts), shared_yaxes=True,
                            column_widths=[w / sum(widths) for w in widths],
+                           # the titles fill the top row, which is the row of the figure
                            subplot_titles=[host for host, _, _ in hosts],
-                           horizontal_spacing=0.02)
+                           row_heights=[1 - BAND_HEIGHT, BAND_HEIGHT] if band else None,
+                           # enough of a gap that the strip is read as a second thing about
+                           # the columns rather than as the foot of the columns themselves
+                           vertical_spacing=BAND_GAP, horizontal_spacing=0.02)
 
     return figure, hosts
+
+
+def add_group_band(figure, hosts, palette, labelled):
+    '''
+    The strip of taxonomic group under each column, one segment per parasite in the colour
+    the other figures of the page draw that group in. The segments touch, so the strip
+    reads as a strip and the clades under a column are blocks rather than a row of bars.
+
+    The groups get a legend of their own (`legend2`), under the one naming the colours of
+    the bars: the two say different things about different parts of the figure, and in a
+    single row of entries the clades read as more of what the bars are split into.
+
+    :param figure: a figure host_columns built with band=True, modified in place
+    :param list hosts: the (host, its rows, its parasites in axis order) of host_columns
+    :param dict palette: {taxonomic group: colour}
+    :param set labelled: groups already in the legend, added to as they are drawn
+    '''
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        for group, rows in host_df.groupby('group', observed=True):
+            figure.add_trace(
+                go.Bar(x=rows['name'], y=[1] * len(rows), name=group, width=1,
+                       marker_color=palette.get(group, UNKNOWN_COLOR),
+                       legend='legend2', legendgroup=group,
+                       showlegend=group not in labelled,
+                       hovertemplate='%{x}' f'<extra>{group}</extra>'),
+                row=2, col=column)
+            labelled.add(group)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=2, col=column)
+    figure.update_yaxes(visible=False, range=[0, 1], row=2)
 
 
 def style_host_columns(figure, y_title):
@@ -102,6 +153,270 @@ def style_host_columns(figure, y_title):
     figure.update_xaxes(tickangle=-60, showgrid=False, tickfont=dict(size=11))
     figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0', zerolinecolor='#e0e0e0')
     figure.update_yaxes(title_text=y_title, row=1, col=1)
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
+def get_interactor_proteins(data_dir, config, side):
+    '''
+    One side of the predicted interactions, protein by protein, with what DeepLoc says
+    about where each protein sits: the probability that it is extracellular -- in the space
+    the two meet in -- the probability that it is on a cell membrane, and which of the two
+    classes those put it in.
+
+    `side` is 'source' for the parasite proteins each parasite reaches its host with, and
+    'target' for the host proteins they reach. Both sides went through a localisation
+    filter to get here, but not the same one: the parasite side through the secretome
+    filter, which allows a multicellular parasite nothing but secreted proteins, and the
+    host side through apply_deeploc_filter, which allows every host both classes. Only the
+    host side can therefore be read as a comparison between parasites.
+
+    One row per protein and not per interaction: a parasite protein reaching eleven host
+    proteins is one protein, not eleven. A parasite infecting two hosts has its proteins
+    counted under each, since the page compares the hosts.
+
+    :param str data_dir: directory holding predictions.parquet and the localisations
+    :param dict config: parsed configuration
+    :param str side: 'source' for the parasite proteins, 'target' for the host proteins
+    :return: one row per host, parasite and protein, or None without a localisation table
+    '''
+    localisations = web_utils.load_deeploc_localisations(data_dir)
+    if localisations.empty:
+        return None
+
+    predictions = web_utils.load_predictions(data_dir)
+    surface = localisations.assign(surface=web_utils.classify_surface(localisations))
+
+    frames = []
+    for host, taxids in web_utils.get_host_groups(config, predictions).items():
+        frame = predictions.loc[predictions['taxid2'].isin(taxids),
+                                ['taxid1_label', side]].drop_duplicates()
+        frames.append(frame.assign(host=host))
+    df = pd.concat(frames, ignore_index=True).merge(surface, left_on=side,
+                                                    right_on='protein', how='inner')
+
+    groups = {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()}
+    order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
+    df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
+    df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
+    df['name'] = df['taxid1_label'].map(short_name)
+
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def get_surface_counts(proteins):
+    '''
+    How many of each parasite's proteins fall in each of the surface classes.
+
+    The figure splits its columns over the two surface classes alone, so a parasite is
+    measured on what was called rather than on how much of the proteome the model was sure
+    about. The proteins in neither class are counted here all the same and are read in the
+    hover; a parasite with nothing in either has no column, which on the host side happens
+    to nobody -- every host protein is here because it was called one or the other.
+
+    :param proteins: the proteins of one side, as get_interactor_proteins builds them
+    :return: one row per host and parasite
+    '''
+    counts = proteins.pivot_table(index=['host', 'taxid1_label', 'name', 'group',
+                                         'group_rank'],
+                                  columns='surface', values='protein', aggfunc='count',
+                                  fill_value=0)
+    for surface_class in [web_utils.EXTRACELLULAR, web_utils.CELL_MEMBRANE,
+                          web_utils.NOT_SURFACE]:
+        if surface_class not in counts.columns:
+            counts[surface_class] = 0
+
+    return counts.reset_index()
+
+
+@st.cache_data(show_spinner=False)
+def generate_surface_split_per_parasite(df, palette):
+    '''
+    How the host proteins each parasite reaches are split between the two surface classes,
+    in the same columns and the same order as the two figures above, so the three are read
+    together.
+
+    Every column is the whole of what that parasite reaches on its host and is split in two
+    by where DeepLoc puts those proteins, so the columns are compared on the split itself
+    rather than on how many proteins a parasite reaches: a column that is nearly solid dark
+    is a parasite that docks onto the surface of the host cell, and the pale part of one is
+    what it meets in the matrix and the fluid around the cell instead. Both classes were
+    open to every host protein -- apply_deeploc_filter keeps a host protein for either --
+    so the difference between the columns is a difference between the parasites.
+
+    The colour is spent on the two classes, so the taxonomic group each parasite belongs to
+    moves to the strip under the columns and the clades of a host are read there as blocks
+    of colour.
+    '''
+    figure, hosts = host_columns(df, band=True)
+    labelled = set()
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        counted = host_df[web_utils.EXTRACELLULAR] + host_df[web_utils.CELL_MEMBRANE]
+        for surface_class in SURFACE_COLORS:
+            figure.add_trace(
+                go.Bar(x=host_df['name'], y=host_df[surface_class] / counted,
+                       name=surface_class, marker_color=SURFACE_COLORS[surface_class],
+                       customdata=host_df[[surface_class]],
+                       legendgroup=surface_class, showlegend=surface_class not in labelled,
+                       hovertemplate='%{x}<br>%{y:.0%} of the host proteins it reaches '
+                                     '(%{customdata[0]} of them)'
+                                     f'<extra>{surface_class}</extra>'),
+                row=1, col=column)
+            labelled.add(surface_class)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
+    add_group_band(figure, hosts, palette, labelled)
+
+    figure = style_host_columns(figure, 'host proteins reached')
+    # two legends, one above the other and each named, since the colours of the bars and
+    # the colours of the strip are two different keys to two different parts of the figure
+    figure.update_layout(barmode='stack', bargap=0.2, margin=dict(t=125),
+                         legend=dict(y=1.28, title_text='DeepLoc',
+                                     title_font=dict(size=11)),
+                         legend2=dict(orientation='h', yanchor='bottom', y=1.14, x=0,
+                                      title_text='taxonomic group',
+                                      title_font=dict(size=11), font=dict(size=11)))
+    figure.update_yaxes(range=[0, 1], tickformat='.0%', row=1)
+    # the names belong under the strip, which is the foot of the figure now, and a column
+    # labelled twice is a column labelled once too often. The room they need is taken off
+    # the figure rather than out of the margin, which is where the strip has pushed them
+    figure.update_xaxes(showticklabels=False, row=1)
+    figure.update_xaxes(automargin=True, row=2)
+    # and the same for the percentages down the left, which the two figures above have no
+    # room for either -- there they are a count anyone can read off the bars, here they
+    # are the scale the split is read on
+    figure.update_yaxes(automargin=True, row=1, col=1)
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
+def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_title,
+                                         point_size=2.5):
+    '''
+    The spread of the probability itself, before it is a class: one box per parasite over
+    the proteins of one surface class, in the same columns and colours as the figures above
+    it. Read within a class rather than across the whole scale, a box says how sure DeepLoc
+    was of the proteins it did call that -- a box sitting on the cut-off is a parasite whose
+    proteins only just qualified, a box near 1 one whose proteins are unambiguous.
+
+    A parasite with no protein of the class has no box, which is how the membrane figure
+    comes out as the unicellular parasites alone: the secretome filter keeps a multicellular
+    parasite's proteins for being secreted and for nothing else.
+
+    Every protein is drawn as well as summarised, jittered across the width of its box.
+    Several of these boxes stand on ten or twenty proteins, which is too few for a box to
+    be read as a distribution without seeing what is behind it. The confidence figure at
+    the top of the page keeps its points off for the opposite reason: there a point is an
+    interaction rather than a protein, and there are thousands of them to a column.
+
+    The scale starts a little below the cut-off, since nothing of the class is under it and
+    a box drawn against the whole 0 to 1 is a box flattened into the top of the figure.
+
+    :param proteins: the proteins of one surface class, as get_parasite_proteins builds them
+    :param dict palette: {taxonomic group: colour}
+    :param str score: the probability column to draw
+    :param float cutoff: the cut-off of that class, drawn as a line and the foot of the scale
+    :param str y_title: what the probability is called down the left of the figure
+    :param float point_size: diameter of a protein drawn beside its box, in pixels. The
+                             proteins are jittered across the width of the box and the box
+                             itself is left unfilled so they are read through it; a column
+                             narrower than its proteins are many comes out as a cloud rather
+                             than as points that can be counted
+    '''
+    figure, hosts = host_columns(proteins)
+    labelled = set()
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        for group, rows in host_df.groupby('group', observed=True):
+            figure.add_trace(
+                go.Box(x=rows['name'], y=rows[score], name=group,
+                       marker=dict(color=palette.get(group, UNKNOWN_COLOR),
+                                   size=point_size, opacity=0.45),
+                       line=dict(color=palette.get(group, UNKNOWN_COLOR), width=1),
+                       fillcolor='rgba(0,0,0,0)',
+                       boxpoints='all', jitter=0.8, pointpos=0,
+                       legendgroup=group, showlegend=group not in labelled,
+                       hovertemplate='%{x}<br>' f'{y_title} ' '%{y:.2f}'
+                                     f'<extra>{host}</extra>'),
+                row=1, col=column)
+            labelled.add(group)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
+
+    figure = style_host_columns(figure, y_title)
+    figure.update_yaxes(range=[cutoff - 0.05, 1], automargin=True, row=1, col=1)
+    # the names are as long as the columns are narrow, so the room they need comes off the
+    # figure rather than out of the margin they would otherwise be cut in
+    figure.update_xaxes(automargin=True)
+    figure.add_hline(y=cutoff, line_width=1, line_dash='dot', line_color='#969696')
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
+def generate_host_score_boxes(proteins, point_size=3):
+    '''
+    How sure DeepLoc was of the host proteins, one box per host and surface class.
+
+    Per host and not per parasite, which is the whole difference between this figure and
+    the two above it. The parasites of a host draw their interactors from the same few
+    hundred host proteins, so a box per parasite is a box over a sample of one pool: their
+    medians span 0.65 to 0.79 with no order to them, forty-six near-copies of the pool and
+    of each other. Per host the figure says the one thing it can say honestly -- how well
+    called the proteins the filter passed are -- and says it in four columns instead.
+
+    A host protein is counted once however many parasites reach it, since here it is a
+    protein of the host and not an interactor of anything.
+
+    The two classes carry two different probabilities, each protein scored on the class it
+    was called: the axis is how sure that call was, and the dotted line in each colour is
+    the cut-off that call was made at.
+
+    :param proteins: the host proteins, as get_interactor_proteins(side='target') builds them
+    :param float point_size: diameter of a protein drawn beside its box, in pixels
+    '''
+    scored = proteins.drop_duplicates(['host', 'protein']).copy()
+    scored = scored[scored['surface'] != web_utils.NOT_SURFACE]
+    scored['score'] = np.where(scored['surface'] == web_utils.EXTRACELLULAR,
+                               scored['extracellular'], scored['cell_membrane'])
+    # host_columns lays out one column per host and orders what is in it by group_rank;
+    # what is in a column here is the two classes rather than the parasites of that host
+    scored['name'] = scored['surface']
+    scored['taxid1_label'] = scored['surface']
+    scored['group_rank'] = scored['surface'].map(list(SURFACE_COLORS).index)
+
+    figure, hosts = host_columns(scored)
+    labelled = set()
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        # in the order the classes are stacked in the figure above, which is the order the
+        # columns are in and the order the legend should name them in
+        for surface_class in SURFACE_COLORS:
+            rows = host_df[host_df['surface'] == surface_class]
+            if rows.empty:
+                continue
+            figure.add_trace(
+                go.Box(x=rows['name'], y=rows['score'], name=surface_class,
+                       marker=dict(color=SURFACE_COLORS[surface_class], size=point_size,
+                                   opacity=0.45),
+                       line=dict(color=SURFACE_LINE_COLORS[surface_class], width=1),
+                       fillcolor='rgba(0,0,0,0)', boxpoints='all', jitter=0.8, pointpos=0,
+                       legendgroup=surface_class,
+                       showlegend=surface_class not in labelled,
+                       hovertemplate='%{x}<br>P %{y:.2f}' f'<extra>{host}</extra>'),
+                row=1, col=column)
+            labelled.add(surface_class)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
+
+    figure = style_host_columns(figure, 'P(the class it was called)')
+    figure.update_yaxes(range=[web_utils.DEEPLOC_MEMBRANE_CUTOFF - 0.05, 1], automargin=True,
+                        row=1, col=1)
+    figure.update_xaxes(tickangle=0, automargin=True)
+    for surface_class, cutoff in [(web_utils.EXTRACELLULAR,
+                                   web_utils.DEEPLOC_EXTRACELLULAR_CUTOFF),
+                                  (web_utils.CELL_MEMBRANE,
+                                   web_utils.DEEPLOC_MEMBRANE_CUTOFF)]:
+        figure.add_hline(y=cutoff, line_width=1, line_dash='dot',
+                         line_color=SURFACE_LINE_COLORS[surface_class])
 
     return figure
 
@@ -193,8 +508,73 @@ st.caption('How well supported those interactions are: the box spans the middle 
            'experimental and database evidence rather than on a single weak source.')
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette), width='stretch')
 
-# the DeepLoc figures -- where the host proteins that survived the localisation filter sit
-# in the cell -- belong here, once data/deeploc is summarised into the app's data directory
+host_proteins = get_interactor_proteins(data_dir, config, 'target')
+parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
+if host_proteins is not None:
+    st.subheader("What Each Parasite Reaches on the Host")
+    st.caption('Where DeepLoc 2 predicts the host proteins behind those interactions sit. Each '
+               'column is the whole of what one parasite reaches on its host, split between the '
+               'proteins called cell membrane -- the surface of the host cell -- and those '
+               'called extracellular, met in the matrix and the fluid around it. The strip under '
+               'the columns is the taxonomic group, in the colours the two figures above use, '
+               'and the split follows it: the intracellular protozoa dock almost entirely onto '
+               'the host cell surface, while a fifth to a half of what the worms reach is '
+               'extracellular -- the laminins, collagens and other matrix proteins. A host '
+               'protein could qualify as either class, so this is a difference between the '
+               'parasites and not an artefact of how the proteins were selected.')
+    st.plotly_chart(generate_surface_split_per_parasite(get_surface_counts(host_proteins),
+                                                        parasite_palette), width='stretch')
+
+    st.subheader("How Sure DeepLoc Is of the Host Proteins")
+    st.caption('How well called the host proteins of that split are: each protein is scored on '
+               'the class it was put in, the box spans the middle half of those probabilities '
+               'and the dotted line in each colour is the cut-off that class was called at. '
+               'This one is per host rather than per parasite, because the parasites of a host '
+               'draw their interactors from the same few hundred proteins -- a box per parasite '
+               'would be forty-six near-copies of the same pool. A host protein is counted once '
+               'here however many parasites reach it. The extracellular calls are the surer of '
+               'the two throughout, and the membrane calls sit closer to their cut-off, which '
+               'is the usual shape of a multi-label model asked for a single compartment.')
+    st.plotly_chart(generate_host_score_boxes(host_proteins), width='stretch')
+
+if parasite_proteins is not None:
+    st.subheader("How Sure DeepLoc Is of the Secreted Parasite Proteins")
+    st.caption('The other side of the interaction, and how well predicted it is. The parasite '
+               'proteins were selected for being secreted, so what is worth asking of them is '
+               'not which class they fall in but how sure the model was: the box spans the '
+               "middle half of the probabilities DeepLoc gives that parasite's extracellular "
+               'proteins of being extracellular, the line across it is the median and the '
+               'dotted line is the cut-off they were called on. A box sitting on the line is a '
+               'parasite whose proteins only just qualified, a box near 1 one whose proteins '
+               'are unambiguously secreted. Every protein is drawn as a dot behind its box; '
+               'where a parasite has a hundred or more of them the dots are a cloud rather '
+               'than a protein each, and are read as density.')
+    st.plotly_chart(
+        generate_surface_scores_per_parasite(
+            parasite_proteins[parasite_proteins['surface'] == web_utils.EXTRACELLULAR],
+            parasite_palette, 'extracellular', web_utils.DEEPLOC_EXTRACELLULAR_CUTOFF,
+            # forty-five columns to a row and up to a hundred and eighty proteins in one of
+            # them, so the smallest dot that still carries colour
+            'P(extracellular)', point_size=2),
+        width='stretch')
+
+    st.subheader("How Sure DeepLoc Is of the Membrane Parasite Proteins")
+    st.caption('The same for the parasite proteins called cell membrane instead, scored on '
+               'that probability. Only the unicellular parasites appear -- the secretome filter '
+               "keeps a multicellular one's proteins for being secreted and for nothing else, "
+               'so the helminths and the tick have no membrane proteins to summarise, and the '
+               'handful the filter let through just under the cut-off, on a threshold of its '
+               'own that is a little lower, are left out. Every protein is drawn as a dot '
+               'behind its box, which several of these boxes need: a box over the six proteins '
+               'of C. parvum, or the one of V. corneae, is not a distribution.')
+    st.plotly_chart(
+        generate_surface_scores_per_parasite(
+            parasite_proteins[parasite_proteins['surface'] == web_utils.CELL_MEMBRANE],
+            parasite_palette, 'cell_membrane', web_utils.DEEPLOC_MEMBRANE_CUTOFF,
+            # a third of the parasites and a fifth of the proteins of the figure above, so
+            # the columns are wide enough for the proteins to be told apart
+            'P(cell membrane)', point_size=3),
+        width='stretch')
 
 st.markdown("---")
 

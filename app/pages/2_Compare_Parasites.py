@@ -52,6 +52,23 @@ CELL = 22
 # one, and the figures follow.
 MATRIX_COLUMN = 900
 CIRCOS_COLUMN = 750
+# marker each surface class is drawn with in the shared-interactors matrix, and the order
+# they are offered in the legend. Colour there is already the parasite's taxonomic group
+# and size is the degree, so the localisation of the host protein goes on the shape --
+# constant down a row, since it is a property of the protein and not of the interaction.
+# NO_LOCALISATION is a protein DeepLoc was never run on, or one whose data directory
+# predates pipeline/build_deeploc_localisations.py
+NO_LOCALISATION = 'Not available'
+# All of them filled: the dots are drawn without an outline, which is what an open
+# symbol is made of
+SURFACE_SYMBOLS = {web_utils.CELL_MEMBRANE: 'circle', web_utils.EXTRACELLULAR: 'diamond',
+                   web_utils.NOT_SURFACE: 'square', NO_LOCALISATION: 'cross'}
+# grey the surface classes are drawn in the legend in. The markers on the plot carry the
+# colour of the parasite's group, so a colour here would say the class had one
+SURFACE_LEGEND_COLOR = '#525252'
+# names the DeepLoc columns are read under in the hover of the shared-interactors matrix
+DEEPLOC_LABELS = {'surface': 'DeepLoc', 'cell_membrane': 'P(cell membrane)',
+                  'extracellular': 'P(extracellular)', 'localizations': 'localisations'}
 
 
 @st.cache_data(show_spinner=False)
@@ -462,8 +479,45 @@ def label_proteins(df_pred, annotations):
     return labels
 
 
+def summarise_localisations(df_pred, localisations):
+    '''
+    The DeepLoc call of each host protein of the matrix, keyed by the gene symbol the
+    rows are drawn under rather than by the STRING id DeepLoc wrote it against.
+
+    A host protein reaches this page only because DeepLoc called it surface-exposed, but
+    the two ways of being surface-exposed are not the same interaction: a cell membrane
+    protein is met on the surface of the host cell, an extracellular one is met in the
+    fluid around it. Which of the two a protein was kept for is web_utils.classify_surface,
+    which the home page reads the parasite proteins with.
+
+    A host group covering two species (Rodent is rat and mouse) carries the same gene
+    under an id of each and those are one row of the matrix, so the id DeepLoc is most
+    sure is surface-exposed is the one the row is described by.
+
+    :param df_pred: tissue-expressed predictions of the host group
+    :param localisations: DeepLoc table written by pipeline/build_deeploc_localisations.py
+    :return: dataframe indexed by gene symbol, or None if there are no localisations
+    '''
+    if localisations is None or localisations.empty:
+        return None
+
+    proteins = df_pred[['target', 'target_name']].drop_duplicates()
+    called = proteins.merge(localisations, left_on='target', right_on='protein', how='inner')
+    if called.empty:
+        return None
+
+    called['best'] = called[['cell_membrane', 'extracellular']].max(axis=1)
+    called = called.sort_values('best', ascending=False, kind='stable')
+    called = called.drop_duplicates('target_name').set_index('target_name')
+
+    called['surface'] = web_utils.classify_surface(called)
+
+    return called[['surface', 'cell_membrane', 'extracellular', 'localizations']]
+
+
 @st.cache_data(show_spinner=False)
-def get_top_shared_proteins(df_pred, groups, group_order, annotations=None, top=40):
+def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
+                            localisations=None, top=40):
     '''
     The host proteins that the most parasites are predicted to interact with. The circos
     and the heatmap both count how much two parasites have in common but neither says what
@@ -477,6 +531,8 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None, top=
 
     :param dict annotations: STRING id --> descriptive protein name, which the rows are
                              labelled with beside the gene symbol
+    :param localisations: DeepLoc table, which the dots carry the surface class and the
+                          two surface probabilities of the host protein from
     '''
     edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
     # one row per dot, which is a name and not a protein id: a host group covering two
@@ -497,11 +553,49 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None, top=
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     labels = label_proteins(df_pred, annotations)
     dots['protein'] = dots['target_name'].map(labels)
+    surface = summarise_localisations(df_pred, localisations)
+    if surface is not None:
+        dots = dots.join(surface, on='target_name')
+        dots['surface'] = dots['surface'].fillna(NO_LOCALISATION)
+        dots['localizations'] = dots['localizations'].fillna('')
     order = sorted(dots['taxid1_label'].unique(),
                    key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
 
     return (dots, [labels[p] for p in proteins],
             [f'{p[0]}. {p.split(" ")[1]}' for p in order], int(counts.max()))
+
+
+def split_dot_legend(figure, groups, surfaces, palette):
+    '''
+    Splits the legend of the shared-interactors matrix back into its two channels.
+
+    Plotly express draws a trace per combination of the two channels it is given and names
+    it after both, so a matrix coloured by taxonomic group and shaped by surface class
+    comes out with a legend of "Nematoda, Cell membrane" entries, one per combination that
+    occurs. Every drawn trace is taken out of the legend and the legend is built from
+    entries carrying no data instead: one per taxonomic group, in its colour and always as
+    a circle so the shape of whichever combination came first says nothing, and one per
+    surface class, in grey since the shape means the same whatever the colour it is drawn
+    in. The group entries keep the legendgroup of the traces they name, so clicking one
+    still hides that parasite group.
+
+    :param figure: the matrix figure, modified in place
+    :param list groups: taxonomic groups that occur, in the order of the legend
+    :param list surfaces: surface classes that occur, in the order of the legend
+    :param dict palette: {taxonomic group: colour}
+    '''
+    for trace in figure.data:
+        trace.update(legendgroup=trace.name.split(',')[0].strip(), showlegend=False)
+
+    def add_key(name, symbol, color, legendgroup):
+        figure.add_scatter(x=[None], y=[None], mode='markers', name=name,
+                           marker=dict(symbol=symbol, size=9, color=color),
+                           legendgroup=legendgroup, hoverinfo='skip', showlegend=True)
+
+    for group in groups:
+        add_key(group, 'circle', palette.get(group, UNKNOWN_COLOR), group)
+    for surface in surfaces:
+        add_key(surface, SURFACE_SYMBOLS[surface], SURFACE_LEGEND_COLOR, 'surface')
 
 
 @st.cache_data(show_spinner=False)
@@ -515,19 +609,38 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
     The area of the dot is what carries the degree (plotly's default), since that is the
     channel size is read on, and sizemin keeps the single-protein dots -- the largest group
     of them -- from collapsing to a speck next to a degree of eighty-six.
+
+    Where the dots carry a DeepLoc call the shape of the marker is the surface class of
+    the host protein, which is constant down a row: a circle is met on the cell membrane,
+    a diamond in the fluid around the cell. The hover carries the two probabilities behind
+    that and everywhere else DeepLoc puts the protein.
     '''
+    localised = 'surface' in dots.columns
+    hover = {'parasites': True, 'parasite': True, 'target_name': True,
+             'degree': True, 'group': False, 'protein': False}
+    orders = {'parasite': parasites, 'protein': proteins,
+              'group': [g for g in palette if g in set(dots['group'])]}
+    if localised:
+        # the class itself is left out of the hover: it is what the shape of the dot says,
+        # and plotly puts the column a shape is taken from at the head of the tooltip,
+        # above the protein whose class it is
+        hover.update({'surface': False, 'cell_membrane': ':.2f', 'extracellular': ':.2f',
+                      'localizations': True})
+        orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
+
     figure = px.scatter(dots, x='parasite', y='protein', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`
                         # most-shared first puts the most-shared protein in the top row
-                        color_discrete_map=palette, category_orders={
-                            'parasite': parasites, 'protein': proteins,
-                            'group': [g for g in palette if g in set(dots['group'])]},
-                        size='degree', size_max=15,
+                        color_discrete_map=palette, category_orders=orders,
+                        symbol='surface' if localised else None,
+                        symbol_map=SURFACE_SYMBOLS if localised else {},
+                        size='degree', size_max=15, labels=DEEPLOC_LABELS,
                         # the gene symbol on its own as well, since the label beside the
                         # axis is cut where the description got too long for it
-                        hover_data={'parasites': True, 'parasite': True, 'target_name': True,
-                                    'degree': True, 'group': False, 'protein': False})
+                        hover_data=hover)
     figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)))
+    if localised:
+        split_dot_legend(figure, orders['group'], orders['surface'], palette)
     figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
@@ -799,7 +912,8 @@ if selected_host != web_utils.NO_HOST:
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
     similarity = get_interactor_similarity(counted, parasite_groups, group_order)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order,
-                                         web_utils.load_protein_annotations(data_dir))
+                                         web_utils.load_protein_annotations(data_dir),
+                                         web_utils.load_deeploc_localisations(data_dir))
 
     # the two figures of how much the parasites share sit side by side, since they are the
     # same numbers read two ways: the matrix gives every pair a cell, the circle gives the
@@ -845,7 +959,10 @@ if selected_host != web_utils.NO_HOST:
                    'that parasite\'s proteins reach it. The parasites are in the order of the '
                    'circos, so a row of dots across a whole taxonomic group is a protein that '
                    'group converges on, and a gap is a parasite that does not reach it. Proteins '
-                   'only one parasite interacts with are left out.')
+                   'only one parasite interacts with are left out. The shape of the dot is where '
+                   'DeepLoc 2 predicts the host protein sits -- a circle on the cell membrane, a '
+                   'diamond outside the cell -- which is the same prediction the host proteins '
+                   'were selected on; hover for the probabilities behind it.')
         st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
                         width='stretch')
 

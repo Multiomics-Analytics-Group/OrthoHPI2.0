@@ -32,6 +32,10 @@ UNKNOWN_COLOR = '#999999'
 NO_CELL_TYPE = 'Not available'
 # colour of the chords at rest, before a parasite is hovered in the circos plot
 REST_COLOR = '#bdbdbd'
+# confidence the figures of shared interactors start at, and the range the slider spans.
+# The same default and range as the network page, so a parasite shows the same
+# interactions here as it does there
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.7
 # gradient the chords of the hovered parasite carry the number of shared host proteins
 # on: light blue through to the dark blue of the page headings, which is also the dark
 # end of the Blues the similarity heatmap is drawn in. The palest steps of the ramp are
@@ -173,7 +177,7 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
     return figure
 
 @st.cache_data(show_spinner=False)
-def get_tissue_expressed_predictions(data_dir, config, host_taxids):
+def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SCORE):
     '''
     Predictions restricted to the host proteins that are expressed in a tissue the
     parasite is known to infect (config['parasites'][taxid]['tissues']), which is the
@@ -182,12 +186,17 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids):
     interaction predicted from orthology. Parasites left without any interactor simply
     do not appear in what is built from this.
 
+    `score` drops the interactions predicted below that confidence, the same cut the
+    network page offers. It is applied here rather than per figure so the circos, the
+    similarity heatmap and the shared-protein dots keep counting the same interactions.
+
     One row is one predicted interaction, parasite protein (`source`) included: the circos
     and the heatmap only ever look at which host proteins are reached, but the dot matrix
     sizes its dots by how many parasite proteins reach each one.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'source',
-                                                               'target', 'target_name']]
+                                                               'target', 'target_name', 'weight']]
+    predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     expressed = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
 
@@ -230,7 +239,7 @@ def get_common_interactors(df_pred, groups, group_order):
             pd.DataFrame(nodes, columns=['index', 'name', 'group']))
 
 @st.cache_resource(show_spinner=False)
-def generate_circos_plot(data_dir, host_taxids, groups, palette, config):
+def generate_circos_plot(data_dir, host_taxids, groups, palette, config, score=MIN_SCORE):
     '''
     The arcs are coloured by taxonomic group (config['parasite_groups']) rather than
     by species: a per-species palette would have to repeat itself for the 35 parasites
@@ -247,9 +256,9 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config):
     styling has to set the alpha too: inheriting the resting alpha washes it out.
 
     The interactions are restricted to the host proteins the parasite could meet in the
-    tissues it infects.
+    tissues it infects, and to those predicted at `score` confidence or better.
     '''
-    predictions = get_tissue_expressed_predictions(data_dir, config, host_taxids)
+    predictions = get_tissue_expressed_predictions(data_dir, config, host_taxids, score)
     links, nodes = get_common_interactors(predictions, groups,
                                           {g: i for i, g in enumerate(palette)})
     if links.empty:
@@ -261,10 +270,11 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config):
     # to drawing the chords black, so those are given the top of the ramp and no colourbar
     graded = links['shared'].nunique() > 1
     # edge_color is the slot the colour dimension goes in and a literal colour there is
-    # ignored, which is what edge_line_color takes. On a linear ramp 236 of the 377 human
-    # chords land in the first colour, since half the pairs share fewer than 5 proteins
-    # and one shares 34, so the scale is logarithmic
-    shading = ({'edge_color': dim('shared'), 'edge_cmap': CHORD_CMAP, 'logz': True} if graded
+    # ignored, which is what edge_line_color takes. The scale is linear: it was logarithmic
+    # for the counts EggNOG 5 gave, where half the pairs shared fewer than 5 proteins and a
+    # linear ramp put 236 of the 377 human chords in the first colour. The EggNOG 6 counts
+    # are far less skewed -- median 8 shared, max 77 -- so a linear ramp now spreads them
+    shading = ({'edge_color': dim('shared'), 'edge_cmap': CHORD_CMAP} if graded
                else {'edge_line_color': CHORD_CMAP[-1]})
     chord = hv.Chord((links, hv.Dataset(nodes, 'index', ['name', 'group'])), vdims=['value', 'shared'])
     chord.opts(
@@ -725,15 +735,15 @@ def show_circos_legend(legend):
         for group, color in legend)
     st.markdown(f"<div style='font-size:0.85em;color:#333333;'>{swatches}</div>", unsafe_allow_html=True)
 
-def show_circos_plot(data_dir, host, host_taxids, config, caption, key):
+def show_circos_plot(data_dir, host, host_taxids, config, caption, key, score):
     st.caption(caption)
     circos_plot, circos_legend = generate_circos_plot(
         data_dir, host_taxids,
         {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()},
-        config.get('parasite_groups', {}), config)
+        config.get('parasite_groups', {}), config, score)
     if circos_plot is None:
         st.text(f'No host proteins are shared by the parasites infecting {host} '
-                'in the tissues they infect')
+                f'in the tissues they infect, at confidence {score:g} or better')
         return
 
     show_circos_legend(circos_legend)
@@ -773,7 +783,20 @@ if selected_host != web_utils.NO_HOST:
     parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
                        for p in config['parasites'].values()}
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
-    counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids)
+
+    # one slider for the three figures below it, which are the same interactions read three
+    # ways -- filtering them apart would put different numbers in figures whose captions
+    # say they match. The tissue dots at the foot of the page are a different count and
+    # keep every prediction.
+    # It sits in the middle of three columns, as the host selector above it does: left to
+    # itself a slider takes the whole width of the page, which is a metre of track for a
+    # range of half a point
+    with st.columns(3)[1]:
+        score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
+                          help='Interactions predicted below this confidence are left out of '
+                               'the three figures below. The tissue plot at the foot of the '
+                               'page counts every prediction.')
+    counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
     similarity = get_interactor_similarity(counted, parasite_groups, group_order)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order,
                                          web_utils.load_protein_annotations(data_dir))
@@ -812,8 +835,8 @@ if selected_host != web_utils.NO_HOST:
                    'are then coloured by how many host proteins each pair shares, on the scale in '
                    'the corner. Only the host proteins expressed in the tissues each parasite is '
                    'known to infect are counted, so what is left are the interactions that can '
-                   'take place where the parasite is.')
-        show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos')
+                   f'take place where the parasite is, predicted at confidence {score:g} or better.')
+        show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos', score)
 
     if top_shared is not None:
         st.subheader("Which Host Interactors the Parasites Have in Common")
@@ -833,7 +856,8 @@ if selected_host != web_utils.NO_HOST:
                'order of how many parasites infect them, so a row that runs across a '
                'taxonomic group is a tissue that clade converges on, and a column is one '
                'parasite\'s whole range. An interaction is counted once per tissue however '
-               'many cell types of it the host protein is expressed in.')
+               'many cell types of it the host protein is expressed in. Every prediction is '
+               'counted here, whatever the confidence slider above is set to.')
     per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config, selected_taxids)
     st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
                                          config.get('parasite_groups', {})),

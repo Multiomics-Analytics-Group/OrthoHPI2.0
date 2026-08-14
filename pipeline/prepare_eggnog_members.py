@@ -66,25 +66,42 @@ def build_members_file(url, output_filepath, source_filepath=None):
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
     kept = seen = 0
 
-    with gzip.open(output_filepath, "wt") as out:
-        if source_filepath is not None:
-            print(f"  Reading {source_filepath}...")
-            with open(source_filepath) as handle:
-                for line in handle:
-                    seen += 1
-                    kept += _emit(line, out)
-        else:
-            print(f"  Streaming {url} (~10 GB, filtering as it downloads)...")
-            with requests.get(url, stream=True, timeout=60) as r:
-                r.raise_for_status()
-                for raw in r.iter_lines(decode_unicode=True):
-                    if not raw:
-                        continue
-                    seen += 1
-                    kept += _emit(raw, out)
-                    if seen % 2_000_000 == 0:
-                        print(f"    {seen:,} groups scanned, {kept:,} at level {LEVEL}")
+    # Write to a temporary file and rename only once the whole input has been
+    # read, so a dropped connection or a parse error leaves any existing
+    # members file untouched instead of truncating it.
+    tmp_filepath = output_filepath + ".tmp"
+    try:
+        with gzip.open(tmp_filepath, "wt") as out:
+            if source_filepath is not None:
+                print(f"  Reading {source_filepath}...")
+                with open(source_filepath) as handle:
+                    for line in handle:
+                        seen += 1
+                        kept += _emit(line, out)
+            else:
+                print(f"  Streaming {url} (~10 GB, filtering as it downloads)...")
+                with requests.get(url, stream=True, timeout=60) as r:
+                    r.raise_for_status()
+                    # The server sends no charset, so decode_unicode would yield bytes.
+                    r.encoding = r.encoding or "utf-8"
+                    for raw in r.iter_lines(decode_unicode=True):
+                        if not raw:
+                            continue
+                        seen += 1
+                        kept += _emit(raw, out)
+                        if seen % 2_000_000 == 0:
+                            print(f"    {seen:,} groups scanned, {kept:,} at level {LEVEL}")
+    except BaseException:
+        if os.path.exists(tmp_filepath):
+            os.remove(tmp_filepath)
+        raise
 
+    if kept == 0:
+        os.remove(tmp_filepath)
+        print(f"  {seen:,} groups scanned, none at level {LEVEL} — {output_filepath} left unchanged")
+        return 0
+
+    os.replace(tmp_filepath, output_filepath)
     print(f"  {seen:,} groups scanned, {kept:,} kept at level {LEVEL}")
     print(f"  Wrote {output_filepath}")
 

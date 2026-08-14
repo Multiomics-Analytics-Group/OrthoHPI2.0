@@ -52,10 +52,17 @@ def calculate_enrichment(pred_df, go_df):
         net_members = go_df[(go_df['description'] == term) & (go_df['#string_protein_id'].isin(nodes))]['#string_protein_id']
         #A
         total_net_members = len(net_members)
-        
-        odd_ratio, p_value = stats.fisher_exact([[total_net_members, total_nodes - total_net_members],
-                                                [total_members - total_net_members, total_prots - total_members - total_nodes - total_net_members]])
-        enrichment.append([term, total_net_members, total_nodes - total_net_members, total_members - total_net_members,  total_prots - total_members - total_nodes - total_net_members, p_value, odd_ratio, ','.join(net_members)])
+
+        # the 2x2 table the test is run on: the proteins of the network annotated to the
+        # term (A), the rest of the network (B), the proteins outside the network
+        # annotated to it (C) and everything else (D). The network proteins annotated to
+        # the term are taken out of both margins of D, so they are added back once
+        a = total_net_members
+        b = total_nodes - total_net_members
+        c = total_members - total_net_members
+        d = total_prots - total_members - total_nodes + total_net_members
+        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]])
+        enrichment.append([term, a, b, c, d, p_value, odd_ratio, ','.join(net_members)])
     
     enrichment = pd.DataFrame(enrichment, columns=['go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes'])
     if not enrichment.empty:

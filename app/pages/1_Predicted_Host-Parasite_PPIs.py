@@ -325,6 +325,26 @@ def generate_interactions_table(df, score, annotations):
     return table[columns].sort_values(by='weight', ascending=False)
 
 
+def search_table(table, search):
+    '''
+    Keeps the rows of the interactions table holding the searched text in any of their
+    columns, ignoring case. The rows shown and the rows handed out by the download
+    button are the same ones this way.
+
+    :param table: the interactions table
+    :param str search: text typed in the search box, empty for no filtering
+    :return: the rows that match
+    '''
+    search = search.strip()
+    if not search or table.empty:
+        return table
+
+    matches = table.astype(str).apply(
+        lambda column: column.str.contains(search, case=False, regex=False))
+
+    return table[matches.any(axis=1)]
+
+
 def generate_tissue_filters(df):
     options = df['Tissue'].unique().tolist()
 
@@ -961,6 +981,14 @@ with st.container():
         st.caption('One row per predicted interaction, with the tissues the host protein '
                    'is expressed in gathered into one cell and the DeepLoc class it was '
                    'kept in the predictions for beside them.')
+        search = st.text_input(
+            "Search the table",
+            key='table_search',
+            placeholder="Protein name, identifier, tissue ...",
+            help="Keeps the rows holding the text typed, looked for in any column.")
+        table = search_table(table, search)
+        if search.strip() and table.empty:
+            st.info(f"No interaction holds '{search}'.")
         gb = GridOptionsBuilder.from_dataframe(table)
         gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
         gb.configure_side_bar() #Add a sidebar

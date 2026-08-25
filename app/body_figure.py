@@ -44,16 +44,30 @@ LEGEND_ID = 'Legend'
 CROP_MARGIN = 10
 
 # The tissues a parasite infects are the 33 fine-grained BTO terms of config['tissues'];
-# the figure draws 21 coarser organs. Twelve of the terms the parasites actually use are
-# drawn as themselves and come straight out of FIGURE_ORGANS. These are the rest of the
-# ones that have an organ containing them on the figure -- seven parasites are recorded
-# only in `small intestine`, which the figure draws as `intestine`, and would otherwise
-# shade nothing at all.
+# the figure draws 21 coarser organs (20 for rat, which has no gall bladder). Of the 27
+# terms the parasites actually use, twelve are drawn as themselves and come straight out
+# of FIGURE_ORGANS. These are the five of the rest that have an organ containing them on
+# the figure -- seven parasites are recorded only in `small intestine`, which the figure
+# draws as `intestine`, and would otherwise shade nothing at all. (`gastrointestinal
+# tract` is in config['tissues'] but no parasite uses it; it is kept here so the map
+# covers the whole vocabulary.)
 #
-# Four terms still have nothing standing for them: `lymph vessel` (Brugia malayi and
-# B. timori), `urethra` and `vagina` (Trichomonas vaginalis) and `mesenteric artery`
-# (Angiostrongylus costaricensis). Those parasites shade no organ rather than being shaded
-# onto a neighbouring one, which would be inventing a location for them.
+# Ten terms still have nothing standing for them:
+#   `bile duct`         Clonorchis sinensis, Opisthorchis felineus, O. viverrini
+#   `lymph vessel`      Brugia malayi, B. timori, Wuchereria bancrofti
+#   `macrophage`        Leishmania braziliensis, L. infantum, L. major
+#   `mesenteric artery` Angiostrongylus costaricensis
+#   `mouth`             Leishmania braziliensis
+#   `nose`              Leishmania braziliensis
+#   `placenta`          Toxoplasma gondii
+#   `urethra`           Trichomonas vaginalis
+#   `urinary bladder`   Schistosoma haematobium
+#   `vagina`            Trichomonas vaginalis
+# Those terms shade no organ rather than being shaded onto a neighbouring one, which would
+# be inventing a location for them. Their interactions still pass the tissue filter and
+# appear in the network and the table; they just contribute to no organ on the figure.
+# Trichomonas vaginalis is the only parasite whose tissues are all in this list, so it is
+# the only one whose figure stays blank -- the others also infect an organ that is drawn.
 ORGAN_PARENTS = {
     'BTO:0000142': 'nervous system',      # brain
     'BTO:0001279': 'nervous system',      # spinal cord

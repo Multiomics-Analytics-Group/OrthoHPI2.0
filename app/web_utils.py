@@ -1,3 +1,4 @@
+import base64
 import os
 import numpy as np
 import pandas as pd
@@ -229,19 +230,66 @@ def filter_tissues(config, df):
     
     return df
 
+# The sources the predictions are built from, as (name, link, logo file), in the order the
+# pipeline reaches them: the orthologous groups, the interactions transferred along them,
+# then what the host protein has to be to keep a prediction, and the structures shown of
+# one. The files are prepared by scripts/build_footer_logos.py, which puts them all on the
+# same background and the same height -- st.columns of a fixed width left them at anything
+# between 19 and 65 pixels tall, since the wordmarks are nothing like the same shape.
+LOGOS = [('EggNOG', 'http://eggnog6.embl.de/', 'eggnog.png'),
+         ('STRING', 'https://string-db.org/', 'string.png'),
+         ('TISSUES', 'https://tissues.jensenlab.org/', 'tissues.png'),
+         ('Human Protein Atlas', 'https://www.proteinatlas.org/', 'hpa.png'),
+         ('Gene Ontology', 'https://geneontology.org/', 'go.png'),
+         ('AlphaFold', 'https://deepmind.google/science/alphafold/', 'deepmind.png'),
+         ('AlphaFold Protein Structure Database', 'https://alphafold.ebi.ac.uk/',
+          'embl-ebi.svg')]
+
+LOGO_DIR = os.path.join('images', 'logos')
+
+# what the footer draws them at; scripts/build_footer_logos.py writes the files at twice
+# this, so they stay sharp on a retina screen
+LOGO_HEIGHT = 40
+
+REPOSITORY = 'https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0'
+
+MIME_TYPES = {'.png': 'image/png', '.svg': 'image/svg+xml'}
+
+
+@st.cache_data(show_spinner=False)
+def logo_source(filename):
+    '''
+    A logo as a data uri, so that it can be given a link. st.image cannot be wrapped in
+    one, and a plain <img src="images/..."> is not served by Streamlit at all.
+
+    :param str filename: name of the file in images/logos
+    :return: the file as a data uri
+    '''
+    with open(os.path.join(LOGO_DIR, filename), 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode()
+
+    mime = MIME_TYPES[os.path.splitext(filename)[1]]
+
+    return f'data:{mime};base64,{encoded}'
+
+
 def footer():
     st.write("Developed with data from:")
 
-    cols = st.columns(5)
-    with cols[0]:
-        st.image('images/eggnog.png', width=200)
-    with cols[1]:
-        st.image('images/string.png', width=200)
-    with cols[2]:
-        st.image('images/hpa.png', width=200)
-    with cols[3]:
-        st.image('images/tissues.png', width=200)
-    with cols[4]:
-        st.image('images/ebi.png', width=200)
+    # a wrapping row rather than fixed columns, which squeezed the logos into each other
+    # on a narrow window instead of moving them onto a second line
+    logos = ''.join(
+        f'<a href="{link}" target="_blank" title="{name}">'
+        f'<img src="{logo_source(filename)}" alt="{name}" height="{LOGO_HEIGHT}"></a>'
+        for name, link, filename in LOGOS)
 
-    st.write("Code available at: https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0")
+    st.markdown(
+        '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem 2.5rem;'
+        f' margin-bottom: 1rem;">{logos}</div>', unsafe_allow_html=True)
+
+    # neither has a logo to put in the row above, and leaving them out credited the tissue
+    # vocabulary and the localisation filter to nobody
+    st.caption('Tissue names follow the BRENDA Tissue Ontology, and the localisation of '
+               'the host proteins is predicted with DeepLoc 2.')
+
+    st.markdown(f'Code available at: [{REPOSITORY.split("//")[1]}]({REPOSITORY})')

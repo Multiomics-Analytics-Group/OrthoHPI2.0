@@ -17,7 +17,7 @@ from streamlit_bokeh import streamlit_bokeh
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
-web_utils.show_pages_menu('Parasites of a host')
+web_utils.show_header('Parasites of a host')
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -68,14 +68,18 @@ SURFACE_SYMBOLS = {web_utils.CELL_MEMBRANE: 'circle', web_utils.EXTRACELLULAR: '
 SURFACE_LEGEND_COLOR = '#525252'
 # names the DeepLoc columns are read under in the hover of the shared-interactors matrix
 DEEPLOC_LABELS = {'surface': 'DeepLoc', 'cell_membrane': 'P(cell membrane)',
-                  'extracellular': 'P(extracellular)', 'localizations': 'localisations'}
+                  'extracellular': 'P(extracellular)', 'localizations': 'localizations'}
 
 
 @st.cache_data(show_spinner=False)
-def count_interactions_per_tissue(data_dir, config, host_taxids):
+def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE):
     '''
     Predicted interactions per parasite and tissue, and per parasite, tissue and cell type,
     keeping only the tissues each parasite is known to infect (config['parasites']).
+
+    `score` drops the interactions predicted below that confidence, the same cut
+    get_tissue_expressed_predictions applies, so the figures of this page are all counting
+    the same interactions whatever the slider is set to.
 
     Both are counted as distinct (parasite protein, host protein) pairs at their own level,
     which is the only honest way to size a tissue: a host protein is expressed in several
@@ -85,7 +89,8 @@ def count_interactions_per_tissue(data_dir, config, host_taxids):
     take place there. The two frames therefore do not add up to each other, on purpose.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
-        ['taxid1', 'taxid1_label', 'source', 'target', 'target_name']]
+        ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
+    predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type']]
 
@@ -144,9 +149,10 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette):
                             'parasite': parasites, 'Tissue': tissues,
                             'group': [g for g in palette if g in set(dots['group'])]},
                         size='interactions', size_max=18,
-                        hover_data={'parasite': True, 'Tissue': True, 'interactions': True,
-                                    'group': False})
-    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)))
+                        custom_data=['interactions'])
+    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
+                         hovertemplate='%{y}<br>%{x}<br>predicted interactions: '
+                                       '%{customdata[0]}<extra></extra>')
     figure.update_layout(height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
@@ -182,8 +188,9 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
                     color_discrete_map=palette, category_orders={
                         'Cell type': cell_types,
                         'group': [g for g in palette if g in set(data['group'])]},
-                    hover_data={'parasite': True, 'Cell type': True, 'interactions': True,
-                                'group': False})
+                    custom_data=['parasite'])
+    figure.update_traces(hovertemplate='%{y}<br>%{customdata[0]}<br>predicted interactions: '
+                                       '%{x}<extra></extra>')
     figure.update_layout(height=max(320, 26 * len(cell_types) + 160), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
@@ -616,17 +623,22 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
     that and everywhere else DeepLoc puts the protein.
     '''
     localised = 'surface' in dots.columns
-    hover = {'parasites': True, 'parasite': True, 'target_name': True,
-             'degree': True, 'group': False, 'protein': False}
     orders = {'parasite': parasites, 'protein': proteins,
               'group': [g for g in palette if g in set(dots['group'])]}
+    # the hover is written out rather than left to plotly express, which prints the raw
+    # column name of whatever it is given. The protein and the parasite are the two axes
+    # already, and `parasites` and `degree` are two different counts of two different
+    # things, which as bare numbers under their column names they do not say
+    hover_columns = ['parasites', 'degree']
+    hover_lines = ['%{y}', 'parasites reaching it: %{customdata[0]}',
+                   'proteins of %{x} reaching it: %{customdata[1]}']
     if localised:
-        # the class itself is left out of the hover: it is what the shape of the dot says,
-        # and plotly puts the column a shape is taken from at the head of the tooltip,
-        # above the protein whose class it is
-        hover.update({'surface': False, 'cell_membrane': ':.2f', 'extracellular': ':.2f',
-                      'localizations': True})
         orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
+        hover_columns += ['cell_membrane', 'extracellular']
+        # the class is the shape of the dot, so the hover carries the two probabilities
+        # behind it rather than naming it a second time
+        hover_lines.append('P(cell membrane) %{customdata[2]:.2f}, '
+                           'P(extracellular) %{customdata[3]:.2f}')
 
     figure = px.scatter(dots, x='parasite', y='protein', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`
@@ -635,10 +647,9 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
                         symbol='surface' if localised else None,
                         symbol_map=SURFACE_SYMBOLS if localised else {},
                         size='degree', size_max=15, labels=DEEPLOC_LABELS,
-                        # the gene symbol on its own as well, since the label beside the
-                        # axis is cut where the description got too long for it
-                        hover_data=hover)
-    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)))
+                        custom_data=hover_columns)
+    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
+                         hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
     if localised:
         split_dot_legend(figure, orders['group'], orders['surface'], palette)
     figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
@@ -863,11 +874,10 @@ def show_circos_plot(data_dir, host, host_taxids, config, caption, key, score):
     streamlit_bokeh(circos_plot, use_container_width=True, key=key)
 
 
-
-st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
-
-st.markdown("<h3 style='text-align: center; color: black;'>The parasites of one host, side by side</h3>", unsafe_allow_html=True)
+st.caption('The parasites predicted against one host, compared with each other: how '
+           'similar their predicted host interactors are, which host proteins several of '
+           'them reach, and the tissues and cell types in which their interactions can '
+           'take place.')
 st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
@@ -922,15 +932,11 @@ if selected_host != web_utils.NO_HOST:
     matrix, circle = st.columns([1.2, 1])
 
     with matrix:
-        st.subheader("Host Interactors Shared by Each Pair of Parasites")
-        st.caption('How much of their predicted host interactors two parasites have in common, '
-                   'as a share of everything either of them interacts with, so a parasite with '
-                   'many predictions does not look similar to everything. The parasites are in '
-                   'the order of the circos down both axes -- taxonomic group, then name, with '
-                   'a strip of the group along each -- so a dark block against the diagonal is a '
-                   'clade whose parasites converge on the same host proteins, and a dark cell '
-                   'away from it is two unrelated parasites that do. The diagonal is each '
-                   'parasite against itself and is 1 by definition.')
+        st.subheader("Host interactors shared by each pair of parasites")
+        st.caption('Jaccard similarity between the host interactors of each pair of '
+                   'parasites: the shared interactors as a proportion of all interactors of '
+                   'either parasite. A strip of the taxonomic group runs along each axis. The '
+                   'diagonal is 1 by definition.')
         if similarity is not None:
             # the figure carries its own size, since a square matrix stretched to the page is
             # a square with blank space either side of it rather than a wider square
@@ -942,43 +948,40 @@ if selected_host != web_utils.NO_HOST:
                     'which is not a matrix worth drawing')
 
     with circle:
-        st.subheader("Circos Plot of Common Host Interactors")
+        st.subheader("Circos plot of common host interactors")
         caption = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
                    'group; a chord joins two parasites that are predicted to interact with the '
                    'same host proteins. Hover (or click) a parasite to pick out its chords, which '
-                   'are then coloured by how many host proteins each pair shares, on the scale in '
-                   'the corner. Only the host proteins expressed in the tissues each parasite is '
-                   'known to infect are counted, so what is left are the interactions that can '
-                   f'take place where the parasite is, predicted at confidence {score:g} or better.')
+                   'are then coloured by how many host proteins each pair shares, on the scale '
+                   'in the corner.')
         show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos', score)
 
     if top_shared is not None:
-        st.subheader("Which Host Interactors the Parasites Have in Common")
-        st.caption('The host proteins reached by the most parasites, with a dot wherever a '
-                   'parasite is predicted to interact with one of them, sized by how many of '
-                   'that parasite\'s proteins reach it. The parasites are in the order of the '
-                   'circos, so a row of dots across a whole taxonomic group is a protein that '
-                   'group converges on, and a gap is a parasite that does not reach it. Proteins '
-                   'only one parasite interacts with are left out. The shape of the dot is where '
-                   'DeepLoc 2 predicts the host protein sits -- a circle on the cell membrane, a '
-                   'diamond outside the cell -- which is the same prediction the host proteins '
-                   'were selected on; hover for the probabilities behind it.')
+        st.subheader("Host interactors common to several parasites")
+        st.caption('Host proteins reached by the most parasites, with a dot wherever a '
+                   'parasite is predicted to interact with one, sized by the number of that '
+                   "parasite's proteins reaching it. Proteins reached by a single parasite "
+                   'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
+                   'protein, circles cell membrane and diamonds extracellular; hover for the '
+                   'underlying probabilities.')
         st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
                         width='stretch')
 
-    st.subheader("Where the Predicted Interactions Can Take Place")
-    st.caption('Each dot is a parasite meeting the host in a tissue it is known to infect, '
-               'sized by how many of the predicted interactions are with proteins expressed '
-               'there. The parasites are in the order of the circos and the tissues in the '
-               'order of how many parasites infect them, so a row that runs across a '
-               'taxonomic group is a tissue that clade converges on, and a column is one '
-               'parasite\'s whole range. An interaction is counted once per tissue however '
-               'many cell types of it the host protein is expressed in. Every prediction is '
-               'counted here, whatever the confidence slider above is set to.')
-    per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config, selected_taxids)
-    st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                         config.get('parasite_groups', {})),
-                    width='stretch')
+    st.subheader("Tissues in which the predicted interactions can take place")
+    st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
+               'each parasite is known to infect and sized by the number of interactions with '
+               'proteins expressed there. Tissues are ordered by the number of parasites '
+               'infecting them. An interaction is counted once per tissue, irrespective of '
+               'the number of cell types the host protein is expressed in.')
+    per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
+                                                              selected_taxids, score)
+    if per_tissue.empty:
+        st.info('No predicted interaction is left at this confidence in a tissue the '
+                'parasites are known to infect.')
+    else:
+        st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
+                                             config.get('parasite_groups', {})),
+                        width='stretch')
 
     # cell types are only worth drawing one tissue at a time, and only for a host they are
     # annotated for: the HPA single cell data is human, so every other host is entirely
@@ -988,12 +991,11 @@ if selected_host != web_utils.NO_HOST:
     annotated = set(per_cell_type.loc[per_cell_type['Cell type'] != NO_CELL_TYPE, 'Tissue'])
     choices = [t for t in ranked.index if t in annotated]
     if choices:
-        st.subheader("Which Cell Types of a Tissue")
-        st.caption('The cell types of one tissue, each carrying the interactions predicted '
-                   'with proteins expressed in it, stacked by taxonomic group. Cell types '
-                   'overlap -- a host protein expressed in several of them is counted in '
-                   'each -- so these bars say which cell types a tissue\'s interactions '
-                   'reach, and are not a division of the tissue into parts.')
+        st.subheader("Cell types of a tissue")
+        st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
+                   'taxonomic group. Cell types overlap, as a host protein expressed in '
+                   'several is counted in each, so the bars are not a partition of the '
+                   'tissue.')
         tissue = st.selectbox('Tissue', choices, index=0,
                               help='Tissues with cell type annotation, most interactions first')
         st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,

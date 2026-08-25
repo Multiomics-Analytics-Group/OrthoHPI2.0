@@ -3,7 +3,7 @@ import streamlit as st
 from css import style
 
 style.load_css()
-web_utils.show_pages_menu('About')
+web_utils.show_header('About')
 
 # Footer
 with st.container():

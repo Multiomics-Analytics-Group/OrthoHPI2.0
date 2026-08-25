@@ -18,7 +18,7 @@ import body_figure
 from ppi_network import ppi_network
 
 style.load_css()
-web_utils.show_pages_menu('Host-parasite network')
+web_utils.show_header('Host-parasite network')
 
 #Initialize variables
 df_select = None
@@ -797,11 +797,9 @@ def show_structures_dialog(edge):
                 st.caption(reason)
 
 
-st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
-
-
-st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)
+st.caption('The predicted interactions of one host and one parasite as a network, with '
+           'the AlphaFold model of the two proteins of an interaction and the biological '
+           'processes over-represented among the host proteins of the network.')
 
 
 # the body figure beside the selectors rather than a third of the row left empty
@@ -914,13 +912,12 @@ with col1:
 
 with st.container():
     if net is not None:
-        st.caption('Predicted interactions between the proteins of the parasite and those of the '
-                   'host, above the chosen confidence score. Each node is a protein: diamonds are '
-                   'parasite proteins and circles host proteins, coloured by the organism they '
-                   'belong to and drawn the larger the more central they are to the network. Each '
-                   'edge is a predicted interaction, drawn the thicker the higher its confidence '
-                   'score. Hover over a node for the full protein name and its identifiers, and '
-                   'click an interaction to see the AlphaFold model of each of its two proteins.')
+        st.caption('Predicted interactions between parasite and host proteins above the '
+                   'selected confidence score. Nodes are proteins, diamonds parasite and '
+                   'circles host, coloured by organism and sized by centrality in the '
+                   'network. Edge width is the confidence score. Hover a node for its full '
+                   'name and identifiers; click an edge for the AlphaFold model of both '
+                   'proteins.')
         html_data = ""
         # Save and read graph as HTML file, which is what the download button hands out.
         # The network on the page is drawn by the component instead: an embedded HTML
@@ -975,12 +972,11 @@ with st.container():
 
 with st.container():
     if df_select is not None:
-        st.header("Table of Host-Parasite PPIs")
+        st.header("Table of host-parasite PPIs")
         table = generate_interactions_table(df_select, score,
                                             web_utils.load_protein_annotations(data_dir))
-        st.caption('One row per predicted interaction, with the tissues the host protein '
-                   'is expressed in gathered into one cell and the DeepLoc class it was '
-                   'kept in the predictions for beside them.')
+        st.caption('One row per predicted interaction, with the tissues the host protein is '
+                   'expressed in and its DeepLoc class.')
         search = st.text_input(
             "Search the table",
             key='table_search',
@@ -1010,7 +1006,7 @@ with st.container():
 
 with st.container():
     if df_select is not None:
-        st.header("Network Functional Enrichment -- GO Biological Processes")
+        st.header("Functional enrichment of the network (GO biological processes)")
         enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir)
         if not enrichment.empty:
             fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
@@ -1038,7 +1034,7 @@ with st.container():
                 mime='text/csv',
             )
         else:
-            st.subheader("No GO terms where found enriched")
+            st.subheader("No GO terms were found enriched")
 
 with st.container():
     if enrichment_table is not None and enrichment_table.empty:
@@ -1050,19 +1046,19 @@ with st.container():
             selected_terms = selected_rows['go_term'].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 
-        st.subheader("Enriched Biological Processes")
+        st.subheader("Enriched biological processes")
         ranked_tab, volcano_tab = st.tabs(["Ranked processes", "All tested processes"])
         with ranked_tab:
-            st.caption(f'The {GO_TOP_N} most significant biological processes over-represented '
-                       'among the host proteins of the network, placed by how strongly they are '
-                       'over-represented (odds ratio), sized by how many proteins of the network '
-                       'carry them and shaded by significance. Select rows in the table above to '
-                       'narrow this down to the processes of interest.')
+            st.caption(f'The {GO_TOP_N} most significantly over-represented biological '
+                       'processes among the host proteins of the network, positioned by odds '
+                       'ratio, sized by the number of network proteins annotated to them and '
+                       'shaded by significance. Select rows in the table above to restrict '
+                       'the figure.')
             st.plotly_chart(get_enrichment_dotplot(enrichment_viz), width='stretch')
         with volcano_tab:
-            st.caption('Every process tested against the network, significant or not: effect '
-                       'size to the right, significance upward, and the processes passing the '
-                       'chosen FDR picked out of the ones that do not.')
+            st.caption('All processes tested against the network: effect size on the x axis '
+                       'and significance on the y axis, with the processes passing the '
+                       'selected FDR highlighted.')
             st.plotly_chart(get_enrichment_volcano(enrichment, fdr, selected_terms),
                             width='stretch')
 
@@ -1086,9 +1082,9 @@ with st.container():
                     style_network(net)
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
-                    st.subheader("Highlighted Nodes for Selected Biological Processes")
-                    st.caption('The same network, with the proteins annotated to the biological '
-                               'processes selected in the table above in pink and the rest in grey.')
+                    st.subheader("Nodes annotated to the selected biological processes")
+                    st.caption('The network with the proteins annotated to the biological '
+                               'processes selected above in pink and the remainder in grey.')
                     with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
                         html_data = HtmlFile.read()
                     st.iframe(html_data, height=500)
@@ -1100,12 +1096,11 @@ with st.container():
                     )
         
         fig = get_enrichment_summary(enrichment_table, load_ontology_parents(data_dir))
-        st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")
-        st.caption('All the enriched processes arranged by the Gene Ontology hierarchy: each one '
-                   'sits inside the closest process above it that is also enriched, its area is '
-                   'the number of proteins of the network annotated to it and its shade is its '
-                   'significance, so related processes are read together rather than as a list. '
-                   'Click a block to zoom in.')
+        st.subheader("Hierarchy of enriched biological processes")
+        st.caption('Enriched processes arranged by the Gene Ontology hierarchy: each process '
+                   'is nested within the closest enriched process above it, its area is the '
+                   'number of network proteins annotated to it and its shade is its '
+                   'significance. Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")

@@ -20,11 +20,20 @@ PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
          ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
          ('About', 'info-circle', 'pages/3_About.py')]
 
+# the name of the app and what it does, drawn above the menu on every page
+TITLE = 'OrthoHPI 2.0'
+SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'
 
-def show_pages_menu(current=None, index=None):
+
+def show_header(current=None, index=None):
     '''
-    Draws the menu across the top of every page and switches to whichever entry is
-    picked, so that a page only has to say which one it is.
+    Draws the chrome every page opens with -- the name of the app, what it does, and the
+    menu across the top -- and switches to whichever entry is picked, so that a page only
+    has to say which one it is.
+
+    The title goes above the menu and is drawn here rather than by each page: the pages
+    carried a copy of the same two lines each, below their own menu, which put the
+    navigation above the name of the thing being navigated.
 
     :param str current: label of the page drawing the menu; the entry it highlights and
                         the one click that is not a navigation
@@ -32,6 +41,11 @@ def show_pages_menu(current=None, index=None):
                       predate the labels
     :return: the label selected, which is `current` unless the page is being left
     '''
+    st.markdown(f"<h1 style='text-align: center; color: #023858;'>{TITLE}</h1>",
+                unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center; color: #2b8cbe;'>{SUBTITLE}</h3>",
+                unsafe_allow_html=True)
+
     labels = [label for label, _, _ in PAGES]
     if index is None:
         index = labels.index(current) if current in labels else 0

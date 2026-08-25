@@ -12,7 +12,7 @@ from css import style
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
-web_utils.show_pages_menu('Hosts of a parasite')
+web_utils.show_header('Hosts of a parasite')
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -693,10 +693,9 @@ def get_overview(df_pred, config, pooled):
                                            'Links in every host', 'Links in one host only'])
 
 
-st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
-
-st.markdown("<h3 style='text-align: center; color: black;'>One parasite, several hosts</h3>", unsafe_allow_html=True)
+st.caption('One parasite across the hosts it is predicted against: which interactions '
+           'carried over to every host, which are found in a single host, and how the '
+           'predictions compare with the host proteins available in each.')
 st.markdown("---")
 
 # the two settings that decide what there is to compare sit above everything, since both
@@ -719,13 +718,12 @@ df_pred = get_multi_host_predictions(data_dir, config, pooled, score)
 if df_pred.empty:
     st.text('No parasite is predicted against more than one host at this confidence')
 else:
-    st.subheader('The Parasites With More Than One Host')
-    st.caption('Every parasite the pipeline predicts against more than one host, with how '
-               'many interactions were predicted in each. The last two columns count them '
-               'at the level the hosts can be compared at -- the orthology group of the '
-               'parasite protein against the orthology group of the host protein, which is '
-               'what the pipeline transferred the interaction at -- so a link in every host '
-               'is one that carried over, and a link in one host only is one that did not.')
+    st.subheader('Parasites with more than one host')
+    st.caption('Parasites predicted against more than one host, with the number of '
+               'interactions predicted in each. The last two columns count interactions as '
+               'pairs of orthology groups, the level at which the hosts can be compared: a '
+               'link present in every host carried over, a link present in one host only did '
+               'not.')
     st.dataframe(get_overview(df_pred, config, pooled), width='stretch', hide_index=True)
 
     parasites = sorted(df_pred['taxid1_label'].unique())
@@ -740,40 +738,31 @@ else:
                         for host, rows in edges.groupby('host')}
         links = get_link_combinations(df_pred, parasite)
 
-        st.subheader('Which Interactions Carried Over to Which Hosts')
-        st.caption(f'Each bar is a set of hosts and counts the interactions of {parasite} '
-                   'predicted in exactly those hosts, with the set named by the matrix '
-                   'below it. An interaction is counted as a pair of orthology groups '
-                   'rather than as a pair of proteins, since a human protein and a pig '
-                   'protein are different proteins and cannot be intersected; the pair of '
-                   'groups is what the interaction was transferred at, so the same pair in '
-                   'two hosts is the same transferred interaction. Read the caveat below '
-                   'the figures before reading a host-specific bar as host specificity.')
+        st.subheader('Interactions shared between sets of hosts')
+        st.caption(f'Interactions of {parasite} predicted in exactly the set of hosts named by '
+                   'the matrix below. Interactions are counted as pairs of orthology groups '
+                   'rather than pairs of proteins, since the orthologous proteins of two '
+                   'hosts are distinct proteins. See the caveat below the figures before '
+                   'interpreting a host-specific bar as host specificity.')
         st.plotly_chart(generate_combination_bars(links, all_hosts, config, pooled),
                         width='stretch')
 
-        st.subheader('Where the Hosts Differ, Protein by Protein')
-        st.caption('One square per predicted interaction: a protein of the parasite across, '
-                   'the family of host proteins it reaches down, and the colour saying which '
-                   'hosts it was predicted in. A row that is one colour all the way across is '
-                   'a family every host reaches; a row that changes colour is where the hosts '
-                   'part. The rows are families and not genes -- an orthology group can hold '
-                   'several genes of the same host, which the hover names -- and they are '
-                   'ordered so that what is shared gathers in the top left.')
+        st.subheader('Interactions per parasite protein and host protein family')
+        st.caption('One square per predicted interaction: parasite proteins on the x axis, '
+                   'families of host proteins on the y axis, coloured by the hosts the '
+                   'interaction was predicted in. Rows are orthology groups rather than '
+                   'genes, named on hover, and are ordered so that the shared interactions '
+                   'gather in the upper left.')
         st.plotly_chart(generate_link_matrix(links, all_hosts, config, pooled),
                         width='stretch')
 
-        st.subheader('How Much of the Difference Is the Host, and How Much Is the Annotation')
-        st.caption('The size of what was predicted in each host, beside the size of what '
-                   'could have been. The last two columns are the pool the pipeline drew '
-                   'from: the host proteins that came through its secretome, tissue and '
-                   'DeepLoc filters, and the ones among them annotated to a tissue this '
-                   'parasite infects. A host with more predicted interactions than another '
-                   'has, on this data, more proteins in that pool rather than more of the '
-                   'parasite\'s attention. The pool is not a superset of what was reached: '
-                   'the tissue filter keeps a host protein expressed in a tissue any '
-                   'parasite infects, so what was reached is counted twice instead — in any '
-                   'tissue, and in a tissue this parasite infects.')
+        st.subheader('Predicted interactions relative to the available host proteins')
+        st.caption('Interactions predicted in each host beside the pool of host proteins '
+                   'available: those passing the secretome, tissue and DeepLoc filters, and '
+                   'those among them annotated to a tissue this parasite infects. The pool is '
+                   'not a superset of what was reached, as the tissue filter keeps a host '
+                   'protein expressed in a tissue any parasite infects, so an interaction is '
+                   'counted twice: in any tissue, and in a tissue this parasite infects.')
         st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
                      width='stretch', hide_index=True)
 
@@ -802,29 +791,21 @@ else:
         taxids = tuple(sorted(set(edges['taxid2'])))
         comparison = get_go_comparison(data_dir, shared, specific, taxids)
         if comparison is not None:
-            st.subheader('What the Shared and the Host-Specific Proteins Do')
-            st.caption('The Gene Ontology terms carried by the host proteins of the '
-                       'interactions found in every host, beside those carried by the host '
-                       'proteins of the interactions found in one host only. These are '
-                       'counts of proteins and not an enrichment: the host-specific set '
-                       'runs to a handful of proteins, and a Fisher test on a handful '
-                       'reports whatever it happens to contain. Terms annotated to fewer '
-                       f'than {GO_MIN_PROTEINS} or more than {GO_MAX_PROTEINS} proteins of '
-                       'the host are left out, which is what keeps the top of the ontology '
-                       'out of the figure.')
+            st.subheader('Gene Ontology terms of shared and host-specific proteins')
+            st.caption('Gene Ontology terms of the host proteins of the interactions found in '
+                       'every host, beside those of the interactions found in a single host. '
+                       'These are counts of proteins and not an enrichment. Terms annotated '
+                       f'to fewer than {GO_MIN_PROTEINS} or more than {GO_MAX_PROTEINS} '
+                       'proteins of the host are omitted.')
             st.plotly_chart(generate_go_bars(comparison), width='stretch')
 
         per_tissue = count_interactions_per_host_tissue(df_pred, parasite, data_dir, config)
         if per_tissue is not None:
-            st.subheader('Where the Interactions Can Take Place in Each Host')
-            st.caption('The predicted interactions whose host protein is annotated to a '
-                       'tissue this parasite is known to infect, per host and tissue. This '
-                       'is the only figure on the page that applies that restriction: the '
-                       'tissue filter of the pipeline keeps a host protein expressed in a '
-                       'tissue any parasite infects, so elsewhere on the page an interaction '
-                       'is counted whatever tissue its host protein was kept for. A host '
-                       'missing from a row has no annotated protein there, which is again '
-                       'more often the annotation than the biology.')
+            st.subheader('Tissues in which the interactions can take place in each host')
+            st.caption('Predicted interactions per host and tissue, restricted to the tissues '
+                       'this parasite is known to infect. This is the only figure on the page '
+                       'that applies that restriction. A host absent from a row has no '
+                       'annotated protein in that tissue.')
             st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config, pooled),
                             width='content')
 

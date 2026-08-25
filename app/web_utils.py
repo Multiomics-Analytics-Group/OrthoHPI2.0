@@ -8,15 +8,16 @@ import utils
 # The pages of the app in the order they are offered, each as (label, bootstrap icon,
 # path to switch to). The app reads at four levels -- every host, one host, one parasite
 # across the hosts it infects, one host and one parasite -- and the menu follows that
-# order. The paths are relative to
-# the app root, which is what st.switch_page takes; the file numbers of the pages no
-# longer match this order (the network page keeps the URL it was published under) and
-# nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
+# order. Each icon shows what the page gives back rather than what it is asked about, so
+# the two directional pages read as a pair and stay apart at menu size. The paths are
+# relative to the app root, which is what st.switch_page takes; the file numbers of the
+# pages no longer match this order (the network page keeps the URL it was published
+# under) and nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
 PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
-         ('Parasites of a host', 'diagram-2', 'pages/2_Compare_Parasites.py'),
-         ('Hosts of a parasite', 'signpost-split', 'pages/4_Hosts_of_a_Parasite.py'),
-         ('Host-parasite network', 'diagram-3', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
-         ('About', 'chat-text', 'pages/3_About.py')]
+         ('Parasites of a host', 'bug', 'pages/2_Compare_Parasites.py'),
+         ('Hosts of a parasite', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
+         ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
+         ('About', 'info-circle', 'pages/3_About.py')]
 
 
 def show_pages_menu(current=None, index=None):

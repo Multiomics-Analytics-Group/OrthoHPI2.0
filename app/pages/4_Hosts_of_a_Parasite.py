@@ -738,23 +738,30 @@ else:
                         for host, rows in edges.groupby('host')}
         links = get_link_combinations(df_pred, parasite)
 
-        st.subheader('Interactions shared between sets of hosts')
-        st.caption(f'Interactions of {parasite} predicted in exactly the set of hosts named by '
-                   'the matrix below. Interactions are counted as pairs of orthology groups '
-                   'rather than pairs of proteins, since the orthologous proteins of two '
-                   'hosts are distinct proteins. See the caveat below the figures before '
-                   'interpreting a host-specific bar as host specificity.')
-        st.plotly_chart(generate_combination_bars(links, all_hosts, config, pooled),
-                        width='stretch')
+        # side by side: the bars are three columns wide whatever the parasite, which is a
+        # figure that does not need the width of the page, and the matrix beside them says
+        # what the sets of the bars are made of
+        sets, matrix = st.columns([2, 3], gap='large')
+        with sets:
+            st.subheader('Interactions shared between sets of hosts')
+            st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
+                       'the matrix below the bars. Interactions are counted as pairs of '
+                       'orthology groups rather than pairs of proteins, since the '
+                       'orthologous proteins of two hosts are distinct proteins. See the '
+                       'caveat below the figures before interpreting a host-specific bar as '
+                       'host specificity.')
+            st.plotly_chart(generate_combination_bars(links, all_hosts, config, pooled),
+                            width='stretch')
 
-        st.subheader('Interactions per parasite protein and host protein family')
-        st.caption('One square per predicted interaction: parasite proteins on the x axis, '
-                   'families of host proteins on the y axis, coloured by the hosts the '
-                   'interaction was predicted in. Rows are orthology groups rather than '
-                   'genes, named on hover, and are ordered so that the shared interactions '
-                   'gather in the upper left.')
-        st.plotly_chart(generate_link_matrix(links, all_hosts, config, pooled),
-                        width='stretch')
+        with matrix:
+            st.subheader('Interactions per parasite protein and host protein family')
+            st.caption('One square per predicted interaction: parasite proteins on the x '
+                       'axis, families of host proteins on the y axis, coloured by the hosts '
+                       'the interaction was predicted in. Rows are orthology groups rather '
+                       'than genes, named on hover, and are ordered so that the shared '
+                       'interactions gather in the upper left.')
+            st.plotly_chart(generate_link_matrix(links, all_hosts, config, pooled),
+                            width='stretch')
 
         st.subheader('Predicted interactions relative to the available host proteins')
         st.caption('Interactions predicted in each host beside the pool of host proteins '
@@ -790,24 +797,32 @@ else:
             links.loc[links['n_hosts'] == 1, 'group2']), 'target'].unique())
         taxids = tuple(sorted(set(edges['taxid2'])))
         comparison = get_go_comparison(data_dir, shared, specific, taxids)
-        if comparison is not None:
-            st.subheader('Gene Ontology terms of shared and host-specific proteins')
-            st.caption('Gene Ontology terms of the host proteins of the interactions found in '
-                       'every host, beside those of the interactions found in a single host. '
-                       'These are counts of proteins and not an enrichment. Terms annotated '
-                       f'to fewer than {GO_MIN_PROTEINS} or more than {GO_MAX_PROTEINS} '
-                       'proteins of the host are omitted.')
-            st.plotly_chart(generate_go_bars(comparison), width='stretch')
-
         per_tissue = count_interactions_per_host_tissue(df_pred, parasite, data_dir, config)
-        if per_tissue is not None:
-            st.subheader('Tissues in which the interactions can take place in each host')
-            st.caption('Predicted interactions per host and tissue, restricted to the tissues '
-                       'this parasite is known to infect. This is the only figure on the page '
-                       'that applies that restriction. A host absent from a row has no '
-                       'annotated protein in that tissue.')
-            st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config, pooled),
-                            width='content')
+
+        # what the proteins of the interactions do, beside where they can do it. The tissue
+        # dots are drawn at the width of their content and leave half a page empty on their
+        # own, which is the room the terms beside them take
+        terms, tissues = st.columns([1, 1], gap='large')
+        with terms:
+            if comparison is not None:
+                st.subheader('Gene Ontology terms of shared and host-specific proteins')
+                st.caption('Gene Ontology terms of the host proteins of the interactions '
+                           'found in every host, beside those of the interactions found in a '
+                           'single host. These are counts of proteins and not an enrichment. '
+                           f'Terms annotated to fewer than {GO_MIN_PROTEINS} or more than '
+                           f'{GO_MAX_PROTEINS} proteins of the host are omitted.')
+                st.plotly_chart(generate_go_bars(comparison), width='stretch')
+
+        with tissues:
+            if per_tissue is not None:
+                st.subheader('Tissues in which the interactions can take place in each host')
+                st.caption('Predicted interactions per host and tissue, restricted to the '
+                           'tissues this parasite is known to infect. This is the only figure '
+                           'on the page that applies that restriction. A host absent from a '
+                           'row has no annotated protein in that tissue.')
+                st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config,
+                                                          pooled),
+                                width='content')
 
 st.markdown("---")
 

@@ -13,9 +13,9 @@ import utils
 # longer match this order (the network page keeps the URL it was published under) and
 # nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
 PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
-         ('Parasites in a host', 'diagram-2', 'pages/2_Compare_Parasites.py'),
-         ('One parasite, several hosts', 'signpost-split', 'pages/4_Hosts_of_a_Parasite.py'),
-         ('Predicted Host-parasite PPIs', 'diagram-3', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
+         ('Parasites of a host', 'diagram-2', 'pages/2_Compare_Parasites.py'),
+         ('Hosts of a parasite', 'signpost-split', 'pages/4_Hosts_of_a_Parasite.py'),
+         ('Host-parasite network', 'diagram-3', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
          ('About', 'chat-text', 'pages/3_About.py')]
 
 

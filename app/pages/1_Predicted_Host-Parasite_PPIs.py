@@ -18,7 +18,7 @@ import body_figure
 from ppi_network import ppi_network
 
 style.load_css()
-web_utils.show_pages_menu('Predicted Host-parasite PPIs')
+web_utils.show_pages_menu('Host-parasite network')
 
 #Initialize variables
 df_select = None
@@ -798,7 +798,7 @@ def show_structures_dialog(edge):
 
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
 
 st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)

@@ -12,7 +12,7 @@ from css import style
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
-web_utils.show_pages_menu('One parasite, several hosts')
+web_utils.show_pages_menu('Hosts of a parasite')
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -694,7 +694,7 @@ def get_overview(df_pred, config, pooled):
 
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
 st.markdown("<h3 style='text-align: center; color: black;'>One parasite, several hosts</h3>", unsafe_allow_html=True)
 st.markdown("---")

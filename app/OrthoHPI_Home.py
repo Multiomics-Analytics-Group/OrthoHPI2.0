@@ -479,13 +479,13 @@ def generate_confidence_per_parasite(df, palette):
 
 
 st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPIs</h3>", unsafe_allow_html=True)
 
 st.markdown("<h3 style='text-align: center; color: black;'>Every host and every parasite</h3>", unsafe_allow_html=True)
 st.caption('Protein-protein interactions between a parasite and its host, predicted by '
            'transferring the interactions of their orthologues. This page is everything that '
-           'was predicted, host by host; **Parasites in a host** compares the parasites of one '
-           'host with each other, and **Predicted Host-parasite PPIs** opens the network of a '
+           'was predicted, host by host; **Parasites of a host** compares the parasites of one '
+           'host with each other, and **Host-parasite network** opens the network of a '
            'single host and parasite.')
 st.markdown("---")
 

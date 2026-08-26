@@ -912,6 +912,7 @@ with col1:
 
 with st.container():
     if net is not None:
+        st.header('Network of host-parasite PPIs')
         st.caption('Predicted interactions between parasite and host proteins above the '
                    'selected confidence score. Nodes are proteins, diamonds parasite and '
                    'circles host, coloured by organism and sized by centrality in the '

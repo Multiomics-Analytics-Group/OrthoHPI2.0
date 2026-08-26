@@ -133,6 +133,16 @@ TABLE_PAGE_SIZE = 10
 # the two sides of the network, tested separately for enrichment
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
 
+# what the host proteins of the network are tested against. The pipeline's filters are
+# the universe the network was drawn from, and the second option narrows that universe
+# the same way the predictions themselves are narrowed. The two answer different
+# questions -- whether the parasite's targets are special among everything it could have
+# reached anywhere, or among what it could have reached where it lives -- and the wider
+# one is offered first because it is the same background for every parasite, so two
+# parasites can be read against each other
+BACKGROUND_FILTERS = 'Proteins that passed the filters'
+BACKGROUND_TISSUES = 'Those in the tissues this parasite infects'
+
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
@@ -446,10 +456,10 @@ def generate_surface_filters(df):
     return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR) if c in present]
 
 @st.cache_data(max_entries=3, ttl=1800)
-def get_enrichment(pred_df, data_dir, side):
+def get_enrichment(pred_df, data_dir, side, background, config_file):
     '''
-    The processes over-represented among one side of the network, against the annotation of
-    that side's species alone.
+    The processes over-represented among one side of the network, against the proteins of
+    that side's species the network could have been drawn from.
 
     The two sides are tested apart rather than pooled. They are annotated to a different
     depth -- 17,265 human proteins carry a term against 11,025 of S. mansoni -- and they
@@ -458,9 +468,26 @@ def get_enrichment(pred_df, data_dir, side):
     against a null that is half the other organism, and whichever side has more proteins in
     the network decides what the section says.
 
+    The host side is tested against the proteins that came through the pipeline's filters,
+    not against the whole proteome. Those filters are why the network holds the proteins it
+    holds, so a proteome background reads them back as a result: at the lowest confidence
+    the page offers, the whole S. mansoni network returns 383 processes against the
+    proteome, led by cell-substrate adhesion -- which is the surface call that let those
+    proteins in -- and 104 against the pool, led by formation of primary germ layer. The
+    difference is smaller on the networks a high confidence leaves, which run to a few
+    proteins and can as easily gain terms as lose them: what changes there is which terms,
+    not how many.
+
+    The parasite side has no such pool to test against -- the pipeline keeps no table of
+    the proteins its secretome filter passed -- so it is still tested against every
+    annotated protein of the parasite, and reads as before.
+
     :param pred_df: predictions of the network, above the chosen score
     :param str data_dir: directory holding gos.parquet
     :param str side: HOST or PARASITE
+    :param str background: BACKGROUND_FILTERS or BACKGROUND_TISSUES, for the host side
+    :param str config_file: configuration naming the tissues the parasite infects, part of
+                            the cache key so a snapshot entrypoint tests against its own
     :return: enrichment dataframe, with A renamed to n_proteins
     '''
     column, taxid_column = (('target', 'taxid2') if side == HOST else ('source', 'taxid1'))
@@ -469,6 +496,18 @@ def get_enrichment(pred_df, data_dir, side):
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
+    if side == HOST:
+        # a host group covers more than one taxid (rat and mouse -> Rodent), so the pool is
+        # taken for the same species the network is read over
+        pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
+        if background == BACKGROUND_TISSUES:
+            parasite = pred_df['taxid1'].iloc[0]
+            pool = pool & web_utils.infected_tissue_proteins(
+                data_dir, utils.read_config(config_file), parasite)
+        # a data directory with no tissue table gives no pool, and is left on the proteome
+        # rather than emptied -- the same fallback the snapshot directories need elsewhere
+        if pool:
+            go_df = go_df[go_df['#string_protein_id'].isin(pool)]
     enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
     # A is the number of proteins of the side annotated to the term, which is what every
     # figure below sizes its marks by
@@ -1112,17 +1151,33 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
-        st.caption('Biological processes over-represented among one side of the network, '
-                   'against every annotated protein of that side\'s species. The two sides '
-                   'are tested apart: they are annotated to a different depth and were '
-                   "selected on different grounds. One-sided Fisher's exact test, "
-                   'corrected across terms with Benjamini-Hochberg; a process is tested '
-                   'when its species gives it 11 to 499 proteins and at least two of them '
-                   'are in the network.')
+        st.caption('Biological processes over-represented among one side of the network. '
+                   'The host proteins are tested against the host proteins the pipeline '
+                   'had to work with -- the ones its expression and localisation filters '
+                   'passed -- and not against the whole proteome, which would return the '
+                   'filters themselves as a result. The parasite proteins are tested '
+                   'against every annotated protein of the parasite, as no such pool is '
+                   'kept for them. The two sides are tested apart: they are annotated to a '
+                   'different depth and were selected on different grounds. One-sided '
+                   "Fisher's exact test, corrected across terms with Benjamini-Hochberg; a "
+                   'process is tested when the background gives it at least 11 proteins, '
+                   'no more than a quarter of them, and at least two are in the network.')
         side = st.radio('Proteins to test', (HOST, PARASITE), horizontal=True,
                         help='The host proteins the parasite is predicted to reach, or the '
                              'parasite proteins reaching them.')
-        enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir, side)
+        background = BACKGROUND_FILTERS
+        if side == HOST:
+            background = st.radio('Test them against', (BACKGROUND_FILTERS,
+                                                        BACKGROUND_TISSUES), horizontal=True,
+                                  help='Every host protein that came through the filters, '
+                                       'or only those expressed where this parasite is. '
+                                       'The narrower background asks whether the targets '
+                                       'are special among the proteins the parasite can '
+                                       'actually meet, and takes the tissues it infects '
+                                       'out of the answer; the wider one is the same for '
+                                       'every parasite, so two of them can be compared.')
+        enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir, side,
+                                    background, web_utils.get_config_file())
         if not enrichment.empty:
             fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
                            help='The Benjamini-Hochberg corrected significance a process '
@@ -1160,8 +1215,17 @@ with st.container():
 
 with st.container():
     if enrichment_view is not None and enrichment_view.empty:
-        st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
-                "to see the processes that are enriched less strongly.")
+        # against the tissues the parasite infects, nothing passing is a result rather than
+        # a setting to loosen: the targets are then no more specialised than the proteins
+        # the parasite meets anyway, and it is the background that is worth changing
+        narrowed = (side == HOST and background == BACKGROUND_TISSUES)
+        st.info(f"No biological process passes an FDR of {fdr}. "
+                + ("Against the proteins of the tissues this parasite infects, its targets "
+                   "carry no process more often than the rest of them. Test against every "
+                   "protein that passed the filters to see what its tissues account for."
+                   if narrowed else
+                   "Loosen the correction above to see the processes that are enriched "
+                   "less strongly."))
     elif enrichment_view is not None:
         enrichment_viz = enrichment_view
         if selected_rows is not None and len(selected_rows) > 0:

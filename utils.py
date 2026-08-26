@@ -39,7 +39,8 @@ def export_graph(G, filename, format='graphml', output_dir='tmp'):
         with open(file_path, 'w') as out:
             out.write(json.dumps(cytoscape_data))
 
-def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=2):
+def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
+                         min_in_set=2):
     """
     Fisher's exact test of every Gene Ontology term against one set of proteins.
 
@@ -50,7 +51,11 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
 
     A term is tested when the background gives it between `min_term` and `max_term`
     proteins -- the range that is neither nearly empty nor nearly everything -- and when at
-    least `min_in_set` of the tested proteins carry it. The size range is read off the
+    least `min_in_set` of the tested proteins carry it. The ceiling is also held to
+    `max_share` of the background: nearly everything is a share of what is being tested
+    against, and a count tuned to a proteome lets a term covering half a smaller background
+    through. The floor stays a count, since a term of three proteins is too small to say
+    anything about however large the background is. The size range is read off the
     background rather than off the tested set: selecting a term because many of the tested
     proteins carry it and then testing whether they over-carry it is the same question
     asked twice, and on a set of twenty proteins it leaves almost nothing to test.
@@ -64,6 +69,7 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
                   (the GO id, which identifies a term) and description (its name)
     :param int min_term: smallest background term tested, exclusive
     :param int max_term: largest background term tested, exclusive
+    :param float max_share: largest share of the background a term may cover
     :param int min_in_set: proteins of the set a term needs before it is worth testing
     :return: dataframe of go_id and go_term, the four cells of the table, p_value,
              odds_ratio, the proteins behind it, and the Benjamini-Hochberg corrected fdr_bh
@@ -74,6 +80,8 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
     tested = set(proteins) & annotated
     total_nodes = len(tested)
     total_prots = len(annotated)
+
+    max_term = min(max_term, round(max_share * total_prots))
 
     # a term is held by its GO id and named by its description, which is what the app
     # writes on the figures

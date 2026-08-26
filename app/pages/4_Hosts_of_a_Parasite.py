@@ -409,26 +409,6 @@ def generate_link_matrix(links, all_hosts, config, pooled):
 
 
 @st.cache_data(show_spinner=False)
-def get_infected_tissue_proteins(data_dir, config, parasite_taxid):
-    '''
-    The host proteins annotated to a tissue this parasite is known to infect, over every
-    host at once.
-
-    The pipeline's tissue filter is not parasite-specific -- it keeps a host protein
-    expressed in a tissue *any* parasite of the config infects -- so a host protein can
-    carry a predicted interaction with a parasite that never reaches the tissue it was
-    kept for. This is the set that says which ones do not.
-
-    :return: set of STRING protein ids
-    '''
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    mapped = config['tissues']
-    infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}
-
-    return set(tissues.loc[tissues['Tissue'].isin(infected), 'Gene'])
-
-
-@st.cache_data(show_spinner=False)
 def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     '''
     How many host proteins the pipeline had to work with in each host, which is the
@@ -443,7 +423,7 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     :return: {host label: (proteins after the filters, of those in an infected tissue)}
     '''
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    infected = get_infected_tissue_proteins(data_dir, config, parasite_taxid)
+    infected = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
 
     available = {}
     for host, taxids in hosts_taxids.items():
@@ -514,7 +494,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     if orthologs is None:
         return None
 
-    expressed = get_infected_tissue_proteins(data_dir, config, parasite_taxid)
+    expressed = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
 
     members, reachable = {}, {}
     for host, taxids in hosts_taxids.items():

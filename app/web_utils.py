@@ -141,6 +141,69 @@ def keep_infected_tissues(predictions, data_dir, config_file):
 
 
 @st.cache_data(show_spinner=False)
+def load_tissue_annotation(data_dir):
+    '''
+    The tissue and cell-type table, which pipeline/main.py writes for exactly the proteins
+    that came through the secretome, tissue and DeepLoc filters. Host proteins only: the
+    parasites are filtered on their secretome and never enter it.
+
+    :param str data_dir: directory holding tissues_cell_types.parquet
+    :return: the table, or None where the directory does not carry one
+    '''
+    tissue_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
+    if not os.path.exists(tissue_file):
+        return None
+
+    return utils.read_parquet_file(input_file=tissue_file)
+
+
+def filtered_pool(data_dir, taxids):
+    '''
+    The host proteins of these species that the pipeline had to work with: the ones that
+    came through every filter, whether or not a parasite was predicted to reach them.
+
+    This is the set a network of one parasite is drawn from, so it is the background any
+    enrichment of that network has to be read against. Tested against the whole proteome
+    instead, a network reports the filters that built it -- its host proteins were kept
+    for being surface or extracellular, and cell-surface processes come out enriched
+    whichever parasite is asked about.
+
+    :param str data_dir: directory holding tissues_cell_types.parquet
+    :param tuple taxids: host taxids as strings
+    :return: set of STRING protein ids, empty where the directory carries no tissue table
+    '''
+    tissues = load_tissue_annotation(data_dir)
+    if tissues is None:
+        return set()
+
+    return set(tissues.loc[tissues['Gene'].str.split('.').str[0].isin(taxids), 'Gene'])
+
+
+def infected_tissue_proteins(data_dir, config, parasite_taxid):
+    '''
+    The host proteins annotated to a tissue this parasite is known to infect, over every
+    host at once.
+
+    The pipeline's tissue filter is not parasite-specific -- it keeps a host protein
+    expressed in a tissue *any* parasite of the config infects -- so a host protein can
+    carry a predicted interaction with a parasite that never reaches the tissue it was
+    kept for. This is the set that says which ones do not.
+
+    :param dict config: parsed configuration, naming the tissues each parasite infects
+    :param parasite_taxid: taxid of the parasite, as anything int() takes
+    :return: set of STRING protein ids
+    '''
+    tissues = load_tissue_annotation(data_dir)
+    if tissues is None:
+        return set()
+
+    mapped = config['tissues']
+    infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}
+
+    return set(tissues.loc[tissues['Tissue'].isin(infected), 'Gene'])
+
+
+@st.cache_data(show_spinner=False)
 def get_host_predictions(data_dir, host_taxids):
     '''
     Predictions against one host group. host_taxids is a tuple of taxids (as strings)

@@ -743,7 +743,7 @@ else:
         # what the sets of the bars are made of
         sets, matrix = st.columns([2, 3], gap='large')
         with sets:
-            st.subheader('Interactions shared between sets of hosts')
+            st.subheader('Shared and host-specific interactions')
             st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
                        'the matrix below the bars. Interactions are counted as pairs of '
                        'orthology groups rather than pairs of proteins, since the '

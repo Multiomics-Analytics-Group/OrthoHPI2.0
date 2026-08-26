@@ -56,7 +56,11 @@ ABSENT_COLOR = '#e0e0e0'
 # to the hover. A group is a family, not a gene, and the families here run to 18 proteins
 SYMBOLS_IN_LABEL = 3
 # a GO term is only worth comparing between the two sets of host proteins if it is neither
-# nearly empty nor nearly everything; the same bounds utils.calculate_enrichment selects on
+# nearly empty nor nearly everything. The size is read off every annotated protein of the
+# host, so 500 is 3 in every 100 of them; the enrichment on the network page holds its
+# ceiling to a quarter of its background instead, and that background is the pool the
+# pipeline's filters passed rather than the whole annotation. The two are not the same
+# bounds and this figure is not an enrichment -- it counts proteins per term
 GO_MIN_PROTEINS, GO_MAX_PROTEINS = 10, 500
 # GO terms drawn in the comparison of what the shared and the host-specific proteins do,
 # and the width their names are broken over lines at beside the axis -- the same width the
@@ -534,8 +538,10 @@ def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
 
     A count and not an enrichment: a host-specific set here runs to three proteins, and a
     Fisher test on three proteins reports whatever the smallest set happens to contain.
-    The terms are filtered to the size range utils.calculate_enrichment selects on, which
-    is what keeps `Cellular process` out of a figure meant to separate two sets.
+    The terms are filtered to GO_MIN_PROTEINS..GO_MAX_PROTEINS of the host's annotated
+    proteins, which is what keeps `Cellular process` out of a figure meant to separate two
+    sets. Those are this figure's own bounds, read off the whole annotation; the network
+    page tests against the pool the filters passed and holds its ceiling to a share of it.
 
     :param tuple shared_proteins: host proteins carrying an interaction found in every host
     :param tuple specific_proteins: host proteins carrying one found in some hosts only
@@ -816,8 +822,9 @@ else:
                            'interactions found in a single host, for the terms both sets '
                            'carry and ranked by how different the share of each set is. '
                            'These are counts of proteins and not an enrichment. Terms '
-                           f'annotated to fewer than {GO_MIN_PROTEINS} or more than '
-                           f'{GO_MAX_PROTEINS} proteins of the host are omitted.')
+                           f'carried by fewer than {GO_MIN_PROTEINS} or more than '
+                           f'{GO_MAX_PROTEINS} of the host\'s annotated proteins are '
+                           'omitted, as neither separates the two sets.')
                 st.plotly_chart(go_bars, width='stretch')
             elif comparison is not None:
                 st.caption('No term is carried by both the shared and the host-specific '

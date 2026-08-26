@@ -381,6 +381,11 @@ def show_body_figure(config, data_dir, df, taxids):
         return
 
     st.markdown('##### Where the predicted interactions can take place')
+    st.caption('Predicted interactions whose host protein is expressed in each organ, '
+               'after the confidence score and the tissue filters, and only in the organs '
+               'this parasite is recorded as infecting. TISSUES annotates a host protein '
+               'to about three organs, so an interaction is counted in each of the ones '
+               'shown and the organs can add up to more than the network.')
     columns = st.columns(len(drawn))
     for column, (taxid, species) in zip(columns, drawn):
         svg, organs = load_figure(species)
@@ -405,9 +410,3 @@ def show_body_figure(config, data_dir, df, taxids):
             else:
                 st.caption('None of the host proteins of this network are annotated to '
                            'an organ this parasite infects.')
-
-    st.caption('Predicted interactions whose host protein is expressed in each organ, '
-               'after the confidence score and the tissue filters, and only in the organs '
-               'this parasite is recorded as infecting. TISSUES annotates a host protein '
-               'to about three organs, so an interaction is counted in each of the ones '
-               'shown and the organs can add up to more than the network.')

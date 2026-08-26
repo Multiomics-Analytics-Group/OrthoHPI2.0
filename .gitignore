@@ -134,6 +134,8 @@ data/deeploc/
 data/tmp/
 data/*.gz
 data/*.fa
+# R objects downloaded for the atlases, hundreds of megabytes each
+data/*.rds
 snapshots/
 docs/data_versions.md
 data/Parasites_db.xlsx

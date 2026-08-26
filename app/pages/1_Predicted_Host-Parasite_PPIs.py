@@ -18,7 +18,7 @@ import body_figure
 from ppi_network import ppi_network
 
 style.load_css()
-web_utils.show_pages_menu('Predicted Host-parasite PPIs')
+web_utils.show_header('Host-parasite network')
 
 #Initialize variables
 df_select = None
@@ -79,15 +79,55 @@ NETWORK_HEIGHT = 1000
 # height of each of the two structure viewers in the dialog an interaction opens
 VIEWER_HEIGHT = 400
 
-# Columns of the interactions table. The colors and shapes only exist to draw the
-# network, the taxids repeat their labels, the parasite and the edge type are the same
-# on every row, and the STRING source id is the taxid and the UniProt accession joined.
-# The host species is put back when the selected host covers more than one (Rodent is
+# Columns of the interactions table. The colors and shapes only exist to draw the network,
+# the taxids repeat their labels, and the parasite and the edge type are the same on every
+# row. The host species is put back when the selected host covers more than one (Rodent is
 # rat and mouse), where it is what tells the rows apart.
-TABLE_COLUMNS = ['source_name', 'source_full_name', 'source_uniprot',
+#
+# Both STRING ids are carried even though the parasite one is the taxid and the UniProt
+# accession joined and could be left to the reader to assemble: the host one cannot be --
+# 9606.ENSP00000312671 shares nothing with Q8N3D4 -- and a table whose two halves are
+# identified differently is a table that has to be explained before it can be used.
+TABLE_COLUMNS = ['source_name', 'source_full_name', 'source', 'source_uniprot',
                  'target_name', 'target_full_name', 'target', 'target_uniprot',
                  'Tissues', 'experimental_evidence_score',
                  'databases_evidence_score', 'weight', 'group1', 'group2']
+
+# what those columns are called once they are read by someone rather than by the network:
+# `source` is the parasite and `target` the host throughout the pipeline, which is not
+# something the table should ask its reader to know. The names are the ones the rest of the
+# app uses, so a column here and a caption elsewhere say the same word for the same thing.
+TABLE_COLUMN_NAMES = {
+    'source_name': 'Parasite protein',
+    'source_full_name': 'Parasite protein description',
+    'source': 'Parasite STRING id',
+    'source_uniprot': 'Parasite UniProt id',
+    'source_surface': 'Parasite DeepLoc class',
+    'taxid2_label': 'Host species',
+    'target_name': 'Host protein',
+    'target_full_name': 'Host protein description',
+    'target': 'Host STRING id',
+    'target_uniprot': 'Host UniProt id',
+    'target_surface': 'Host DeepLoc class',
+    'experimental_evidence_score': 'Experimental evidence',
+    'databases_evidence_score': 'Database evidence',
+    'weight': 'Confidence score',
+    'group1': 'Parasite orthology group',
+    'group2': 'Host orthology group'}
+
+# and the columns of the enrichment table. GO_TERM_COLUMN is read back out of the grid
+# when rows are picked, so the figures below highlight what was selected.
+ENRICHMENT_COLUMN_NAMES = {
+    'go_term': 'Biological process',
+    'n_proteins': 'Proteins of the network',
+    'odds_ratio': 'Odds ratio',
+    'p_value': 'P value',
+    'fdr_bh': 'FDR (BH)'}
+GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
+
+# rows to a page of either table. The grid is grown to the page rather than the page fitted
+# to a fixed height, so the last page of a short table is the only one drawn short
+TABLE_PAGE_SIZE = 10
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -303,7 +343,7 @@ def generate_interactions_table(df, score, annotations):
     '''
     table = df[df['weight'] >= score]
     if table.empty:
-        return table[TABLE_COLUMNS[:1]]
+        return table[TABLE_COLUMNS[:1]].rename(columns=TABLE_COLUMN_NAMES)
 
     tissues = table.groupby(['source', 'target'])['Tissue'].apply(
         lambda t: ', '.join(sorted(t.dropna().unique()))).rename('Tissues').reset_index()
@@ -317,12 +357,65 @@ def generate_interactions_table(df, score, annotations):
     columns = list(TABLE_COLUMNS)
     if table['taxid2_label'].nunique() > 1:
         columns.insert(columns.index('target_name'), 'taxid2_label')
-    # where DeepLoc puts the host protein, which is why it is in the network at all. Only
-    # when the data directory has the localisations, since the snapshot ones do not
+    # where DeepLoc puts each side. The host call is why the host protein is in the network
+    # at all; the parasite call is not a criterion -- the secretome filter is what selected
+    # those -- and is here to be read rather than to explain the selection, which is why a
+    # parasite protein can be called neither class and still be in the table. Only when the
+    # data directory has the localisations, since the snapshot ones do not
+    if 'source_surface' in table.columns:
+        columns.insert(columns.index('target_name'), 'source_surface')
     if 'target_surface' in table.columns:
         columns.insert(columns.index('Tissues'), 'target_surface')
 
-    return table[columns].sort_values(by='weight', ascending=False)
+    return (table[columns].sort_values(by='weight', ascending=False)
+                          .rename(columns=TABLE_COLUMN_NAMES))
+
+
+def search_table(table, search):
+    '''
+    Keeps the rows of the interactions table holding the searched text in any of their
+    columns, ignoring case. The rows shown and the rows handed out by the download
+    button are the same ones this way.
+
+    :param table: the interactions table
+    :param str search: text typed in the search box, empty for no filtering
+    :return: the rows that match
+    '''
+    search = search.strip()
+    if not search or table.empty:
+        return table
+
+    matches = table.astype(str).apply(
+        lambda column: column.str.contains(search, case=False, regex=False))
+
+    return table[matches.any(axis=1)]
+
+
+def name_the_selection(table, parasite, host):
+    '''
+    The parasite and the host as two columns at the front of the table.
+
+    For the table on the page they would be the same value on every row -- one parasite and
+    one host group are selected before it is built -- and the host is only named there when
+    the group covers two species. The downloaded file is the other way round: it is read
+    away from the selectors that made it, and outlives the parasite name in its filename.
+
+    :param table: the interactions table, as generate_interactions_table returns it
+    :param str parasite: the selected parasite
+    :param str host: the selected host group
+    :return: the table with the two columns in front, or unchanged if it is empty
+    '''
+    if table.empty:
+        return table
+
+    # a host group covering two species already carries the species of each row, and that
+    # is the column the group name must not overwrite: it is the one thing the rows of a
+    # pooled host differ by
+    host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
+    named = table.assign(**{'Parasite species': parasite, host_column: host})
+    front = ['Parasite species', host_column]
+
+    return named[front + [c for c in named.columns if c not in front]]
 
 
 def generate_tissue_filters(df):
@@ -777,11 +870,9 @@ def show_structures_dialog(edge):
                 st.caption(reason)
 
 
-st.markdown("<h1 style='text-align: center; color: #023858;'>OrthoHPI 2.0</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: #2b8cbe;'>Orthology Prediction of Host-Parasite PPI</h3>", unsafe_allow_html=True)
-
-
-st.markdown("<h3 style='text-align: center; color: black;'>Graph of predicted Host-Parasite PPIs</h3>", unsafe_allow_html=True)
+st.caption('The predicted interactions of one host and one parasite as a network, with '
+           'the AlphaFold model of the two proteins of an interaction and the biological '
+           'processes over-represented among the host proteins of the network.')
 
 
 # the body figure beside the selectors rather than a third of the row left empty
@@ -815,6 +906,7 @@ with col2:
         surface_calls = get_surface_calls(data_dir)
         if not surface_calls.empty:
             df_select = df_select.assign(
+                source_surface=df_select['source'].map(surface_calls['surface']),
                 target_surface=df_select['target'].map(surface_calls['surface']))
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
@@ -894,13 +986,13 @@ with col1:
 
 with st.container():
     if net is not None:
-        st.caption('Predicted interactions between the proteins of the parasite and those of the '
-                   'host, above the chosen confidence score. Each node is a protein: diamonds are '
-                   'parasite proteins and circles host proteins, coloured by the organism they '
-                   'belong to and drawn the larger the more central they are to the network. Each '
-                   'edge is a predicted interaction, drawn the thicker the higher its confidence '
-                   'score. Hover over a node for the full protein name and its identifiers, and '
-                   'click an interaction to see the AlphaFold model of each of its two proteins.')
+        st.header('Network of host-parasite PPIs')
+        st.caption('Predicted interactions between parasite and host proteins above the '
+                   'selected confidence score. Nodes are proteins, diamonds parasite and '
+                   'circles host, coloured by organism and sized by centrality in the '
+                   'network. Edge width is the confidence score. Hover a node for its full '
+                   'name and identifiers; click an edge for the AlphaFold model of both '
+                   'proteins.')
         html_data = ""
         # Save and read graph as HTML file, which is what the download button hands out.
         # The network on the page is drawn by the component instead: an embedded HTML
@@ -955,14 +1047,25 @@ with st.container():
 
 with st.container():
     if df_select is not None:
-        st.header("Table of Host-Parasite PPIs")
+        st.header("Table of host-parasite PPIs")
         table = generate_interactions_table(df_select, score,
                                             web_utils.load_protein_annotations(data_dir))
-        st.caption('One row per predicted interaction, with the tissues the host protein '
-                   'is expressed in gathered into one cell and the DeepLoc class it was '
-                   'kept in the predictions for beside them.')
+        st.caption('One row per predicted interaction, with the tissues the host protein is '
+                   'expressed in and its DeepLoc class.')
+        search = st.text_input(
+            "Search the table",
+            key='table_search',
+            placeholder="Protein name, identifier, tissue ...",
+            help="Keeps the rows holding the text typed, looked for in any column.")
+        table = search_table(table, search)
+        if search.strip() and table.empty:
+            st.info(f"No interaction holds '{search}'.")
         gb = GridOptionsBuilder.from_dataframe(table)
-        gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+        # a page of a known size with the grid grown to fit it. Sizing the page to a fixed
+        # height instead fits as many whole rows as it can and draws the remainder of the
+        # height as blank rows under the last one
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=TABLE_PAGE_SIZE)
+        gb.configure_grid_options(domLayout='autoHeight')
         gb.configure_side_bar() #Add a sidebar
         gridOptions = gb.build()
         grid_response = AgGrid(
@@ -970,27 +1073,37 @@ with st.container():
                             gridOptions=gridOptions,
                             data_return_mode='AS_INPUT',
                             fit_columns_on_grid_load=False,
-                            enable_enterprise_modules=True,
-                            height=350
+                            enable_enterprise_modules=True
                         )
         st.download_button(
             label="Download Network Table",
-            data=utils.convert_df(table),
+            data=utils.convert_df(name_the_selection(table, selected_parasite,
+                                                     selected_host)),
             file_name=f'{selected_parasite}_network_table.tsv',
             mime='text/csv',
         )
 
 with st.container():
     if df_select is not None:
-        st.header("Network Functional Enrichment -- GO Biological Processes")
+        st.header("Functional enrichment of the network (GO biological processes)")
+        st.caption('Biological processes over-represented among the proteins of the network, '
+                   'host and parasite alike, against every annotated protein of the two '
+                   "species. Fisher's exact test, corrected across terms with "
+                   'Benjamini-Hochberg; only processes carried by 11 to 499 proteins of the '
+                   'network are tested.')
         enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir)
         if not enrichment.empty:
-            fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
-            st.text(f"Terms enriched: {len(enrichment[enrichment['fdr_bh'] <= fdr]['go_term'].values.tolist())}")
-            st.text("Select GO terms to get more details")
-            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][['go_term', 'n_proteins', 'odds_ratio', 'p_value', 'fdr_bh']]
+            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
+                           help='The Benjamini-Hochberg corrected significance a process '
+                                'has to reach to be counted as enriched.')
+            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][
+                list(ENRICHMENT_COLUMN_NAMES)].rename(columns=ENRICHMENT_COLUMN_NAMES)
+            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}. Select rows '
+                       'to pick them out of the figures below.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
-            gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+            gb.configure_pagination(paginationAutoPageSize=False,
+                                    paginationPageSize=TABLE_PAGE_SIZE)
+            gb.configure_grid_options(domLayout='autoHeight')
             gb.configure_side_bar() #Add a sidebar
             gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children") #Enable multi-row selection
             gridOptions = gb.build()
@@ -999,8 +1112,7 @@ with st.container():
                                 gridOptions=gridOptions,
                                 data_return_mode='AS_INPUT',
                                 fit_columns_on_grid_load=False,
-                                enable_enterprise_modules=True,
-                                height=350
+                                enable_enterprise_modules=True
                             )
             selected_rows = grid_response['selected_rows']
             st.download_button(
@@ -1010,7 +1122,7 @@ with st.container():
                 mime='text/csv',
             )
         else:
-            st.subheader("No GO terms where found enriched")
+            st.subheader("No GO terms were found enriched")
 
 with st.container():
     if enrichment_table is not None and enrichment_table.empty:
@@ -1019,22 +1131,22 @@ with st.container():
     elif enrichment_table is not None:
         enrichment_viz = enrichment_table
         if selected_rows is not None and len(selected_rows) > 0:
-            selected_terms = selected_rows['go_term'].values.tolist()
+            selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 
-        st.subheader("Enriched Biological Processes")
+        st.subheader("Enriched biological processes")
         ranked_tab, volcano_tab = st.tabs(["Ranked processes", "All tested processes"])
         with ranked_tab:
-            st.caption(f'The {GO_TOP_N} most significant biological processes over-represented '
-                       'among the host proteins of the network, placed by how strongly they are '
-                       'over-represented (odds ratio), sized by how many proteins of the network '
-                       'carry them and shaded by significance. Select rows in the table above to '
-                       'narrow this down to the processes of interest.')
+            st.caption(f'The {GO_TOP_N} most significantly over-represented biological '
+                       'processes among the host proteins of the network, positioned by odds '
+                       'ratio, sized by the number of network proteins annotated to them and '
+                       'shaded by significance. Select rows in the table above to restrict '
+                       'the figure.')
             st.plotly_chart(get_enrichment_dotplot(enrichment_viz), width='stretch')
         with volcano_tab:
-            st.caption('Every process tested against the network, significant or not: effect '
-                       'size to the right, significance upward, and the processes passing the '
-                       'chosen FDR picked out of the ones that do not.')
+            st.caption('All processes tested against the network: effect size on the x axis '
+                       'and significance on the y axis, with the processes passing the '
+                       'selected FDR highlighted.')
             st.plotly_chart(get_enrichment_volcano(enrichment, fdr, selected_terms),
                             width='stretch')
 
@@ -1058,9 +1170,9 @@ with st.container():
                     style_network(net)
                     net.save_graph(f'{path}/{selected_parasite}2.html')
                     net = None
-                    st.subheader("Highlighted Nodes for Selected Biological Processes")
-                    st.caption('The same network, with the proteins annotated to the biological '
-                               'processes selected in the table above in pink and the rest in grey.')
+                    st.subheader("Nodes annotated to the selected biological processes")
+                    st.caption('The network with the proteins annotated to the biological '
+                               'processes selected above in pink and the remainder in grey.')
                     with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
                         html_data = HtmlFile.read()
                     st.iframe(html_data, height=500)
@@ -1072,12 +1184,11 @@ with st.container():
                     )
         
         fig = get_enrichment_summary(enrichment_table, load_ontology_parents(data_dir))
-        st.subheader("Visual Summary of Enriched Hierarchy of Biological Processes")
-        st.caption('All the enriched processes arranged by the Gene Ontology hierarchy: each one '
-                   'sits inside the closest process above it that is also enriched, its area is '
-                   'the number of proteins of the network annotated to it and its shade is its '
-                   'significance, so related processes are read together rather than as a list. '
-                   'Click a block to zoom in.')
+        st.subheader("Hierarchy of enriched biological processes")
+        st.caption('Enriched processes arranged by the Gene Ontology hierarchy: each process '
+                   'is nested within the closest enriched process above it, its area is the '
+                   'number of network proteins annotated to it and its shade is its '
+                   'significance. Click a block to zoom in.')
         st.plotly_chart(fig, width='stretch')
 
 st.markdown("---")

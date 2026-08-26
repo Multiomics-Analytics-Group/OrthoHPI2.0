@@ -190,3 +190,26 @@ labels it `Extracellular`, or — only if the parasite is not flagged
 current `config.yml` sets `multicellular`, so all 24 currently get both
 categories; the flag exists to let a multicellular species (e.g. a
 helminth) be restricted to `Extracellular` only, but isn't in use yet.
+
+## Host orthologs for the cross-host page (`scripts/build_host_orthologs.py`)
+
+The app's *One parasite, several hosts* page compares the same parasite in
+two or more hosts, and has to separate two reasons an interaction predicted
+in one host can be missing from another: the host has no protein in that
+orthology group at all, or it has one and the pipeline's filters dropped it
+before the transfer in step 7. `predictions.parquet` cannot tell them apart —
+a group with no predicted interaction is simply absent from it either way.
+
+This script streams `data/downloads/2759_members.tsv.gz` (the same members
+file step 7 reads) and writes, for the host orthology groups that appear in
+`predictions.parquet`, which proteins of each host belong to them:
+
+```
+$ python scripts/build_host_orthologs.py
+```
+
+Output: `data/host_orthologs.parquet` (`group`, `taxid`, `n_proteins`,
+`proteins`) — a few hundred rows, since only the ~200 groups the predictions
+reach are kept. Re-run it after `pipeline/main.py` whenever the hosts or the
+parasites change. The page treats a missing file as "not known" and leaves
+that section out rather than failing.

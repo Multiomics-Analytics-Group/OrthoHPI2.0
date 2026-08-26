@@ -1,3 +1,4 @@
+import base64
 import os
 import numpy as np
 import pandas as pd
@@ -6,21 +7,33 @@ from streamlit_option_menu import option_menu
 import utils
 
 # The pages of the app in the order they are offered, each as (label, bootstrap icon,
-# path to switch to). The app reads at three levels -- every host, one host, one
-# host and one parasite -- and the menu follows that order. The paths are relative to
-# the app root, which is what st.switch_page takes; the file numbers of the pages no
-# longer match this order (the network page keeps the URL it was published under) and
-# nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
+# path to switch to). The app reads at four levels -- every host, one host, one parasite
+# across the hosts it infects, one host and one parasite -- and the menu follows that
+# order. Each icon shows what the page gives back rather than what it is asked about, so
+# the two directional pages read as a pair and stay apart at menu size. The paths are
+# relative to the app root, which is what st.switch_page takes; the file numbers of the
+# pages no longer match this order (the network page keeps the URL it was published
+# under) and nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
 PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
-         ('Parasites in a host', 'diagram-2', 'pages/2_Compare_Parasites.py'),
-         ('Predicted Host-parasite PPIs', 'diagram-3', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
-         ('About', 'chat-text', 'pages/3_About.py')]
+         ('Parasites of a host', 'bug', 'pages/2_Compare_Parasites.py'),
+         ('Hosts of a parasite', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
+         ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
+         ('About', 'info-circle', 'pages/3_About.py')]
+
+# the name of the app and what it does, drawn above the menu on every page
+TITLE = 'OrthoHPI 2.0'
+SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'
 
 
-def show_pages_menu(current=None, index=None):
+def show_header(current=None, index=None):
     '''
-    Draws the menu across the top of every page and switches to whichever entry is
-    picked, so that a page only has to say which one it is.
+    Draws the chrome every page opens with -- the name of the app, what it does, and the
+    menu across the top -- and switches to whichever entry is picked, so that a page only
+    has to say which one it is.
+
+    The title goes above the menu and is drawn here rather than by each page: the pages
+    carried a copy of the same two lines each, below their own menu, which put the
+    navigation above the name of the thing being navigated.
 
     :param str current: label of the page drawing the menu; the entry it highlights and
                         the one click that is not a navigation
@@ -28,6 +41,11 @@ def show_pages_menu(current=None, index=None):
                       predate the labels
     :return: the label selected, which is `current` unless the page is being left
     '''
+    st.markdown(f"<h1 style='text-align: center; color: #023858;'>{TITLE}</h1>",
+                unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center; color: #2b8cbe;'>{SUBTITLE}</h3>",
+                unsafe_allow_html=True)
+
     labels = [label for label, _, _ in PAGES]
     if index is None:
         index = labels.index(current) if current in labels else 0
@@ -54,20 +72,72 @@ def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
 
 
-@st.cache_data(show_spinner=False)
-def load_predictions(data_dir):
+def load_predictions(data_dir, config_file=None):
     '''
-    Every predicted interaction. Shared by the three pages rather than reloaded on each
-    of them: the cache is keyed by the data directory, so the parquet is read once
-    however the app is navigated.
+    Every predicted interaction that could take place: the ones whose host protein is
+    expressed in a tissue the parasite is known to infect. Shared by the pages rather than
+    reloaded on each of them, so the restriction is applied once and every page counts the
+    same interactions.
+
+    The config file is resolved here rather than inside the cache so that it is part of the
+    cache key: a snapshot entrypoint pointing at another configuration infects other
+    tissues and keeps other interactions.
 
     :param str data_dir: directory holding predictions.parquet
+    :param str config_file: configuration to read the infected tissues from, defaulting to
+                            the one the session was started with
     :return: predictions dataframe
     '''
+    return _load_predictions(data_dir, config_file or get_config_file())
+
+
+@st.cache_data(show_spinner=False)
+def _load_predictions(data_dir, config_file):
     predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
     predictions['weight'] = predictions['weight'].astype(float)
 
-    return predictions
+    return keep_infected_tissues(predictions, data_dir, config_file)
+
+
+def keep_infected_tissues(predictions, data_dir, config_file):
+    '''
+    Drops the interactions whose host protein is not expressed anywhere the parasite is.
+
+    The pipeline filters the host proteins by tissue already, but on the union of the
+    tissues every parasite infects, so a gut parasite keeps a protein expressed only in
+    brain. Applying it per parasite is what makes an interaction on any page a claim about
+    something that could happen: without it a parasite of one tissue carries predictions
+    against proteins it never meets -- for the narrowest of them, 99 of every 100.
+
+    A data directory with no tissue table is left alone rather than emptied, which is what
+    the snapshot directories need.
+
+    :param predictions: predictions dataframe
+    :param str data_dir: directory holding tissues_cell_types.parquet
+    :param str config_file: configuration naming the tissues each parasite infects
+    :return: the predictions whose host protein is expressed where its parasite is
+    '''
+    tissue_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
+    if not os.path.exists(tissue_file):
+        return predictions
+
+    config = utils.read_config(config_file)
+    tissues = utils.read_parquet_file(input_file=tissue_file)
+    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']]
+    expressed = tissues.drop_duplicates().groupby('Tissue')['target'].apply(frozenset)
+
+    names = config['tissues']
+    reachable = {}
+    for taxid, parasite in config['parasites'].items():
+        proteins = set()
+        for tissue in parasite['tissues']:
+            proteins |= expressed.get(names[tissue].lower(), frozenset())
+        reachable[str(taxid)] = proteins
+
+    keep = [target in reachable.get(str(taxid), ())
+            for taxid, target in zip(predictions['taxid1'], predictions['target'])]
+
+    return predictions[keep]
 
 
 @st.cache_data(show_spinner=False)
@@ -226,19 +296,66 @@ def filter_tissues(config, df):
     
     return df
 
+# The sources the predictions are built from, as (name, link, logo file), in the order the
+# pipeline reaches them: the orthologous groups, the interactions transferred along them,
+# then what the host protein has to be to keep a prediction, and the structures shown of
+# one. The files are prepared by scripts/build_footer_logos.py, which puts them all on the
+# same background and the same height -- st.columns of a fixed width left them at anything
+# between 19 and 65 pixels tall, since the wordmarks are nothing like the same shape.
+LOGOS = [('EggNOG', 'http://eggnog6.embl.de/', 'eggnog.png'),
+         ('STRING', 'https://string-db.org/', 'string.png'),
+         ('TISSUES', 'https://tissues.jensenlab.org/', 'tissues.png'),
+         ('Human Protein Atlas', 'https://www.proteinatlas.org/', 'hpa.png'),
+         ('Gene Ontology', 'https://geneontology.org/', 'go.png'),
+         ('AlphaFold', 'https://deepmind.google/science/alphafold/', 'deepmind.png'),
+         ('AlphaFold Protein Structure Database', 'https://alphafold.ebi.ac.uk/',
+          'embl-ebi.svg')]
+
+LOGO_DIR = os.path.join('images', 'logos')
+
+# what the footer draws them at; scripts/build_footer_logos.py writes the files at twice
+# this, so they stay sharp on a retina screen
+LOGO_HEIGHT = 40
+
+REPOSITORY = 'https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0'
+
+MIME_TYPES = {'.png': 'image/png', '.svg': 'image/svg+xml'}
+
+
+@st.cache_data(show_spinner=False)
+def logo_source(filename):
+    '''
+    A logo as a data uri, so that it can be given a link. st.image cannot be wrapped in
+    one, and a plain <img src="images/..."> is not served by Streamlit at all.
+
+    :param str filename: name of the file in images/logos
+    :return: the file as a data uri
+    '''
+    with open(os.path.join(LOGO_DIR, filename), 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode()
+
+    mime = MIME_TYPES[os.path.splitext(filename)[1]]
+
+    return f'data:{mime};base64,{encoded}'
+
+
 def footer():
     st.write("Developed with data from:")
 
-    cols = st.columns(5)
-    with cols[0]:
-        st.image('images/eggnog.png', width=200)
-    with cols[1]:
-        st.image('images/string.png', width=200)
-    with cols[2]:
-        st.image('images/hpa.png', width=200)
-    with cols[3]:
-        st.image('images/tissues.png', width=200)
-    with cols[4]:
-        st.image('images/ebi.png', width=200)
+    # a wrapping row rather than fixed columns, which squeezed the logos into each other
+    # on a narrow window instead of moving them onto a second line
+    logos = ''.join(
+        f'<a href="{link}" target="_blank" title="{name}">'
+        f'<img src="{logo_source(filename)}" alt="{name}" height="{LOGO_HEIGHT}"></a>'
+        for name, link, filename in LOGOS)
 
-    st.write("Code available at: https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0")
+    st.markdown(
+        '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem 2.5rem;'
+        f' margin-bottom: 1rem;">{logos}</div>', unsafe_allow_html=True)
+
+    # neither has a logo to put in the row above, and leaving them out credited the tissue
+    # vocabulary and the localisation filter to nobody
+    st.caption('Tissue names follow the BRENDA Tissue Ontology, and the localisation of '
+               'the host proteins is predicted with DeepLoc 2.')
+
+    st.markdown(f'Code available at: [{REPOSITORY.split("//")[1]}]({REPOSITORY})')

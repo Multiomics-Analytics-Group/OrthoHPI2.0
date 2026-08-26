@@ -39,38 +39,87 @@ def export_graph(G, filename, format='graphml', output_dir='tmp'):
         with open(file_path, 'w') as out:
             out.write(json.dumps(cytoscape_data))
 
-def calculate_enrichment(pred_df, go_df):
-    nodes = pred_df['source'].unique().tolist() + pred_df['target'].unique().tolist()
-    total_nodes = len(nodes)
-    selected_gos = go_df[go_df['#string_protein_id'].isin(nodes)].groupby('description').filter(lambda x: (len(x)> 10) & (len(x) < 500))['description'].unique().tolist()
-    total_prots = len(go_df['#string_protein_id'].unique().tolist())
+def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
+                         min_in_set=2):
+    """
+    Fisher's exact test of every Gene Ontology term against one set of proteins.
+
+    `proteins` and `go_df` have to be of the same species. The background is every
+    annotated protein of `go_df`, so a set of one organism tested against the annotation of
+    two is tested against a null that is partly another organism's: the two differ in how
+    deeply they are annotated, and the difference is read as enrichment.
+
+    A term is tested when the background gives it between `min_term` and `max_term`
+    proteins -- the range that is neither nearly empty nor nearly everything -- and when at
+    least `min_in_set` of the tested proteins carry it. The ceiling is also held to
+    `max_share` of the background: nearly everything is a share of what is being tested
+    against, and a count tuned to a proteome lets a term covering half a smaller background
+    through. The floor stays a count, since a term of three proteins is too small to say
+    anything about however large the background is. The size range is read off the
+    background rather than off the tested set: selecting a term because many of the tested
+    proteins carry it and then testing whether they over-carry it is the same question
+    asked twice, and on a set of twenty proteins it leaves almost nothing to test.
+
+    The test is one-sided: only a term the set carries more often than the background is
+    a result here, and a two-sided test would let a term the set is depleted of pass under
+    a heading that reads as over-representation.
+
+    :param proteins: the protein ids to test, as STRING ids
+    :param go_df: GO annotations of their species, with columns #string_protein_id, term
+                  (the GO id, which identifies a term) and description (its name)
+    :param int min_term: smallest background term tested, exclusive
+    :param int max_term: largest background term tested, exclusive
+    :param float max_share: largest share of the background a term may cover
+    :param int min_in_set: proteins of the set a term needs before it is worth testing
+    :return: dataframe of go_id and go_term, the four cells of the table, p_value,
+             odds_ratio, the proteins behind it, and the Benjamini-Hochberg corrected fdr_bh
+    """
+    annotated = set(go_df['#string_protein_id'])
+    # the universe is what is annotated: a protein no term can be counted against belongs
+    # in neither margin of the table
+    tested = set(proteins) & annotated
+    total_nodes = len(tested)
+    total_prots = len(annotated)
+
+    max_term = min(max_term, round(max_share * total_prots))
+
+    # a term is held by its GO id and named by its description, which is what the app
+    # writes on the figures
+    names = dict(go_df[['term', 'description']].drop_duplicates().values)
+    sizes = go_df.groupby('term')['#string_protein_id'].nunique()
+    in_set = (go_df[go_df['#string_protein_id'].isin(tested)]
+              .groupby('term')['#string_protein_id'].nunique())
+    terms = sizes[(sizes > min_term) & (sizes < max_term)].index.intersection(
+        in_set[in_set >= min_in_set].index)
+
     enrichment = []
-    for term in selected_gos:   
-        members = go_df[(go_df['description'] == term)]['#string_protein_id']
-        #E
-        total_members = len(members)
-        net_members = go_df[(go_df['description'] == term) & (go_df['#string_protein_id'].isin(nodes))]['#string_protein_id']
-        #A
-        total_net_members = len(net_members)
+    for term, ids in go_df[go_df['term'].isin(terms)].groupby(
+            'term')['#string_protein_id']:
+        members = set(ids)
+        net_members = members & tested
 
-        # the 2x2 table the test is run on: the proteins of the network annotated to the
-        # term (A), the rest of the network (B), the proteins outside the network
-        # annotated to it (C) and everything else (D). The network proteins annotated to
-        # the term are taken out of both margins of D, so they are added back once
-        a = total_net_members
-        b = total_nodes - total_net_members
-        c = total_members - total_net_members
-        d = total_prots - total_members - total_nodes + total_net_members
-        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]])
-        enrichment.append([term, a, b, c, d, p_value, odd_ratio, ','.join(net_members)])
-    
-    enrichment = pd.DataFrame(enrichment, columns=['go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes'])
+        # the 2x2 table the test is run on: the proteins of the set annotated to the term
+        # (A), the rest of the set (B), the proteins outside the set annotated to it (C)
+        # and everything else (D). The set's proteins annotated to the term are taken out
+        # of both margins of D, so they are added back once
+        a = len(net_members)
+        b = total_nodes - a
+        c = len(members) - a
+        d = total_prots - len(members) - total_nodes + a
+        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]], alternative='greater')
+        enrichment.append([term, names.get(term, term), a, b, c, d, p_value, odd_ratio,
+                           ','.join(sorted(net_members))])
+
+    enrichment = pd.DataFrame(enrichment, columns=['go_id', 'go_term', 'A', 'B', 'C', 'D',
+                                                   'p_value', 'odds_ratio', 'nodes'])
     if not enrichment.empty:
-        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), alpha=0.01, method='fdr_bh')[1]
+        # only the corrected p-values are used, and those do not depend on a threshold:
+        # the significance a term has to reach is chosen in the app, term by term
+        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(),
+                                             method='fdr_bh')[1]
         enrichment = enrichment.sort_values(by='fdr_bh', ascending=True)
-    
-    return enrichment
 
+    return enrichment
 
 def save_to_parquet(df, output_file):
     df.to_parquet(output_file, compression='gzip', index=False)

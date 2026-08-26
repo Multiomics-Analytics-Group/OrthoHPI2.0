@@ -26,6 +26,7 @@ net = None
 selected_rows = []
 selected_terms = []
 enrichment_table = None
+enrichment_view = None
 enrichment = None
 path = 'data/tmp'
 # where the network is written for the download buttons; not in the repository, so it
@@ -128,6 +129,19 @@ GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 # rows to a page of either table. The grid is grown to the page rather than the page fitted
 # to a fixed height, so the last page of a short table is the only one drawn short
 TABLE_PAGE_SIZE = 10
+
+# the two sides of the network, tested separately for enrichment
+HOST, PARASITE = 'Host proteins', 'Parasite proteins'
+
+# what the host proteins of the network are tested against. The pipeline's filters are
+# the universe the network was drawn from, and the second option narrows that universe
+# the same way the predictions themselves are narrowed. The two answer different
+# questions -- whether the parasite's targets are special among everything it could have
+# reached anywhere, or among what it could have reached where it lives -- and the wider
+# one is offered first because it is the same background for every parasite, so two
+# parasites can be read against each other
+BACKGROUND_FILTERS = 'Proteins that passed the filters'
+BACKGROUND_TISSUES = 'Those in the tissues this parasite infects'
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -442,16 +456,57 @@ def generate_surface_filters(df):
     return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR) if c in present]
 
 @st.cache_data(max_entries=3, ttl=1800)
-def get_enrichment(pred_df, data_dir):
-    species = pred_df['taxid1'].unique().tolist() + pred_df['taxid2'].unique().tolist()
-    species = [int(s) for s in species]
+def get_enrichment(pred_df, data_dir, side, background, config_file):
+    '''
+    The processes over-represented among one side of the network, against the proteins of
+    that side's species the network could have been drawn from.
+
+    The two sides are tested apart rather than pooled. They are annotated to a different
+    depth -- 17,265 human proteins carry a term against 11,025 of S. mansoni -- and they
+    were selected on different grounds, the host proteins for being surface or
+    extracellular and the parasite proteins for being secreted. Pooled, the test is run
+    against a null that is half the other organism, and whichever side has more proteins in
+    the network decides what the section says.
+
+    Either side is tested against the proteins of its species that came through the
+    pipeline's filters, not against the whole proteome. Those filters are why a network
+    holds the proteins it holds, so a proteome background reads them back as a result: at
+    the lowest confidence the page offers, the whole S. mansoni network returns 383
+    processes against the proteome, led by cell-substrate adhesion -- which is the surface
+    call that let those host proteins in -- and 104 against the pool. Its parasite side
+    goes from 49 processes to 28, tested against the 826 proteins the secretome filter
+    passed rather than the 11,025 annotated ones. The difference is smaller on the
+    networks a high confidence leaves, which run to a few proteins and can as easily gain
+    terms as lose them: what changes there is which terms, not how many.
+
+    :param pred_df: predictions of the network, above the chosen score
+    :param str data_dir: directory holding gos.parquet
+    :param str side: HOST or PARASITE
+    :param str background: BACKGROUND_FILTERS or BACKGROUND_TISSUES, for the host side
+    :param str config_file: configuration naming the tissues the parasite infects, part of
+                            the cache key so a snapshot entrypoint tests against its own
+    :return: enrichment dataframe, with A renamed to n_proteins
+    '''
+    column, taxid_column = (('target', 'taxid2') if side == HOST else ('source', 'taxid1'))
+    species = [int(s) for s in pred_df[taxid_column].unique()]
     # the filter is pushed down to the reader (fastparquet prunes row groups only,
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    enrichment = utils.calculate_enrichment(pred_df, go_df)
-    # A is the number of proteins of the network annotated to the term, which is what
-    # every figure below sizes its marks by
+    # a host group covers more than one taxid (rat and mouse -> Rodent), so the pool is
+    # taken for the same species the network is read over
+    pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
+    if side == HOST and background == BACKGROUND_TISSUES:
+        parasite = pred_df['taxid1'].iloc[0]
+        pool = pool & web_utils.infected_tissue_proteins(
+            data_dir, utils.read_config(config_file), parasite)
+    # a data directory carrying neither table gives no pool, and is left on the proteome
+    # rather than emptied -- the same fallback the snapshot directories need elsewhere
+    if pool:
+        go_df = go_df[go_df['#string_protein_id'].isin(pool)]
+    enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
+    # A is the number of proteins of the side annotated to the term, which is what every
+    # figure below sizes its marks by
     enrichment = enrichment.rename(columns={'A': 'n_proteins'})
 
     return enrichment
@@ -594,7 +649,7 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
 
 @st.cache_data(show_spinner=False)
 def load_ontology_parents(data_dir):
-    '''child term -> its parent terms, the shape the ontology is walked upward in.'''
+    '''child GO id -> its parent GO ids, the shape the ontology is walked upward in.'''
     ontology = load_ontology(data_dir)
 
     return ontology.groupby('child')['parent'].apply(list).to_dict()
@@ -607,6 +662,9 @@ def nearest_enriched_ancestors(terms, parents_of):
     ancestor sit at the top level. The ontology is a graph rather than a tree -- a term
     can have several parents -- so it is walked breadth-first and the first enriched
     level reached wins.
+
+    Terms are GO ids here rather than names: the ontology is keyed by id, and a name
+    that does not match a node in it would leave the term looking like a root.
     '''
     enriched = set(terms)
     ancestors = {}
@@ -649,8 +707,9 @@ def get_enrichment_summary(enrichment_df, parents_of):
     enriched term above it, and the area of a block is the number of proteins of the
     network annotated to it.
     '''
-    view = prepare_enrichment_view(enrichment_df).drop_duplicates(subset='go_term')
-    terms = view['go_term'].tolist()
+    view = prepare_enrichment_view(enrichment_df).drop_duplicates(subset='go_id')
+    terms = view['go_id'].tolist()
+    labels = view['go_term'].tolist()
     ancestors = nearest_enriched_ancestors(terms, parents_of)
     odds_text = np.where(view['capped'], 'infinite',
                          view['odds_ratio_plot'].map('{:.1f}'.format))
@@ -666,10 +725,12 @@ def get_enrichment_summary(enrichment_df, parents_of):
     # It is given the palest step of the ramp, and the scale is pinned to the terms so
     # that the root cannot shift it
     fig = pgo.Figure(pgo.Treemap(
+        # a block is held by its GO id and named by its term, so two processes cannot
+        # collide and the nesting follows the ontology rather than the wording
         ids=[GO_TREEMAP_ROOT_ID] + terms,
         # unwrapped: a block draws its name on one line and drops it when it does not
         # fit, which keeps the header of a group readable instead of hiding it
-        labels=[GO_TREEMAP_ROOT_LABEL] + terms,
+        labels=[GO_TREEMAP_ROOT_LABEL] + labels,
         parents=[''] + [ancestors[t] or GO_TREEMAP_ROOT_ID for t in terms],
         values=[0] + view['n_proteins'].tolist(),
         # a parent term keeps its own proteins on top of those of the terms nested in it
@@ -1086,18 +1147,42 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
-        st.caption('Biological processes over-represented among the proteins of the network, '
-                   'host and parasite alike, against every annotated protein of the two '
-                   "species. Fisher's exact test, corrected across terms with "
-                   'Benjamini-Hochberg; only processes carried by 11 to 499 proteins of the '
-                   'network are tested.')
-        enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir)
+        st.caption('Biological processes over-represented among one side of the network. '
+                   'Each side is tested against the proteins of its own species the '
+                   'pipeline had to work with -- the ones its filters passed, the host '
+                   'proteins on expression and localisation and the parasite proteins on '
+                   'being secreted -- and not against the whole proteome, which would '
+                   'return those filters themselves as a result. The two sides are tested '
+                   'apart: they are annotated to a different depth and were selected on '
+                   "different grounds. One-sided Fisher's exact test, corrected across "
+                   'terms with Benjamini-Hochberg; a process is tested when the background '
+                   'gives it at least 11 proteins, no more than a quarter of them, and at '
+                   'least two are in the network.')
+        side = st.radio('Proteins to test', (HOST, PARASITE), horizontal=True,
+                        help='The host proteins the parasite is predicted to reach, or the '
+                             'parasite proteins reaching them.')
+        background = BACKGROUND_FILTERS
+        if side == HOST:
+            background = st.radio('Test them against', (BACKGROUND_FILTERS,
+                                                        BACKGROUND_TISSUES), horizontal=True,
+                                  help='Every host protein that came through the filters, '
+                                       'or only those expressed where this parasite is. '
+                                       'The narrower background asks whether the targets '
+                                       'are special among the proteins the parasite can '
+                                       'actually meet, and takes the tissues it infects '
+                                       'out of the answer; the wider one is the same for '
+                                       'every parasite, so two of them can be compared.')
+        enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir, side,
+                                    background, web_utils.get_config_file())
         if not enrichment.empty:
             fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
                            help='The Benjamini-Hochberg corrected significance a process '
                                 'has to reach to be counted as enriched.')
-            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][
-                list(ENRICHMENT_COLUMN_NAMES)].rename(columns=ENRICHMENT_COLUMN_NAMES)
+            # the figures read the columns the enrichment is built with; only the grid and
+            # the file it hands out are renamed for reading
+            enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
+            enrichment_table = enrichment_view[list(ENRICHMENT_COLUMN_NAMES)].rename(
+                columns=ENRICHMENT_COLUMN_NAMES)
             st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}. Select rows '
                        'to pick them out of the figures below.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
@@ -1125,11 +1210,20 @@ with st.container():
             st.subheader("No GO terms were found enriched")
 
 with st.container():
-    if enrichment_table is not None and enrichment_table.empty:
-        st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
-                "to see the processes that are enriched less strongly.")
-    elif enrichment_table is not None:
-        enrichment_viz = enrichment_table
+    if enrichment_view is not None and enrichment_view.empty:
+        # against the tissues the parasite infects, nothing passing is a result rather than
+        # a setting to loosen: the targets are then no more specialised than the proteins
+        # the parasite meets anyway, and it is the background that is worth changing
+        narrowed = (side == HOST and background == BACKGROUND_TISSUES)
+        st.info(f"No biological process passes an FDR of {fdr}. "
+                + ("Against the proteins of the tissues this parasite infects, its targets "
+                   "carry no process more often than the rest of them. Test against every "
+                   "protein that passed the filters to see what its tissues account for."
+                   if narrowed else
+                   "Loosen the correction above to see the processes that are enriched "
+                   "less strongly."))
+    elif enrichment_view is not None:
+        enrichment_viz = enrichment_view
         if selected_rows is not None and len(selected_rows) > 0:
             selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
@@ -1138,10 +1232,10 @@ with st.container():
         ranked_tab, volcano_tab = st.tabs(["Ranked processes", "All tested processes"])
         with ranked_tab:
             st.caption(f'The {GO_TOP_N} most significantly over-represented biological '
-                       'processes among the host proteins of the network, positioned by odds '
-                       'ratio, sized by the number of network proteins annotated to them and '
-                       'shaded by significance. Select rows in the table above to restrict '
-                       'the figure.')
+                       f'processes among the {side.lower()} of the network, positioned by '
+                       'odds ratio, sized by the number of them annotated to each process '
+                       'and shaded by significance. Select rows in the table above to '
+                       'restrict the figure.')
             st.plotly_chart(get_enrichment_dotplot(enrichment_viz), width='stretch')
         with volcano_tab:
             st.caption('All processes tested against the network: effect size on the x axis '
@@ -1183,7 +1277,7 @@ with st.container():
                         mime='text/html',
                     )
         
-        fig = get_enrichment_summary(enrichment_table, load_ontology_parents(data_dir))
+        fig = get_enrichment_summary(enrichment_view, load_ontology_parents(data_dir))
         st.subheader("Hierarchy of enriched biological processes")
         st.caption('Enriched processes arranged by the Gene Ontology hierarchy: each process '
                    'is nested within the closest enriched process above it, its area is the '

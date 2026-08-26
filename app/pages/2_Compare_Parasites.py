@@ -196,7 +196,9 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title='predicted interactions', yaxis_title=None,
                          bargap=0.25)
-    figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0')
+    # the bars are stacked, so the axis has to reach the total of a cell type and not the
+    # tallest of its parts
+    web_utils.count_ticks(figure, totals.max(), showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 

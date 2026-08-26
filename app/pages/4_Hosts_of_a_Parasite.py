@@ -56,7 +56,13 @@ ABSENT_COLOR = '#e0e0e0'
 # to the hover. A group is a family, not a gene, and the families here run to 18 proteins
 SYMBOLS_IN_LABEL = 3
 # a GO term is only worth comparing between the two sets of host proteins if it is neither
-# nearly empty nor nearly everything; the same bounds utils.calculate_enrichment selects on
+# nearly empty nor nearly everything. The size is read off every annotated protein of the
+# hosts being compared -- two or more of them, so 36,000 to 54,000 proteins, and a term of
+# 500 covers fewer than 2 in every 100. Read off the pool the pipeline's filters passed
+# instead, the same terms are small enough that a ceiling on the share of it lets the
+# broadest of them back in: a quarter of a 2,420-protein pool is 605 proteins, which
+# admits `Regulation of primary metabolic process` and fills the figure with terms both
+# sets carry alike. This is a count and not an enrichment, and it keeps its own bounds
 GO_MIN_PROTEINS, GO_MAX_PROTEINS = 10, 500
 # GO terms drawn in the comparison of what the shared and the host-specific proteins do,
 # and the width their names are broken over lines at beside the axis -- the same width the
@@ -339,8 +345,8 @@ def generate_combination_bars(links, all_hosts, config, pooled):
     # tallest bar
     figure.update_layout(height=460, plot_bgcolor='white', showlegend=False,
                          margin=dict(l=150, r=10, t=45, b=20), bargap=0.4)
-    figure.update_yaxes(title_text='orthology-group links', showgrid=True,
-                        gridcolor='#f0f0f0', row=1, col=1)
+    web_utils.count_ticks(figure, counts.max(), axis='y', title_text='orthology-group links',
+                showgrid=True, gridcolor='#f0f0f0', row=1, col=1)
     figure.update_yaxes(title_text=None, categoryorder='array', categoryarray=all_hosts[::-1],
                         showgrid=False, row=2, col=1)
     figure.update_xaxes(showticklabels=False, row=1, col=1)
@@ -409,26 +415,6 @@ def generate_link_matrix(links, all_hosts, config, pooled):
 
 
 @st.cache_data(show_spinner=False)
-def get_infected_tissue_proteins(data_dir, config, parasite_taxid):
-    '''
-    The host proteins annotated to a tissue this parasite is known to infect, over every
-    host at once.
-
-    The pipeline's tissue filter is not parasite-specific -- it keeps a host protein
-    expressed in a tissue *any* parasite of the config infects -- so a host protein can
-    carry a predicted interaction with a parasite that never reaches the tissue it was
-    kept for. This is the set that says which ones do not.
-
-    :return: set of STRING protein ids
-    '''
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    mapped = config['tissues']
-    infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}
-
-    return set(tissues.loc[tissues['Tissue'].isin(infected), 'Gene'])
-
-
-@st.cache_data(show_spinner=False)
 def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     '''
     How many host proteins the pipeline had to work with in each host, which is the
@@ -443,7 +429,7 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     :return: {host label: (proteins after the filters, of those in an infected tissue)}
     '''
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    infected = get_infected_tissue_proteins(data_dir, config, parasite_taxid)
+    infected = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
 
     available = {}
     for host, taxids in hosts_taxids.items():
@@ -514,7 +500,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     if orthologs is None:
         return None
 
-    expressed = get_infected_tissue_proteins(data_dir, config, parasite_taxid)
+    expressed = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
 
     members, reachable = {}, {}
     for host, taxids in hosts_taxids.items():
@@ -554,8 +540,10 @@ def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
 
     A count and not an enrichment: a host-specific set here runs to three proteins, and a
     Fisher test on three proteins reports whatever the smallest set happens to contain.
-    The terms are filtered to the size range utils.calculate_enrichment selects on, which
-    is what keeps `Cellular process` out of a figure meant to separate two sets.
+    The terms are filtered to GO_MIN_PROTEINS..GO_MAX_PROTEINS of the annotated proteins
+    of the hosts being compared, which is what keeps `Cellular process` out of a figure
+    meant to separate two sets. Those are this figure's own bounds and not the ones the
+    network page's enrichment uses, which are a share of a much smaller background.
 
     :param tuple shared_proteins: host proteins carrying an interaction found in every host
     :param tuple specific_proteins: host proteins carrying one found in some hosts only
@@ -634,7 +622,7 @@ def generate_go_bars(comparison):
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title='host proteins annotated to the term',
                          yaxis_title=None, bargap=0.3)
-    figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0')
+    web_utils.count_ticks(figure, view['proteins'].max(), showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 
@@ -836,8 +824,9 @@ else:
                            'interactions found in a single host, for the terms both sets '
                            'carry and ranked by how different the share of each set is. '
                            'These are counts of proteins and not an enrichment. Terms '
-                           f'annotated to fewer than {GO_MIN_PROTEINS} or more than '
-                           f'{GO_MAX_PROTEINS} proteins of the host are omitted.')
+                           f'carried by fewer than {GO_MIN_PROTEINS} or more than '
+                           f'{GO_MAX_PROTEINS} of the hosts\' annotated proteins are '
+                           'omitted, as neither separates the two sets.')
                 st.plotly_chart(go_bars, width='stretch')
             elif comparison is not None:
                 st.caption('No term is carried by both the shared and the host-specific '

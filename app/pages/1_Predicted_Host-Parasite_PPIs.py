@@ -102,17 +102,28 @@ TABLE_COLUMN_NAMES = {
     'source_full_name': 'Parasite protein description',
     'source': 'Parasite STRING id',
     'source_uniprot': 'Parasite UniProt id',
+    'source_surface': 'Parasite DeepLoc class',
     'taxid2_label': 'Host species',
     'target_name': 'Host protein',
     'target_full_name': 'Host protein description',
     'target': 'Host STRING id',
     'target_uniprot': 'Host UniProt id',
-    'target_surface': 'DeepLoc class',
+    'target_surface': 'Host DeepLoc class',
     'experimental_evidence_score': 'Experimental evidence',
     'databases_evidence_score': 'Database evidence',
     'weight': 'Confidence score',
     'group1': 'Parasite orthology group',
     'group2': 'Host orthology group'}
+
+# and the columns of the enrichment table. GO_TERM_COLUMN is read back out of the grid
+# when rows are picked, so the figures below highlight what was selected.
+ENRICHMENT_COLUMN_NAMES = {
+    'go_term': 'Biological process',
+    'n_proteins': 'Proteins of the network',
+    'odds_ratio': 'Odds ratio',
+    'p_value': 'P value',
+    'fdr_bh': 'FDR (BH)'}
+GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -342,8 +353,13 @@ def generate_interactions_table(df, score, annotations):
     columns = list(TABLE_COLUMNS)
     if table['taxid2_label'].nunique() > 1:
         columns.insert(columns.index('target_name'), 'taxid2_label')
-    # where DeepLoc puts the host protein, which is why it is in the network at all. Only
-    # when the data directory has the localisations, since the snapshot ones do not
+    # where DeepLoc puts each side. The host call is why the host protein is in the network
+    # at all; the parasite call is not a criterion -- the secretome filter is what selected
+    # those -- and is here to be read rather than to explain the selection, which is why a
+    # parasite protein can be called neither class and still be in the table. Only when the
+    # data directory has the localisations, since the snapshot ones do not
+    if 'source_surface' in table.columns:
+        columns.insert(columns.index('target_name'), 'source_surface')
     if 'target_surface' in table.columns:
         columns.insert(columns.index('Tissues'), 'target_surface')
 
@@ -886,6 +902,7 @@ with col2:
         surface_calls = get_surface_calls(data_dir)
         if not surface_calls.empty:
             df_select = df_select.assign(
+                source_surface=df_select['source'].map(surface_calls['surface']),
                 target_surface=df_select['target'].map(surface_calls['surface']))
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
@@ -1062,12 +1079,20 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
+        st.caption('Biological processes over-represented among the proteins of the network, '
+                   'host and parasite alike, against every annotated protein of the two '
+                   "species. Fisher's exact test, corrected across terms with "
+                   'Benjamini-Hochberg; only processes carried by 11 to 499 proteins of the '
+                   'network are tested.')
         enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir)
         if not enrichment.empty:
-            fdr = st.radio("FDR BH correction",(0.01, 0.05, 0.1), horizontal=True)
-            st.text(f"Terms enriched: {len(enrichment[enrichment['fdr_bh'] <= fdr]['go_term'].values.tolist())}")
-            st.text("Select GO terms to get more details")
-            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][['go_term', 'n_proteins', 'odds_ratio', 'p_value', 'fdr_bh']]
+            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
+                           help='The Benjamini-Hochberg corrected significance a process '
+                                'has to reach to be counted as enriched.')
+            enrichment_table = enrichment[enrichment['fdr_bh'] <= fdr][
+                list(ENRICHMENT_COLUMN_NAMES)].rename(columns=ENRICHMENT_COLUMN_NAMES)
+            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}. Select rows '
+                       'to pick them out of the figures below.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
             gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
             gb.configure_side_bar() #Add a sidebar
@@ -1098,7 +1123,7 @@ with st.container():
     elif enrichment_table is not None:
         enrichment_viz = enrichment_table
         if selected_rows is not None and len(selected_rows) > 0:
-            selected_terms = selected_rows['go_term'].values.tolist()
+            selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
             enrichment_viz = enrichment_viz[enrichment_viz['go_term'].isin(selected_terms)]
 
         st.subheader("Enriched biological processes")

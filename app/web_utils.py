@@ -72,20 +72,72 @@ def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
 
 
-@st.cache_data(show_spinner=False)
-def load_predictions(data_dir):
+def load_predictions(data_dir, config_file=None):
     '''
-    Every predicted interaction. Shared by the three pages rather than reloaded on each
-    of them: the cache is keyed by the data directory, so the parquet is read once
-    however the app is navigated.
+    Every predicted interaction that could take place: the ones whose host protein is
+    expressed in a tissue the parasite is known to infect. Shared by the pages rather than
+    reloaded on each of them, so the restriction is applied once and every page counts the
+    same interactions.
+
+    The config file is resolved here rather than inside the cache so that it is part of the
+    cache key: a snapshot entrypoint pointing at another configuration infects other
+    tissues and keeps other interactions.
 
     :param str data_dir: directory holding predictions.parquet
+    :param str config_file: configuration to read the infected tissues from, defaulting to
+                            the one the session was started with
     :return: predictions dataframe
     '''
+    return _load_predictions(data_dir, config_file or get_config_file())
+
+
+@st.cache_data(show_spinner=False)
+def _load_predictions(data_dir, config_file):
     predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
     predictions['weight'] = predictions['weight'].astype(float)
 
-    return predictions
+    return keep_infected_tissues(predictions, data_dir, config_file)
+
+
+def keep_infected_tissues(predictions, data_dir, config_file):
+    '''
+    Drops the interactions whose host protein is not expressed anywhere the parasite is.
+
+    The pipeline filters the host proteins by tissue already, but on the union of the
+    tissues every parasite infects, so a gut parasite keeps a protein expressed only in
+    brain. Applying it per parasite is what makes an interaction on any page a claim about
+    something that could happen: without it a parasite of one tissue carries predictions
+    against proteins it never meets -- for the narrowest of them, 99 of every 100.
+
+    A data directory with no tissue table is left alone rather than emptied, which is what
+    the snapshot directories need.
+
+    :param predictions: predictions dataframe
+    :param str data_dir: directory holding tissues_cell_types.parquet
+    :param str config_file: configuration naming the tissues each parasite infects
+    :return: the predictions whose host protein is expressed where its parasite is
+    '''
+    tissue_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
+    if not os.path.exists(tissue_file):
+        return predictions
+
+    config = utils.read_config(config_file)
+    tissues = utils.read_parquet_file(input_file=tissue_file)
+    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']]
+    expressed = tissues.drop_duplicates().groupby('Tissue')['target'].apply(frozenset)
+
+    names = config['tissues']
+    reachable = {}
+    for taxid, parasite in config['parasites'].items():
+        proteins = set()
+        for tissue in parasite['tissues']:
+            proteins |= expressed.get(names[tissue].lower(), frozenset())
+        reachable[str(taxid)] = proteins
+
+    keep = [target in reachable.get(str(taxid), ())
+            for taxid, target in zip(predictions['taxid1'], predictions['target'])]
+
+    return predictions[keep]
 
 
 @st.cache_data(show_spinner=False)

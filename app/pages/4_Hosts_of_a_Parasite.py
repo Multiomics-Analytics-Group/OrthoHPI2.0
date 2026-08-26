@@ -21,9 +21,11 @@ data_dir = web_utils.get_data_dir()
 
 # The confidence the figures start at, and the range the slider spans, the same as the
 # other two pages. Worth knowing while reading it: the parasites with more than one host
-# are the small interactomes of the set, and the default leaves some of them three
-# interactions in a host -- lower the slider to see the comparison at full size
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.7
+# are the small interactomes of the set, and once the predictions are restricted to the
+# tissues a parasite infects the usual 0.7 leaves two parasites on the page and one of them
+# a single host, so this page opens at the bottom of the range and is raised rather than
+# lowered
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # One colour per host, fixed here and not read from config['hosts'], which is where the
 # rest of the app takes them from. This page is the only one that draws the hosts against
 # each other rather than one at a time, and the config colours do not survive that: human
@@ -63,6 +65,10 @@ GO_TOP_N = 12
 GO_LABEL_WRAP_WIDTH = 42
 # how many host proteins of a set have to carry a GO term for it to be drawn at all
 GO_MIN_IN_SET = 2
+# what the two sets of host proteins are called wherever they are counted or drawn
+SHARED_SET, SPECIFIC_SET = 'shared by every host', 'host-specific'
+# tissues below which the tissue figure is a single row of dots and is left undrawn
+MIN_TISSUES = 2
 
 
 def short_name(parasite):
@@ -457,25 +463,19 @@ def get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids):
     the last two columns are why: the human proteome is annotated far more deeply, so far
     more human proteins reach the transfer step at all.
 
-    The two 'available' columns are the pool the pipeline drew from and are not a superset
-    of the proteins reached: the tissue filter is not parasite-specific, so a host protein
-    kept for a tissue another parasite infects can still carry an interaction here. That is
-    why what was reached is counted twice -- in any tissue, and in a tissue this parasite
-    infects -- rather than compared against the pool.
+    The two 'available' columns are the pool the pipeline drew from, and the second of them
+    is a superset of the proteins reached: both are restricted to the tissues this parasite
+    infects, so the two can be read against each other.
     '''
     edges = df_pred[df_pred['taxid1_label'] == parasite]
     parasite_taxid = edges['taxid1'].iloc[0]
     available = count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids)
-    infected = get_infected_tissue_proteins(data_dir, config, parasite_taxid)
 
     coverage = edges.groupby('host').agg(**{
         'predicted interactions': ('target', 'size'),
         'parasite proteins': ('source', 'nunique'),
         'host proteins reached': ('target', 'nunique'),
         'host families reached': ('group2', 'nunique')}).reset_index()
-    reached_here = edges[edges['target'].isin(infected)].groupby('host')['target'].nunique()
-    coverage['reached in a tissue this parasite infects'] = coverage['host'].map(
-        reached_here).fillna(0).astype(int)
     coverage['host proteins available after the filters'] = coverage['host'].map(
         lambda h: available[h][0])
     coverage['available in a tissue this parasite infects'] = coverage['host'].map(
@@ -571,14 +571,17 @@ def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
     general = set(sizes[(sizes < GO_MIN_PROTEINS) | (sizes > GO_MAX_PROTEINS)].index)
 
     counted = []
-    for name, proteins in (('shared by every host', shared_proteins),
-                           ('host-specific', specific_proteins)):
+    for name, proteins in ((SHARED_SET, shared_proteins),
+                           (SPECIFIC_SET, specific_proteins)):
         terms = go_df[go_df['#string_protein_id'].isin(proteins)]
         terms = terms[~terms['description'].isin(general)]
         counts = terms.groupby('description')['#string_protein_id'].nunique()
         counts = counts[counts >= GO_MIN_IN_SET]
+        # the size of the set the count came out of, which is what makes a count of two
+        # comparable between a set of sixty proteins and a set of three
         counted.append(pd.DataFrame({'term': counts.index, 'set': name,
-                                     'proteins': counts.values}))
+                                     'proteins': counts.values,
+                                     'set_size': len(proteins)}))
 
     comparison = pd.concat(counted, ignore_index=True)
 
@@ -587,12 +590,33 @@ def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
 
 @st.cache_data(show_spinner=False)
 def generate_go_bars(comparison):
-    '''The GO terms of the two sets of host proteins as paired bars, the terms ranked by
-    how many proteins carry them in either set. A term drawn against one set only is one
-    the other set has fewer than GO_MIN_IN_SET proteins for, not one it has none for.'''
-    ranked = comparison.groupby('term')['proteins'].max().sort_values(ascending=False,
-                                                                     kind='stable')
-    terms = list(ranked.head(GO_TOP_N).index)
+    '''
+    The GO terms of the two sets of host proteins as paired bars.
+
+    Only the terms both sets carry are drawn, and they are ranked by how different the
+    share of each set carrying them is. Ranking by the count instead let the larger set
+    choose the terms: the shared set is two to five times the host-specific one for most
+    parasites, so the twelve biggest counts were twelve terms of the shared set, drawn
+    against nothing and read as a comparison. Ranking by the difference alone is no better,
+    since the largest difference is a term one set does not carry at all.
+
+    :param comparison: term, set, proteins and set_size, as get_go_comparison builds it
+    :return: the figure, or None if no term is carried by both sets
+    '''
+    counts = comparison.pivot_table(index='term', columns='set', values='proteins',
+                                    fill_value=0)
+    for name in (SHARED_SET, SPECIFIC_SET):
+        if name not in counts.columns:
+            return None
+
+    both = counts[(counts[SHARED_SET] > 0) & (counts[SPECIFIC_SET] > 0)]
+    if both.empty:
+        return None
+
+    sizes = comparison.drop_duplicates('set').set_index('set')['set_size']
+    difference = (both[SHARED_SET] / sizes[SHARED_SET]
+                  - both[SPECIFIC_SET] / sizes[SPECIFIC_SET]).abs()
+    terms = list(difference.sort_values(ascending=False, kind='stable').head(GO_TOP_N).index)
     view = comparison[comparison['term'].isin(terms)].copy()
     # the names of GO terms are sentences, and one of them beside an axis is as wide as the
     # figure, so they are broken over lines as the network page breaks them
@@ -602,8 +626,8 @@ def generate_go_bars(comparison):
 
     figure = px.bar(view, x='proteins', y='term', color='set', orientation='h',
                     barmode='group',
-                    color_discrete_map={'shared by every host': SHARED_COLOR,
-                                        'host-specific': PARTIAL_COLORS[0]},
+                    color_discrete_map={SHARED_SET: SHARED_COLOR,
+                                        SPECIFIC_SET: PARTIAL_COLORS[0]},
                     category_orders={'term': [wrapped[t] for t in terms]})
     figure.update_layout(height=max(360, 46 * len(terms) + 140), plot_bgcolor='white',
                          margin=dict(l=330, r=10, t=10, b=40), legend_title_text='',
@@ -622,10 +646,8 @@ def count_interactions_per_host_tissue(df_pred, parasite, data_dir, config):
     host protein is annotated to a tissue the parasite is known to infect, counted per
     host and tissue.
 
-    This is the one place the tissue restriction is applied, and it is why the rest of the
-    page does not apply it: a host whose proteins are annotated to none of the tissues the
-    parasite infects -- rat, for two of the rodent parasites -- disappears from it, and a
-    comparison with one host left in it is not a comparison.
+    The restriction itself is applied to every prediction the app loads
+    (web_utils.keep_infected_tissues); what this adds is the breakdown by tissue.
     '''
     edges = df_pred[df_pred['taxid1_label'] == parasite]
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
@@ -710,8 +732,8 @@ with settings:
     score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
                       help='Interactions predicted below this confidence are left out, as '
                            'on the other pages. These are the smallest interactomes of the '
-                           'set, so lowering it is often what makes the comparison big '
-                           'enough to read.')
+                           'set, so this page starts at the bottom of the range: raising it '
+                           'leaves fewer parasites with more than one host.')
 
 df_pred = get_multi_host_predictions(data_dir, config, pooled, score)
 
@@ -766,10 +788,9 @@ else:
         st.subheader('Predicted interactions relative to the available host proteins')
         st.caption('Interactions predicted in each host beside the pool of host proteins '
                    'available: those passing the secretome, tissue and DeepLoc filters, and '
-                   'those among them annotated to a tissue this parasite infects. The pool is '
-                   'not a superset of what was reached, as the tissue filter keeps a host '
-                   'protein expressed in a tissue any parasite infects, so an interaction is '
-                   'counted twice: in any tissue, and in a tissue this parasite infects.')
+                   'those among them annotated to a tissue this parasite infects. The second '
+                   'pool is what the predictions were drawn from, so a host with more '
+                   'predicted interactions than another may simply have more of it.')
         st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
                      width='stretch', hide_index=True)
 
@@ -803,26 +824,46 @@ else:
         # dots are drawn at the width of their content and leave half a page empty on their
         # own, which is the room the terms beside them take
         terms, tissues = st.columns([1, 1], gap='large')
+        # both columns keep their heading whether or not there is a figure under it: these
+        # two sit side by side, and a column that empties itself reads as something broken
+        # rather than as an answer
+        go_bars = generate_go_bars(comparison) if comparison is not None else None
         with terms:
-            if comparison is not None:
-                st.subheader('Gene Ontology terms of shared and host-specific proteins')
-                st.caption('Gene Ontology terms of the host proteins of the interactions '
-                           'found in every host, beside those of the interactions found in a '
-                           'single host. These are counts of proteins and not an enrichment. '
-                           f'Terms annotated to fewer than {GO_MIN_PROTEINS} or more than '
+            st.subheader('Gene Ontology terms of shared and host-specific proteins')
+            if go_bars is not None:
+                st.caption('Gene Ontology terms carried by the host proteins of the '
+                           'interactions found in every host and by those of the '
+                           'interactions found in a single host, for the terms both sets '
+                           'carry and ranked by how different the share of each set is. '
+                           'These are counts of proteins and not an enrichment. Terms '
+                           f'annotated to fewer than {GO_MIN_PROTEINS} or more than '
                            f'{GO_MAX_PROTEINS} proteins of the host are omitted.')
-                st.plotly_chart(generate_go_bars(comparison), width='stretch')
+                st.plotly_chart(go_bars, width='stretch')
+            elif comparison is not None:
+                st.caption('No term is carried by both the shared and the host-specific '
+                           'proteins of this parasite, so there is nothing to compare them '
+                           'on. The host-specific set is the smaller of the two and runs to '
+                           'a handful of proteins.')
+            else:
+                st.caption('None of the host proteins of this parasite carries a Gene '
+                           'Ontology term in the size range the figure selects on.')
 
         with tissues:
-            if per_tissue is not None:
-                st.subheader('Tissues in which the interactions can take place in each host')
-                st.caption('Predicted interactions per host and tissue, restricted to the '
-                           'tissues this parasite is known to infect. This is the only figure '
-                           'on the page that applies that restriction. A host absent from a '
+            st.subheader('Tissues in which the interactions can take place in each host')
+            if per_tissue is not None and per_tissue['Tissue'].nunique() >= MIN_TISSUES:
+                st.caption('Predicted interactions per host and tissue, broken down by the '
+                           'tissues this parasite is known to infect. A host absent from a '
                            'row has no annotated protein in that tissue.')
                 st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config,
                                                           pooled),
                                 width='content')
+            elif per_tissue is not None:
+                only = per_tissue['Tissue'].iloc[0]
+                st.caption(f'Every predicted interaction of {parasite} that can take place '
+                           f'does so in a single tissue, the {only}.')
+            else:
+                st.caption('No host protein of this parasite is annotated to a tissue it is '
+                           'known to infect.')
 
 st.markdown("---")
 

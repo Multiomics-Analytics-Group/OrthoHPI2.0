@@ -484,7 +484,8 @@ def generate_confidence_per_parasite(df, palette):
 
 
 st.caption('Protein-protein interactions between parasites and their hosts, predicted by '
-           'orthology transfer. This page presents the complete set of predictions per host; '
+           'orthology transfer and restricted to the host proteins expressed in a tissue '
+           'the parasite is known to infect. This page presents every prediction per host; '
            '**Parasites of a host** compares the parasites of a single host, **Hosts of a '
            'parasite** follows one parasite across the hosts it infects, and **Host-parasite '
            'network** shows the network of one host-parasite pair.')
@@ -495,7 +496,7 @@ parasite_palette = config.get('parasite_groups', {})
 
 st.subheader("Number of predicted interactions per parasite")
 st.caption('Predicted interactions per parasite, grouped by host and coloured by taxonomic '
-           'group. No confidence threshold or tissue restriction is applied.')
+           'group. No confidence threshold is applied.')
 st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette), width='stretch')
 
 st.subheader("Confidence of the predicted interactions per parasite")

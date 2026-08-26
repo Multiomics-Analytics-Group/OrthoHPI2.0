@@ -79,15 +79,40 @@ NETWORK_HEIGHT = 1000
 # height of each of the two structure viewers in the dialog an interaction opens
 VIEWER_HEIGHT = 400
 
-# Columns of the interactions table. The colors and shapes only exist to draw the
-# network, the taxids repeat their labels, the parasite and the edge type are the same
-# on every row, and the STRING source id is the taxid and the UniProt accession joined.
-# The host species is put back when the selected host covers more than one (Rodent is
+# Columns of the interactions table. The colors and shapes only exist to draw the network,
+# the taxids repeat their labels, and the parasite and the edge type are the same on every
+# row. The host species is put back when the selected host covers more than one (Rodent is
 # rat and mouse), where it is what tells the rows apart.
-TABLE_COLUMNS = ['source_name', 'source_full_name', 'source_uniprot',
+#
+# Both STRING ids are carried even though the parasite one is the taxid and the UniProt
+# accession joined and could be left to the reader to assemble: the host one cannot be --
+# 9606.ENSP00000312671 shares nothing with Q8N3D4 -- and a table whose two halves are
+# identified differently is a table that has to be explained before it can be used.
+TABLE_COLUMNS = ['source_name', 'source_full_name', 'source', 'source_uniprot',
                  'target_name', 'target_full_name', 'target', 'target_uniprot',
                  'Tissues', 'experimental_evidence_score',
                  'databases_evidence_score', 'weight', 'group1', 'group2']
+
+# what those columns are called once they are read by someone rather than by the network:
+# `source` is the parasite and `target` the host throughout the pipeline, which is not
+# something the table should ask its reader to know. The names are the ones the rest of the
+# app uses, so a column here and a caption elsewhere say the same word for the same thing.
+TABLE_COLUMN_NAMES = {
+    'source_name': 'Parasite protein',
+    'source_full_name': 'Parasite protein description',
+    'source': 'Parasite STRING id',
+    'source_uniprot': 'Parasite UniProt id',
+    'taxid2_label': 'Host species',
+    'target_name': 'Host protein',
+    'target_full_name': 'Host protein description',
+    'target': 'Host STRING id',
+    'target_uniprot': 'Host UniProt id',
+    'target_surface': 'DeepLoc class',
+    'experimental_evidence_score': 'Experimental evidence',
+    'databases_evidence_score': 'Database evidence',
+    'weight': 'Confidence score',
+    'group1': 'Parasite orthology group',
+    'group2': 'Host orthology group'}
 
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
@@ -303,7 +328,7 @@ def generate_interactions_table(df, score, annotations):
     '''
     table = df[df['weight'] >= score]
     if table.empty:
-        return table[TABLE_COLUMNS[:1]]
+        return table[TABLE_COLUMNS[:1]].rename(columns=TABLE_COLUMN_NAMES)
 
     tissues = table.groupby(['source', 'target'])['Tissue'].apply(
         lambda t: ', '.join(sorted(t.dropna().unique()))).rename('Tissues').reset_index()
@@ -322,7 +347,8 @@ def generate_interactions_table(df, score, annotations):
     if 'target_surface' in table.columns:
         columns.insert(columns.index('Tissues'), 'target_surface')
 
-    return table[columns].sort_values(by='weight', ascending=False)
+    return (table[columns].sort_values(by='weight', ascending=False)
+                          .rename(columns=TABLE_COLUMN_NAMES))
 
 
 def search_table(table, search):
@@ -343,6 +369,33 @@ def search_table(table, search):
         lambda column: column.str.contains(search, case=False, regex=False))
 
     return table[matches.any(axis=1)]
+
+
+def name_the_selection(table, parasite, host):
+    '''
+    The parasite and the host as two columns at the front of the table.
+
+    For the table on the page they would be the same value on every row -- one parasite and
+    one host group are selected before it is built -- and the host is only named there when
+    the group covers two species. The downloaded file is the other way round: it is read
+    away from the selectors that made it, and outlives the parasite name in its filename.
+
+    :param table: the interactions table, as generate_interactions_table returns it
+    :param str parasite: the selected parasite
+    :param str host: the selected host group
+    :return: the table with the two columns in front, or unchanged if it is empty
+    '''
+    if table.empty:
+        return table
+
+    # a host group covering two species already carries the species of each row, and that
+    # is the column the group name must not overwrite: it is the one thing the rows of a
+    # pooled host differ by
+    host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
+    named = table.assign(**{'Parasite species': parasite, host_column: host})
+    front = ['Parasite species', host_column]
+
+    return named[front + [c for c in named.columns if c not in front]]
 
 
 def generate_tissue_filters(df):
@@ -1000,7 +1053,8 @@ with st.container():
                         )
         st.download_button(
             label="Download Network Table",
-            data=utils.convert_df(table),
+            data=utils.convert_df(name_the_selection(table, selected_parasite,
+                                                     selected_host)),
             file_name=f'{selected_parasite}_network_table.tsv',
             mime='text/csv',
         )

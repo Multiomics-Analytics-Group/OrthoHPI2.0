@@ -468,19 +468,16 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
     against a null that is half the other organism, and whichever side has more proteins in
     the network decides what the section says.
 
-    The host side is tested against the proteins that came through the pipeline's filters,
-    not against the whole proteome. Those filters are why the network holds the proteins it
-    holds, so a proteome background reads them back as a result: at the lowest confidence
-    the page offers, the whole S. mansoni network returns 383 processes against the
-    proteome, led by cell-substrate adhesion -- which is the surface call that let those
-    proteins in -- and 104 against the pool, led by formation of primary germ layer. The
-    difference is smaller on the networks a high confidence leaves, which run to a few
-    proteins and can as easily gain terms as lose them: what changes there is which terms,
-    not how many.
-
-    The parasite side has no such pool to test against -- the pipeline keeps no table of
-    the proteins its secretome filter passed -- so it is still tested against every
-    annotated protein of the parasite, and reads as before.
+    Either side is tested against the proteins of its species that came through the
+    pipeline's filters, not against the whole proteome. Those filters are why a network
+    holds the proteins it holds, so a proteome background reads them back as a result: at
+    the lowest confidence the page offers, the whole S. mansoni network returns 383
+    processes against the proteome, led by cell-substrate adhesion -- which is the surface
+    call that let those host proteins in -- and 104 against the pool. Its parasite side
+    goes from 49 processes to 28, tested against the 826 proteins the secretome filter
+    passed rather than the 11,025 annotated ones. The difference is smaller on the
+    networks a high confidence leaves, which run to a few proteins and can as easily gain
+    terms as lose them: what changes there is which terms, not how many.
 
     :param pred_df: predictions of the network, above the chosen score
     :param str data_dir: directory holding gos.parquet
@@ -496,18 +493,17 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    if side == HOST:
-        # a host group covers more than one taxid (rat and mouse -> Rodent), so the pool is
-        # taken for the same species the network is read over
-        pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
-        if background == BACKGROUND_TISSUES:
-            parasite = pred_df['taxid1'].iloc[0]
-            pool = pool & web_utils.infected_tissue_proteins(
-                data_dir, utils.read_config(config_file), parasite)
-        # a data directory with no tissue table gives no pool, and is left on the proteome
-        # rather than emptied -- the same fallback the snapshot directories need elsewhere
-        if pool:
-            go_df = go_df[go_df['#string_protein_id'].isin(pool)]
+    # a host group covers more than one taxid (rat and mouse -> Rodent), so the pool is
+    # taken for the same species the network is read over
+    pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
+    if side == HOST and background == BACKGROUND_TISSUES:
+        parasite = pred_df['taxid1'].iloc[0]
+        pool = pool & web_utils.infected_tissue_proteins(
+            data_dir, utils.read_config(config_file), parasite)
+    # a data directory carrying neither table gives no pool, and is left on the proteome
+    # rather than emptied -- the same fallback the snapshot directories need elsewhere
+    if pool:
+        go_df = go_df[go_df['#string_protein_id'].isin(pool)]
     enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
     # A is the number of proteins of the side annotated to the term, which is what every
     # figure below sizes its marks by
@@ -1152,16 +1148,16 @@ with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
         st.caption('Biological processes over-represented among one side of the network. '
-                   'The host proteins are tested against the host proteins the pipeline '
-                   'had to work with -- the ones its expression and localisation filters '
-                   'passed -- and not against the whole proteome, which would return the '
-                   'filters themselves as a result. The parasite proteins are tested '
-                   'against every annotated protein of the parasite, as no such pool is '
-                   'kept for them. The two sides are tested apart: they are annotated to a '
-                   'different depth and were selected on different grounds. One-sided '
-                   "Fisher's exact test, corrected across terms with Benjamini-Hochberg; a "
-                   'process is tested when the background gives it at least 11 proteins, '
-                   'no more than a quarter of them, and at least two are in the network.')
+                   'Each side is tested against the proteins of its own species the '
+                   'pipeline had to work with -- the ones its filters passed, the host '
+                   'proteins on expression and localisation and the parasite proteins on '
+                   'being secreted -- and not against the whole proteome, which would '
+                   'return those filters themselves as a result. The two sides are tested '
+                   'apart: they are annotated to a different depth and were selected on '
+                   "different grounds. One-sided Fisher's exact test, corrected across "
+                   'terms with Benjamini-Hochberg; a process is tested when the background '
+                   'gives it at least 11 proteins, no more than a quarter of them, and at '
+                   'least two are in the network.')
         side = st.radio('Proteins to test', (HOST, PARASITE), horizontal=True,
                         help='The host proteins the parasite is predicted to reach, or the '
                              'parasite proteins reaching them.')

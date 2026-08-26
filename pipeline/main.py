@@ -61,6 +61,54 @@ def get_species_proteins(string_url, taxid):
     return proteins
 
 
+def filter_proteins(config_file, data_dir, proteins):
+    """
+    Narrow every species to the proteins an interaction could be predicted between: the
+    parasite proteins the secretome predictions call secreted or membrane-bound, and the
+    host proteins expressed in a tissue some parasite of the config infects and called
+    surface-exposed by DeepLoc.
+
+    Kept apart from run() so that the pool can be rebuilt for a data directory without
+    repeating the orthology transfer, which is the expensive half of the pipeline.
+
+    :param str config_file: path to the configuration file
+    :param str data_dir: directory holding the secretome and DeepLoc inputs
+    :param dict proteins: {taxid: {protein: name}} before filtering; filtered in place
+    :return: ({protein: name} over every species, {protein: [tissue, ...]} for the hosts)
+    """
+    # proteins stays a {taxid: {protein: name}} dict through all three filters,
+    # then is flattened to one {protein: name} dict for the homology transfer
+    proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
+    tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
+    # host proteins kept if DeepLoc calls them Extracellular or Cell membrane (surface-exposed)
+    filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
+                                 deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
+                                 extracellular_cutoff=DEEPLOC_EXTRACELLULAR_CUTOFF,
+                                 membrane_cutoff=DEEPLOC_MEMBRANE_CUTOFF)
+
+    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues
+
+
+def save_eligible_proteins(proteins, output_file):
+    """
+    Write the proteins the filters passed, over every species of the config.
+
+    This is what the app tests a network's enrichment against. A network holds the
+    proteins it holds because these are the ones it could have been built from, so the
+    whole proteome is the wrong background: tested against it, a network returns the
+    filters that made it -- surface processes for the hosts, secretion for the parasites
+    -- whichever parasite is being asked about. The parasites need this file, having no
+    tissue table to be read out of.
+
+    :param dict proteins: {protein: name} after the filters, over every species
+    :param str output_file: parquet path to write
+    """
+    eligible = pd.DataFrame(sorted(proteins.items()), columns=['protein', 'name'])
+    eligible['taxid'] = eligible['protein'].str.split('.').str[0]
+
+    utils.save_to_parquet(eligible, output_file)
+
+
 def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file):
     """
     Build the (Gene, Tissue, cell-type) annotation table and write it to parquet.
@@ -163,17 +211,13 @@ def run(config_file, data_dir, verbose=False):
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/DeepLoc filters...")
-    # proteins stays a {taxid: {protein: name}} dict through all three filters,
-    # then is flattened to one {protein: name} dict for the homology transfer
-    proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
-    tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
-    # host proteins kept if DeepLoc calls them Extracellular or Cell membrane (surface-exposed)
-    filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
-                                 deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
-                                 extracellular_cutoff=DEEPLOC_EXTRACELLULAR_CUTOFF,
-                                 membrane_cutoff=DEEPLOC_MEMBRANE_CUTOFF)
-    proteins = utils.merge_dict_of_dicts(dict_of_dicts=proteins)
+    proteins, tissues = filter_proteins(config_file=config_file, data_dir=data_dir,
+                                        proteins=proteins)
     print(f"  {len(proteins)} proteins after filtering")
+
+    print("Writing the proteins the filters passed...")
+    save_eligible_proteins(proteins=proteins,
+                           output_file=os.path.join(data_dir, 'eligible_proteins.parquet'))
 
     print("Annotating tissue and cell type expression...")
     get_tissue_cell_type_annotation(tissues=tissues, proteins=proteins, config_file=config_file, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))

@@ -157,21 +157,46 @@ def load_tissue_annotation(data_dir):
     return utils.read_parquet_file(input_file=tissue_file)
 
 
+@st.cache_data(show_spinner=False)
+def load_eligible_proteins(data_dir):
+    '''
+    The proteins the pipeline's filters passed, over every species, as
+    pipeline/main.py writes them (or scripts/build_eligible_proteins.py for a data
+    directory built before that file existed).
+
+    :param str data_dir: directory holding eligible_proteins.parquet
+    :return: the table, or None where the directory does not carry one
+    '''
+    eligible_file = os.path.join(data_dir, 'eligible_proteins.parquet')
+    if not os.path.exists(eligible_file):
+        return None
+
+    return utils.read_parquet_file(input_file=eligible_file)
+
+
 def filtered_pool(data_dir, taxids):
     '''
-    The host proteins of these species that the pipeline had to work with: the ones that
-    came through every filter, whether or not a parasite was predicted to reach them.
+    The proteins of these species that the pipeline had to work with: the ones that came
+    through every filter, whether or not an interaction was predicted for them.
 
-    This is the set a network of one parasite is drawn from, so it is the background any
-    enrichment of that network has to be read against. Tested against the whole proteome
-    instead, a network reports the filters that built it -- its host proteins were kept
-    for being surface or extracellular, and cell-surface processes come out enriched
-    whichever parasite is asked about.
+    This is the set a network is drawn from, so it is the background any enrichment of
+    that network has to be read against. Tested against the whole proteome instead, a
+    network reports the filters that built it -- its host proteins were kept for being
+    surface or extracellular and its parasite proteins for being secreted, and those are
+    the processes that come out enriched whichever parasite is asked about.
 
-    :param str data_dir: directory holding tissues_cell_types.parquet
-    :param tuple taxids: host taxids as strings
-    :return: set of STRING protein ids, empty where the directory carries no tissue table
+    A data directory written before eligible_proteins.parquet existed falls back to the
+    tissue table, which covers the hosts alone; its parasites are then left on the
+    proteome, which is what they were tested against before.
+
+    :param str data_dir: directory holding eligible_proteins.parquet
+    :param tuple taxids: taxids as strings, of either side
+    :return: set of STRING protein ids, empty where the directory carries neither table
     '''
+    eligible = load_eligible_proteins(data_dir)
+    if eligible is not None:
+        return set(eligible.loc[eligible['taxid'].isin(taxids), 'protein'])
+
     tissues = load_tissue_annotation(data_dir)
     if tissues is None:
         return set()

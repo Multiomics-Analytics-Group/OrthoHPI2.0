@@ -57,10 +57,12 @@ ABSENT_COLOR = '#e0e0e0'
 SYMBOLS_IN_LABEL = 3
 # a GO term is only worth comparing between the two sets of host proteins if it is neither
 # nearly empty nor nearly everything. The size is read off every annotated protein of the
-# host, so 500 is 3 in every 100 of them; the enrichment on the network page holds its
-# ceiling to a quarter of its background instead, and that background is the pool the
-# pipeline's filters passed rather than the whole annotation. The two are not the same
-# bounds and this figure is not an enrichment -- it counts proteins per term
+# hosts being compared -- two or more of them, so 36,000 to 54,000 proteins, and a term of
+# 500 covers fewer than 2 in every 100. Read off the pool the pipeline's filters passed
+# instead, the same terms are small enough that a ceiling on the share of it lets the
+# broadest of them back in: a quarter of a 2,420-protein pool is 605 proteins, which
+# admits `Regulation of primary metabolic process` and fills the figure with terms both
+# sets carry alike. This is a count and not an enrichment, and it keeps its own bounds
 GO_MIN_PROTEINS, GO_MAX_PROTEINS = 10, 500
 # GO terms drawn in the comparison of what the shared and the host-specific proteins do,
 # and the width their names are broken over lines at beside the axis -- the same width the
@@ -538,10 +540,10 @@ def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
 
     A count and not an enrichment: a host-specific set here runs to three proteins, and a
     Fisher test on three proteins reports whatever the smallest set happens to contain.
-    The terms are filtered to GO_MIN_PROTEINS..GO_MAX_PROTEINS of the host's annotated
-    proteins, which is what keeps `Cellular process` out of a figure meant to separate two
-    sets. Those are this figure's own bounds, read off the whole annotation; the network
-    page tests against the pool the filters passed and holds its ceiling to a share of it.
+    The terms are filtered to GO_MIN_PROTEINS..GO_MAX_PROTEINS of the annotated proteins
+    of the hosts being compared, which is what keeps `Cellular process` out of a figure
+    meant to separate two sets. Those are this figure's own bounds and not the ones the
+    network page's enrichment uses, which are a share of a much smaller background.
 
     :param tuple shared_proteins: host proteins carrying an interaction found in every host
     :param tuple specific_proteins: host proteins carrying one found in some hosts only
@@ -823,7 +825,7 @@ else:
                            'carry and ranked by how different the share of each set is. '
                            'These are counts of proteins and not an enrichment. Terms '
                            f'carried by fewer than {GO_MIN_PROTEINS} or more than '
-                           f'{GO_MAX_PROTEINS} of the host\'s annotated proteins are '
+                           f'{GO_MAX_PROTEINS} of the hosts\' annotated proteins are '
                            'omitted, as neither separates the two sets.')
                 st.plotly_chart(go_bars, width='stretch')
             elif comparison is not None:

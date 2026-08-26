@@ -125,6 +125,10 @@ ENRICHMENT_COLUMN_NAMES = {
     'fdr_bh': 'FDR (BH)'}
 GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 
+# rows to a page of either table. The grid is grown to the page rather than the page fitted
+# to a fixed height, so the last page of a short table is the only one drawn short
+TABLE_PAGE_SIZE = 10
+
 # Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
@@ -1057,7 +1061,11 @@ with st.container():
         if search.strip() and table.empty:
             st.info(f"No interaction holds '{search}'.")
         gb = GridOptionsBuilder.from_dataframe(table)
-        gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+        # a page of a known size with the grid grown to fit it. Sizing the page to a fixed
+        # height instead fits as many whole rows as it can and draws the remainder of the
+        # height as blank rows under the last one
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=TABLE_PAGE_SIZE)
+        gb.configure_grid_options(domLayout='autoHeight')
         gb.configure_side_bar() #Add a sidebar
         gridOptions = gb.build()
         grid_response = AgGrid(
@@ -1065,8 +1073,7 @@ with st.container():
                             gridOptions=gridOptions,
                             data_return_mode='AS_INPUT',
                             fit_columns_on_grid_load=False,
-                            enable_enterprise_modules=True,
-                            height=350
+                            enable_enterprise_modules=True
                         )
         st.download_button(
             label="Download Network Table",
@@ -1094,7 +1101,9 @@ with st.container():
             st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}. Select rows '
                        'to pick them out of the figures below.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
-            gb.configure_pagination(paginationAutoPageSize=True) #Add pagination
+            gb.configure_pagination(paginationAutoPageSize=False,
+                                    paginationPageSize=TABLE_PAGE_SIZE)
+            gb.configure_grid_options(domLayout='autoHeight')
             gb.configure_side_bar() #Add a sidebar
             gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children") #Enable multi-row selection
             gridOptions = gb.build()
@@ -1103,8 +1112,7 @@ with st.container():
                                 gridOptions=gridOptions,
                                 data_return_mode='AS_INPUT',
                                 fit_columns_on_grid_load=False,
-                                enable_enterprise_modules=True,
-                                height=350
+                                enable_enterprise_modules=True
                             )
             selected_rows = grid_response['selected_rows']
             st.download_button(

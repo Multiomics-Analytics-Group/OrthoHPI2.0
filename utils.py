@@ -55,14 +55,18 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
     proteins carry it and then testing whether they over-carry it is the same question
     asked twice, and on a set of twenty proteins it leaves almost nothing to test.
 
+    The test is one-sided: only a term the set carries more often than the background is
+    a result here, and a two-sided test would let a term the set is depleted of pass under
+    a heading that reads as over-representation.
+
     :param proteins: the protein ids to test, as STRING ids
-    :param go_df: GO annotations of their species, with columns #string_protein_id and
-                  description
+    :param go_df: GO annotations of their species, with columns #string_protein_id, term
+                  (the GO id, which identifies a term) and description (its name)
     :param int min_term: smallest background term tested, exclusive
     :param int max_term: largest background term tested, exclusive
     :param int min_in_set: proteins of the set a term needs before it is worth testing
-    :return: dataframe of go_term, the four cells of the table, p_value, odds_ratio, the
-             proteins behind it, and the Benjamini-Hochberg corrected fdr_bh
+    :return: dataframe of go_id and go_term, the four cells of the table, p_value,
+             odds_ratio, the proteins behind it, and the Benjamini-Hochberg corrected fdr_bh
     """
     annotated = set(go_df['#string_protein_id'])
     # the universe is what is annotated: a protein no term can be counted against belongs
@@ -71,15 +75,18 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
     total_nodes = len(tested)
     total_prots = len(annotated)
 
-    sizes = go_df.groupby('description')['#string_protein_id'].nunique()
+    # a term is held by its GO id and named by its description, which is what the app
+    # writes on the figures
+    names = dict(go_df[['term', 'description']].drop_duplicates().values)
+    sizes = go_df.groupby('term')['#string_protein_id'].nunique()
     in_set = (go_df[go_df['#string_protein_id'].isin(tested)]
-              .groupby('description')['#string_protein_id'].nunique())
+              .groupby('term')['#string_protein_id'].nunique())
     terms = sizes[(sizes > min_term) & (sizes < max_term)].index.intersection(
         in_set[in_set >= min_in_set].index)
 
     enrichment = []
-    for term, ids in go_df[go_df['description'].isin(terms)].groupby(
-            'description')['#string_protein_id']:
+    for term, ids in go_df[go_df['term'].isin(terms)].groupby(
+            'term')['#string_protein_id']:
         members = set(ids)
         net_members = members & tested
 
@@ -91,13 +98,16 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=
         b = total_nodes - a
         c = len(members) - a
         d = total_prots - len(members) - total_nodes + a
-        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]])
-        enrichment.append([term, a, b, c, d, p_value, odd_ratio, ','.join(sorted(net_members))])
+        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]], alternative='greater')
+        enrichment.append([term, names.get(term, term), a, b, c, d, p_value, odd_ratio,
+                           ','.join(sorted(net_members))])
 
-    enrichment = pd.DataFrame(enrichment, columns=['go_term', 'A', 'B', 'C', 'D', 'p_value',
-                                                   'odds_ratio', 'nodes'])
+    enrichment = pd.DataFrame(enrichment, columns=['go_id', 'go_term', 'A', 'B', 'C', 'D',
+                                                   'p_value', 'odds_ratio', 'nodes'])
     if not enrichment.empty:
-        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), alpha=0.01,
+        # only the corrected p-values are used, and those do not depend on a threshold:
+        # the significance a term has to reach is chosen in the app, term by term
+        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(),
                                              method='fdr_bh')[1]
         enrichment = enrichment.sort_values(by='fdr_bh', ascending=True)
 

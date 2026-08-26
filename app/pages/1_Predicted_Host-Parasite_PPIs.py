@@ -614,7 +614,7 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
 
 @st.cache_data(show_spinner=False)
 def load_ontology_parents(data_dir):
-    '''child term -> its parent terms, the shape the ontology is walked upward in.'''
+    '''child GO id -> its parent GO ids, the shape the ontology is walked upward in.'''
     ontology = load_ontology(data_dir)
 
     return ontology.groupby('child')['parent'].apply(list).to_dict()
@@ -627,6 +627,9 @@ def nearest_enriched_ancestors(terms, parents_of):
     ancestor sit at the top level. The ontology is a graph rather than a tree -- a term
     can have several parents -- so it is walked breadth-first and the first enriched
     level reached wins.
+
+    Terms are GO ids here rather than names: the ontology is keyed by id, and a name
+    that does not match a node in it would leave the term looking like a root.
     '''
     enriched = set(terms)
     ancestors = {}
@@ -669,8 +672,9 @@ def get_enrichment_summary(enrichment_df, parents_of):
     enriched term above it, and the area of a block is the number of proteins of the
     network annotated to it.
     '''
-    view = prepare_enrichment_view(enrichment_df).drop_duplicates(subset='go_term')
-    terms = view['go_term'].tolist()
+    view = prepare_enrichment_view(enrichment_df).drop_duplicates(subset='go_id')
+    terms = view['go_id'].tolist()
+    labels = view['go_term'].tolist()
     ancestors = nearest_enriched_ancestors(terms, parents_of)
     odds_text = np.where(view['capped'], 'infinite',
                          view['odds_ratio_plot'].map('{:.1f}'.format))
@@ -686,10 +690,12 @@ def get_enrichment_summary(enrichment_df, parents_of):
     # It is given the palest step of the ramp, and the scale is pinned to the terms so
     # that the root cannot shift it
     fig = pgo.Figure(pgo.Treemap(
+        # a block is held by its GO id and named by its term, so two processes cannot
+        # collide and the nesting follows the ontology rather than the wording
         ids=[GO_TREEMAP_ROOT_ID] + terms,
         # unwrapped: a block draws its name on one line and drops it when it does not
         # fit, which keeps the header of a group readable instead of hiding it
-        labels=[GO_TREEMAP_ROOT_LABEL] + terms,
+        labels=[GO_TREEMAP_ROOT_LABEL] + labels,
         parents=[''] + [ancestors[t] or GO_TREEMAP_ROOT_ID for t in terms],
         values=[0] + view['n_proteins'].tolist(),
         # a parent term keeps its own proteins on top of those of the terms nested in it
@@ -1109,9 +1115,10 @@ with st.container():
         st.caption('Biological processes over-represented among one side of the network, '
                    'against every annotated protein of that side\'s species. The two sides '
                    'are tested apart: they are annotated to a different depth and were '
-                   "selected on different grounds. Fisher's exact test, corrected across "
-                   'terms with Benjamini-Hochberg; a process is tested when its species '
-                   'gives it 11 to 499 proteins and at least two of them are in the network.')
+                   "selected on different grounds. One-sided Fisher's exact test, "
+                   'corrected across terms with Benjamini-Hochberg; a process is tested '
+                   'when its species gives it 11 to 499 proteins and at least two of them '
+                   'are in the network.')
         side = st.radio('Proteins to test', (HOST, PARASITE), horizontal=True,
                         help='The host proteins the parasite is predicted to reach, or the '
                              'parasite proteins reaching them.')

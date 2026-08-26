@@ -384,6 +384,27 @@ def filter_tissues(config, df):
     
     return df
 
+def count_ticks(figure, largest, axis='x', **kwargs):
+    '''
+    Put whole numbers on an axis that counts things.
+
+    Left to itself plotly divides a short range into halves, so a figure whose tallest bar
+    is three proteins is ruled at 0.5, 1.0, 1.5 -- and half a protein is not a quantity.
+    Above ten its own steps are whole numbers already and are left alone, since one tick
+    per unit would crowd the axis.
+
+    :param figure: the figure to rule
+    :param largest: the largest count drawn
+    :param str axis: 'x' or 'y'
+    :param kwargs: passed on to the axis, so a caller can rule it in one call
+    '''
+    update = figure.update_xaxes if axis == 'x' else figure.update_yaxes
+    if largest <= 10:
+        update(dtick=1, tickformat='d', **kwargs)
+    else:
+        update(tickformat='d', **kwargs)
+
+
 # The sources the predictions are built from, as (name, link, logo file), in the order the
 # pipeline reaches them: the orthologous groups, the interactions transferred along them,
 # then what the host protein has to be to keep a prediction, and the structures shown of

@@ -345,8 +345,8 @@ def generate_combination_bars(links, all_hosts, config, pooled):
     # tallest bar
     figure.update_layout(height=460, plot_bgcolor='white', showlegend=False,
                          margin=dict(l=150, r=10, t=45, b=20), bargap=0.4)
-    figure.update_yaxes(title_text='orthology-group links', showgrid=True,
-                        gridcolor='#f0f0f0', row=1, col=1)
+    web_utils.count_ticks(figure, counts.max(), axis='y', title_text='orthology-group links',
+                showgrid=True, gridcolor='#f0f0f0', row=1, col=1)
     figure.update_yaxes(title_text=None, categoryorder='array', categoryarray=all_hosts[::-1],
                         showgrid=False, row=2, col=1)
     figure.update_xaxes(showticklabels=False, row=1, col=1)
@@ -622,7 +622,7 @@ def generate_go_bars(comparison):
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title='host proteins annotated to the term',
                          yaxis_title=None, bargap=0.3)
-    figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0')
+    web_utils.count_ticks(figure, view['proteins'].max(), showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 

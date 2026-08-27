@@ -27,9 +27,11 @@ data_dir = web_utils.get_data_dir()
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
-# what a host protein with no HPA cell type annotation is filed under. Every host but
-# human is entirely this, since the HPA single cell data is human only
-NO_CELL_TYPE = 'Not available'
+# share of the nTPM a host protein reaches anywhere in a tissue that one of its cell types
+# has to carry for the protein to count as expressed there. The HPA rows are kept from
+# nTPM > 0, at which the median protein is annotated in every cell type of its tissue, so
+# presence alone gives every cell type of a tissue the same count
+PEAK_FRACTION = 0.5
 # colour of the chords at rest, before a parasite is hovered in the circos plot
 REST_COLOR = '#bdbdbd'
 # confidence the figures of shared interactors start at, and the range the slider spans.
@@ -87,12 +89,22 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     same interaction once per cell type. That number is how finely the HPA annotates the
     tissue -- lung has 13 cell types, blood has one -- and not how many interactions can
     take place there. The two frames therefore do not add up to each other, on purpose.
+
+    The tissue counts take a host protein to be present wherever the HPA annotates it,
+    while the cell type counts keep only the cell types the protein is concentrated in
+    (PEAK_FRACTION of the nTPM it reaches anywhere in that tissue). A protein is detected
+    at some level in nearly every cell type of its tissue, so counting presence per cell
+    type draws the same bar for all of them; what differs between cell types is where the
+    protein is abundant. Host proteins the HPA gives no cell type -- every host but human,
+    the single cell data being human only -- are counted in their tissue and left out of
+    the cell type frame.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
         ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type']]
+    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
+                                                         'nTPM']]
 
     mapped_tissues = config['tissues']
     infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
@@ -103,17 +115,21 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     aux = predictions.drop_duplicates().astype({'taxid1': str})
     aux = pd.merge(aux, tissues, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
-    aux['Cell type'] = aux['Cell type'].fillna(NO_CELL_TYPE)
 
     # the pair is (source, target_name) rather than (source, target) for the same reason the
     # dot matrix draws one dot: a host group covering two species -- Rodent is rat and mouse
     # -- holds the same gene under an id of each, and that is one interaction, not two
-    def pairs(*level):
-        return (aux.drop_duplicates(list(level) + ['source', 'target_name'])
-                   .groupby(list(level), observed=True).size()
-                   .rename('interactions').reset_index())
+    def pairs(frame, *level):
+        return (frame.drop_duplicates(list(level) + ['source', 'target_name'])
+                     .groupby(list(level), observed=True).size()
+                     .rename('interactions').reset_index())
 
-    return pairs('taxid1_label', 'Tissue'), pairs('taxid1_label', 'Tissue', 'Cell type')
+    # the rows with no nTPM are the hosts the HPA does not cover, and drop out of the
+    # comparison rather than being kept as a cell type of their own
+    peak = aux['nTPM'] >= PEAK_FRACTION * aux.groupby(['target', 'Tissue'])['nTPM'].transform('max')
+
+    return (pairs(aux, 'taxid1_label', 'Tissue'),
+            pairs(aux[peak], 'taxid1_label', 'Tissue', 'Cell type'))
 
 
 @st.cache_data(show_spinner=False)
@@ -173,23 +189,27 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
 
     Summing over parasites is sound here where summing over cell types is not: two
     parasites interacting in the same cell type are two different interactions.
+
+    A bar counts the interactions with host proteins concentrated in that cell type, which
+    count_interactions_per_tissue defines; a protein abundant in several is counted in each,
+    so the bars still overlap and do not partition the tissue.
     '''
     data = per_cell_type[per_cell_type['Tissue'] == tissue].copy()
     data['group'] = data['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     data['parasite'] = data['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     totals = data.groupby('Cell type')['interactions'].sum().sort_values(ascending=False,
                                                                         kind='stable')
-    # the proteins with no cell type annotation are not a cell type and are not a small one
-    # either, so they go last however many interactions they carry
-    cell_types = [c for c in totals.index if c != NO_CELL_TYPE]
-    cell_types += [c for c in totals.index if c == NO_CELL_TYPE]
+    cell_types = list(totals.index)
 
     figure = px.bar(data, x='interactions', y='Cell type', color='group', orientation='h',
                     color_discrete_map=palette, category_orders={
                         'Cell type': cell_types,
                         'group': [g for g in palette if g in set(data['group'])]},
                     custom_data=['parasite'])
-    figure.update_traces(hovertemplate='%{y}<br>%{customdata[0]}<br>predicted interactions: '
+    # two parasites of one group are two segments of the same colour, and would read as a
+    # single bar without a line to part them
+    figure.update_traces(marker_line=dict(color='white', width=1),
+                         hovertemplate='%{y}<br>%{customdata[0]}<br>predicted interactions: '
                                        '%{x}<extra></extra>')
     figure.update_layout(height=max(320, 26 * len(cell_types) + 160), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
@@ -986,18 +1006,20 @@ if selected_host != web_utils.NO_HOST:
                         width='stretch')
 
     # cell types are only worth drawing one tissue at a time, and only for a host they are
-    # annotated for: the HPA single cell data is human, so every other host is entirely
-    # NO_CELL_TYPE and the bars would be one bar
+    # annotated for: the HPA single cell data is human, so every other host has no cell type
+    # at all and nothing to draw
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
-    annotated = set(per_cell_type.loc[per_cell_type['Cell type'] != NO_CELL_TYPE, 'Tissue'])
+    annotated = set(per_cell_type['Tissue'])
     choices = [t for t in ranked.index if t in annotated]
     if choices:
         st.subheader("Cell types of a tissue")
         st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
-                   'taxonomic group. Cell types overlap, as a host protein expressed in '
-                   'several is counted in each, so the bars are not a partition of the '
-                   'tissue.')
+                   'taxonomic group. A host protein counts towards a cell type where it '
+                   'reaches at least half the expression it has anywhere in the tissue, so '
+                   'the bars are the cell types the interaction partners are concentrated '
+                   'in. A protein abundant in several counts in each, and the bars are '
+                   'therefore not a partition of the tissue.')
         tissue = st.selectbox('Tissue', choices, index=0,
                               help='Tissues with cell type annotation, most interactions first')
         st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,

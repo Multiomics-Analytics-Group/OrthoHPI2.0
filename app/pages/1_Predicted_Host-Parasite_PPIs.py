@@ -817,6 +817,12 @@ def annotate_edges(edges, df, annotations):
     host to parasite -- so the pair is looked up unordered and written back with the
     parasite protein always first.
 
+    What the prediction was transferred from travels with the edge too: the two orthology
+    groups and the two evidence scores STRING gives their link. The edge is drawn between
+    two proteins, but nothing about those two proteins was measured -- the pair exists
+    because their groups interact -- so the groups are what a reader has to see to know
+    what the edge stands on.
+
     :param list edges: vis.js edge dictionaries, as pyvis built them
     :param df: predictions dataframe of the selected parasite
     :param dict annotations: STRING id --> descriptive protein name
@@ -825,7 +831,8 @@ def annotate_edges(edges, df, annotations):
     # the species travels with the edge as well, so the dialog can name it beside each
     # protein and say which of the two models is the parasite's and which the host's
     cols = ['source', 'source_name', 'source_uniprot', 'taxid1_label',
-            'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight']
+            'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight',
+            'group1', 'group2', 'experimental_evidence_score', 'databases_evidence_score']
     pairs = {}
     for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
         pairs[frozenset((row.source, row.target))] = {
@@ -839,7 +846,14 @@ def annotate_edges(edges, df, annotations):
             'host_uniprot': None if pd.isna(row.target_uniprot) else str(row.target_uniprot),
             'host_full': annotations.get(row.target, ''),
             'host_species': str(row.taxid2_label),
-            'weight': float(row.weight)}
+            'weight': float(row.weight),
+            'parasite_group': str(row.group1),
+            'host_group': str(row.group2),
+            # the two scores the weight is the mean of, kept apart: a link carried by
+            # experiments and one carried by a database curation average out the same and
+            # are not the same evidence
+            'experimental': float(row.experimental_evidence_score),
+            'databases': float(row.databases_evidence_score)}
 
     annotated = []
     for edge in edges:
@@ -891,14 +905,25 @@ def show_structure(pdb_file):
 def show_structures_dialog(edge):
     '''
     Shows the AlphaFold model of each of the two proteins of the interaction that was
-    clicked in the network. Opened over the network rather than placed under it so that
-    the table and the enrichment plots below do not move on every click.
+    clicked in the network, over the orthology groups the interaction was transferred from.
+    Opened over the network rather than placed under it so that the table and the
+    enrichment plots below do not move on every click.
+
+    The provenance is named as a pair of groups and not as a pair of proteins, which is
+    what it is: the link comes from STRING's COG links, one row per pair of orthology
+    groups, and no interaction between these two proteins was ever measured. Writing it
+    the other way round -- an interaction between two named proteins somewhere in STRING
+    -- would be inventing a record the transfer never had.
 
     :param dict edge: the clicked edge, as annotated by annotate_edges
     '''
     st.markdown(f"**{edge['parasite']}** ({edge['parasite_species']}) &ndash; "
                 f"**{edge['host']}** ({edge['host_species']}) &nbsp;·&nbsp; "
                 f"interaction confidence score {edge['weight']:.2f}", unsafe_allow_html=True)
+    st.caption(f"Transferred from the STRING link between orthology groups "
+               f"**{edge['parasite_group']}** (parasite) and **{edge['host_group']}** "
+               f"(host), scored on experimental evidence {edge['experimental']:.2f} and "
+               f"database evidence {edge['databases']:.2f}.")
     st.markdown(strv.plddt_legend(), unsafe_allow_html=True)
 
     # one entry per protein rather than a dict keyed by protein name, so the species stays

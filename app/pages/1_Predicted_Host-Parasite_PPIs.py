@@ -437,10 +437,28 @@ def generate_tissue_filters(df):
 
     return options
 
-def generate_cell_type_filters(df):
-    options = df['Cell type'].dropna().unique().tolist()
+def generate_cell_type_filters(df, score):
+    '''
+    The cell types on offer, the one holding the most host proteins first, and how many
+    each holds. The count is what makes one cell type worth picking over another, and it
+    is read off the interactions above the confidence slider so that an option never
+    promises proteins the network is not drawing.
 
-    return options
+    A cell type holds the host proteins concentrated in it rather than those merely
+    detected there (web_utils.keep_peak_cell_types, which says why), and the filter that
+    reads these options keeps the same rows.
+
+    :param dataframe df: the predictions of the parasite, annotated with tissues
+    :param float score: confidence the network is drawn from
+    :return: series of host proteins per cell type, its index the options themselves
+    '''
+    annotated = df[(df['weight'] >= score) & df['Cell type'].notna()]
+    if annotated.empty:
+        return pd.Series(dtype=int)
+
+    return (web_utils.keep_peak_cell_types(annotated)
+                     .groupby('Cell type')['target_name'].nunique()
+                     .sort_values(ascending=False, kind='stable'))
 
 def generate_surface_filters(df):
     '''
@@ -1007,15 +1025,25 @@ with col2:
         # tissue as well, and someone after a cell type had to find its tissue first to be
         # allowed to ask for it. Picking tissues first narrows what is offered here, since
         # the options are read off whatever is left of the predictions
-        cell_type_options = generate_cell_type_filters(df_select)
-        if len(cell_type_options) > 0:
+        cell_type_counts = generate_cell_type_filters(df_select, score)
+        if len(cell_type_counts) > 0:
+            def cell_type_label(cell_type):
+                proteins = cell_type_counts[cell_type]
+
+                return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
+
             selected_cell_types = st.multiselect(
-                'Select cell types to filter the predicted PPI', cell_type_options,
-                help='The single cell annotation is human, so this is offered for human '
-                     'host proteins alone. A host protein with no cell type annotation is '
-                     'left out once a cell type is chosen.')
+                'Select cell types to filter the predicted PPI', list(cell_type_counts.index),
+                format_func=cell_type_label,
+                help='A cell type is offered with the number of host proteins concentrated '
+                     'in it -- expressed there at half at least of what they reach anywhere '
+                     'in the tissue, since nearly every protein of a tissue is detected in '
+                     'nearly every one of its cell types. The single cell annotation is '
+                     'human, so this is offered for human host proteins alone, and a host '
+                     'protein with no cell type is left out once a cell type is chosen.')
             if len(selected_cell_types) > 0:
-                df_select = df_select[df_select['Cell type'].isin(selected_cell_types)]
+                peak = web_utils.keep_peak_cell_types(df_select[df_select['Cell type'].notna()])
+                df_select = peak[peak['Cell type'].isin(selected_cell_types)]
 
         # localisation is independent of the tissue, so it filters beside the tissues
         # rather than inside them: a host protein is on the cell surface or in the space

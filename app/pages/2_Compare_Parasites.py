@@ -27,11 +27,6 @@ data_dir = web_utils.get_data_dir()
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
-# share of the nTPM a host protein reaches anywhere in a tissue that one of its cell types
-# has to carry for the protein to count as expressed there. The HPA rows are kept from
-# nTPM > 0, at which the median protein is annotated in every cell type of its tissue, so
-# presence alone gives every cell type of a tissue the same count
-PEAK_FRACTION = 0.5
 # colour of the chords at rest, before a parasite is hovered in the circos plot
 REST_COLOR = '#bdbdbd'
 # confidence the figures of shared interactors start at, and the range the slider spans.
@@ -92,12 +87,9 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
 
     The tissue counts take a host protein to be present wherever the HPA annotates it,
     while the cell type counts keep only the cell types the protein is concentrated in
-    (PEAK_FRACTION of the nTPM it reaches anywhere in that tissue). A protein is detected
-    at some level in nearly every cell type of its tissue, so counting presence per cell
-    type draws the same bar for all of them; what differs between cell types is where the
-    protein is abundant. Host proteins the HPA gives no cell type -- every host but human,
-    the single cell data being human only -- are counted in their tissue and left out of
-    the cell type frame.
+    (web_utils.keep_peak_cell_types, which says why). Host proteins the HPA gives no cell
+    type -- every host but human, the single cell data being human only -- are counted in
+    their tissue and left out of the cell type frame.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
         ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
@@ -124,12 +116,8 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
                      .groupby(list(level), observed=True).size()
                      .rename('interactions').reset_index())
 
-    # the rows with no nTPM are the hosts the HPA does not cover, and drop out of the
-    # comparison rather than being kept as a cell type of their own
-    peak = aux['nTPM'] >= PEAK_FRACTION * aux.groupby(['target', 'Tissue'])['nTPM'].transform('max')
-
     return (pairs(aux, 'taxid1_label', 'Tissue'),
-            pairs(aux[peak], 'taxid1_label', 'Tissue', 'Cell type'))
+            pairs(web_utils.keep_peak_cell_types(aux), 'taxid1_label', 'Tissue', 'Cell type'))
 
 
 @st.cache_data(show_spinner=False)

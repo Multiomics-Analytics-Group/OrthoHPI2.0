@@ -32,6 +32,10 @@ UNKNOWN_COLOR = '#999999'
 # are sized as if every host had at least this many parasites. Human has 35 against the
 # two of pig, and strictly proportional columns leave pig a strip its labels overrun.
 MIN_COLUMN = 4
+# the confidence the counts of the page are drawn at, and the range the slider spans, the
+# same default and range as the network page: a parasite counted here then agrees with the
+# network the reader opens next instead of being several times larger than it
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.7
 # share of the height of a figure taken by the strip of taxonomic group under its columns.
 # Enough to read as a band of colour, not enough to be read as a quantity of its own
 BAND_HEIGHT = 0.06
@@ -166,7 +170,7 @@ def style_host_columns(figure, y_title):
 
 
 @st.cache_data(show_spinner=False)
-def get_interactor_proteins(data_dir, config, side):
+def get_interactor_proteins(data_dir, config, side, score=None):
     '''
     One side of the predicted interactions, protein by protein, with what DeepLoc says
     about where each protein sits: the probability that it is extracellular -- in the space
@@ -187,6 +191,11 @@ def get_interactor_proteins(data_dir, config, side):
     :param str data_dir: directory holding predictions.parquet and the localisations
     :param dict config: parsed configuration
     :param str side: 'source' for the parasite proteins, 'target' for the host proteins
+    :param score: keep only the proteins of interactions predicted at or above this
+                  confidence, or None for every prediction. The figures of the page take
+                  it both ways: the proportions are read at the threshold, the boxes of
+                  the probability itself at every prediction, since a box standing on the
+                  eight proteins a threshold leaves is not a distribution
     :return: one row per host, parasite and protein, or None without a localisation table
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
@@ -194,6 +203,8 @@ def get_interactor_proteins(data_dir, config, side):
         return None
 
     predictions = web_utils.load_predictions(data_dir)
+    if score is not None:
+        predictions = predictions[predictions['weight'] >= score]
     surface = localisations.assign(surface=web_utils.classify_surface(localisations))
 
     frames = []
@@ -214,7 +225,7 @@ def get_interactor_proteins(data_dir, config, side):
 
 
 @st.cache_data(show_spinner=False)
-def get_surface_counts(proteins):
+def get_surface_counts(proteins, every=None):
     '''
     How many of each parasite's proteins fall in each of the surface classes.
 
@@ -225,6 +236,10 @@ def get_surface_counts(proteins):
     to nobody -- every host protein is here because it was called one or the other.
 
     :param proteins: the proteins of one side, as get_interactor_proteins builds them
+    :param every: the same proteins before the confidence threshold, to keep a parasite the
+                  threshold emptied as a column with nothing in it. Dropping it instead
+                  would take a column out of this figure and leave it in the figures above
+                  and below, which are read across the page as the same columns
     :return: one row per host and parasite
     '''
     counts = proteins.pivot_table(index=['host', 'taxid1_label', 'name', 'group',
@@ -235,8 +250,14 @@ def get_surface_counts(proteins):
                           web_utils.NOT_SURFACE]:
         if surface_class not in counts.columns:
             counts[surface_class] = 0
+    counts = counts.reset_index()
 
-    return counts.reset_index()
+    if every is not None:
+        keys = ['host', 'taxid1_label', 'name', 'group', 'group_rank']
+        counts = (every[keys].drop_duplicates()
+                  .merge(counts, on=keys, how='left').fillna(0))
+
+    return counts
 
 
 @st.cache_data(show_spinner=False)
@@ -427,19 +448,29 @@ def generate_host_score_boxes(proteins, point_size=3):
 
 
 @st.cache_data(show_spinner=False)
-def generate_interactions_per_parasite(df, palette):
+def generate_interactions_per_parasite(df, palette, score):
     '''
-    How many interactions are predicted for each parasite, in one column per host.
+    How many interactions are predicted for each parasite at or above a confidence, in one
+    column per host.
 
     The bars are coloured by taxonomic group rather than one colour per parasite: the
     colour then carries something -- the same something the circos, the heatmap strips
     and the dot matrix are coloured by -- instead of only telling neighbouring bars apart,
     which their position already does.
+
+    The columns are laid out from every prediction and only the bars are thresholded, so a
+    parasite left with nothing keeps its place on the axis and is read as an absence rather
+    than disappearing out of a figure the one below it still draws it in.
+
+    :param df: overview predictions, as get_overview_predictions builds them
+    :param dict palette: {taxonomic group: colour}
+    :param float score: the confidence to count from
     '''
     figure, hosts = host_columns(df)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
-        counts = host_df.groupby(['name', 'group'], observed=True).size().reset_index(name='count')
+        kept = host_df[host_df['weight'] >= score]
+        counts = kept.groupby(['name', 'group'], observed=True).size().reset_index(name='count')
         for group, rows in counts.groupby('group', observed=True):
             figure.add_trace(
                 go.Bar(x=rows['name'], y=rows['count'], name=group,
@@ -457,14 +488,24 @@ def generate_interactions_per_parasite(df, palette):
 
 
 @st.cache_data(show_spinner=False)
-def generate_confidence_per_parasite(df, palette):
+def generate_confidence_per_parasite(df, palette, score):
     '''
     The spread of the confidence score of each parasite's predicted interactions, in the
     same columns and colours as the counts above, so the two figures are read together:
     a parasite with many interactions and a low box has many weakly supported ones.
 
+    The one figure of the page the slider does not filter, drawn on every prediction with
+    the slider as a line across it instead. Filtering a distribution by the axis it is
+    drawn on says nothing -- every lower whisker becomes the slider -- where the line makes
+    this figure the key to the slider: how much of a parasite's box stands above it is how
+    much of that parasite survives into the counts above.
+
     The outlying points are left off. Every interaction is a point, and a few hundred of
     them beside each box hide the boxes themselves.
+
+    :param df: overview predictions, as get_overview_predictions builds them
+    :param dict palette: {taxonomic group: colour}
+    :param float score: where the counts above are cut, drawn as a line
     '''
     figure, hosts = host_columns(df)
     labelled = set()
@@ -480,7 +521,12 @@ def generate_confidence_per_parasite(df, palette):
             labelled.add(group)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
 
-    return style_host_columns(figure, 'confidence score')
+    figure = style_host_columns(figure, 'confidence score')
+    figure.add_hline(y=score, line_width=1, line_dash='dot', line_color='#969696',
+                     annotation_text='counted above', annotation_position='top left',
+                     annotation_font=dict(size=10, color='#969696'))
+
+    return figure
 
 
 st.caption('Protein-protein interactions between parasites and their hosts, predicted by '
@@ -494,45 +540,76 @@ st.markdown("---")
 overview = get_overview_predictions(data_dir, config)
 parasite_palette = config.get('parasite_groups', {})
 
+# one slider for the counts and the proportions of the page, so what is counted here is
+# what the network page opens on rather than several times more of it. It sits in the
+# middle of three columns, as the sliders of the other pages do: left to itself a slider
+# takes the whole width of the page, which is a metre of track for a range of half a point
+with st.columns(3)[1]:
+    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
+                      help='Interactions predicted below this confidence are left out of '
+                           'the counts and the proportions. The boxplots keep every '
+                           'prediction: the confidence figure draws this threshold as a '
+                           'line instead, and the localization figures stand on too few '
+                           'proteins to be thresholded as well.')
+
 st.subheader("Number of predicted interactions per parasite")
-st.caption('Predicted interactions per parasite, grouped by host and coloured by taxonomic '
-           'group. No confidence threshold is applied.')
-st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette), width='stretch')
+st.caption('Predicted interactions per parasite at or above the confidence set above, grouped '
+           'by host and coloured by taxonomic group. A parasite with no prediction left keeps '
+           'its place on the axis.')
+st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, score),
+                width='stretch')
 
 st.subheader("Confidence of the predicted interactions per parasite")
 st.caption('Boxplots of the distribution of confidence scores per parasite. Scores derive from '
            'the evidence supporting the orthologous interaction from which each prediction was '
-           'transferred.')
-st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette), width='stretch')
+           'transferred. Every prediction is counted here, whatever the slider is set to; the '
+           'dotted line marks it, so the part of a box above the line is the part of that '
+           'parasite counted in the figure above.')
+st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, score),
+                width='stretch')
 
+# the localisation figures are drawn twice over: the proportions at the threshold, and the
+# boxes of the probability itself on every prediction. At 0.7 a parasite is left a median
+# of seventeen host proteins and eight of its own, which a proportion can still be read
+# off and a box cannot
 host_proteins = get_interactor_proteins(data_dir, config, 'target')
 parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
+host_proteins_kept = get_interactor_proteins(data_dir, config, 'target', score)
+parasite_proteins_kept = get_interactor_proteins(data_dir, config, 'source', score)
 if host_proteins is not None:
     st.subheader("Proportion of extracellular and membrane host proteins")
-    st.caption('Subcellular localization predicted by DeepLoc 2 for the host proteins of each '
-               'parasite, divided into cell membrane and extracellular. The strip below the '
-               'columns indicates taxonomic group, coloured as above.')
-    st.plotly_chart(generate_surface_split_per_parasite(get_surface_counts(host_proteins),
-                                                        parasite_palette), width='stretch')
+    st.caption('Subcellular localization predicted by DeepLoc 2 for the host proteins each '
+               'parasite reaches at or above the confidence set above, divided into cell '
+               'membrane and extracellular. The strip below the columns indicates taxonomic '
+               'group, coloured as above.')
+    st.plotly_chart(
+        generate_surface_split_per_parasite(get_surface_counts(host_proteins_kept,
+                                                               every=host_proteins),
+                                            parasite_palette), width='stretch')
 
     st.subheader("Localization confidence of host proteins")
     st.caption('Boxplots of the DeepLoc 2 probabilities of the host proteins for the class '
                'they were assigned to, one column per class and one box per host. The dotted '
                'line in each column marks the cut-off that class was called at. Each host '
-               'protein is counted once, irrespective of the number of parasites reaching it.')
+               'protein is counted once, irrespective of the number of parasites reaching it, '
+               'and every prediction is counted whatever the slider is set to.')
     st.plotly_chart(generate_host_score_boxes(host_proteins), width='stretch')
 
 if parasite_proteins is not None:
     unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
+    kept_unicellular = parasite_proteins_kept[
+        parasite_proteins_kept['group'].isin(UNICELLULAR_GROUPS)]
     if not unicellular.empty:
         st.subheader("Proportion of extracellular and membrane parasite proteins")
-        st.caption('Subcellular localization predicted by DeepLoc 2 for the proteins of each '
-                   'unicellular parasite, divided into cell membrane and extracellular. '
-                   'Multicellular parasites are omitted, as the secretome filter admits only '
-                   'their secreted proteins. The strip below the columns indicates taxonomic '
-                   'group, coloured as above.')
+        st.caption('Subcellular localization predicted by DeepLoc 2 for the proteins each '
+                   'unicellular parasite reaches its host with at or above the confidence set '
+                   'above, divided into cell membrane and extracellular. Multicellular '
+                   'parasites are omitted, as the secretome filter admits only their secreted '
+                   'proteins. The strip below the columns indicates taxonomic group, coloured '
+                   'as above.')
         st.plotly_chart(
-            generate_surface_split_per_parasite(get_surface_counts(unicellular),
+            generate_surface_split_per_parasite(get_surface_counts(kept_unicellular,
+                                                                   every=unicellular),
                                                 parasite_palette,
                                                 y_title='proteins of the parasite',
                                                 hover_noun='its proteins'),
@@ -540,9 +617,10 @@ if parasite_proteins is not None:
 
     st.subheader("Localization confidence of extracellular parasite proteins")
     st.caption('Boxplots of the DeepLoc 2 probability of extracellular localization for the '
-               'extracellular proteins of each parasite. The dotted line marks the cut-off. '
-               'Individual proteins are shown as points behind each box; for parasites with a '
-               'hundred or more proteins the points are read as density.')
+               'extracellular proteins of each parasite, over every prediction whatever the '
+               'slider is set to. The dotted line marks the cut-off. Individual proteins are '
+               'shown as points behind each box; for parasites with a hundred or more proteins '
+               'the points are read as density.')
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             parasite_proteins[parasite_proteins['surface'] == web_utils.EXTRACELLULAR],
@@ -554,8 +632,8 @@ if parasite_proteins is not None:
 
     st.subheader("Localization confidence of membrane parasite proteins")
     st.caption('The equivalent for the parasite proteins assigned to cell membrane, scored on '
-               'that probability. Only unicellular parasites are represented. Individual '
-               'proteins are shown as points; boxes over very few proteins (six for *C. '
+               'that probability, again over every prediction. Only unicellular parasites are '
+               'represented. Individual proteins are shown as points; boxes over very few proteins (six for *C. '
                'parvum*, one for *V. corneae*) should not be read as distributions.')
     st.plotly_chart(
         generate_surface_scores_per_parasite(

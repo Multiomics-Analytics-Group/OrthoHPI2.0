@@ -1,0 +1,114 @@
+% OrthoHPI 2.0 manuscript.
+%
+% Build with `make` (needs tectonic: brew install tectonic).
+% refs.bib is exported from Zotero -- do not edit it by hand, add the
+% reference in Zotero instead. See the Makefile header.
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{authblk}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+% natbib + classic bibtex rather than biblatex + biber: tectonic runs bibtex
+% internally, but has to shell out to biber, and its bundled biblatex (3.17)
+% does not match the biber Homebrew ships (2.22). natbib is also what most
+% journal classes expect, so this survives the move to a template.
+\usepackage[numbers,sort&compress]{natbib}
+\bibliographystyle{unsrtnat}
+
+\graphicspath{{figures/}}
+
+% Preprint styling: line numbers and 1.5 spacing make a draft easier to
+% comment on. Drop both when a journal class takes over.
+\usepackage{lineno}
+\linenumbers
+\usepackage{setspace}
+\onehalfspacing
+
+% A note to self that survives into the PDF but is obviously not prose.
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\title{OrthoHPI 2.0: homology-derived host--parasite protein--protein
+interactions at tissue and cell-type resolution}
+
+% Author list and affiliations as given on the EMBL poster
+% (scripts/build_poster.py on branch poster-embl).
+\author[1]{Ida K.S. Meitil}
+\author[2]{Yesid Cuesta Astroz}
+\author[2]{Juan Esteban Vargas Gomez}
+\author[1]{Alberto Santos}
+\affil[1]{Department of Health Technology, Technical University of Denmark,
+Kgs.\ Lyngby, Denmark}
+\affil[2]{Escuela de Microbiolog\'ia, Universidad de Antioquia, Medell\'in,
+Colombia}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\todo{abstract}
+\end{abstract}
+
+\section{Introduction}
+OrthoHPI 2.0 renews and extends the original OrthoHPI
+resource~\cite{cuestaastroz2019analysis}, integrating current releases of the
+underlying databases and predictors and broadening the set of parasites
+covered. Host proteins are restricted to surface-exposed localisations
+predicted by DeepLoc~\cite{dum2024deeploc}.
+
+\todo{introduction}
+
+\section{Methods}
+
+% The stages below mirror docs/pipeline.md, which is the running description
+% of what `python -m pipeline.main` actually does. Keep the two in step.
+
+\subsection{Data sources}
+\todo{STRING v12.0, EggNOG 6, JensenLab TISSUES, Human Protein Atlas, Gene
+Ontology. Canonical URLs and versions are in config.yml lines 1--32.}
+
+\subsection{Proteomes and orthologous groups}
+\todo{EggNOG Eukaryota (2759) groups; hosts human, rat, mouse, pig; 40 parasite
+species.}
+
+\subsection{Filtering the parasite proteome}
+\todo{Secretome filter via DeepLoc.}
+
+\subsection{Filtering the host proteome}
+\todo{Tissue filter against parasite lifecycle tissues; DeepLoc filter to
+surface-exposed localisations.}
+
+\subsection{Homology transfer}
+\todo{Transfer of STRING interactions through shared orthologous groups.}
+
+\subsection{Tissue and cell-type annotation}
+\todo{TISSUES confidence scores and HPA single-cell expression.}
+
+\subsection{Implementation and availability}
+\todo{Streamlit application, repository URL, data snapshot.}
+
+\section{Results}
+\todo{results}
+
+\section{Discussion}
+\todo{discussion}
+
+\section*{Data and code availability}
+\todo{Repository: \url{https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0}}
+
+\bibliography{refs}
+
+\end{document}

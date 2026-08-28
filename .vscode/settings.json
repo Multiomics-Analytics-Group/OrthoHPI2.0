@@ -1,0 +1,26 @@
+{
+  // LaTeX Workshop drives tectonic for paper/paper.tex: build on save, and
+  // SyncTeX so ctrl-click moves between the source and the preview. This is
+  // the piece that makes writing here feel like Overleaf.
+  //
+  // The Makefile stays the canonical build (`cd paper && make`); this is the
+  // same tectonic invocation, run by the editor.
+  "latex-workshop.latex.tools": [
+    {
+      "name": "tectonic",
+      "command": "tectonic",
+      "args": ["--synctex", "--keep-logs", "%DOC%.tex"]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    { "name": "tectonic", "tools": ["tectonic"] }
+  ],
+  "latex-workshop.latex.autoBuild.run": "onFileChange",
+  "latex-workshop.view.pdf.viewer": "tab",
+
+  // The build products the Makefile's `clean` target removes; hiding them
+  // keeps the paper/ folder readable in the explorer.
+  "latex-workshop.latex.clean.fileTypes": [
+    "*.aux", "*.bbl", "*.blg", "*.log", "*.out", "*.run.xml", "*.synctex.gz"
+  ]
+}

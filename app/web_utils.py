@@ -384,6 +384,35 @@ def filter_tissues(config, df):
     
     return df
 
+# share of the nTPM a host protein reaches anywhere in a tissue that one of its cell
+# types has to carry for the protein to count as expressed in that cell type
+PEAK_CELL_TYPE_FRACTION = 0.5
+
+
+def keep_peak_cell_types(df, fraction=PEAK_CELL_TYPE_FRACTION):
+    '''
+    The rows of a tissue-annotated frame holding the cell types a host protein is
+    concentrated in: the ones where it reaches `fraction` of the nTPM it has anywhere in
+    that tissue.
+
+    The HPA rows are kept from nTPM > 0, at which the median protein is annotated in every
+    cell type of its tissue. Anything counted per cell type on presence alone therefore
+    comes out much the same for all the cell types of a tissue, and says how finely the HPA
+    annotates it rather than anything about the protein. What differs between cell types is
+    where the protein is abundant.
+
+    Rows the HPA gives no cell type -- every host but human, its single cell data being
+    human only -- carry no nTPM either and drop out.
+
+    :param dataframe df: rows carrying target, Tissue and nTPM
+    :param float fraction: share of the per-protein, per-tissue maximum a cell type needs
+    :return: the subset of the rows
+    '''
+    peak = df.groupby(['target', 'Tissue'])['nTPM'].transform('max')
+
+    return df[df['nTPM'] >= fraction * peak]
+
+
 def count_ticks(figure, largest, axis='x', **kwargs):
     '''
     Put whole numbers on an axis that counts things.

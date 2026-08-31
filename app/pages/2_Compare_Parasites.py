@@ -391,16 +391,17 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
     shown = [g for g in palette if g in set(clades)]
     steps = [[i / len(shown), palette[g]] for i, g in enumerate(shown)]
     steps += [[(i + 1) / len(shown), palette[g]] for i, g in enumerate(shown)]
-    names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
+    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
+    y_names = list(counts.index)
     strip = dict(colorscale=sorted(steps), zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
                  hovertemplate='%{text}<extra></extra>')
 
     figure = make_subplots(rows=2, cols=2, column_widths=[0.03, 0.97], row_heights=[0.97, 0.03],
                            horizontal_spacing=0.01, vertical_spacing=0.012)
-    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=names,
+    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=y_names,
                                 text=[[c] for c in clades], xgap=0, ygap=1, **strip), row=1, col=1)
 
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=names, y=names,
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=x_names, y=y_names,
                                 colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
                                             '#3182bd', '#08519c'],
                                 zmin=0, zmax=counts.to_numpy().max(),
@@ -409,7 +410,7 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
                                               thickness=12, len=0.6, y=1, yanchor='top')),
                      row=1, col=2)
 
-    figure.add_trace(go.Heatmap(z=[[shown.index(c) for c in clades]], x=names,
+    figure.add_trace(go.Heatmap(z=[[shown.index(c) for c in clades]], x=x_names,
                                 text=[list(clades)], xgap=1, ygap=0, **strip), row=2, col=2)
 
     # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
@@ -442,13 +443,14 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
     figure.update_yaxes(visible=False, row=2, col=1)
     figure.update_yaxes(autorange='reversed')
 
-    # the widest parasite name, which is what the labels need down the left and, turned
-    # through 60 degrees, under the bottom
-    label = 6.5 * max(len(n) for n in names) + 12
-    left, right, top, bottom = label, 105, 60, 0.87 * label + 25
+    # Full names need more room down the left; abbreviated names remain on the rotated
+    # x-axis so the bottom margin stays compact.
+    left = 6.5 * max(len(name) for name in y_names) + 12
+    bottom = 0.87 * (6.5 * max(len(name) for name in x_names) + 12) + 25
+    right, top = 105, 60
     # 0.96 is the width the matrix is given of what is left, the rest going to the group
     # strip beside it and the gap between the two, so the figure comes out at `column`
-    side = max(240, min((column - left - right) * 0.96, CELL * len(names)))
+    side = max(240, min((column - left - right) * 0.96, CELL * len(x_names)))
     figure.update_layout(width=side / 0.96 + left + right, height=side / 0.958 + top + bottom,
                          plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),

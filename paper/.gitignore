@@ -1,0 +1,14 @@
+# Generated figures -- rebuilt from the data, so not worth committing. Follows
+# the same rule as poster/figures/ in the top-level .gitignore.
+figures/
+
+# LaTeX build products.
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+paper.pdf

@@ -35,7 +35,7 @@ MIN_COLUMN = 4
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.7
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # share of the height of a figure taken by the strip of taxonomic group under its columns.
 # Enough to read as a band of colour, not enough to be read as a quantity of its own
 BAND_HEIGHT = 0.06
@@ -64,12 +64,9 @@ def short_name(parasite):
 @st.cache_data(show_spinner=False)
 def get_overview_predictions(data_dir, config):
     '''
-    Every predicted interaction, labelled with the host group it was predicted against
+    Every predicted interaction, labelled with the host species it was predicted against
     and with the taxonomic group of its parasite. A parasite infecting more than one host
     appears once per host, since the point of this page is comparing those.
-
-    The hosts come from web_utils.get_host_groups, so the columns of the figures are
-    exactly the host options the other two pages offer -- rat and mouse pooled as Rodent.
 
     :param str data_dir: directory holding predictions.parquet
     :param dict config: parsed configuration
@@ -80,9 +77,11 @@ def get_overview_predictions(data_dir, config):
     order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
 
     frames = []
-    for host, taxids in web_utils.get_host_groups(config, predictions).items():
-        frame = predictions.loc[predictions['taxid2'].isin(taxids), ['taxid1_label', 'weight']]
-        frames.append(frame.assign(host=host))
+    for taxid, host in config['hosts'].items():
+        frame = predictions.loc[predictions['taxid2'] == str(taxid),
+                                ['taxid1_label', 'weight']]
+        if not frame.empty:
+            frames.append(frame.assign(host=host['label']))
     df = pd.concat(frames, ignore_index=True)
 
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
@@ -208,10 +207,11 @@ def get_interactor_proteins(data_dir, config, side, score=None):
     surface = localisations.assign(surface=web_utils.classify_surface(localisations))
 
     frames = []
-    for host, taxids in web_utils.get_host_groups(config, predictions).items():
-        frame = predictions.loc[predictions['taxid2'].isin(taxids),
+    for taxid, host in config['hosts'].items():
+        frame = predictions.loc[predictions['taxid2'] == str(taxid),
                                 ['taxid1_label', side]].drop_duplicates()
-        frames.append(frame.assign(host=host))
+        if not frame.empty:
+            frames.append(frame.assign(host=host['label']))
     df = pd.concat(frames, ignore_index=True).merge(surface, left_on=side,
                                                     right_on='protein', how='inner')
 
@@ -451,12 +451,7 @@ def generate_host_score_boxes(proteins, point_size=3):
 def generate_interactions_per_parasite(df, palette, score):
     '''
     How many interactions are predicted for each parasite at or above a confidence, in one
-    column per host.
-
-    The bars are coloured by taxonomic group rather than one colour per parasite: the
-    colour then carries something -- the same something the circos, the heatmap strips
-    and the dot matrix are coloured by -- instead of only telling neighbouring bars apart,
-    which their position already does.
+    column per host. Bars are coloured by taxonomic group.
 
     The columns are laid out from every prediction and only the bars are thresholded, so a
     parasite left with nothing keeps its place on the axis and is read as an absence rather
@@ -467,7 +462,7 @@ def generate_interactions_per_parasite(df, palette, score):
     :param float score: the confidence to count from
     '''
     figure, hosts = host_columns(df)
-    labelled = set()
+    labelled_groups = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         kept = host_df[host_df['weight'] >= score]
         counts = kept.groupby(['name', 'group'], observed=True).size().reset_index(name='count')
@@ -475,13 +470,11 @@ def generate_interactions_per_parasite(df, palette, score):
             figure.add_trace(
                 go.Bar(x=rows['name'], y=rows['count'], name=group,
                        marker_color=palette.get(group, UNKNOWN_COLOR),
-                       # one legend entry per group however many hosts it turns up in,
-                       # and clicking it hides that group in every column at once
-                       legendgroup=group, showlegend=group not in labelled,
+                       legendgroup=group, showlegend=group not in labelled_groups,
                        hovertemplate='%{x}<br>%{y} predicted interactions'
-                                     f'<extra>{host}</extra>'),
+                                     f'<extra>{group}</extra>'),
                 row=1, col=column)
-            labelled.add(group)
+            labelled_groups.add(group)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
 
     return style_host_columns(figure, 'predicted interactions')
@@ -554,8 +547,7 @@ with st.columns(3)[1]:
 
 st.subheader("Number of predicted interactions per parasite")
 st.caption('Predicted interactions per parasite at or above the confidence set above, grouped '
-           'by host and coloured by taxonomic group. A parasite with no prediction left keeps '
-           'its place on the axis.')
+           'by host and coloured by parasite taxonomic group.')
 st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, score),
                 width='stretch')
 

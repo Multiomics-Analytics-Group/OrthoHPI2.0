@@ -369,9 +369,9 @@ def generate_link_matrix(links, all_hosts, config, pooled):
     the host proteins have different names in each. Here the difference is the figure --
     a row that changes colour across is a family one host reaches and another does not.
 
-    The rows are ordered by how many hosts reach them and the columns by how many rows
-    they carry, so the block of shared interactions gathers in the top left corner and
-    what only one host has falls away from it.
+    The rows are ordered by how many hosts reach them, then by host in configured order;
+    the block of shared interactions gathers in the top left corner and host-specific
+    rows stay together instead of mixing Rat and Mouse families.
     '''
     squares = links.explode('parasite_proteins').rename(
         columns={'parasite_proteins': 'parasite protein'})
@@ -380,9 +380,19 @@ def generate_link_matrix(links, all_hosts, config, pooled):
     squares['host proteins'] = squares['host_proteins'].map(', '.join)
     squares['orthology groups'] = squares['group1'] + ' → ' + squares['group2']
 
-    rows = (squares.groupby('family')
-                   .agg(hosts=('n_hosts', 'max'), links=('family', 'size'))
-                   .sort_values(['hosts', 'links'], ascending=False, kind='stable'))
+    host_order = {
+        host_label(taxid, config, pooled): index
+        for index, taxid in enumerate(config['hosts'])
+    }
+    rows = squares.groupby('family').agg(
+        hosts=('hosts', lambda values: frozenset().union(*values)),
+        links=('family', 'size'),
+    )
+    rows['n_hosts'] = rows['hosts'].map(len)
+    rows['host_order'] = rows['hosts'].map(
+        lambda hosts: tuple(sorted(host_order[host] for host in hosts)))
+    rows = rows.sort_values(['n_hosts', 'host_order', 'links'],
+                            ascending=[False, True, False], kind='stable')
     columns = (squares.groupby('parasite protein')
                       .agg(hosts=('n_hosts', 'max'), links=('parasite protein', 'size'))
                       .sort_values(['hosts', 'links'], ascending=False, kind='stable'))
@@ -400,7 +410,7 @@ def generate_link_matrix(links, all_hosts, config, pooled):
                         hover_data={'family': False, 'host proteins': True,
                                     'orthology groups': True, 'interactions': True,
                                     'combination': True})
-    figure.update_traces(marker=dict(symbol='square', size=11, line=dict(width=0)))
+    figure.update_traces(marker=dict(symbol='square', size=9, line=dict(width=0)))
     figure.update_layout(height=max(420, 17 * len(rows) + 260), plot_bgcolor='white',
                          # the gene symbols down the side and the parasite proteins along the
                          # foot are long enough that plotly cuts them off if left to itself

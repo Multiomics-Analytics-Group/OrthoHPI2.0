@@ -6,6 +6,14 @@ import pandas as pd
 import utils
 
 
+def tissue_cutoff(host, default):
+    """Return a host-specific TISSUES cutoff, or the pipeline default when absent."""
+    cutoff = host.get('tissue_cutoff', default)
+    if not isinstance(cutoff, (int, float)):
+        raise TypeError(f"tissue_cutoff for {host.get('label', 'host')} must be numeric")
+    return float(cutoff)
+
+
 def apply_tissue_filter(config_file, valid_proteins, cutoff):
     hosts = utils.read_config(filepath=config_file, field='hosts')
     tissue_mapping = utils.read_config(filepath=config_file, field='tissues')
@@ -15,7 +23,9 @@ def apply_tissue_filter(config_file, valid_proteins, cutoff):
         if 'tissues_url' in hosts[taxid]:
             url = hosts[taxid]['tissues_url']
             filename = utils.download_file(url=url, data_dir='data/downloads')
-            host_tissues, proteins = get_tissues(config_file, filename, proteins, cutoff, tissue_mapping, taxid)
+            host_tissues, proteins = get_tissues(
+                config_file, filename, proteins, tissue_cutoff(hosts[taxid], cutoff),
+                tissue_mapping, taxid)
             tissues.update(host_tissues)
 
         valid_proteins[taxid] = proteins

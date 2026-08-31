@@ -35,11 +35,11 @@ REST_COLOR = '#bdbdbd'
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # gradient the chords of the hovered parasite carry the number of shared host proteins
 # on: light blue through to the dark blue of the page headings, which is also the dark
-# end of the Blues the similarity heatmap is drawn in. The palest steps of the ramp are
+# end of the Blues the shared-interactor heatmap is drawn in. The palest steps of the ramp are
 # left out -- a hairline in them is invisible against the white background -- and the
 # dark end is the many-proteins end, so the pairs that share the most stand out
 CHORD_CMAP = ['#a6bddb', '#74a9cf', '#3690c0', '#0570b0', '#045a8d', '#034368', '#023858']
-# side of a cell of the similarity heatmap, in pixels, which is what sizes that figure
+# side of a cell of the shared-interactor heatmap, in pixels, which is what sizes that figure
 CELL = 22
 # how wide the two columns of the shared-interactors row come out, in pixels, on the window
 # the app is being read in. Neither figure can ask its column how wide it is -- the matrix
@@ -49,6 +49,13 @@ CELL = 22
 # one, and the figures follow.
 MATRIX_COLUMN = 900
 CIRCOS_COLUMN = 750
+
+
+def matrix_width(columns):
+    '''Intrinsic width for sparse parasite matrices, capped at the page-width layout.'''
+    return min(MATRIX_COLUMN, max(460, 100 * columns + 260))
+
+
 # marker each surface class is drawn with in the shared-interactors matrix, and the order
 # they are offered in the legend. Colour there is already the parasite's taxonomic group
 # and size is the degree, so the localisation of the host protein goes on the shape --
@@ -108,9 +115,8 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     aux = pd.merge(aux, tissues, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
 
-    # the pair is (source, target_name) rather than (source, target) for the same reason the
-    # dot matrix draws one dot: a host group covering two species -- Rodent is rat and mouse
-    # -- holds the same gene under an id of each, and that is one interaction, not two
+    # The pair is keyed by the display gene name so aliases of the same host gene do not
+    # inflate tissue or cell-type interaction counts.
     def pairs(frame, *level):
         return (frame.drop_duplicates(list(level) + ['source', 'target_name'])
                      .groupby(list(level), observed=True).size()
@@ -157,7 +163,8 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette):
     figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
                          hovertemplate='%{y}<br>%{x}<br>predicted interactions: '
                                        '%{customdata[0]}<extra></extra>')
-    figure.update_layout(height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
+    figure.update_layout(width=matrix_width(len(parasites)),
+                         height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title='tissue the parasite infects')
@@ -222,7 +229,7 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
 
     `score` drops the interactions predicted below that confidence, the same cut the
     network page offers. It is applied here rather than per figure so the circos, the
-    similarity heatmap and the shared-protein dots keep counting the same interactions.
+    shared-interactor heatmap and the shared-protein dots keep counting the same interactions.
 
     One row is one predicted interaction, parasite protein (`source`) included: the circos
     and the heatmap only ever look at which host proteins are reached, but the dot matrix
@@ -340,12 +347,11 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, score=M
 
 
 @st.cache_data(show_spinner=False)
-def get_interactor_similarity(df_pred, groups, group_order):
+def get_shared_interactor_counts(df_pred, groups, group_order):
     '''
-    Jaccard similarity between the host proteins each pair of parasites is predicted to
-    interact with. Jaccard rather than the count of shared proteins the circos draws: the
-    parasites have between 12 and 200 predicted interactors, so a raw count mostly reports
-    how many predictions a parasite has.
+    Number of host proteins each pair of parasites is predicted to interact with. The
+    diagonal is fixed at the largest off-diagonal count as a visual boundary; every
+    off-diagonal cell is the host proteins shared by that pair.
 
     The parasites are in the order of the circos and the dot matrix -- taxonomic group,
     then name -- so that a row is the same parasite in all three, and a clade is a block
@@ -357,20 +363,21 @@ def get_interactor_similarity(df_pred, groups, group_order):
     if len(labels) < 3:
         return None
 
-    similarity = np.array([[len(targets[a] & targets[b]) / len(targets[a] | targets[b])
-                            for b in labels] for a in labels])
+    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels])
+    maximum_shared = np.triu(counts, k=1).max()
+    np.fill_diagonal(counts, maximum_shared)
 
-    return (pd.DataFrame(similarity, index=labels, columns=labels),
+    return (pd.DataFrame(counts, index=labels, columns=labels),
             [groups.get(g, UNKNOWN_GROUP) for g in labels])
 
 
 @st.cache_data(show_spinner=False)
-def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUMN):
+def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_COLUMN):
     '''
-    The similarity matrix, with a strip of the taxonomic group of each parasite down the
-    side and along the bottom, so that the two axes are visibly the same list of parasites
-    in the same order. The cells are held square (scaleanchor), which is the other half of
-    reading the matrix as symmetric.
+    The shared-interactor count matrix, with a strip of the taxonomic group of each
+    parasite down the side and along the bottom, so that the two axes are visibly the
+    same list of parasites in the same order. The cells are held square (scaleanchor),
+    which is the other half of reading the matrix as symmetric.
 
     Squaring the cells means one of the two axes has to give up whatever space the figure
     has beyond the square, which plotly takes off the range and turns into blank margins
@@ -379,9 +386,9 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     size instead of being stretched to the page. scaleanchor is then only making up the
     difference between the room the labels were given and the room they take.
 
-    The diagonal carries its true value of 1 rather than being left blank. Blank renders as
-    the white the colour scale starts at, so it could not be told from a pair sharing
-    nothing -- and 238 of the 992 off-diagonal cells of the human matrix are exactly that.
+    The diagonal carries the maximum shared-interactor count rather than being left
+    blank. Blank renders as the white the colour scale starts at, so it could not be
+    told from a pair sharing nothing.
 
     :param column: pixels the column holding this figure is expected to be. The matrix takes
                    what is left of it once the labels and the colour bar have taken theirs,
@@ -392,23 +399,26 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     shown = [g for g in palette if g in set(clades)]
     steps = [[i / len(shown), palette[g]] for i, g in enumerate(shown)]
     steps += [[(i + 1) / len(shown), palette[g]] for i, g in enumerate(shown)]
-    names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
+    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
+    y_names = list(counts.index)
     strip = dict(colorscale=sorted(steps), zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
                  hovertemplate='%{text}<extra></extra>')
 
     figure = make_subplots(rows=2, cols=2, column_widths=[0.03, 0.97], row_heights=[0.97, 0.03],
                            horizontal_spacing=0.01, vertical_spacing=0.012)
-    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=names,
+    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=y_names,
                                 text=[[c] for c in clades], xgap=0, ygap=1, **strip), row=1, col=1)
 
-    figure.add_trace(go.Heatmap(z=similarity.to_numpy(), x=names, y=names, colorscale='Blues',
-                                zmin=0, zmax=1,
-                                hovertemplate='%{y} and %{x}<br>Jaccard %{z:.2f}<extra></extra>',
-                                colorbar=dict(title='Shared<br>interactors<br>(Jaccard)',
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=x_names, y=y_names,
+                                colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
+                                            '#3182bd', '#08519c'],
+                                zmin=0, zmax=counts.to_numpy().max(),
+                                hovertemplate='%{y} and %{x}<br>Shared interactors %{z:.0f}<extra></extra>',
+                                colorbar=dict(title='Shared<br>interactors',
                                               thickness=12, len=0.6, y=1, yanchor='top')),
                      row=1, col=2)
 
-    figure.add_trace(go.Heatmap(z=[[shown.index(c) for c in clades]], x=names,
+    figure.add_trace(go.Heatmap(z=[[shown.index(c) for c in clades]], x=x_names,
                                 text=[list(clades)], xgap=1, ygap=0, **strip), row=2, col=2)
 
     # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
@@ -441,13 +451,14 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     figure.update_yaxes(visible=False, row=2, col=1)
     figure.update_yaxes(autorange='reversed')
 
-    # the widest parasite name, which is what the labels need down the left and, turned
-    # through 60 degrees, under the bottom
-    label = 6.5 * max(len(n) for n in names) + 12
-    left, right, top, bottom = label, 105, 60, 0.87 * label + 25
+    # Full names need more room down the left; abbreviated names remain on the rotated
+    # x-axis so the bottom margin stays compact.
+    left = 6.5 * max(len(name) for name in y_names) + 12
+    bottom = 0.87 * (6.5 * max(len(name) for name in x_names) + 12) + 25
+    right, top = 105, 60
     # 0.96 is the width the matrix is given of what is left, the rest going to the group
     # strip beside it and the gap between the two, so the figure comes out at `column`
-    side = max(240, min((column - left - right) * 0.96, CELL * len(names)))
+    side = max(240, min((column - left - right) * 0.96, CELL * len(x_names)))
     figure.update_layout(width=side / 0.96 + left + right, height=side / 0.958 + top + bottom,
                          plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),
@@ -465,20 +476,20 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
 DESCRIPTION_WIDTH = 38
 
 
-def label_proteins(df_pred, annotations):
+def label_proteins(df_pred, annotations, truncate=True):
     '''
     Names each host protein by its gene symbol and its descriptive protein name, since the
     symbol on its own identifies the protein only for someone who already knows it.
 
-    The descriptions are keyed by STRING id and the matrix is keyed by symbol -- a host
-    group covering two species carries the same gene under an id of each -- so the first
-    description found for a symbol is the one used. Proteins UniProt has nothing but
-    "Uncharacterized protein" for keep their symbol alone: that description names nothing
-    and would be repeated down the axis.
+    The descriptions are keyed by STRING id and the matrix is keyed by symbol, so the
+    first description found for a symbol is the one used. Proteins UniProt has nothing
+    but "Uncharacterized protein" for keep their symbol alone: that description names
+    nothing and would be repeated down the axis.
 
     :param df_pred: tissue-expressed predictions of the host group
     :param dict annotations: STRING id --> descriptive protein name
-    :return: {gene symbol: axis label}
+    :param bool truncate: shorten descriptions for labels that must fit an axis
+    :return: {gene symbol: protein label}
     '''
     described = {}
     for protein, name in df_pred[['target', 'target_name']].drop_duplicates().values:
@@ -489,7 +500,7 @@ def label_proteins(df_pred, annotations):
     labels = {}
     for name in df_pred['target_name'].unique():
         description = described.get(name)
-        if description and len(description) > DESCRIPTION_WIDTH:
+        if truncate and description and len(description) > DESCRIPTION_WIDTH:
             description = description[:DESCRIPTION_WIDTH - 1].rstrip() + '…'
         labels[name] = f'{name} · {description}' if description else str(name)
 
@@ -507,8 +518,7 @@ def summarise_localisations(df_pred, localisations):
     fluid around it. Which of the two a protein was kept for is web_utils.classify_surface,
     which the home page reads the parasite proteins with.
 
-    A host group covering two species (Rodent is rat and mouse) carries the same gene
-    under an id of each and those are one row of the matrix, so the id DeepLoc is most
+    A gene can have more than one STRING protein identifier, so the id DeepLoc is most
     sure is surface-exposed is the one the row is described by.
 
     :param df_pred: tissue-expressed predictions of the host group
@@ -552,9 +562,8 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
                           two surface probabilities of the host protein from
     '''
     edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
-    # one row per dot, which is a name and not a protein id: a host group covering two
-    # species (Rodent is rat and mouse) has the same gene under an id of each, and those
-    # are one row of the matrix, not two dots on top of each other
+    # One row per dot, keyed by the display gene name rather than a protein identifier, so
+    # aliases do not produce dots on top of each other.
     pairs = edges[['taxid1_label', 'target_name']].drop_duplicates()
     counts = pairs.groupby('target_name')['taxid1_label'].nunique()
     counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
@@ -570,6 +579,8 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     labels = label_proteins(df_pred, annotations)
     dots['protein'] = dots['target_name'].map(labels)
+    full_labels = label_proteins(df_pred, annotations, truncate=False)
+    dots['protein_full'] = dots['target_name'].map(full_labels)
     surface = summarise_localisations(df_pred, localisations)
     if surface is not None:
         dots = dots.join(surface, on='target_name')
@@ -639,16 +650,16 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
     # column name of whatever it is given. The protein and the parasite are the two axes
     # already, and `parasites` and `degree` are two different counts of two different
     # things, which as bare numbers under their column names they do not say
-    hover_columns = ['parasites', 'degree']
-    hover_lines = ['%{y}', 'parasites reaching it: %{customdata[0]}',
-                   'proteins of %{x} reaching it: %{customdata[1]}']
+    hover_columns = ['protein_full', 'parasites', 'degree']
+    hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
+                   'proteins of %{x} reaching it: %{customdata[2]}']
     if localised:
         orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
         hover_columns += ['cell_membrane', 'extracellular']
         # the class is the shape of the dot, so the hover carries the two probabilities
         # behind it rather than naming it a second time
-        hover_lines.append('P(cell membrane) %{customdata[2]:.2f}, '
-                           'P(extracellular) %{customdata[3]:.2f}')
+        hover_lines.append('P(cell membrane) %{customdata[3]:.2f}, '
+                           'P(extracellular) %{customdata[4]:.2f}')
 
     figure = px.scatter(dots, x='parasite', y='protein', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`
@@ -662,7 +673,8 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
                          hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
     if localised:
         split_dot_legend(figure, orders['group'], orders['surface'], palette)
-    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
+    figure.update_layout(width=matrix_width(len(parasites)),
+                         height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
@@ -884,10 +896,9 @@ def show_circos_plot(data_dir, host, host_taxids, config, caption, key, score):
     streamlit_bokeh(circos_plot, use_container_width=True, key=key)
 
 
-st.caption('The parasites predicted against one host, compared with each other: how '
-           'similar their predicted host interactors are, which host proteins several of '
-           'them reach, and the tissues and cell types in which their interactions can '
-           'take place.')
+st.caption('The parasites predicted against one host, compared with each other: which host '
+           'interactors they share, which host proteins several of them reach, and the '
+           'tissues and cell types in which their interactions can take place.')
 st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
@@ -896,8 +907,7 @@ with col1:
     st.write('')
 
 with col2:
-    # the host applies to every page (web_utils.host_selector), and hosts the config
-    # groups together (rat + mouse) are one option
+    # The host selection is shared across pages.
     selected_host, selected_taxids = web_utils.host_selector(
         config, web_utils.load_predictions(data_dir),
         'Select a host to compare the parasites that infect it')
@@ -909,10 +919,9 @@ with col3:
 
 
 if selected_host != web_utils.NO_HOST:
-    # the heatmap and the dot matrix count the same interactions as the circos: the heatmap
-    # reads where the circos cannot, since it normalises for how many predictions a parasite
-    # has and has no chords to overlap, and the dot matrix names the host proteins that
-    # neither of the other two ever shows
+    # The heatmap and dot matrix read the same filtered interactions: the heatmap gives
+    # every parasite pair a shared-host-interactor count, while the dot matrix names the
+    # host proteins those pairs have in common.
     parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
                        for p in config['parasites'].values()}
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
@@ -930,89 +939,76 @@ if selected_host != web_utils.NO_HOST:
                                'the three figures below. The tissue plot at the foot of the '
                                'page counts every prediction.')
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
-    similarity = get_interactor_similarity(counted, parasite_groups, group_order)
+    shared_counts = get_shared_interactor_counts(counted, parasite_groups, group_order)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order,
                                          web_utils.load_protein_annotations(data_dir),
                                          web_utils.load_deeploc_localisations(data_dir))
 
-    # the two figures of how much the parasites share sit side by side, since they are the
-    # same numbers read two ways: the matrix gives every pair a cell, the circle gives the
-    # pairs that share anything a chord. The matrix is given the wider column -- it carries
-    # a label per parasite on both of its axes, where the circle carries one per arc.
-    matrix, circle = st.columns([1.2, 1])
+    matrix, shared = st.columns(2)
 
     with matrix:
         st.subheader("Host interactors shared by each pair of parasites")
-        st.caption('Jaccard similarity between the host interactors of each pair of '
-                   'parasites: the shared interactors as a proportion of all interactors of '
-                   'either parasite. A strip of the taxonomic group runs along each axis. The '
-                   'diagonal is 1 by definition.')
-        if similarity is not None:
+        st.caption('Number of host interactors shared by each pair of parasites. A strip of '
+                   'the taxonomic group runs along each axis. The diagonal is fixed to the '
+                   'largest shared-interactor count.')
+        if shared_counts is not None:
             # the figure carries its own size, since a square matrix stretched to the page is
             # a square with blank space either side of it rather than a wider square
-            st.plotly_chart(generate_similarity_heatmap(*similarity,
-                                                        config.get('parasite_groups', {})),
+            st.plotly_chart(generate_shared_interactor_heatmap(
+                *shared_counts, config.get('parasite_groups', {})),
                             width='content')
         else:
-            st.text(f'Fewer than three parasites of {selected_host} share any host protein, '
-                    'which is not a matrix worth drawing')
+            st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
-    with circle:
-        st.subheader("Circos plot of common host interactors")
-        caption = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
-                   'group; a chord joins two parasites that are predicted to interact with the '
-                   'same host proteins. Hover (or click) a parasite to pick out its chords, which '
-                   'are then coloured by how many host proteins each pair shares, on the scale '
-                   'in the corner.')
-        show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos', score)
+    with shared:
+        if top_shared is not None:
+            st.subheader("Host interactors common to several parasites")
+            st.caption('Host proteins reached by the most parasites, with a dot wherever a '
+                       'parasite is predicted to interact with one, sized by the number of that '
+                       "parasite's proteins reaching it. Proteins reached by a single parasite "
+                       'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
+                       'protein, circles cell membrane and diamonds extracellular; hover for the '
+                       'underlying probabilities.')
+            st.plotly_chart(
+                generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
+                width='content')
 
-    if top_shared is not None:
-        st.subheader("Host interactors common to several parasites")
-        st.caption('Host proteins reached by the most parasites, with a dot wherever a '
-                   'parasite is predicted to interact with one, sized by the number of that '
-                   "parasite's proteins reaching it. Proteins reached by a single parasite "
-                   'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
-                   'protein, circles cell membrane and diamonds extracellular; hover for the '
-                   'underlying probabilities.')
-        st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
-                        width='stretch')
-
-    st.subheader("Tissues in which the predicted interactions can take place")
-    st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
-               'each parasite is known to infect and sized by the number of interactions with '
-               'proteins expressed there. Tissues are ordered by the number of parasites '
-               'infecting them. An interaction is counted once per tissue, irrespective of '
-               'the number of cell types the host protein is expressed in.')
     per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
                                                               selected_taxids, score)
-    if per_tissue.empty:
-        st.info('No predicted interaction is left at this confidence in a tissue the '
-                'parasites are known to infect.')
-    else:
-        st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                             config.get('parasite_groups', {})),
-                        width='stretch')
-
-    # cell types are only worth drawing one tissue at a time, and only for a host they are
-    # annotated for: the HPA single cell data is human, so every other host has no cell type
-    # at all and nothing to draw
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
     annotated = set(per_cell_type['Tissue'])
     choices = [t for t in ranked.index if t in annotated]
-    if choices:
-        st.subheader("Cell types of a tissue")
-        st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
-                   'taxonomic group. A host protein counts towards a cell type where it '
-                   'reaches at least half the expression it has anywhere in the tissue, so '
-                   'the bars are the cell types the interaction partners are concentrated '
-                   'in. A protein abundant in several counts in each, and the bars are '
-                   'therefore not a partition of the tissue.')
-        tissue = st.selectbox('Tissue', choices, index=0,
-                              help='Tissues with cell type annotation, most interactions first')
-        st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
-                                                config.get('parasite_groups', {})),
-                        width='stretch')
+    tissues, cell_types = st.columns(2)
+    with tissues:
+        st.subheader("Tissues in which the predicted interactions can take place")
+        st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
+                   'each parasite is known to infect and sized by the number of interactions with '
+                   'proteins expressed there. Tissues are ordered by the number of parasites '
+                   'infecting them. An interaction is counted once per tissue, irrespective of '
+                   'the number of cell types the host protein is expressed in.')
+        if per_tissue.empty:
+            st.info('No predicted interaction is left at this confidence in a tissue the '
+                    'parasites are known to infect.')
+        else:
+            st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
+                                                 config.get('parasite_groups', {})),
+                            width='content')
+
+    with cell_types:
+        if choices:
+            st.subheader("Cell types of a tissue")
+            st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
+                       'taxonomic group. A host protein counts towards a cell type where it '
+                       'reaches at least half the expression it has anywhere in the tissue, so '
+                       'the bars are the cell types the interaction partners are concentrated '
+                       'in. A protein abundant in several counts in each, and the bars are '
+                       'therefore not a partition of the tissue.')
+            tissue = st.selectbox('Tissue', choices, index=0,
+                                  help='Tissues with cell type annotation, most interactions first')
+            st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
+                                                    config.get('parasite_groups', {})),
+                            width='stretch')
 
 st.markdown("---")
 

@@ -61,6 +61,20 @@ def short_name(parasite):
     return f'{parasite[0]}. {parasite.split(" ")[1]}'
 
 
+def host_coverage_caption(data_dir, config):
+    '''A compact summary of the post-filter host pools behind cross-host comparisons.'''
+    eligible = web_utils.load_eligible_proteins(data_dir)
+    if eligible is None:
+        return None
+
+    parts = []
+    for taxid, host in config['hosts'].items():
+        count = (eligible['taxid'].astype(str) == str(taxid)).sum()
+        parts.append(f"{host['label']}: {count:,} proteins (TISSUES >= "
+                     f"{host['tissue_cutoff']:g})")
+    return 'Eligible host proteins after tissue and DeepLoc filtering — ' + '; '.join(parts) + '.'
+
+
 @st.cache_data(show_spinner=False)
 def get_overview_predictions(data_dir, config):
     '''
@@ -532,6 +546,9 @@ st.markdown("---")
 
 overview = get_overview_predictions(data_dir, config)
 parasite_palette = config.get('parasite_groups', {})
+coverage = host_coverage_caption(data_dir, config)
+if coverage:
+    st.caption(coverage)
 
 # one slider for the counts and the proportions of the page, so what is counted here is
 # what the network page opens on rather than several times more of it. It sits in the

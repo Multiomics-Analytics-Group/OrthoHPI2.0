@@ -177,7 +177,10 @@ def load_figure(species):
     legends = [(parent, child) for parent in root.iter() for child in parent
                if child.get('id') == LEGEND_ID]
     for parent, legend in legends:
-        crop_to(root, above=legend_top(legend))
+        # The non-human legends overlap lower anatomy in their SVG coordinate space, so
+        # shortening their viewBox cuts off the feet, tail, or lower body.
+        if species == 'human':
+            crop_to(root, above=legend_top(legend))
         parent.remove(legend)
 
     # the figures are drawn at a fixed pixel size, which would overflow a narrow column
@@ -375,9 +378,8 @@ def legend_html(bounds):
 def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
-    predicted interactions reaching them. A host group covering more than one species
-    (Rodent is rat and mouse) gets one figure each, since the two are annotated
-    separately and TISSUES draws a different body for each.
+    predicted interactions reaching them. Each selected host species gets its own figure,
+    annotated against its own TISSUES data.
 
     :param dict config: parsed configuration
     :param str data_dir: directory holding figure_tissues.parquet

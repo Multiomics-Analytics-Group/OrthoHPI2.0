@@ -1181,7 +1181,7 @@ with col2:
             df_select = df_select.assign(
                 source_surface=df_select['source'].map(surface_calls['surface']),
                 target_surface=df_select['target'].map(surface_calls['surface']))
-        score = st.slider('Confidence score', 0.4, 0.9, 0.7)
+        score = st.slider('Confidence score', 0.4, 0.9, 0.4)
 
         selected_tissues = []
         tissues_options = generate_tissue_filters(df_select)

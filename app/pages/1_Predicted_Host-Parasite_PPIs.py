@@ -22,7 +22,7 @@ web_utils.show_header('Host-parasite network')
 
 #Initialize variables
 df_select = None
-net = None
+networks = []
 selected_rows = []
 selected_terms = []
 enrichment_table = None
@@ -1228,32 +1228,21 @@ with col2:
             if len(selected_surface) > 0:
                 df_select = df_select[df_select['target_surface'].isin(selected_surface)]
 
-        # Create networkx graph object from pandas dataframe
-        G = generate_graph(df_select, score, web_utils.load_protein_annotations(data_dir),
-                           surface_calls)
-            
-        st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
-
-        # Initiate PyVis network object
-        net = Network(height=f'{NETWORK_HEIGHT}px', width="100%",
-                      bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
-        # Take Networkx graph and translate it to a PyVis graph format
-        net.from_nx(G)
-        # Save other formats
-        utils.export_graph(G, filename=f'{selected_parasite}.graphml',
-                        format='graphml', output_dir=f'{path}')
-        utils.export_graph(G, filename=f'{selected_parasite}.json',
-                        format='cytoscape', output_dir=f'{path}')
-        G = None
-
-        # Generate network with specific layout settings. The repulsion solver rather
-        # than force atlas: it spaces the proteins far enough apart that the names on
-        # them can be read, which is worth more than the tighter, rounder shape the
-        # force atlas layout draws.
-        net.repulsion(node_distance=420, central_gravity=0.33,
-                        spring_length=110, spring_strength=0.10,
-                        damping=0.95)
-        style_network(net)
+        annotations = web_utils.load_protein_annotations(data_dir)
+        for host_taxid in selected_taxids:
+            host_df = df_select[df_select['taxid2'].astype(str) == host_taxid]
+            host_df = host_df.assign(
+                target_color=config['hosts'][int(host_taxid)]['color'])
+            G = generate_graph(host_df, score, annotations, surface_calls)
+            net = Network(height=f'{NETWORK_HEIGHT}px', width="100%",
+                          bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
+            net.from_nx(G)
+            net.repulsion(node_distance=420, central_gravity=0.33,
+                          spring_length=110, spring_strength=0.10,
+                          damping=0.95)
+            style_network(net)
+            networks.append((host_taxid, config['hosts'][int(host_taxid)]['label'],
+                             host_df, G, net))
         
         #net.show_buttons(filter_=['nodes'])
         
@@ -1266,40 +1255,41 @@ with col1:
                                      selected_taxids, selected_tissues)
 
 
-with st.container():
+def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
-        st.header('Network of host-parasite PPIs')
-        st.caption('Predicted interactions between parasite and host proteins above the '
-                   'selected confidence score. Nodes are proteins, diamonds parasite and '
-                   'circles host, coloured by organism and sized by centrality in the '
-                   'network. Edge width is the confidence score. Hover a node for its full '
-                   'name and identifiers; click an edge for the AlphaFold model of both '
-                   'proteins.')
+        st.subheader(host_label)
+        st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
+        if host_df.empty:
+            st.info(f'No predicted interactions for this parasite in {host_label}.')
+            return
+        filename = f'{selected_parasite}_{host_taxid}_network'
         html_data = ""
         # Save and read graph as HTML file, which is what the download button hands out.
         # The network on the page is drawn by the component instead: an embedded HTML
         # file has no way of telling Python which interaction was clicked.
-        net.save_graph(f'{path}/{selected_parasite}.html')
-        with open(f'{path}/{selected_parasite}.html','r',encoding='utf-8') as HtmlFile:
+        net.save_graph(f'{path}/{filename}.html')
+        utils.export_graph(G, filename=f'{filename}.graphml',
+                           format='graphml', output_dir=path)
+        utils.export_graph(G, filename=f'{filename}.json',
+                           format='cytoscape', output_dir=path)
+        with open(f'{path}/{filename}.html','r',encoding='utf-8') as HtmlFile:
             html_data = HtmlFile.read()
         nodes, edges = net.get_network_data()[:2]
-        # no widget key on purpose: Streamlit then identifies the component by its
-        # arguments, so choosing another parasite or moving the score slider makes it a
-        # different widget and the interaction selected in the previous network is
-        # dropped rather than carried over to one that no longer contains it
         selected_edge = ppi_network(
             nodes=nodes,
-            edges=annotate_edges(edges, df_select, web_utils.load_protein_annotations(data_dir)),
+            edges=annotate_edges(edges, host_df, web_utils.load_protein_annotations(data_dir)),
             options=network_options(net),
-            height=NETWORK_HEIGHT)
+            height=NETWORK_HEIGHT,
+            key=f'network_{selected_parasite}_{host_taxid}')
         net = None
 
         # Closing the dialog reruns the page with the component still holding the edge
         # that opened it, so the click is remembered to keep it from opening again. The
         # nonce changes on every click, which is what makes clicking the same edge twice
         # open the dialog again.
-        if selected_edge is not None and selected_edge['nonce'] != st.session_state.get('shown_edge'):
-            st.session_state['shown_edge'] = selected_edge['nonce']
+        shown_edge_key = f'shown_edge_{host_taxid}'
+        if selected_edge is not None and selected_edge['nonce'] != st.session_state.get(shown_edge_key):
+            st.session_state[shown_edge_key] = selected_edge['nonce']
             show_structures_dialog(selected_edge['edge'])
         with st.container():
             c1, c2, c3 = st.columns(3)
@@ -1308,23 +1298,40 @@ with st.container():
                 st.download_button(
                     label="Download Network as Html",
                     data=html_data,
-                    file_name=f'{selected_parasite}_network.html',
+                    file_name=f'{filename}.html',
                     mime='text/html',
                 )
             with c2:
                 st.download_button(
                     label="Download Network as GraphML",
-                    data=open(f'{path}/{selected_parasite}.graphml','r',encoding='utf-8'),
-                    file_name=f'{selected_parasite}_network.graphml',
+                    data=open(f'{path}/{filename}.graphml','r',encoding='utf-8'),
+                    file_name=f'{filename}.graphml',
                     mime='text/plain',
                 )
             with c3:
                 st.download_button(
                     label="Download Network as Cytoscape",
-                    data=open(f'{path}/{selected_parasite}.json','r',encoding='utf-8'),
-                    file_name=f'{selected_parasite}_network.json',
+                    data=open(f'{path}/{filename}.json','r',encoding='utf-8'),
+                    file_name=f'{filename}.json',
                     mime='text/plain',
                 )
+
+
+if networks:
+    st.header('Network of host-parasite PPIs')
+    st.caption('Predicted interactions between parasite and host proteins above the '
+               'selected confidence score. Nodes are proteins, diamonds parasite and '
+               'circles host, coloured by organism and sized by centrality in the '
+               'network. Edge width is the confidence score. Hover a node for its full '
+               'name and identifiers; click an edge for the AlphaFold model of both '
+               'proteins.')
+    if selected_host == 'Rodent':
+        st.caption('Rat and Mouse networks are shown separately; their host nodes use '
+                   'their species-specific colors.')
+    columns = st.columns(len(networks))
+    for column, network in zip(columns, networks):
+        with column:
+            render_network_panel(*network)
 
 
 with st.container():

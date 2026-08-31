@@ -9,29 +9,26 @@ urls:
     string_sequences_url: https://stringdb-downloads.org/download/protein.sequences.v12.0/TAXID.protein.sequences.v12.0.fa.gz
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
 
-# `group` (optional) collapses several host species into one option in the app;
-# hosts without it are their own group. Rat and mouse are grouped as Rodent.
+# Every host is presented as its own species throughout the app.
 hosts:
     9606:
         label: Homo sapiens
-        color: "#525252"
+        color: "#0072B2"
         tissue_cutoff: 2.5
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
     10116:
         label: Rattus norvegicus
-        group: Rodent
-        color: "#1b7837"
+        color: "#E69F00"
         tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
     10090:
         label: Mus musculus
-        group: Rodent
-        color: "#1b7837"
+        color: "#009E73"
         tissue_cutoff: 2.0
         tissues_url: https://download.jensenlab.org/mouse_tissue_experiments_full.tsv
     9823:
         label: Sus scrofa
-        color: "#762a83"
+        color: "#CC79A7"
         tissue_cutoff: 1.5
         tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
 

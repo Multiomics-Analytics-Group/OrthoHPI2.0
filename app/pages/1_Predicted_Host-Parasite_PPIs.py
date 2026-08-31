@@ -92,8 +92,8 @@ VIEWER_HEIGHT = 400
 
 # Columns of the interactions table. The colors and shapes only exist to draw the network,
 # the taxids repeat their labels, and the parasite and the edge type are the same on every
-# row. The host species is put back when the selected host covers more than one (Rodent is
-# rat and mouse), where it is what tells the rows apart.
+# row. The selected host is one species, so its proteins are unambiguous throughout the
+# network, table, and tissue views.
 #
 # Both STRING ids are carried even though the parasite one is the taxid and the UniProt
 # accession joined and could be left to the reader to assemble: the host one cannot be --
@@ -426,15 +426,14 @@ def name_the_selection(table, parasite, host):
 
     :param table: the interactions table, as generate_interactions_table returns it
     :param str parasite: the selected parasite
-    :param str host: the selected host group
+    :param str host: the selected host species
     :return: the table with the two columns in front, or unchanged if it is empty
     '''
     if table.empty:
         return table
 
-    # a host group covering two species already carries the species of each row, and that
-    # is the column the group name must not overwrite: it is the one thing the rows of a
-    # pooled host differ by
+    # The table may already contain a host-species column from an upstream export; keep it
+    # and label this selected-species column as the host group in that case.
     host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
     named = table.assign(**{'Parasite species': parasite, host_column: host})
     front = ['Parasite species', host_column]
@@ -680,8 +679,7 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    # a host group covers more than one taxid (rat and mouse -> Rodent), so the pool is
-    # taken for the same species the network is read over
+    # The selected host is one species, so the background pool is read from its own taxid.
     pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
     if side == HOST and background == BACKGROUND_TISSUES:
         parasite = pred_df['taxid1'].iloc[0]

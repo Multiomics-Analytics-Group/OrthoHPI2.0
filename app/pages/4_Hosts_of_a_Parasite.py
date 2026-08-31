@@ -36,8 +36,7 @@ MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # blue says how far a link carried over on this page, and nothing else may use it.
 # A host without an entry falls back to its config colour (see host_palette).
 HOST_COLORS = {'Homo sapiens': '#D55E00', 'Sus scrofa': '#CC79A7',
-               'Mus musculus': '#009E73', 'Rattus norvegicus': '#E69F00',
-               'Rodent': '#009E73'}
+               'Mus musculus': '#009E73', 'Rattus norvegicus': '#E69F00'}
 # colour of a link predicted against every host of the parasite, and the shades of it a
 # link predicted against some but not all of them is drawn in -- only reachable with three
 # hosts or more, where there is more than one way of being partly shared, so they are
@@ -78,9 +77,7 @@ MIN_TISSUES = 2
 
 
 def short_name(parasite):
-    '''`Trichinella spiralis` as `T. spiralis`, the abbreviation the other pages label
-    their parasites with. Host names go through it too, so `Rodent` -- a host group that
-    is a clade and not a binomial -- is returned unchanged rather than split.'''
+    '''`Trichinella spiralis` as `T. spiralis`, the abbreviation the other pages use.'''
     parts = parasite.split(' ')
 
     return f'{parasite[0]}. {parts[1]}' if len(parts) > 1 else parasite
@@ -108,40 +105,30 @@ def load_host_orthologs(data_dir):
     return utils.read_parquet_file(input_file=input_file)
 
 
-def host_label(host, config, pooled):
-    '''The name a host taxid is read under on this page: its own species name, or the
-    group the config collapses it into (rat and mouse -> Rodent) when the pooling box is
-    ticked, which is how every other page reads it.'''
-    host = config['hosts'][int(host)]
-
-    return host.get('group', host['label']) if pooled else host['label']
+def host_label(host, config):
+    '''The configured species name of a host taxid.'''
+    return config['hosts'][int(host)]['label']
 
 
-def host_color(host_label, config, pooled):
+def host_color(host_label, config):
     '''The colour this page fixes for the host (HOST_COLORS), falling back to the one the
-    config gives it -- a host added to the config and not to HOST_COLORS still gets drawn,
-    in the colour the rest of the app knows it by. Grouped hosts carry the same colour in
-    the config, so a group has one whichever of its members is found.'''
+    config gives it -- a host added to the config and not to HOST_COLORS still gets drawn
+    in the colour the rest of the app knows it by.'''
     if host_label in HOST_COLORS:
         return HOST_COLORS[host_label]
 
     for taxid, host in config['hosts'].items():
-        if (host.get('group', host['label']) if pooled else host['label']) == host_label:
+        if host['label'] == host_label:
             return host['color']
 
     return SHARED_COLOR
 
 
 @st.cache_data(show_spinner=False)
-def get_multi_host_predictions(data_dir, config, pooled, score=MIN_SCORE):
+def get_multi_host_predictions(data_dir, config, score=MIN_SCORE):
     '''
     Every prediction of the parasites that are predicted against more than one host,
     labelled with the host it was predicted against.
-
-    Whether rat and mouse count as one host or two is the whole population of this page:
-    five of the seven parasites with more than one host are rodent parasites, and pooling
-    them the way the rest of the app does leaves four parasites to compare. Both readings
-    are offered, and the parasites that qualify are recounted under the one chosen.
 
     Every prediction is kept whatever tissue the host protein is annotated to. The tissue
     filter of the pipeline keeps a host protein expressed in a tissue *any* parasite
@@ -149,13 +136,12 @@ def get_multi_host_predictions(data_dir, config, pooled, score=MIN_SCORE):
     never reaches the tissue it was kept for; the figure at the foot of the page is where
     that is read, and restricting the whole page to it would empty two of the comparisons.
 
-    :param bool pooled: read the hosts as the config groups them rather than as species
     :param float score: interactions predicted below this confidence are left out
     :return: predictions of the multi-host parasites, with a `host` column
     '''
     predictions = web_utils.load_predictions(data_dir)
     predictions = predictions[predictions['weight'] >= score].copy()
-    predictions['host'] = predictions['taxid2'].map(lambda t: host_label(t, config, pooled))
+    predictions['host'] = predictions['taxid2'].map(lambda t: host_label(t, config))
 
     hosts = predictions.groupby('taxid1')['host'].nunique()
 
@@ -185,28 +171,22 @@ def tint(color, amount):
     return '#%02x%02x%02x' % tuple(round(c + (255 - c) * amount) for c in channels)
 
 
-def host_palette(all_hosts, config, pooled):
+def host_palette(all_hosts, config):
     '''
-    One colour per host of the parasite, which the config cannot always give: rat and
-    mouse carry the same colour there because they are one clade and every other page
-    reads them as one host. Read as species -- which is how this page reads them by
-    default, since five of the seven parasites with more than one host are rodent
-    parasites -- that is two hosts in one colour and two columns that cannot be told apart.
-
-    The first host of a colour keeps it and the others are mixed toward white, so the
-    clade is still one colour and the species within it are still separate.
+    One colour per host of the parasite. A repeated configured colour is tinted for later
+    hosts so each species remains distinguishable.
 
     :return: {host label: colour}
     '''
     sharing = {}
     for host in all_hosts:
-        sharing.setdefault(host_color(host, config, pooled), []).append(host)
+        sharing.setdefault(host_color(host, config), []).append(host)
 
     return {host: tint(color, min(SPECIES_TINT * i, 0.7))
             for color, hosts in sharing.items() for i, host in enumerate(hosts)}
 
 
-def combination_palette(links, all_hosts, config, pooled):
+def combination_palette(links, all_hosts, config):
     '''
     The colour each set of hosts is drawn in, over both figures, so that a set is the same
     colour wherever it is read.
@@ -220,7 +200,7 @@ def combination_palette(links, all_hosts, config, pooled):
     :return: {combination label: colour}
     '''
     members = links.drop_duplicates('combination').set_index('combination')['hosts']
-    hosts_palette = host_palette(all_hosts, config, pooled)
+    hosts_palette = host_palette(all_hosts, config)
     palette, partial = {}, 0
     for combination in order_combinations(links):
         hosts = members[combination]
@@ -299,7 +279,7 @@ def order_combinations(links):
 
 
 @st.cache_data(show_spinner=False)
-def generate_combination_bars(links, all_hosts, config, pooled):
+def generate_combination_bars(links, all_hosts, config):
     '''
     How many of the transferred interactions carried over to which hosts: a bar per set of
     hosts, over a matrix saying which hosts the set is.
@@ -314,7 +294,7 @@ def generate_combination_bars(links, all_hosts, config, pooled):
     order = order_combinations(links)
     counts = links.groupby('combination').size().reindex(order)
     members = links.drop_duplicates('combination').set_index('combination')['hosts']
-    palette = combination_palette(links, all_hosts, config, pooled)
+    palette = combination_palette(links, all_hosts, config)
     colors = [palette[c] for c in order]
 
     figure = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
@@ -358,7 +338,7 @@ def generate_combination_bars(links, all_hosts, config, pooled):
 
 
 @st.cache_data(show_spinner=False)
-def generate_link_matrix(links, all_hosts, config, pooled):
+def generate_link_matrix(links, all_hosts, config):
     '''
     Every transferred interaction of the parasite as one square: the parasite protein
     across, the host protein family down, the colour saying which hosts it was predicted
@@ -381,7 +361,7 @@ def generate_link_matrix(links, all_hosts, config, pooled):
     squares['orthology groups'] = squares['group1'] + ' → ' + squares['group2']
 
     host_order = {
-        host_label(taxid, config, pooled): index
+        host_label(taxid, config): index
         for index, taxid in enumerate(config['hosts'])
     }
     rows = squares.groupby('family').agg(
@@ -398,7 +378,7 @@ def generate_link_matrix(links, all_hosts, config, pooled):
                       .sort_values(['hosts', 'links'], ascending=False, kind='stable'))
 
     order = order_combinations(links)
-    palette = combination_palette(links, all_hosts, config, pooled)
+    palette = combination_palette(links, all_hosts, config)
 
     figure = px.scatter(squares, x='parasite protein', y='family', color='combination',
                         color_discrete_map=palette,
@@ -664,14 +644,14 @@ def count_interactions_per_host_tissue(df_pred, parasite, data_dir, config):
 
 
 @st.cache_data(show_spinner=False)
-def generate_host_tissue_dots(per_tissue, all_hosts, config, pooled):
+def generate_host_tissue_dots(per_tissue, all_hosts, config):
     '''A dot wherever a host carries a predicted interaction with a protein expressed in a
     tissue the parasite infects, sized by how many. A gap in a row is a host whose proteins
     of that tissue are not annotated, which on this data is what most of the gaps are.'''
     dots = per_tissue.copy()
     tissues = list(dots.groupby('Tissue')['interactions'].sum().sort_values(
         ascending=False, kind='stable').index)
-    palette = host_palette(all_hosts, config, pooled)
+    palette = host_palette(all_hosts, config)
 
     figure = px.scatter(dots, x='host', y='Tissue', color='host', size='interactions',
                         size_max=26, color_discrete_map=palette,
@@ -692,7 +672,7 @@ def generate_host_tissue_dots(per_tissue, all_hosts, config, pooled):
 
 
 @st.cache_data(show_spinner=False)
-def get_overview(df_pred, config, pooled):
+def get_overview(df_pred, config):
     '''
     Every parasite that has more than one host, and how much of it carried over between
     them. Drawn before anything is selected, since which parasites are even comparable is
@@ -718,22 +698,16 @@ st.caption('One parasite across the hosts it is predicted against: which interac
            'predictions compare with the host proteins available in each.')
 st.markdown("---")
 
-# the two settings that decide what there is to compare sit above everything, since both
-# of them change which parasites are even on the page
+# The confidence threshold decides which multi-host predictions there are to compare.
 settings, _ = st.columns([1, 1])
 with settings:
-    pooled = st.checkbox('Read rat and mouse as one host (Rodent), as the other pages do',
-                         value=False,
-                         help='Five of the seven parasites with more than one host are '
-                              'rodent parasites. Pooling rat and mouse the way the rest of '
-                              'the app does leaves four parasites to compare.')
     score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
                       help='Interactions predicted below this confidence are left out, as '
                            'on the other pages. These are the smallest interactomes of the '
                            'set, so this page starts at the bottom of the range: raising it '
                            'leaves fewer parasites with more than one host.')
 
-df_pred = get_multi_host_predictions(data_dir, config, pooled, score)
+df_pred = get_multi_host_predictions(data_dir, config, score)
 
 if df_pred.empty:
     st.text('No parasite is predicted against more than one host at this confidence')
@@ -744,7 +718,7 @@ else:
                'pairs of orthology groups, the level at which the hosts can be compared: a '
                'link present in every host carried over, a link present in one host only did '
                'not.')
-    st.dataframe(get_overview(df_pred, config, pooled), width='stretch', hide_index=True)
+    st.dataframe(get_overview(df_pred, config), width='stretch', hide_index=True)
 
     parasites = sorted(df_pred['taxid1_label'].unique())
     with st.columns(3)[1]:
@@ -770,7 +744,7 @@ else:
                        'orthologous proteins of two hosts are distinct proteins. See the '
                        'caveat below the figures before interpreting a host-specific bar as '
                        'host specificity.')
-            st.plotly_chart(generate_combination_bars(links, all_hosts, config, pooled),
+            st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
 
         with matrix:
@@ -780,7 +754,7 @@ else:
                        'the interaction was predicted in. Rows are orthology groups rather '
                        'than genes, named on hover, and are ordered so that the shared '
                        'interactions gather in the upper left.')
-            st.plotly_chart(generate_link_matrix(links, all_hosts, config, pooled),
+            st.plotly_chart(generate_link_matrix(links, all_hosts, config),
                             width='stretch')
 
         st.subheader('Predicted interactions relative to the available host proteins')
@@ -853,8 +827,7 @@ else:
                 st.caption('Predicted interactions per host and tissue, broken down by the '
                            'tissues this parasite is known to infect. A host absent from a '
                            'row has no annotated protein in that tissue.')
-                st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config,
-                                                          pooled),
+                st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config),
                                 width='content')
             elif per_tissue is not None:
                 only = per_tissue['Tissue'].iloc[0]

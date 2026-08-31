@@ -108,9 +108,8 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     aux = pd.merge(aux, tissues, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
 
-    # the pair is (source, target_name) rather than (source, target) for the same reason the
-    # dot matrix draws one dot: a host group covering two species -- Rodent is rat and mouse
-    # -- holds the same gene under an id of each, and that is one interaction, not two
+    # The pair is keyed by the display gene name so aliases of the same host gene do not
+    # inflate tissue or cell-type interaction counts.
     def pairs(frame, *level):
         return (frame.drop_duplicates(list(level) + ['source', 'target_name'])
                      .groupby(list(level), observed=True).size()
@@ -507,8 +506,7 @@ def summarise_localisations(df_pred, localisations):
     fluid around it. Which of the two a protein was kept for is web_utils.classify_surface,
     which the home page reads the parasite proteins with.
 
-    A host group covering two species (Rodent is rat and mouse) carries the same gene
-    under an id of each and those are one row of the matrix, so the id DeepLoc is most
+    A gene can have more than one STRING protein identifier, so the id DeepLoc is most
     sure is surface-exposed is the one the row is described by.
 
     :param df_pred: tissue-expressed predictions of the host group
@@ -552,9 +550,8 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
                           two surface probabilities of the host protein from
     '''
     edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
-    # one row per dot, which is a name and not a protein id: a host group covering two
-    # species (Rodent is rat and mouse) has the same gene under an id of each, and those
-    # are one row of the matrix, not two dots on top of each other
+    # One row per dot, keyed by the display gene name rather than a protein identifier, so
+    # aliases do not produce dots on top of each other.
     pairs = edges[['taxid1_label', 'target_name']].drop_duplicates()
     counts = pairs.groupby('target_name')['taxid1_label'].nunique()
     counts = counts[counts > 1].sort_values(ascending=False, kind='stable')

@@ -231,13 +231,12 @@ def infected_tissue_proteins(data_dir, config, parasite_taxid):
 @st.cache_data(show_spinner=False)
 def get_host_predictions(data_dir, host_taxids):
     '''
-    Predictions against one host group. host_taxids is a tuple of taxids (as strings)
-    so grouped hosts -- rat and mouse under Rodent -- are pooled into a single view;
-    the predictions keep their own species label and taxid.
+    Predictions against the selected host species. host_taxids is a one-taxid tuple of
+    strings so the selector and its callers retain the same interface.
 
     :param str data_dir: directory holding predictions.parquet
-    :param tuple host_taxids: taxids of the selected host group, as strings
-    :return: predictions dataframe of that host group
+    :param tuple host_taxids: taxid of the selected host species, as a string
+    :return: predictions dataframe of that host species
     '''
     predictions = load_predictions(data_dir)
 
@@ -316,21 +315,19 @@ def classify_surface(localisations):
 
 def get_host_groups(config, predictions):
     '''
-    Maps each host group offered in the app to the taxids it covers. Hosts sharing a
-    `group` in the config (rat and mouse -> Rodent) are presented as one option, hosts
-    without one stand alone under their label. Groups with no predicted interaction are
-    dropped so the selector never offers an empty host.
+    Maps each host species offered in the app to its taxid. Hosts with no predicted
+    interaction are dropped so the selector never offers an empty host.
 
-    :param dict config: parsed configuration
+    :param dict config: parsed configuration of individual host species
     :param predictions: predictions dataframe, used to drop groups without predictions
-    :return: {group label: [taxid as str, ...]} sorted by group label
+    :return: {host species label: [taxid as str]} sorted by label
     '''
     predicted = set(predictions['taxid2'])
     groups = {}
     for taxid, host in config['hosts'].items():
         taxid = str(taxid)
         if taxid in predicted:
-            groups.setdefault(host.get('group', host['label']), []).append(taxid)
+            groups[host['label']] = [taxid]
 
     return {group: groups[group] for group in sorted(groups)}
 

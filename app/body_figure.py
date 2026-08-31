@@ -376,8 +376,7 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
     predicted interactions reaching them. A host group covering more than one species
-    (Rodent is rat and mouse) gets one figure each, since the two are annotated
-    separately and TISSUES draws a different body for each.
+    The selected host species gets its own figure, annotated against its own TISSUES data.
 
     :param dict config: parsed configuration
     :param str data_dir: directory holding figure_tissues.parquet

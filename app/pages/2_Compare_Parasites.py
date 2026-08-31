@@ -894,10 +894,9 @@ def show_circos_plot(data_dir, host, host_taxids, config, caption, key, score):
     streamlit_bokeh(circos_plot, use_container_width=True, key=key)
 
 
-st.caption('The parasites predicted against one host, compared with each other: how '
-           'similar their predicted host interactors are, which host proteins several of '
-           'them reach, and the tissues and cell types in which their interactions can '
-           'take place.')
+st.caption('The parasites predicted against one host, compared with each other: which host '
+           'interactors they share, which host proteins several of them reach, and the '
+           'tissues and cell types in which their interactions can take place.')
 st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
@@ -906,8 +905,7 @@ with col1:
     st.write('')
 
 with col2:
-    # the host applies to every page (web_utils.host_selector), and hosts the config
-    # groups together (rat + mouse) are one option
+    # The host selection is shared across pages.
     selected_host, selected_taxids = web_utils.host_selector(
         config, web_utils.load_predictions(data_dir),
         'Select a host to compare the parasites that infect it')
@@ -919,10 +917,9 @@ with col3:
 
 
 if selected_host != web_utils.NO_HOST:
-    # the heatmap and the dot matrix count the same interactions as the circos: the heatmap
-    # reads where the circos cannot, since it normalises for how many predictions a parasite
-    # has and has no chords to overlap, and the dot matrix names the host proteins that
-    # neither of the other two ever shows
+    # The heatmap and dot matrix read the same filtered interactions: the heatmap gives
+    # every parasite pair a shared-host-interactor count, while the dot matrix names the
+    # host proteins those pairs have in common.
     parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
                        for p in config['parasites'].values()}
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
@@ -945,11 +942,7 @@ if selected_host != web_utils.NO_HOST:
                                          web_utils.load_protein_annotations(data_dir),
                                          web_utils.load_deeploc_localisations(data_dir))
 
-    # the two figures of how much the parasites share sit side by side, since they are the
-    # same numbers read two ways: the matrix gives every pair a cell, the circle gives the
-    # pairs that share anything a chord. The matrix is given the wider column -- it carries
-    # a label per parasite on both of its axes, where the circle carries one per arc.
-    matrix, circle = st.columns([1.2, 1])
+    matrix, shared = st.columns(2)
 
     with matrix:
         st.subheader("Host interactors shared by each pair of parasites")
@@ -965,62 +958,55 @@ if selected_host != web_utils.NO_HOST:
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
-    with circle:
-        st.subheader("Circos plot of common host interactors")
-        caption = (f'Each arc is a parasite infecting {selected_host}, coloured by its taxonomic '
-                   'group; a chord joins two parasites that are predicted to interact with the '
-                   'same host proteins. Hover (or click) a parasite to pick out its chords, which '
-                   'are then coloured by how many host proteins each pair shares, on the scale '
-                   'in the corner.')
-        show_circos_plot(data_dir, selected_host, selected_taxids, config, caption, 'circos', score)
+    with shared:
+        if top_shared is not None:
+            st.subheader("Host interactors common to several parasites")
+            st.caption('Host proteins reached by the most parasites, with a dot wherever a '
+                       'parasite is predicted to interact with one, sized by the number of that '
+                       "parasite's proteins reaching it. Proteins reached by a single parasite "
+                       'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
+                       'protein, circles cell membrane and diamonds extracellular; hover for the '
+                       'underlying probabilities.')
+            st.plotly_chart(
+                generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
+                width='content')
 
-    if top_shared is not None:
-        st.subheader("Host interactors common to several parasites")
-        st.caption('Host proteins reached by the most parasites, with a dot wherever a '
-                   'parasite is predicted to interact with one, sized by the number of that '
-                   "parasite's proteins reaching it. Proteins reached by a single parasite "
-                   'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
-                   'protein, circles cell membrane and diamonds extracellular; hover for the '
-                   'underlying probabilities.')
-        st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
-                        width='content')
-
-    st.subheader("Tissues in which the predicted interactions can take place")
-    st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
-               'each parasite is known to infect and sized by the number of interactions with '
-               'proteins expressed there. Tissues are ordered by the number of parasites '
-               'infecting them. An interaction is counted once per tissue, irrespective of '
-               'the number of cell types the host protein is expressed in.')
     per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
                                                               selected_taxids, score)
-    if per_tissue.empty:
-        st.info('No predicted interaction is left at this confidence in a tissue the '
-                'parasites are known to infect.')
-    else:
-        st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                             config.get('parasite_groups', {})),
-                        width='content')
-
-    # cell types are only worth drawing one tissue at a time, and only for a host they are
-    # annotated for: the HPA single cell data is human, so every other host has no cell type
-    # at all and nothing to draw
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
     annotated = set(per_cell_type['Tissue'])
     choices = [t for t in ranked.index if t in annotated]
-    if choices:
-        st.subheader("Cell types of a tissue")
-        st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
-                   'taxonomic group. A host protein counts towards a cell type where it '
-                   'reaches at least half the expression it has anywhere in the tissue, so '
-                   'the bars are the cell types the interaction partners are concentrated '
-                   'in. A protein abundant in several counts in each, and the bars are '
-                   'therefore not a partition of the tissue.')
-        tissue = st.selectbox('Tissue', choices, index=0,
-                              help='Tissues with cell type annotation, most interactions first')
-        st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
-                                                config.get('parasite_groups', {})),
-                        width='stretch')
+    tissues, cell_types = st.columns(2)
+    with tissues:
+        st.subheader("Tissues in which the predicted interactions can take place")
+        st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
+                   'each parasite is known to infect and sized by the number of interactions with '
+                   'proteins expressed there. Tissues are ordered by the number of parasites '
+                   'infecting them. An interaction is counted once per tissue, irrespective of '
+                   'the number of cell types the host protein is expressed in.')
+        if per_tissue.empty:
+            st.info('No predicted interaction is left at this confidence in a tissue the '
+                    'parasites are known to infect.')
+        else:
+            st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
+                                                 config.get('parasite_groups', {})),
+                            width='content')
+
+    with cell_types:
+        if choices:
+            st.subheader("Cell types of a tissue")
+            st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
+                       'taxonomic group. A host protein counts towards a cell type where it '
+                       'reaches at least half the expression it has anywhere in the tissue, so '
+                       'the bars are the cell types the interaction partners are concentrated '
+                       'in. A protein abundant in several counts in each, and the bars are '
+                       'therefore not a partition of the tissue.')
+            tissue = st.selectbox('Tissue', choices, index=0,
+                                  help='Tissues with cell type annotation, most interactions first')
+            st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
+                                                    config.get('parasite_groups', {})),
+                            width='stretch')
 
 st.markdown("---")
 

@@ -30,10 +30,10 @@ FIGURE_DIR = 'images'
 # the others say `thyroid gland`, and the annotation follows the majority.
 ORGAN_ALIASES = {'thyroid': 'thyroid gland'}
 
-# The green ramp of the TISSUES figures, as their own legend uses it. The first colour is
-# for an organ no interaction reaches, so it stays the white the figures are drawn in.
+# A blue interaction-count ramp. The first colour is for an organ no interaction reaches,
+# so it stays the white the figures are drawn in.
 NO_INTERACTIONS_COLOR = '#ffffff'
-PALETTE = ['#dcf2d7', '#acdea6', '#6dc072', '#30994f', '#006d2c']
+PALETTE = ['#deebf7', '#9ecae1', '#6baed6', '#3182bd', '#08519c']
 
 # the legend is stripped and redrawn below the figure: it is labelled with the confidence
 # scores of the TISSUES website, which are not what is being shown here, and the pig
@@ -268,7 +268,7 @@ def color_scale(counts):
         edges.append(upper)
 
     # the colours are spread over the whole palette rather than taken from one end, so
-    # the busiest organ is the darkest green whatever the size of the network
+    # the busiest organ is the darkest blue whatever the size of the network
     bounds = []
     for i, upper in enumerate(edges):
         shade = (round(i * (len(PALETTE) - 1) / (len(edges) - 1))

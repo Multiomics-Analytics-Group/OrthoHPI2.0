@@ -342,8 +342,8 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, score=M
 def get_shared_interactor_counts(df_pred, groups, group_order):
     '''
     Number of host proteins each pair of parasites is predicted to interact with. The
-    diagonal is the total number of host proteins that parasite is predicted to interact
-    with, while off-diagonal cells are the host proteins shared by the pair.
+    diagonal is fixed at the largest off-diagonal count as a visual boundary; every
+    off-diagonal cell is the host proteins shared by that pair.
 
     The parasites are in the order of the circos and the dot matrix -- taxonomic group,
     then name -- so that a row is the same parasite in all three, and a clade is a block
@@ -356,6 +356,8 @@ def get_shared_interactor_counts(df_pred, groups, group_order):
         return None
 
     counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels])
+    maximum_shared = np.triu(counts, k=1).max()
+    np.fill_diagonal(counts, maximum_shared)
 
     return (pd.DataFrame(counts, index=labels, columns=labels),
             [groups.get(g, UNKNOWN_GROUP) for g in labels])
@@ -376,9 +378,9 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
     size instead of being stretched to the page. scaleanchor is then only making up the
     difference between the room the labels were given and the room they take.
 
-    The diagonal carries the total host-interactor count of that parasite rather than
-    being left blank. Blank renders as the white the colour scale starts at, so it could
-    not be told from a pair sharing nothing.
+    The diagonal carries the maximum shared-interactor count rather than being left
+    blank. Blank renders as the white the colour scale starts at, so it could not be
+    told from a pair sharing nothing.
 
     :param column: pixels the column holding this figure is expected to be. The matrix takes
                    what is left of it once the labels and the colour bar have taken theirs,
@@ -939,8 +941,8 @@ if selected_host != web_utils.NO_HOST:
     with matrix:
         st.subheader("Host interactors shared by each pair of parasites")
         st.caption('Number of host interactors shared by each pair of parasites. A strip of '
-                   'the taxonomic group runs along each axis. The diagonal is the total '
-                   'number of host interactors for that parasite.')
+                   'the taxonomic group runs along each axis. The diagonal is fixed to the '
+                   'largest shared-interactor count.')
         if shared_counts is not None:
             # the figure carries its own size, since a square matrix stretched to the page is
             # a square with blank space either side of it rather than a wider square

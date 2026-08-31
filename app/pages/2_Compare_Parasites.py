@@ -952,8 +952,7 @@ if selected_host != web_utils.NO_HOST:
                 *shared_counts, config.get('parasite_groups', {})),
                             width='content')
         else:
-            st.text(f'Fewer than three parasites of {selected_host} share any host protein, '
-                    'which is not a matrix worth drawing')
+            st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
     with circle:
         st.subheader("Circos plot of common host interactors")

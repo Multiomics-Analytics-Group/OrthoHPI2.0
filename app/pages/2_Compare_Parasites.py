@@ -35,11 +35,11 @@ REST_COLOR = '#bdbdbd'
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # gradient the chords of the hovered parasite carry the number of shared host proteins
 # on: light blue through to the dark blue of the page headings, which is also the dark
-# end of the Blues the similarity heatmap is drawn in. The palest steps of the ramp are
+# end of the Blues the shared-interactor heatmap is drawn in. The palest steps of the ramp are
 # left out -- a hairline in them is invisible against the white background -- and the
 # dark end is the many-proteins end, so the pairs that share the most stand out
 CHORD_CMAP = ['#a6bddb', '#74a9cf', '#3690c0', '#0570b0', '#045a8d', '#034368', '#023858']
-# side of a cell of the similarity heatmap, in pixels, which is what sizes that figure
+# side of a cell of the shared-interactor heatmap, in pixels, which is what sizes that figure
 CELL = 22
 # how wide the two columns of the shared-interactors row come out, in pixels, on the window
 # the app is being read in. Neither figure can ask its column how wide it is -- the matrix
@@ -221,7 +221,7 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
 
     `score` drops the interactions predicted below that confidence, the same cut the
     network page offers. It is applied here rather than per figure so the circos, the
-    similarity heatmap and the shared-protein dots keep counting the same interactions.
+    shared-interactor heatmap and the shared-protein dots keep counting the same interactions.
 
     One row is one predicted interaction, parasite protein (`source`) included: the circos
     and the heatmap only ever look at which host proteins are reached, but the dot matrix
@@ -339,12 +339,11 @@ def generate_circos_plot(data_dir, host_taxids, groups, palette, config, score=M
 
 
 @st.cache_data(show_spinner=False)
-def get_interactor_similarity(df_pred, groups, group_order):
+def get_shared_interactor_counts(df_pred, groups, group_order):
     '''
-    Jaccard similarity between the host proteins each pair of parasites is predicted to
-    interact with. Jaccard rather than the count of shared proteins the circos draws: the
-    parasites have between 12 and 200 predicted interactors, so a raw count mostly reports
-    how many predictions a parasite has.
+    Number of host proteins each pair of parasites is predicted to interact with. The
+    diagonal is the total number of host proteins that parasite is predicted to interact
+    with, while off-diagonal cells are the host proteins shared by the pair.
 
     The parasites are in the order of the circos and the dot matrix -- taxonomic group,
     then name -- so that a row is the same parasite in all three, and a clade is a block
@@ -356,20 +355,19 @@ def get_interactor_similarity(df_pred, groups, group_order):
     if len(labels) < 3:
         return None
 
-    similarity = np.array([[len(targets[a] & targets[b]) / len(targets[a] | targets[b])
-                            for b in labels] for a in labels])
+    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels])
 
-    return (pd.DataFrame(similarity, index=labels, columns=labels),
+    return (pd.DataFrame(counts, index=labels, columns=labels),
             [groups.get(g, UNKNOWN_GROUP) for g in labels])
 
 
 @st.cache_data(show_spinner=False)
-def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUMN):
+def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_COLUMN):
     '''
-    The similarity matrix, with a strip of the taxonomic group of each parasite down the
-    side and along the bottom, so that the two axes are visibly the same list of parasites
-    in the same order. The cells are held square (scaleanchor), which is the other half of
-    reading the matrix as symmetric.
+    The shared-interactor count matrix, with a strip of the taxonomic group of each
+    parasite down the side and along the bottom, so that the two axes are visibly the
+    same list of parasites in the same order. The cells are held square (scaleanchor),
+    which is the other half of reading the matrix as symmetric.
 
     Squaring the cells means one of the two axes has to give up whatever space the figure
     has beyond the square, which plotly takes off the range and turns into blank margins
@@ -378,9 +376,9 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     size instead of being stretched to the page. scaleanchor is then only making up the
     difference between the room the labels were given and the room they take.
 
-    The diagonal carries its true value of 1 rather than being left blank. Blank renders as
-    the white the colour scale starts at, so it could not be told from a pair sharing
-    nothing -- and 238 of the 992 off-diagonal cells of the human matrix are exactly that.
+    The diagonal carries the total host-interactor count of that parasite rather than
+    being left blank. Blank renders as the white the colour scale starts at, so it could
+    not be told from a pair sharing nothing.
 
     :param column: pixels the column holding this figure is expected to be. The matrix takes
                    what is left of it once the labels and the colour bar have taken theirs,
@@ -391,7 +389,7 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     shown = [g for g in palette if g in set(clades)]
     steps = [[i / len(shown), palette[g]] for i, g in enumerate(shown)]
     steps += [[(i + 1) / len(shown), palette[g]] for i, g in enumerate(shown)]
-    names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
+    names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
     strip = dict(colorscale=sorted(steps), zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
                  hovertemplate='%{text}<extra></extra>')
 
@@ -400,10 +398,10 @@ def generate_similarity_heatmap(similarity, clades, palette, column=MATRIX_COLUM
     figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=names,
                                 text=[[c] for c in clades], xgap=0, ygap=1, **strip), row=1, col=1)
 
-    figure.add_trace(go.Heatmap(z=similarity.to_numpy(), x=names, y=names, colorscale='Blues',
-                                zmin=0, zmax=1,
-                                hovertemplate='%{y} and %{x}<br>Jaccard %{z:.2f}<extra></extra>',
-                                colorbar=dict(title='Shared<br>interactors<br>(Jaccard)',
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=names, y=names, colorscale='Blues',
+                                zmin=0, zmax=counts.to_numpy().max(),
+                                hovertemplate='%{y} and %{x}<br>Shared interactors %{z:.0f}<extra></extra>',
+                                colorbar=dict(title='Shared<br>interactors',
                                               thickness=12, len=0.6, y=1, yanchor='top')),
                      row=1, col=2)
 
@@ -927,7 +925,7 @@ if selected_host != web_utils.NO_HOST:
                                'the three figures below. The tissue plot at the foot of the '
                                'page counts every prediction.')
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
-    similarity = get_interactor_similarity(counted, parasite_groups, group_order)
+    shared_counts = get_shared_interactor_counts(counted, parasite_groups, group_order)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order,
                                          web_utils.load_protein_annotations(data_dir),
                                          web_utils.load_deeploc_localisations(data_dir))
@@ -940,15 +938,14 @@ if selected_host != web_utils.NO_HOST:
 
     with matrix:
         st.subheader("Host interactors shared by each pair of parasites")
-        st.caption('Jaccard similarity between the host interactors of each pair of '
-                   'parasites: the shared interactors as a proportion of all interactors of '
-                   'either parasite. A strip of the taxonomic group runs along each axis. The '
-                   'diagonal is 1 by definition.')
-        if similarity is not None:
+        st.caption('Number of host interactors shared by each pair of parasites. A strip of '
+                   'the taxonomic group runs along each axis. The diagonal is the total '
+                   'number of host interactors for that parasite.')
+        if shared_counts is not None:
             # the figure carries its own size, since a square matrix stretched to the page is
             # a square with blank space either side of it rather than a wider square
-            st.plotly_chart(generate_similarity_heatmap(*similarity,
-                                                        config.get('parasite_groups', {})),
+            st.plotly_chart(generate_shared_interactor_heatmap(
+                *shared_counts, config.get('parasite_groups', {})),
                             width='content')
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein, '

@@ -123,8 +123,9 @@ def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file)
         columns=['Gene', 'Tissue'],
     )
     tissues_df = tissues_df[tissues_df['Gene'].isin(proteins.keys())]
-    # HPA cell types are human-only, so non-human host genes stay NaN after this left join
-    hpa_data = hpa.parse_hpa(config_file, valid_proteins=proteins.keys())
+    # HPA annotates human; an optional preprocessed pig atlas adds pig cell types.
+    hpa_data = hpa.parse_cell_type_data(config_file, data_dir=os.path.dirname(output_file),
+                                        valid_proteins=proteins.keys())
     tissues_df = pd.merge(tissues_df, hpa_data, on=['Gene', 'Tissue'], how='left')
 
     utils.save_to_parquet(tissues_df, output_file)

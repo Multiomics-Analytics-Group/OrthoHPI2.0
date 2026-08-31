@@ -49,6 +49,13 @@ CELL = 22
 # one, and the figures follow.
 MATRIX_COLUMN = 900
 CIRCOS_COLUMN = 750
+
+
+def matrix_width(columns):
+    '''Intrinsic width for sparse parasite matrices, capped at the page-width layout.'''
+    return min(MATRIX_COLUMN, max(460, 100 * columns + 260))
+
+
 # marker each surface class is drawn with in the shared-interactors matrix, and the order
 # they are offered in the legend. Colour there is already the parasite's taxonomic group
 # and size is the degree, so the localisation of the host protein goes on the shape --
@@ -156,7 +163,8 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette):
     figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
                          hovertemplate='%{y}<br>%{x}<br>predicted interactions: '
                                        '%{customdata[0]}<extra></extra>')
-    figure.update_layout(height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
+    figure.update_layout(width=matrix_width(len(parasites)),
+                         height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title='tissue the parasite infects')
@@ -663,7 +671,8 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
                          hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
     if localised:
         split_dot_legend(figure, orders['group'], orders['surface'], palette)
-    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
+    figure.update_layout(width=matrix_width(len(parasites)),
+                         height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
@@ -974,7 +983,7 @@ if selected_host != web_utils.NO_HOST:
                    'protein, circles cell membrane and diamonds extracellular; hover for the '
                    'underlying probabilities.')
         st.plotly_chart(generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
-                        width='stretch')
+                        width='content')
 
     st.subheader("Tissues in which the predicted interactions can take place")
     st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
@@ -990,7 +999,7 @@ if selected_host != web_utils.NO_HOST:
     else:
         st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
                                              config.get('parasite_groups', {})),
-                        width='stretch')
+                        width='content')
 
     # cell types are only worth drawing one tissue at a time, and only for a host they are
     # annotated for: the HPA single cell data is human, so every other host has no cell type

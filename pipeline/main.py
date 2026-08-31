@@ -6,7 +6,8 @@ import pandas as pd
 import utils
 from . import homology, filters, hpa, go
 
-# jensenlab confidence score below which a host protein's tissue evidence is ignored.
+# Default jensenlab confidence score below which a host protein's tissue evidence is
+# ignored. A host can override it with hosts.<taxid>.tissue_cutoff in config.yml.
 TISSUE_CUTOFF = 2.5
 
 # DeepLoc 2 (Accurate) probability cut-offs for keeping a host protein as surface-exposed.

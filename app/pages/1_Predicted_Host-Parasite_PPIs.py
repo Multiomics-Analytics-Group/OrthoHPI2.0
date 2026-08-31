@@ -92,8 +92,8 @@ VIEWER_HEIGHT = 400
 
 # Columns of the interactions table. The colors and shapes only exist to draw the network,
 # the taxids repeat their labels, and the parasite and the edge type are the same on every
-# row. The selected host is one species, so its proteins are unambiguous throughout the
-# network, table, and tissue views.
+# row. The optional Rodent view carries both rat and mouse proteins, so their species is
+# retained to distinguish them throughout the network, table, and tissue views.
 #
 # Both STRING ids are carried even though the parasite one is the taxid and the UniProt
 # accession joined and could be left to the reader to assemble: the host one cannot be --
@@ -432,8 +432,8 @@ def name_the_selection(table, parasite, host):
     if table.empty:
         return table
 
-    # The table may already contain a host-species column from an upstream export; keep it
-    # and label this selected-species column as the host group in that case.
+    # The combined Rodent view already carries each row's host species; preserve that
+    # column and add the selected host label separately.
     host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
     named = table.assign(**{'Parasite species': parasite, host_column: host})
     front = ['Parasite species', host_column]
@@ -679,7 +679,7 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    # The selected host is one species, so the background pool is read from its own taxid.
+    # The background pool is read from exactly the species included in the selected view.
     pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
     if side == HOST and background == BACKGROUND_TISSUES:
         parasite = pred_df['taxid1'].iloc[0]
@@ -1153,7 +1153,7 @@ with col2:
 
     # the host carries over from whichever page it was last chosen on
     selected_host, selected_taxids = web_utils.host_selector(
-        config, load_predictions(data_dir), 'Select a host')
+        config, load_predictions(data_dir), 'Select a host', include_rodents=True)
 
     if selected_host == web_utils.NO_HOST:
         st.text('Choose 1 host to explore the predicted host-parasite interactions')

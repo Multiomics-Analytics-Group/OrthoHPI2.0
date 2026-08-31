@@ -313,13 +313,14 @@ def classify_surface(localisations):
                      index=localisations.index)
 
 
-def get_host_groups(config, predictions):
+def get_host_groups(config, predictions, include_rodents=False):
     '''
     Maps each host species offered in the app to its taxid. Hosts with no predicted
     interaction are dropped so the selector never offers an empty host.
 
     :param dict config: parsed configuration of individual host species
     :param predictions: predictions dataframe, used to drop groups without predictions
+    :param bool include_rodents: add a combined rat/mouse option
     :return: {host species label: [taxid as str]} sorted by label
     '''
     predicted = set(predictions['taxid2'])
@@ -328,6 +329,10 @@ def get_host_groups(config, predictions):
         taxid = str(taxid)
         if taxid in predicted:
             groups[host['label']] = [taxid]
+
+    rodent_taxids = ['10116', '10090']
+    if include_rodents and all(taxid in predicted for taxid in rodent_taxids):
+        groups['Rodent'] = rodent_taxids
 
     return {group: groups[group] for group in sorted(groups)}
 
@@ -341,16 +346,17 @@ HOST_WIDGET_KEY = 'selected_host_widget'
 NO_HOST = '<select>'
 
 
-def host_selector(config, predictions, label='Select a host'):
+def host_selector(config, predictions, label='Select a host', include_rodents=False):
     '''
     Draws the host selectbox, shared across pages through HOST_STATE_KEY.
 
     :param dict config: parsed configuration
     :param predictions: predictions dataframe, used to build the options
     :param str label: label shown above the selectbox
+    :param bool include_rodents: offer a combined rat/mouse option
     :return: (group label, tuple of taxids as str); NO_HOST and () when nothing is chosen
     '''
-    groups = get_host_groups(config, predictions)
+    groups = get_host_groups(config, predictions, include_rodents=include_rodents)
     options = [NO_HOST] + list(groups)
 
     current = st.session_state.get(HOST_STATE_KEY, NO_HOST)

@@ -18,7 +18,7 @@ hosts:
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
     10116:
         label: Rattus norvegicus
-        color: "#E69F00"
+        color: "#0072B2"
         tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
     10090:

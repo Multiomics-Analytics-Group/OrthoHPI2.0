@@ -177,9 +177,9 @@ def load_figure(species):
     legends = [(parent, child) for parent in root.iter() for child in parent
                if child.get('id') == LEGEND_ID]
     for parent, legend in legends:
-        # The rodent legend overlaps the lower silhouette in its SVG coordinate space,
-        # so shortening its viewBox cuts off the feet and tail.
-        if species not in {'rat', 'mouse'}:
+        # The non-human legends overlap lower anatomy in their SVG coordinate space, so
+        # shortening their viewBox cuts off the feet, tail, or lower body.
+        if species == 'human':
             crop_to(root, above=legend_top(legend))
         parent.remove(legend)
 

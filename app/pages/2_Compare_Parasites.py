@@ -400,7 +400,9 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
     figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=names,
                                 text=[[c] for c in clades], xgap=0, ygap=1, **strip), row=1, col=1)
 
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=names, y=names, colorscale='Blues',
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=names, y=names,
+                                colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
+                                            '#3182bd', '#08519c'],
                                 zmin=0, zmax=counts.to_numpy().max(),
                                 hovertemplate='%{y} and %{x}<br>Shared interactors %{z:.0f}<extra></extra>',
                                 colorbar=dict(title='Shared<br>interactors',

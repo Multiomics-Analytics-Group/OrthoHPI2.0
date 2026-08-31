@@ -12,7 +12,7 @@ with `nervous system` too. Reading those 21 codes straight out of the same file 
 lets the figure be shaded without mapping the 33 lifecycle names onto it by hand.
 
 The integrated channel is used rather than the experiments channel the pipeline reads:
-`saliva` and `urine` are annotated only through knowledge and text mining, and are
+`saliva` and `urinary bladder` are annotated only through knowledge and text mining, and are
 missing from the experiments file.
 
 Writes <data_dir>/figure_tissues.parquet with one row per (host protein, organ).
@@ -27,10 +27,9 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 
-# BTO code -> the `title` attribute the organ carries in images/tissues_<species>.svg.
-# The figures label the same term differently in places: the pig calls BTO:0001379
-# `thyroid` where the others say `thyroid gland`, so the alias is resolved when the
-# figure is drawn (app/body_figure.py) rather than here.
+# BTO code -> the normalized organ name. The source figures call the urinary-bladder
+# region `urine` and differ on the thyroid label; these source-label aliases are resolved
+# when the figure is drawn (app/body_figure.py).
 FIGURE_ORGANS = {
     'BTO:0000047': 'adrenal gland',
     'BTO:0000089': 'blood',
@@ -51,7 +50,8 @@ FIGURE_ORGANS = {
     'BTO:0001281': 'spleen',
     'BTO:0001307': 'stomach',
     'BTO:0001379': 'thyroid gland',
-    'BTO:0001419': 'urine',
+    'BTO:0001418': 'urinary bladder',
+    'BTO:0001419': 'urinary bladder',
     'BTO:0001484': 'nervous system',
 }
 

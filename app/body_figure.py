@@ -26,9 +26,13 @@ ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
 
 FIGURE_DIR = 'images'
 
-# The figures do not all label the same organ the same way: the pig says `thyroid` where
-# the others say `thyroid gland`, and the annotation follows the majority.
-ORGAN_ALIASES = {'thyroid': 'thyroid gland'}
+# The pig says `thyroid` where the other figures say `thyroid gland`; all figures call
+# their urinary-bladder region `urine`. Normalize these source labels for annotations and
+# user-facing tooltips.
+ORGAN_ALIASES = {
+    'thyroid': 'thyroid gland',
+    'urine': 'urinary bladder',
+}
 
 # A blue interaction-count ramp. The first colour is for an organ no interaction reaches,
 # so it stays the white the figures are drawn in.
@@ -61,7 +65,6 @@ CROP_MARGIN = 10
 #   `nose`              Leishmania braziliensis
 #   `placenta`          Toxoplasma gondii
 #   `urethra`           Trichomonas vaginalis
-#   `urinary bladder`   Schistosoma haematobium
 #   `vagina`            Trichomonas vaginalis
 # Those terms shade no organ rather than being shaded onto a neighbouring one, which would
 # be inventing a location for them. Their interactions still pass the tissue filter and
@@ -216,6 +219,26 @@ def infected_organs(config, taxid):
     return organs
 
 
+def tissue_organs(config, tissues):
+    '''
+    The body-figure organs corresponding to explicitly selected lifecycle tissues.
+
+    :param dict config: parsed configuration
+    :param iterable tissues: selected, lower-case display names
+    :return: set of normalized organ names represented by those tissues
+    '''
+    selected = {tissue.lower() for tissue in tissues}
+    organs = set()
+    for code, tissue in config['tissues'].items():
+        if tissue.lower() not in selected:
+            continue
+        organ = FIGURE_ORGANS.get(code, ORGAN_PARENTS.get(code))
+        if organ is not None:
+            organs.add(ORGAN_ALIASES.get(organ, organ))
+
+    return organs
+
+
 def count_interactions(df, figure_tissues):
     '''
     Counts the predicted interactions reaching each organ. An interaction is counted once
@@ -350,7 +373,7 @@ def legend_html(bounds):
             + ''.join(swatches) + '</div>')
 
 
-def show_body_figure(config, data_dir, df, taxids):
+def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
     predicted interactions reaching them. A host group covering more than one species
@@ -361,6 +384,7 @@ def show_body_figure(config, data_dir, df, taxids):
     :param str data_dir: directory holding figure_tissues.parquet
     :param df: predictions dataframe, already filtered to what the network shows
     :param taxids: taxids of the selected host
+    :param iterable selected_tissues: explicitly selected tissue display names, if any
     '''
     figure_tissues = load_figure_tissues(data_dir)
     if figure_tissues is None or df.empty:
@@ -380,6 +404,10 @@ def show_body_figure(config, data_dir, df, taxids):
                    'infecting, so there is nothing to shade.')
         return
 
+    selected_organs = (tissue_organs(config, selected_tissues)
+                       if selected_tissues else infected)
+    shown_organs = infected & selected_organs
+
     st.markdown('##### Where the predicted interactions can take place')
     st.caption('Predicted interactions whose host protein is expressed in each organ, '
                'after the confidence score and the tissue filters, and only in the organs '
@@ -398,7 +426,7 @@ def show_body_figure(config, data_dir, df, taxids):
         # stretch the colour scale to a range nothing on the figure can reach, and an
         # organ the parasite does not infect is not somewhere the interaction can happen
         counts = {organ: count for organ, count in counts.items()
-                  if organ in organs and organ in infected}
+                  if organ in organs and organ in shown_organs}
         bounds, highest = color_scale(counts)
 
         with column:

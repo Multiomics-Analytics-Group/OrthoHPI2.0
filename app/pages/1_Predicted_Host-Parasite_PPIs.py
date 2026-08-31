@@ -1183,6 +1183,7 @@ with col2:
                 target_surface=df_select['target'].map(surface_calls['surface']))
         score = st.slider('Confidence score', 0.4, 0.9, 0.7)
 
+        selected_tissues = []
         tissues_options = generate_tissue_filters(df_select)
         if len(tissues_options) > 0:
             selected_tissues = st.multiselect('Select tissues to filter the predicted PPI', tissues_options)
@@ -1264,7 +1265,7 @@ with col2:
 with col1:
     if df_select is not None:
         body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
-                                     selected_taxids)
+                                     selected_taxids, selected_tissues)
 
 
 with st.container():

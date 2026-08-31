@@ -30,13 +30,12 @@ MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
 # rest of the app takes them from. This page is the only one that draws the hosts against
 # each other rather than one at a time, and the config colours do not survive that: human
 # is a dark grey there, which is the colour of a host a set does not include (ABSENT_COLOR)
-# and close to the colour of a link shared by every host, and rat and mouse are the one
-# green of their clade, which is two of the columns here. These are the colourblind-safe
+# and close to the colour of a link shared by every host. These are the colourblind-safe
 # Okabe-Ito set the config already uses for the parasite groups, with the blues left out --
 # blue says how far a link carried over on this page, and nothing else may use it.
 # A host without an entry falls back to its config colour (see host_palette).
-HOST_COLORS = {'Homo sapiens': '#D55E00', 'Sus scrofa': '#CC79A7',
-               'Mus musculus': '#009E73', 'Rattus norvegicus': '#E69F00'}
+HOST_COLORS = {'Homo sapiens (human)': '#D55E00', 'Sus scrofa (pig)': '#CC79A7',
+               'Mus musculus (mouse)': '#009E73', 'Rattus norvegicus (rat)': '#E69F00'}
 # colour of a link predicted against every host of the parasite, and the shades of it a
 # link predicted against some but not all of them is drawn in -- only reachable with three
 # hosts or more, where there is more than one way of being partly shared, so they are

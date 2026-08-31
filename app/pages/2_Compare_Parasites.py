@@ -476,20 +476,20 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
 DESCRIPTION_WIDTH = 38
 
 
-def label_proteins(df_pred, annotations):
+def label_proteins(df_pred, annotations, truncate=True):
     '''
     Names each host protein by its gene symbol and its descriptive protein name, since the
     symbol on its own identifies the protein only for someone who already knows it.
 
-    The descriptions are keyed by STRING id and the matrix is keyed by symbol -- a host
-    group covering two species carries the same gene under an id of each -- so the first
-    description found for a symbol is the one used. Proteins UniProt has nothing but
-    "Uncharacterized protein" for keep their symbol alone: that description names nothing
-    and would be repeated down the axis.
+    The descriptions are keyed by STRING id and the matrix is keyed by symbol, so the
+    first description found for a symbol is the one used. Proteins UniProt has nothing
+    but "Uncharacterized protein" for keep their symbol alone: that description names
+    nothing and would be repeated down the axis.
 
     :param df_pred: tissue-expressed predictions of the host group
     :param dict annotations: STRING id --> descriptive protein name
-    :return: {gene symbol: axis label}
+    :param bool truncate: shorten descriptions for labels that must fit an axis
+    :return: {gene symbol: protein label}
     '''
     described = {}
     for protein, name in df_pred[['target', 'target_name']].drop_duplicates().values:
@@ -500,7 +500,7 @@ def label_proteins(df_pred, annotations):
     labels = {}
     for name in df_pred['target_name'].unique():
         description = described.get(name)
-        if description and len(description) > DESCRIPTION_WIDTH:
+        if truncate and description and len(description) > DESCRIPTION_WIDTH:
             description = description[:DESCRIPTION_WIDTH - 1].rstrip() + '…'
         labels[name] = f'{name} · {description}' if description else str(name)
 
@@ -579,6 +579,8 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     labels = label_proteins(df_pred, annotations)
     dots['protein'] = dots['target_name'].map(labels)
+    full_labels = label_proteins(df_pred, annotations, truncate=False)
+    dots['protein_full'] = dots['target_name'].map(full_labels)
     surface = summarise_localisations(df_pred, localisations)
     if surface is not None:
         dots = dots.join(surface, on='target_name')
@@ -648,16 +650,16 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
     # column name of whatever it is given. The protein and the parasite are the two axes
     # already, and `parasites` and `degree` are two different counts of two different
     # things, which as bare numbers under their column names they do not say
-    hover_columns = ['parasites', 'degree']
-    hover_lines = ['%{y}', 'parasites reaching it: %{customdata[0]}',
-                   'proteins of %{x} reaching it: %{customdata[1]}']
+    hover_columns = ['protein_full', 'parasites', 'degree']
+    hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
+                   'proteins of %{x} reaching it: %{customdata[2]}']
     if localised:
         orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
         hover_columns += ['cell_membrane', 'extracellular']
         # the class is the shape of the dot, so the hover carries the two probabilities
         # behind it rather than naming it a second time
-        hover_lines.append('P(cell membrane) %{customdata[2]:.2f}, '
-                           'P(extracellular) %{customdata[3]:.2f}')
+        hover_lines.append('P(cell membrane) %{customdata[3]:.2f}, '
+                           'P(extracellular) %{customdata[4]:.2f}')
 
     figure = px.scatter(dots, x='parasite', y='protein', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`

@@ -48,23 +48,18 @@ LEGEND_ID = 'Legend'
 CROP_MARGIN = 10
 
 # The tissues a parasite infects are the 33 fine-grained BTO terms of config['tissues'];
-# the figure draws 21 coarser organs (20 for rat, which has no gall bladder). Of the 27
-# terms the parasites actually use, twelve are drawn as themselves and come straight out
-# of FIGURE_ORGANS. These are the five of the rest that have an organ containing them on
-# the figure -- seven parasites are recorded only in `small intestine`, which the figure
-# draws as `intestine`, and would otherwise shade nothing at all. (`gastrointestinal
-# tract` is in config['tissues'] but no parasite uses it; it is kept here so the map
-# covers the whole vocabulary.)
+# the figure draws 21 coarser organs (20 for rat, which has no gall bladder). Most terms
+# are drawn directly by FIGURE_ORGANS. The following lifecycle tissues have a defensible
+# coarser organ on the figure: seven parasites are recorded only in `small intestine`,
+# which is represented as `intestine`, and would otherwise shade nothing at all.
+# (`gastrointestinal tract` is in config['tissues'] but no parasite uses it; it is kept
+# here so the map covers the whole vocabulary.)
 #
-# Ten terms still have nothing standing for them:
-#   `bile duct`         Clonorchis sinensis, Opisthorchis felineus, O. viverrini
-#   `lymph vessel`      Brugia malayi, B. timori, Wuchereria bancrofti
+# Five terms still have nothing standing for them:
 #   `macrophage`        Leishmania braziliensis, L. infantum, L. major
-#   `mesenteric artery` Angiostrongylus costaricensis
 #   `mouth`             Leishmania braziliensis
 #   `nose`              Leishmania braziliensis
 #   `placenta`          Toxoplasma gondii
-#   `urethra`           Trichomonas vaginalis
 #   `vagina`            Trichomonas vaginalis
 # Those terms shade no organ rather than being shaded onto a neighbouring one, which would
 # be inventing a location for them. Their interactions still pass the tissue filter and
@@ -78,6 +73,10 @@ ORGAN_PARENTS = {
     'BTO:0000269': 'intestine',           # colon
     'BTO:0001158': 'intestine',           # rectum
     'BTO:0000511': 'intestine',           # gastrointestinal tract
+    'BTO:0000122': 'liver',               # bile duct
+    'BTO:0000752': 'lymph nodes',         # lymph vessel
+    'BTO:0000779': 'intestine',           # mesenteric artery
+    'BTO:0001426': 'urinary bladder',     # urethra
 }
 
 

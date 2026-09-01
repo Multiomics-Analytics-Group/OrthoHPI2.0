@@ -1,0 +1,139 @@
+"""
+Build mouse cell-type expression from the Tabula Muris Senis droplet H5AD.
+
+By default this downloads the official raw droplet dataset from Figshare, filters
+to 3-month mice, normalizes each cell to 10,000 counts, applies log1p, averages
+expression by tissue and Cell Ontology label, and maps mouse genes to STRING IDs:
+
+    .venv/bin/python -m pipeline.build_mouse_atlas_cell_types
+
+Supply --input to process a previously downloaded H5AD. The default droplet
+dataset is used deliberately: its UMI counts must not be pooled directly with
+the Smart-seq2/FACS dataset's read counts.
+"""
+import argparse
+import os
+
+import anndata
+import numpy as np
+import pandas as pd
+from scipy import sparse
+
+import utils
+
+MOUSE_TAXID = '10090'
+COUNTS_PER_CELL = 10_000
+DEFAULT_AGE = '3m'
+DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
+                             'tabula-muris-senis-droplet-official-raw-obj.h5ad')
+TISSUE_MAPPING = {
+    'Bladder': 'urinary bladder',
+    'Brain': 'brain',
+    'Brain_Myeloid': 'brain',
+    'Brain_Non-Myeloid': 'brain',
+    'Heart': 'heart',
+    'Heart_and_Aorta': 'heart',
+    'Kidney': 'kidney',
+    'Large_Intestine': 'intestine',
+    'Limb_Muscle': 'muscle',
+    'Liver': 'liver',
+    'Lung': 'lung',
+    'Marrow': 'bone marrow',
+    'Pancreas': 'pancreas',
+    'Skin': 'skin',
+    'Spleen': 'spleen',
+}
+
+
+def normalized_tissues(obs):
+    """Map source tissue labels to the OrthoHPI vocabulary without inventing matches."""
+    source = obs['tissue']
+    if 'tissue_free_annotation' in obs:
+        # The droplet data retains the original Heart/Aorta distinction here.
+        source = obs['tissue_free_annotation'].replace('', pd.NA).fillna(source)
+    return source.map(TISSUE_MAPPING)
+
+
+def mean_normalized_expression(matrix):
+    """Return log1p(CP10K)-normalized mean expression for every gene."""
+    matrix = matrix.tocsr().astype(np.float64)
+    totals = np.asarray(matrix.sum(axis=1)).ravel()
+    nonzero = totals > 0
+    matrix = matrix[nonzero]
+    if matrix.shape[0] == 0:
+        return np.zeros(matrix.shape[1])
+
+    matrix = sparse.diags(COUNTS_PER_CELL / totals[nonzero]) @ matrix
+    matrix.data = np.log1p(matrix.data)
+    return np.asarray(matrix.mean(axis=0)).ravel()
+
+
+def aggregate_expression(input_file, config_file, age):
+    """Aggregate the selected Tabula Muris Senis H5AD into the shared schema."""
+    atlas = anndata.read_h5ad(input_file, backed='r')
+    required = {'age', 'tissue', 'cell_ontology_class'}
+    missing = required.difference(atlas.obs.columns)
+    if missing:
+        raise ValueError(f'{input_file} is missing required obs columns: {sorted(missing)}')
+
+    obs_columns = list(required | {'tissue_free_annotation'})
+    obs_columns = [column for column in obs_columns if column in atlas.obs.columns]
+    obs = atlas.obs[obs_columns].copy()
+    obs = obs[obs['age'].astype(str) == age]
+    obs['Tissue'] = normalized_tissues(obs)
+    valid_tissues = {name.lower() for name in
+                     utils.read_config(filepath=config_file, field='tissues').values()}
+    obs = obs[obs['Tissue'].isin(valid_tissues) & obs['cell_ontology_class'].notna()]
+
+    aliases = utils.parse_string_aliases(
+        config_file=config_file,
+        sources=['Ensembl_gene', 'UniProt_GN_Name'],
+        taxid=MOUSE_TAXID,
+    )
+    genes = pd.Series(atlas.var_names.astype(str), index=np.arange(atlas.n_vars)).map(aliases)
+    mapped = genes.notna().to_numpy()
+    rows = []
+    for (tissue, cell_type), group in obs.groupby(['Tissue', 'cell_ontology_class'],
+                                                  observed=True):
+        positions = atlas.obs.index.get_indexer(group.index)
+        means = mean_normalized_expression(atlas.X[positions, :])[mapped]
+        frame = pd.DataFrame({
+            'Gene': genes[mapped].to_numpy(),
+            'Tissue': tissue,
+            'Cell type': str(cell_type),
+            'nTPM': means,
+        })
+        rows.append(frame[frame['nTPM'] > 0])
+
+    if not rows:
+        return pd.DataFrame(columns=['Gene', 'Tissue', 'Cell type', 'nTPM'])
+    data = pd.concat(rows, ignore_index=True)
+    return (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nTPM']
+            .mean())
+
+
+def build(input_file, config_file, output_file, age):
+    """Write Tabula Muris Senis cell-type expression as a shared Parquet artifact."""
+    data = aggregate_expression(input_file=input_file, config_file=config_file, age=age)
+    os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
+    utils.save_to_parquet(data, output_file)
+    print(f'Wrote {len(data):,} mouse cell-type expression rows to {output_file}')
+    return data
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--input', default=None, help='official raw droplet H5AD')
+    parser.add_argument('--config', default='config.yml')
+    parser.add_argument('--output', default='data/mouse_atlas_cell_types.parquet')
+    parser.add_argument('--age', default=DEFAULT_AGE, help='Tabula Muris Senis age (default: 3m)')
+    args = parser.parse_args()
+
+    input_file = args.input or DEFAULT_INPUT
+    if args.input is None:
+        url = utils.read_config(args.config, field='urls')['tabula_muris_senis_droplet_url']
+        input_file = utils.download_file(url, data_dir=os.path.dirname(DEFAULT_INPUT))
+        if input_file != DEFAULT_INPUT:
+            os.replace(input_file, DEFAULT_INPUT)
+    build(input_file=input_file, config_file=args.config, output_file=args.output, age=args.age)

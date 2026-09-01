@@ -8,6 +8,7 @@ urls:
     go_ontology_url: http://current.geneontology.org/ontology/go.obo
     string_sequences_url: https://stringdb-downloads.org/download/protein.sequences.v12.0/TAXID.protein.sequences.v12.0.fa.gz
     hpa_single_cell_tissue_url: https://www.proteinatlas.org/download/rna_single_cell_type_tissue.tsv.zip
+    tabula_muris_senis_droplet_url: https://ndownloader.figshare.com/files/23938934
 
 # Every host is presented as its own species throughout the app.
 hosts:

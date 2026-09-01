@@ -4,6 +4,7 @@ import pandas as pd
 import utils
 
 PIG_TAXID = '9823'
+MOUSE_TAXID = '10090'
 CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 
 
@@ -97,8 +98,26 @@ def read_pig_atlas(data_dir, valid_proteins):
     return filter_valid_proteins(data, valid_proteins)
 
 
+def read_mouse_atlas(data_dir, valid_proteins):
+    """Load preprocessed Tabula Muris Senis expression, when it has been generated."""
+    filename = f'{data_dir}/mouse_atlas_cell_types.parquet'
+    try:
+        data = utils.read_parquet_file(input_file=filename)
+    except FileNotFoundError:
+        return pd.DataFrame(columns=CELL_TYPE_COLUMNS)
+
+    missing = set(CELL_TYPE_COLUMNS).difference(data.columns)
+    if missing:
+        raise ValueError(f'{filename} is missing required columns: {sorted(missing)}')
+
+    data = data[CELL_TYPE_COLUMNS]
+    data = data[data['Gene'].astype(str).str.startswith(f'{MOUSE_TAXID}.')]
+    return filter_valid_proteins(data, valid_proteins)
+
+
 def parse_cell_type_data(config_file, data_dir, valid_proteins):
-    """Return human HPA and optional pig-atlas cell-type annotations."""
+    """Return HPA and optional pig/mouse atlas cell-type annotations."""
     human = parse_hpa(config_file=config_file, valid_proteins=valid_proteins)
     pig = read_pig_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
-    return pd.concat([human, pig], ignore_index=True, sort=False)
+    mouse = read_mouse_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
+    return pd.concat([human, pig, mouse], ignore_index=True, sort=False)

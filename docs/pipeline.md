@@ -106,8 +106,9 @@ pipeline.
 
 Reshapes the `tissues` dict from step 4 into a long `(Gene, Tissue)` table,
 then left-joins it with human Human Protein Atlas and optional Pig Cell Atlas
-single-cell RNA data (`cell_type_annotations.parse_cell_type_data`) to add
-cell-type resolution on top of tissue resolution.
+or Tabula Muris Senis mouse single-cell RNA data
+(`cell_type_annotations.parse_cell_type_data`) to add cell-type resolution on
+top of tissue resolution.
 Written to `data/tissues_cell_types.parquet` — this is annotation data
 consumed by the Streamlit app, not a filter.
 

@@ -1,6 +1,6 @@
 """
 Prepare the source logos of the app footer (app/web_utils.py) at a common height, from the
-copies in images/.
+copies in images/logos/source/.
 
 The originals were saved from each website at whatever size and background they happened to
 be drawn on, and the footer drew them all at the same *width*. The aspect ratios run from
@@ -25,7 +25,7 @@ import os
 import numpy as np
 from PIL import Image, ImageChops
 
-SOURCE_DIR = 'images'
+SOURCE_DIR = os.path.join('images', 'logos', 'source')
 OUTPUT_DIR = os.path.join('images', 'logos')
 
 # the height the footer draws them at; the files are written at twice this so they stay

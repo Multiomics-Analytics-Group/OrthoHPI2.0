@@ -2,7 +2,7 @@
 Shades the TISSUES body figure of a host with the number of predicted interactions
 reaching each of its organs.
 
-The figures (images/tissues_<species>.svg) come from tissues.jensenlab.org and draw 21
+The figures (images/tissues/tissues_<species>.svg) come from tissues.jensenlab.org and draw 21
 organs, each element carrying the organ as its `title` attribute. That is a coarser
 vocabulary than the 33 lifecycle tissues of the configuration, which is what decides
 whether a prediction is shown at all; the organs are read from the same TISSUES download
@@ -24,7 +24,7 @@ SVG_NS = 'http://www.w3.org/2000/svg'
 ET.register_namespace('', SVG_NS)
 ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
 
-FIGURE_DIR = 'images'
+FIGURE_DIR = os.path.join('images', 'tissues')
 
 # The pig says `thyroid` where the other figures say `thyroid gland`; all figures call
 # their urinary-bladder region `urine`. Normalize these source labels for annotations and
@@ -101,7 +101,7 @@ def get_species(config, taxid):
     '''
     The species name jensenlab uses for a host, taken from the tissue url the
     configuration already holds so that the hosts are only listed in one place. It names
-    both the download and the figure, images/tissues_<species>.svg.
+    both the download and the figure, images/tissues/tissues_<species>.svg.
 
     :param dict config: parsed configuration
     :param taxid: host taxid, as a string or an int

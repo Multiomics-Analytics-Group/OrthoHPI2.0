@@ -14,15 +14,15 @@ OrthoHPI 2.0 has been developed entirely with **Python 3.8.2** and Streamlit (ht
 
 The **homology prediction** has been done using:
 
-<a src="http://eggnog6.embl.de/"><img width=100 alt="eggnog" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/eggnog.png"> </a>
+<a src="http://eggnog6.embl.de/"><img width=100 alt="eggnog" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/logos/source/eggnog.png"> </a>
 
 
-<a src="https://string-db.org/"><img width=100 alt="string" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/string.png"></a>
+<a src="https://string-db.org/"><img width=100 alt="string" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/logos/source/string.png"></a>
 
 
 The **tissue annotation** used to filter the proteomes comes from:
 
-<a src="https://tissues.jensenlab.org/"><img width=100 alt="tissues" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/tissues.png"></a>
+<a src="https://tissues.jensenlab.org/"><img width=100 alt="tissues" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/logos/source/tissues.png"></a>
 
 Host proteins are filtered to surface-exposed (extracellular / cell membrane)
 localizations predicted by **[DeepLoc 2.0](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/)**.
@@ -30,7 +30,7 @@ localizations predicted by **[DeepLoc 2.0](https://services.healthtech.dtu.dk/se
 
 The **cell type expression** information has been downloaded from:
 
-<a src="https://www.proteinatlas.org/humanproteome/tissue+cell+type"><img width=200 alt="hpa" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/hpa.png"></a>
+<a src="https://www.proteinatlas.org/humanproteome/tissue+cell+type"><img width=200 alt="hpa" src="https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0/blob/main/images/logos/source/hpa.png"></a>
 
 ## Getting started
 
@@ -64,5 +64,4 @@ $ python -m pipeline.main
 ```
 
 For a detailed description of the pipeline, see [docs/pipeline.md](docs/pipeline.md).
-
 

@@ -1,6 +1,6 @@
 """
 Annotate the host proteins of the predictions with the organs drawn on the TISSUES
-body figures (images/tissues_<species>.svg).
+body figures (images/tissues/tissues_<species>.svg).
 
 This is deliberately separate from the tissue annotation the pipeline already builds.
 `config.yml` picks 33 fine-grained BTO terms chosen for parasite lifecycles, which is

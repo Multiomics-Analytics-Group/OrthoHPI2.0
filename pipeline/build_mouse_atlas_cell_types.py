@@ -131,9 +131,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     input_file = args.input or DEFAULT_INPUT
-    if args.input is None:
+    if args.input is None and not os.path.isfile(DEFAULT_INPUT):
         url = utils.read_config(args.config, field='urls')['tabula_muris_senis_droplet_url']
         input_file = utils.download_file(url, data_dir=os.path.dirname(DEFAULT_INPUT))
         if input_file != DEFAULT_INPUT:
             os.replace(input_file, DEFAULT_INPUT)
+            input_file = DEFAULT_INPUT
     build(input_file=input_file, config_file=args.config, output_file=args.output, age=args.age)

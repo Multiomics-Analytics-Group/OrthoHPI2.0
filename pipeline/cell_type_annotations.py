@@ -1,3 +1,5 @@
+"""Load and combine cell-type annotations from host-specific atlas sources."""
+
 import pandas as pd
 import utils
 

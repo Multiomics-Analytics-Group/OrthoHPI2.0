@@ -4,7 +4,7 @@ from collections import Counter
 import pandas as pd
 
 import utils
-from . import homology, filters, hpa, go
+from . import cell_type_annotations, homology, filters, go
 
 # Default jensenlab confidence score below which a host protein's tissue evidence is
 # ignored. A host can override it with hosts.<taxid>.tissue_cutoff in config.yml.
@@ -124,9 +124,9 @@ def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file)
     )
     tissues_df = tissues_df[tissues_df['Gene'].isin(proteins.keys())]
     # HPA annotates human; an optional preprocessed pig atlas adds pig cell types.
-    hpa_data = hpa.parse_cell_type_data(config_file, data_dir=os.path.dirname(output_file),
-                                        valid_proteins=proteins.keys())
-    tissues_df = pd.merge(tissues_df, hpa_data, on=['Gene', 'Tissue'], how='left')
+    cell_type_data = cell_type_annotations.parse_cell_type_data(
+        config_file, data_dir=os.path.dirname(output_file), valid_proteins=proteins.keys())
+    tissues_df = pd.merge(tissues_df, cell_type_data, on=['Gene', 'Tissue'], how='left')
 
     utils.save_to_parquet(tissues_df, output_file)
 

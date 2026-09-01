@@ -3,8 +3,9 @@
 Mouse cell-type annotation is derived from the Tabula Muris Senis raw droplet
 dataset, downloaded from the atlas authors' Figshare record:
 [Processed files (to use with Scanpy), v3](https://doi.org/10.6084/m9.figshare.8273102.v3).
-The default input is the 4.06 GB
-`tabula-muris-senis-droplet-official-raw-obj.h5ad` file.
+The default inputs are the 4.06 GB
+`tabula-muris-senis-droplet-official-raw-obj.h5ad` file and the 2.37 GB FACS
+file from the same record.
 
 Run the builder from the repository root:
 
@@ -24,10 +25,12 @@ The atlas download is streamed to a temporary file and is only used after its
 HDF5 signature is validated, so an interrupted download will be discarded and
 retried safely.
 
-The droplet and Smart-seq2/FACS datasets use different count technologies. The
-default workflow deliberately uses only droplet data rather than pooling their
-values. To process an explicitly downloaded compatible H5AD, pass
-`--input path/to/file.h5ad`.
+The droplet and Smart-seq2/FACS datasets use different count technologies, so
+their values are never pooled. Droplet data is preferred for every tissue it
+covers; FACS data is used only as a fallback for tissues missing from the
+3-month droplet data, including brain and gut tissues. Pass `--droplet-only`
+to omit that fallback, or `--input` / `--facs-input` to use explicitly
+downloaded compatible H5AD files.
 
 ## Tissue mapping
 

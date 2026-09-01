@@ -29,6 +29,8 @@ CELLS_PER_CHUNK = 4_096
 DEFAULT_AGE = '3m'
 DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
                              'tabula-muris-senis-droplet-official-raw-obj.h5ad')
+DEFAULT_FACS_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
+                                  'tabula-muris-senis-facs-official-raw-obj.h5ad')
 HDF5_SIGNATURE = b'\x89HDF\r\n\x1a\n'
 TISSUE_MAPPING = {
     'Bladder': 'urinary bladder',
@@ -51,10 +53,16 @@ TISSUE_MAPPING = {
 
 def normalized_tissues(obs):
     """Map source tissue labels to the OrthoHPI vocabulary without inventing matches."""
-    source = obs['tissue']
+    source = obs['tissue'].astype(object).copy()
     if 'tissue_free_annotation' in obs:
-        # The droplet data retains the original Heart/Aorta distinction here.
-        source = obs['tissue_free_annotation'].replace('', pd.NA).fillna(source)
+        # Only this pooled source category needs its free annotation to distinguish
+        # heart from aorta. Other free annotations are finer tissue names that are
+        # not part of the OrthoHPI tissue vocabulary.
+        heart_or_aorta = source == 'Heart_and_Aorta'
+        source.loc[heart_or_aorta] = (
+            obs.loc[heart_or_aorta, 'tissue_free_annotation'].replace('', pd.NA)
+            .fillna(source.loc[heart_or_aorta]).astype(object)
+        )
     return source.map(TISSUE_MAPPING)
 
 
@@ -67,7 +75,7 @@ def is_hdf5(filename):
         return False
 
 
-def download_default_atlas(url, output_file=DEFAULT_INPUT):
+def download_atlas(url, output_file):
     """Stream the large atlas download into a complete, validated H5AD file."""
     if is_hdf5(output_file):
         return output_file
@@ -218,17 +226,38 @@ def build(input_file, config_file, output_file, age):
     return data
 
 
+def combine_atlases(droplet, facs):
+    """Use FACS only for tissues absent from droplet data; never pool technologies."""
+    if facs is None:
+        return droplet
+    return pd.concat([droplet, facs[~facs['Tissue'].isin(droplet['Tissue'])]],
+                     ignore_index=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--input', default=None, help='official raw droplet H5AD')
+    parser.add_argument('--facs-input', default=None, help='official raw FACS H5AD')
+    parser.add_argument('--droplet-only', action='store_true',
+                        help='do not use FACS as a fallback for missing tissues')
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--output', default='data/mouse_atlas_cell_types.parquet')
     parser.add_argument('--age', default=DEFAULT_AGE, help='Tabula Muris Senis age (default: 3m)')
     args = parser.parse_args()
 
     input_file = args.input or DEFAULT_INPUT
+    urls = utils.read_config(args.config, field='urls')
     if args.input is None:
-        url = utils.read_config(args.config, field='urls')['tabula_muris_senis_droplet_url']
-        input_file = download_default_atlas(url)
-    build(input_file=input_file, config_file=args.config, output_file=args.output, age=args.age)
+        input_file = download_atlas(urls['tabula_muris_senis_droplet_url'], DEFAULT_INPUT)
+    droplet = aggregate_expression(input_file=input_file, config_file=args.config, age=args.age)
+    facs = None
+    if not args.droplet_only:
+        facs_file = args.facs_input or DEFAULT_FACS_INPUT
+        if args.facs_input is None:
+            facs_file = download_atlas(urls['tabula_muris_senis_facs_url'], DEFAULT_FACS_INPUT)
+        facs = aggregate_expression(input_file=facs_file, config_file=args.config, age=args.age)
+    data = combine_atlases(droplet, facs)
+    os.makedirs(os.path.dirname(args.output) or '.', exist_ok=True)
+    utils.save_to_parquet(data, args.output)
+    print(f'Wrote {len(data):,} mouse cell-type expression rows to {args.output}')

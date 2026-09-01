@@ -44,8 +44,11 @@ def map_expression(input_file, config_file):
     if missing:
         raise ValueError(f'{input_file} is missing required columns: {sorted(missing)}')
 
-    aliases = utils.parse_string_aliases(config_file=config_file,
-                                         sources=['Ensembl_gene'], taxid=PIG_TAXID)
+    aliases = utils.parse_string_aliases(
+        config_file=config_file,
+        sources=['Ensembl_gene', 'UniProt_GN_Name'],
+        taxid=PIG_TAXID,
+    )
     valid_tissues = {name.lower() for name in
                      utils.read_config(filepath=config_file, field='tissues').values()}
 

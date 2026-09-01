@@ -387,6 +387,33 @@ def filter_tissues(config, df):
     
     return df
 
+
+# Pig atlas abbreviations that need context in app labels. The enterocyte labels
+# are intentionally kept as their atlas codes because their individual expansions
+# are not documented; only their shared lineage is known.
+CELL_TYPE_DESCRIPTIONS = {
+    'EEC': 'enteroendocrine cells',
+    'TA': 'transit-amplifying cells',
+    'TA-G1': 'transit-amplifying cells, G1 phase',
+    'TA-G2': 'transit-amplifying cells, G2 phase',
+    'AT1': 'alveolar type 1 cells',
+    'AT2': 'alveolar type 2 cells',
+    'AT1/AT2': 'alveolar type 1/type 2 cells',
+    'OPC': 'oligodendrocyte progenitor cells',
+    'EP': 'enterocyte progenitor/precursor subset',
+    'EPE': 'enterocyte progenitor/precursor subset',
+    'EPL': 'enterocyte progenitor/precursor subset',
+    'EM': 'enterocyte progenitor/precursor subset',
+    'EI': 'enterocyte progenitor/precursor subset',
+}
+
+
+def display_cell_type(cell_type):
+    """Return a descriptive label while retaining the atlas cell-type code."""
+    description = CELL_TYPE_DESCRIPTIONS.get(cell_type)
+    return f'{cell_type} ({description})' if description else cell_type
+
+
 # share of the nTPM a host protein reaches anywhere in a tissue that one of its cell
 # types has to carry for the protein to count as expressed in that cell type
 PEAK_CELL_TYPE_FRACTION = 0.5

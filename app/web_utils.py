@@ -387,6 +387,7 @@ def filter_tissues(config, df):
     
     return df
 
+
 # share of the nTPM a host protein reaches anywhere in a tissue that one of its cell
 # types has to carry for the protein to count as expressed in that cell type
 PEAK_CELL_TYPE_FRACTION = 0.5

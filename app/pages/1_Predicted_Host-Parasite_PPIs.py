@@ -1206,9 +1206,9 @@ with col2:
                 help='A cell type is offered with the number of host proteins concentrated '
                      'in it -- expressed there at half at least of what they reach anywhere '
                      'in the tissue, since nearly every protein of a tissue is detected in '
-                     'nearly every one of its cell types. The single cell annotation is '
-                     'human, so this is offered for human host proteins alone, and a host '
-                     'protein with no cell type is left out once a cell type is chosen.')
+                     'nearly every one of its cell types. Cell-type annotation is available '
+                     'for human (HPA) and pig (Pig Cell Atlas); a host protein with no cell '
+                     'type is left out once a cell type is chosen.')
             if len(selected_cell_types) > 0:
                 peak = web_utils.keep_peak_cell_types(df_select[df_select['Cell type'].notna()])
                 df_select = peak[peak['Cell type'].isin(selected_cell_types)]
@@ -1344,8 +1344,8 @@ with st.container():
                        'tissue. The columns of both tabs are those cell types, grouped into '
                        'the tissues the parasite infects, and a cell type is written under '
                        'its block alone, since the same kind of cell is annotated separately '
-                       'in each tissue. The single cell annotation is human, so this is drawn '
-                       'for human host proteins alone.')
+                       'in each tissue. Cell-type annotation is available for human (HPA) and '
+                       'pig (Pig Cell Atlas).')
             # the same columns twice, counted and then opened up: how many interactions a
             # cell type holds, and which host proteins they are
             per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])

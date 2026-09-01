@@ -1,5 +1,10 @@
+"""Load and combine cell-type annotations from host-specific atlas sources."""
+
 import pandas as pd
 import utils
+
+PIG_TAXID = '9823'
+CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 
 
 def read_hpa(config_file):
@@ -66,3 +71,34 @@ def parse_hpa(config_file, valid_proteins):
     data = filter_valid_proteins(data, valid_proteins=valid_proteins)
 
     return data
+
+
+def read_pig_atlas(data_dir, valid_proteins):
+    """
+    Load preprocessed pig cell-atlas expression, when it has been generated.
+
+    The raw atlas is a 14 GB Seurat object and is intentionally processed outside
+    the main pipeline by build_pig_atlas_cell_types.py. Keeping this optional
+    preserves pipeline runs for configurations and snapshots that do not include
+    the pig atlas.
+    """
+    filename = f'{data_dir}/pig_atlas_cell_types.parquet'
+    try:
+        data = utils.read_parquet_file(input_file=filename)
+    except FileNotFoundError:
+        return pd.DataFrame(columns=CELL_TYPE_COLUMNS)
+
+    missing = set(CELL_TYPE_COLUMNS).difference(data.columns)
+    if missing:
+        raise ValueError(f'{filename} is missing required columns: {sorted(missing)}')
+
+    data = data[CELL_TYPE_COLUMNS]
+    data = data[data['Gene'].astype(str).str.startswith(f'{PIG_TAXID}.')]
+    return filter_valid_proteins(data, valid_proteins)
+
+
+def parse_cell_type_data(config_file, data_dir, valid_proteins):
+    """Return human HPA and optional pig-atlas cell-type annotations."""
+    human = parse_hpa(config_file=config_file, valid_proteins=valid_proteins)
+    pig = read_pig_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
+    return pd.concat([human, pig], ignore_index=True, sort=False)

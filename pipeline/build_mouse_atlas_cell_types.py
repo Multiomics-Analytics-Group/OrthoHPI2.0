@@ -17,6 +17,7 @@ import os
 import anndata
 import numpy as np
 import pandas as pd
+import requests
 from scipy import sparse
 
 import utils
@@ -26,6 +27,7 @@ COUNTS_PER_CELL = 10_000
 DEFAULT_AGE = '3m'
 DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
                              'tabula-muris-senis-droplet-official-raw-obj.h5ad')
+HDF5_SIGNATURE = b'\x89HDF\r\n\x1a\n'
 TISSUE_MAPPING = {
     'Bladder': 'urinary bladder',
     'Brain': 'brain',
@@ -52,6 +54,47 @@ def normalized_tissues(obs):
         # The droplet data retains the original Heart/Aorta distinction here.
         source = obs['tissue_free_annotation'].replace('', pd.NA).fillna(source)
     return source.map(TISSUE_MAPPING)
+
+
+def is_hdf5(filename):
+    """Return whether filename starts with the HDF5 file signature."""
+    try:
+        with open(filename, 'rb') as handle:
+            return handle.read(len(HDF5_SIGNATURE)) == HDF5_SIGNATURE
+    except FileNotFoundError:
+        return False
+
+
+def download_default_atlas(url, output_file=DEFAULT_INPUT):
+    """Stream the large atlas download into a complete, validated H5AD file."""
+    if is_hdf5(output_file):
+        return output_file
+
+    if os.path.exists(output_file):
+        print(f'Removing invalid atlas download: {output_file}')
+        os.remove(output_file)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    temporary_file = f'{output_file}.part'
+    if os.path.exists(temporary_file):
+        os.remove(temporary_file)
+
+    print(f'Downloading Tabula Muris Senis atlas to {output_file}...')
+    complete = False
+    try:
+        with requests.get(url, stream=True, timeout=60) as response:
+            response.raise_for_status()
+            with open(temporary_file, 'wb') as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        handle.write(chunk)
+        if not is_hdf5(temporary_file):
+            raise ValueError('Downloaded file is not a valid HDF5 file')
+        os.replace(temporary_file, output_file)
+        complete = True
+    finally:
+        if not complete and os.path.exists(temporary_file):
+            os.remove(temporary_file)
+    return output_file
 
 
 def mean_normalized_expression(matrix):
@@ -131,10 +174,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     input_file = args.input or DEFAULT_INPUT
-    if args.input is None and not os.path.isfile(DEFAULT_INPUT):
+    if args.input is None:
         url = utils.read_config(args.config, field='urls')['tabula_muris_senis_droplet_url']
-        input_file = utils.download_file(url, data_dir=os.path.dirname(DEFAULT_INPUT))
-        if input_file != DEFAULT_INPUT:
-            os.replace(input_file, DEFAULT_INPUT)
-            input_file = DEFAULT_INPUT
+        input_file = download_default_atlas(url)
     build(input_file=input_file, config_file=args.config, output_file=args.output, age=args.age)

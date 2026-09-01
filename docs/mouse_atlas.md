@@ -20,6 +20,9 @@ maps genes to mouse STRING IDs and writes `data/mouse_atlas_cell_types.parquet`;
 the refresh command adds matching mouse rows to
 `data/tissues_cell_types.parquet`, the annotation artifact read by the app. It
 does not rerun the full prediction pipeline or download unrelated references.
+The atlas download is streamed to a temporary file and is only used after its
+HDF5 signature is validated, so an interrupted download will be discarded and
+retried safely.
 
 The droplet and Smart-seq2/FACS datasets use different count technologies. The
 default workflow deliberately uses only droplet data rather than pooling their

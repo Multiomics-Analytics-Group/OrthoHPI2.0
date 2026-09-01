@@ -15,6 +15,7 @@ import argparse
 import os
 
 import anndata
+import h5py
 import numpy as np
 import pandas as pd
 import requests
@@ -24,6 +25,7 @@ import utils
 
 MOUSE_TAXID = '10090'
 COUNTS_PER_CELL = 10_000
+CELLS_PER_CHUNK = 4_096
 DEFAULT_AGE = '3m'
 DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
                              'tabula-muris-senis-droplet-official-raw-obj.h5ad')
@@ -111,6 +113,31 @@ def mean_normalized_expression(matrix):
     return np.asarray(matrix.mean(axis=0)).ravel()
 
 
+def read_csr_chunk(matrix, start, stop, n_genes):
+    """Read consecutive rows from an H5AD CSR matrix into an in-memory CSR matrix."""
+    offsets = matrix['indptr'][start:stop + 1]
+    data_start, data_stop = offsets[0], offsets[-1]
+    return sparse.csr_matrix(
+        (matrix['data'][data_start:data_stop], matrix['indices'][data_start:data_stop],
+         offsets - data_start),
+        shape=(stop - start, n_genes),
+    )
+
+
+def normalized_expression_sum(matrix):
+    """Return summed log1p(CP10K) expression and the number of nonempty cells."""
+    matrix = matrix.tocsr().astype(np.float64)
+    totals = np.asarray(matrix.sum(axis=1)).ravel()
+    nonzero = totals > 0
+    matrix = matrix[nonzero]
+    if matrix.shape[0] == 0:
+        return np.zeros(matrix.shape[1]), 0
+
+    matrix = sparse.diags(COUNTS_PER_CELL / totals[nonzero]) @ matrix
+    matrix.data = np.log1p(matrix.data)
+    return np.asarray(matrix.sum(axis=0)).ravel(), matrix.shape[0]
+
+
 def aggregate_expression(input_file, config_file, age):
     """Aggregate the selected Tabula Muris Senis H5AD into the shared schema."""
     atlas = anndata.read_h5ad(input_file, backed='r')
@@ -135,11 +162,38 @@ def aggregate_expression(input_file, config_file, age):
     )
     genes = pd.Series(atlas.var_names.astype(str), index=np.arange(atlas.n_vars)).map(aliases)
     mapped = genes.notna().to_numpy()
+
+    group_codes, groups = pd.factorize(pd.MultiIndex.from_frame(
+        obs[['Tissue', 'cell_ontology_class']]))
+    cell_groups = np.full(atlas.n_obs, -1, dtype=np.int32)
+    cell_groups[atlas.obs.index.get_indexer(obs.index)] = group_codes
+    sums = [np.zeros(atlas.n_vars) for _ in groups]
+    counts = np.zeros(len(groups), dtype=np.int64)
+    n_obs = atlas.n_obs
+    n_vars = atlas.n_vars
+    atlas.file.close()
+
+    with h5py.File(input_file, 'r') as h5ad:
+        matrix = h5ad['X']
+        if matrix.attrs.get('h5sparse_format') != 'csr':
+            raise ValueError(f'{input_file} must store X as a CSR sparse matrix')
+        for start in range(0, n_obs, CELLS_PER_CHUNK):
+            stop = min(start + CELLS_PER_CHUNK, n_obs)
+            chunk_groups = cell_groups[start:stop]
+            if not (chunk_groups >= 0).any():
+                continue
+            chunk = read_csr_chunk(matrix, start, stop, n_vars)
+            for group_code in np.unique(chunk_groups[chunk_groups >= 0]):
+                expression, cell_count = normalized_expression_sum(
+                    chunk[chunk_groups == group_code])
+                sums[group_code] += expression
+                counts[group_code] += cell_count
+
     rows = []
-    for (tissue, cell_type), group in obs.groupby(['Tissue', 'cell_ontology_class'],
-                                                  observed=True):
-        positions = atlas.obs.index.get_indexer(group.index)
-        means = mean_normalized_expression(atlas.X[positions, :])[mapped]
+    for group_code, (tissue, cell_type) in enumerate(groups):
+        if counts[group_code] == 0:
+            continue
+        means = (sums[group_code] / counts[group_code])[mapped]
         frame = pd.DataFrame({
             'Gene': genes[mapped].to_numpy(),
             'Tissue': tissue,

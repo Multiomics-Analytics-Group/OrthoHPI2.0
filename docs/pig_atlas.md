@@ -3,6 +3,9 @@
 A Seurat v4.0.2 object, project `"Pig"`, written by R 4.0.3. 14.1 GB
 uncompressed — loading it whole is the real obstacle, not R.
 
+Downloaded from <https://dreamapp.biomed.au.dk/pigatlas/pig_atlas_20221014.rds>
+on 2026-08-17.
+
 | | |
 | --- | --- |
 | Genes × cells | 20,922 × 295,417 |

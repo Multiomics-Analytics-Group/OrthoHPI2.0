@@ -124,10 +124,11 @@ happen.
 | 35 | CD4+ Naive T cells | 2,170 | | 71 | Cholangiocytes | 15 |
 | 36 | Paneth | 2,057 | | | | |
 
-The single-letter codes are intestinal epithelium from the neonatal ileum
-series: EPL/EPE/EP/EM/EI (enterocyte progenitor/precursor subsets),
-TA/TA-G1/TA-G2 (transit-amplifying), EEC (enteroendocrine), Stem, Paneth, Tuft,
-Goblet.
+The neonatal-ileum samples use the labels `EPL`, `EPE`, `EP`, `EM`, `EI`,
+`TA`, `TA-G1`, `TA-G2`, `EEC`, `Stem`, `Paneth`, `Tuft`, and `Goblet`. The RDS
+metadata does not define the abbreviations or their biological relationships,
+so they are retained exactly as supplied and must not be expanded or merged
+without a cited source from the atlas authors.
 
 Three labelling quirks to be aware of before joining on these:
 
@@ -135,9 +136,9 @@ Three labelling quirks to be aware of before joining on these:
   mutually exclusive.
 - `CD4+ Naive  T cells` has a double space.
 - `Others` (947) and `Immune cells` (225) are catch-alls.
-- `Transient amplifying cells` and `TA` appear to be the same population
-  labelled differently in different tissues — Intestine uses the former, the
-  neonatal ileum series the latter.
+- `Transient amplifying cells` occurs in `Intestine`, while `TA` occurs in the
+  neonatal-ileum samples. The metadata does not state whether they represent
+  the same population.
 
 ## Cell types per tissue
 

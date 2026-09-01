@@ -505,7 +505,6 @@ def cell_type_marks(df, score):
         return None, None
 
     marks = web_utils.keep_peak_cell_types(annotated).copy()
-    marks['cell_type_display'] = marks['Cell type'].map(web_utils.display_cell_type)
     # the row a protein reaches its maximum in is always kept, so the share is read off
     # the marks themselves and the darkest of a row is 100%
     marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
@@ -548,8 +547,7 @@ def label_tissue_blocks(figure, blocks):
 
     figure.update_xaxes(tickmode='array', tickvals=columns, tickangle=-60, title=None,
                         showgrid=False,
-                        ticktext=[web_utils.display_cell_type(
-                            column.split(MATRIX_SEPARATOR)[1]) for column in columns])
+                        ticktext=[column.split(MATRIX_SEPARATOR)[1] for column in columns])
 
     return figure
 
@@ -585,7 +583,7 @@ def generate_cell_type_bars(marks, blocks):
 
     figure = px.bar(counted, x='column', y='interactions',
                     category_orders={'column': columns},
-                    custom_data=['cell_type_display', 'Tissue'])
+                    custom_data=['Cell type', 'Tissue'])
     figure.update_traces(marker_color=EDGE_ACCENT_COLOR,
                          hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>'
                                        'Predicted interactions: %{y}<extra></extra>')
@@ -627,7 +625,7 @@ def generate_cell_type_matrix(marks, blocks):
                         # plotly express flips category_orders on a y axis, so the protein
                         # in the most cell types first puts it in the top row
                         category_orders={'column': columns, 'target_name': proteins},
-                        custom_data=['Tissue', 'cell_type_display', 'nTPM', 'share'])
+                        custom_data=['Tissue', 'Cell type', 'nTPM', 'share'])
     figure.update_traces(marker=dict(size=MATRIX_MARK_SIZE, symbol='square',
                                      line=dict(color=NETWORK_BACKGROUND, width=1)),
                          hovertemplate='<b>%{y}</b><br>%{customdata[1]} (%{customdata[0]})'
@@ -1200,8 +1198,7 @@ with col2:
             def cell_type_label(cell_type):
                 proteins = cell_type_counts[cell_type]
 
-                label = web_utils.display_cell_type(cell_type)
-                return f'{label} ({proteins} protein{"" if proteins == 1 else "s"})'
+                return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
 
             selected_cell_types = st.multiselect(
                 'Select cell types to filter the predicted PPI', list(cell_type_counts.index),

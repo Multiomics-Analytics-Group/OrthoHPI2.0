@@ -190,16 +190,15 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
     so the bars still overlap and do not partition the tissue.
     '''
     data = per_cell_type[per_cell_type['Tissue'] == tissue].copy()
-    data['cell_type_display'] = data['Cell type'].map(web_utils.display_cell_type)
     data['group'] = data['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     data['parasite'] = data['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
-    totals = data.groupby('cell_type_display')['interactions'].sum().sort_values(
-        ascending=False, kind='stable')
+    totals = data.groupby('Cell type')['interactions'].sum().sort_values(ascending=False,
+                                                                        kind='stable')
     cell_types = list(totals.index)
 
-    figure = px.bar(data, x='interactions', y='cell_type_display', color='group', orientation='h',
+    figure = px.bar(data, x='interactions', y='Cell type', color='group', orientation='h',
                     color_discrete_map=palette, category_orders={
-                        'cell_type_display': cell_types,
+                        'Cell type': cell_types,
                         'group': [g for g in palette if g in set(data['group'])]},
                     custom_data=['parasite'])
     # two parasites of one group are two segments of the same colour, and would read as a

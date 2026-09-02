@@ -3,7 +3,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import streamlit as st
-import textwrap
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -54,24 +53,6 @@ ABSENT_COLOR = '#e0e0e0'
 # most gene symbols written into the label of an orthology group before the rest are left
 # to the hover. A group is a family, not a gene, and the families here run to 18 proteins
 SYMBOLS_IN_LABEL = 3
-# a GO term is only worth comparing between the two sets of host proteins if it is neither
-# nearly empty nor nearly everything. The size is read off every annotated protein of the
-# hosts being compared -- two or more of them, so 36,000 to 54,000 proteins, and a term of
-# 500 covers fewer than 2 in every 100. Read off the pool the pipeline's filters passed
-# instead, the same terms are small enough that a ceiling on the share of it lets the
-# broadest of them back in: a quarter of a 2,420-protein pool is 605 proteins, which
-# admits `Regulation of primary metabolic process` and fills the figure with terms both
-# sets carry alike. This is a count and not an enrichment, and it keeps its own bounds
-GO_MIN_PROTEINS, GO_MAX_PROTEINS = 10, 500
-# GO terms drawn in the comparison of what the shared and the host-specific proteins do,
-# and the width their names are broken over lines at beside the axis -- the same width the
-# network page wraps them at
-GO_TOP_N = 12
-GO_LABEL_WRAP_WIDTH = 42
-# how many host proteins of a set have to carry a GO term for it to be drawn at all
-GO_MIN_IN_SET = 2
-# what the two sets of host proteins are called wherever they are counted or drawn
-SHARED_SET, SPECIFIC_SET = 'shared by every host', 'host-specific'
 def short_name(parasite):
     '''`Trichinella spiralis` as `T. spiralis`, the abbreviation the other pages use.'''
     parts = parasite.split(' ')
@@ -533,101 +514,6 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
 
 
 @st.cache_data(show_spinner=False)
-def get_go_comparison(data_dir, shared_proteins, specific_proteins, taxids):
-    '''
-    What the host proteins of the shared interactions do, beside what the host-specific
-    ones do.
-
-    A count and not an enrichment: a host-specific set here runs to three proteins, and a
-    Fisher test on three proteins reports whatever the smallest set happens to contain.
-    The terms are filtered to GO_MIN_PROTEINS..GO_MAX_PROTEINS of the annotated proteins
-    of the hosts being compared, which is what keeps `Cellular process` out of a figure
-    meant to separate two sets. Those are this figure's own bounds and not the ones the
-    network page's enrichment uses, which are a share of a much smaller background.
-
-    :param tuple shared_proteins: host proteins carrying an interaction found in every host
-    :param tuple specific_proteins: host proteins carrying one found in some hosts only
-    :param tuple taxids: host taxids the GO annotations are read for
-    :return: dataframe of term, set, proteins; or None if nothing passes the filters
-    '''
-    species = [int(t) for t in taxids]
-    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet',
-                                    filters=[('taxid', 'in', species)])
-    go_df = go_df[go_df['taxid'].isin(species)]
-
-    sizes = go_df.groupby('description')['#string_protein_id'].nunique()
-    general = set(sizes[(sizes < GO_MIN_PROTEINS) | (sizes > GO_MAX_PROTEINS)].index)
-
-    counted = []
-    for name, proteins in ((SHARED_SET, shared_proteins),
-                           (SPECIFIC_SET, specific_proteins)):
-        terms = go_df[go_df['#string_protein_id'].isin(proteins)]
-        terms = terms[~terms['description'].isin(general)]
-        counts = terms.groupby('description')['#string_protein_id'].nunique()
-        counts = counts[counts >= GO_MIN_IN_SET]
-        # the size of the set the count came out of, which is what makes a count of two
-        # comparable between a set of sixty proteins and a set of three
-        counted.append(pd.DataFrame({'term': counts.index, 'set': name,
-                                     'proteins': counts.values,
-                                     'set_size': len(proteins)}))
-
-    comparison = pd.concat(counted, ignore_index=True)
-
-    return comparison if not comparison.empty else None
-
-
-@st.cache_data(show_spinner=False)
-def generate_go_bars(comparison):
-    '''
-    The GO terms of the two sets of host proteins as paired bars.
-
-    Only the terms both sets carry are drawn, and they are ranked by how different the
-    share of each set carrying them is. Ranking by the count instead let the larger set
-    choose the terms: the shared set is two to five times the host-specific one for most
-    parasites, so the twelve biggest counts were twelve terms of the shared set, drawn
-    against nothing and read as a comparison. Ranking by the difference alone is no better,
-    since the largest difference is a term one set does not carry at all.
-
-    :param comparison: term, set, proteins and set_size, as get_go_comparison builds it
-    :return: the figure, or None if no term is carried by both sets
-    '''
-    counts = comparison.pivot_table(index='term', columns='set', values='proteins',
-                                    fill_value=0)
-    for name in (SHARED_SET, SPECIFIC_SET):
-        if name not in counts.columns:
-            return None
-
-    both = counts[(counts[SHARED_SET] > 0) & (counts[SPECIFIC_SET] > 0)]
-    if both.empty:
-        return None
-
-    sizes = comparison.drop_duplicates('set').set_index('set')['set_size']
-    difference = (both[SHARED_SET] / sizes[SHARED_SET]
-                  - both[SPECIFIC_SET] / sizes[SPECIFIC_SET]).abs()
-    terms = list(difference.sort_values(ascending=False, kind='stable').head(GO_TOP_N).index)
-    view = comparison[comparison['term'].isin(terms)].copy()
-    # the names of GO terms are sentences, and one of them beside an axis is as wide as the
-    # figure, so they are broken over lines as the network page breaks them
-    wrapped = {term: '<br>'.join(textwrap.wrap(str(term), width=GO_LABEL_WRAP_WIDTH))
-               for term in terms}
-    view['term'] = view['term'].map(wrapped)
-
-    figure = px.bar(view, x='proteins', y='term', color='set', orientation='h',
-                    barmode='group',
-                    color_discrete_map={SHARED_SET: SHARED_COLOR,
-                                        SPECIFIC_SET: PARTIAL_COLORS[0]},
-                    category_orders={'term': [wrapped[t] for t in terms]})
-    figure.update_layout(height=max(360, 46 * len(terms) + 140), plot_bgcolor='white',
-                         margin=dict(l=330, r=10, t=10, b=40), legend_title_text='',
-                         legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
-                         xaxis_title='host proteins annotated to the term',
-                         yaxis_title=None, bargap=0.3)
-    web_utils.count_ticks(figure, view['proteins'].max(), showgrid=True, gridcolor='#f0f0f0')
-
-    return figure
-
-
-@st.cache_data(show_spinner=False)
 def get_overview(df_pred, config):
     '''
     Every parasite that has more than one host, and how much of it carried over between
@@ -745,34 +631,6 @@ else:
             st.caption('Run `python scripts/build_host_orthologs.py` to add the check of '
                        'whether a host missing an interaction has a protein of the family '
                        'at all.')
-
-        shared = tuple(edges.loc[edges['group2'].isin(
-            links.loc[links['n_hosts'] == len(all_hosts), 'group2']), 'target'].unique())
-        specific = tuple(edges.loc[edges['group2'].isin(
-            links.loc[links['n_hosts'] == 1, 'group2']), 'target'].unique())
-        taxids = tuple(sorted(set(edges['taxid2'])))
-        comparison = get_go_comparison(data_dir, shared, specific, taxids)
-        go_bars = generate_go_bars(comparison) if comparison is not None else None
-        with st.container():
-            st.subheader('Gene Ontology terms of shared and host-specific proteins')
-            if go_bars is not None:
-                st.caption('Gene Ontology terms carried by the host proteins of the '
-                           'interactions found in every host and by those of the '
-                           'interactions found in a single host, for the terms both sets '
-                           'carry and ranked by how different the share of each set is. '
-                           'These are counts of proteins and not an enrichment. Terms '
-                           f'carried by fewer than {GO_MIN_PROTEINS} or more than '
-                           f'{GO_MAX_PROTEINS} of the hosts\' annotated proteins are '
-                           'omitted, as neither separates the two sets.')
-                st.plotly_chart(go_bars, width='stretch')
-            elif comparison is not None:
-                st.caption('No term is carried by both the shared and the host-specific '
-                           'proteins of this parasite, so there is nothing to compare them '
-                           'on. The host-specific set is the smaller of the two and runs to '
-                           'a handful of proteins.')
-            else:
-                st.caption('None of the host proteins of this parasite carries a Gene '
-                           'Ontology term in the size range the figure selects on.')
 
 st.markdown("---")
 

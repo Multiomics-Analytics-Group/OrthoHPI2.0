@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import body_figure
 from css import style
 
 st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
@@ -71,10 +72,6 @@ GO_LABEL_WRAP_WIDTH = 42
 GO_MIN_IN_SET = 2
 # what the two sets of host proteins are called wherever they are counted or drawn
 SHARED_SET, SPECIFIC_SET = 'shared by every host', 'host-specific'
-# tissues below which the tissue figure is a single row of dots and is left undrawn
-MIN_TISSUES = 2
-
-
 def short_name(parasite):
     '''`Trichinella spiralis` as `T. spiralis`, the abbreviation the other pages use.'''
     parts = parasite.split(' ')
@@ -617,60 +614,6 @@ def generate_go_bars(comparison):
 
 
 @st.cache_data(show_spinner=False)
-def count_interactions_per_host_tissue(df_pred, parasite, data_dir, config):
-    '''
-    Where in each host the predicted interactions can take place: the interactions whose
-    host protein is annotated to a tissue the parasite is known to infect, counted per
-    host and tissue.
-
-    The restriction itself is applied to every prediction the app loads
-    (web_utils.keep_infected_tissues); what this adds is the breakdown by tissue.
-    '''
-    edges = df_pred[df_pred['taxid1_label'] == parasite]
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
-
-    mapped = config['tissues']
-    infected = {mapped[t].lower() for t in config['parasites'][int(edges['taxid1'].iloc[0])]['tissues']}
-
-    aux = edges[['host', 'source', 'target']].drop_duplicates()
-    aux = pd.merge(aux, tissues, on='target')
-    aux = aux[aux['Tissue'].isin(infected)]
-    if aux.empty:
-        return None
-
-    return aux.groupby(['host', 'Tissue']).size().rename('interactions').reset_index()
-
-
-@st.cache_data(show_spinner=False)
-def generate_host_tissue_dots(per_tissue, all_hosts, config):
-    '''A dot wherever a host carries a predicted interaction with a protein expressed in a
-    tissue the parasite infects, sized by how many. A gap in a row is a host whose proteins
-    of that tissue are not annotated, which on this data is what most of the gaps are.'''
-    dots = per_tissue.copy()
-    tissues = list(dots.groupby('Tissue')['interactions'].sum().sort_values(
-        ascending=False, kind='stable').index)
-    palette = host_palette(all_hosts, config)
-
-    figure = px.scatter(dots, x='host', y='Tissue', color='host', size='interactions',
-                        size_max=26, color_discrete_map=palette,
-                        category_orders={'host': all_hosts, 'Tissue': tissues},
-                        hover_data={'host': True, 'Tissue': True, 'interactions': True})
-    figure.update_traces(marker=dict(sizemin=5, line=dict(width=0)))
-    # a column per host and nothing else, so the figure carries its own width rather than
-    # being stretched to the page: two hosts spread over a metre of it are two columns with
-    # a field between them. The tissue names down the side need the left margin spelled out
-    figure.update_layout(height=max(320, 34 * len(tissues) + 200), plot_bgcolor='white',
-                         width=170 * len(all_hosts) + 200, showlegend=False,
-                         margin=dict(l=170, r=20, t=10, b=40),
-                         xaxis_title=None, yaxis_title='tissue the parasite infects')
-    figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0')
-    figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
-
-    return figure
-
-
-@st.cache_data(show_spinner=False)
 def get_overview(df_pred, config):
     '''
     Every parasite that has more than one host, and how much of it carried over between
@@ -731,6 +674,23 @@ else:
                         for host, rows in edges.groupby('host')}
         links = get_link_combinations(df_pred, parasite)
 
+        body_column, coverage_column = st.columns([1, 1], gap='large')
+        with body_column:
+            body_figure.show_body_figure(
+                config, data_dir, edges[edges['weight'] >= score],
+                tuple(taxid for host in all_hosts for taxid in hosts_taxids[host]),
+                shared_color_scale=True, title_as_subheader=True)
+        with coverage_column:
+            st.subheader('Predicted interactions relative to the available host proteins')
+            st.caption('Interactions predicted in each host beside the pool of host proteins '
+                       'available: those passing the secretome, tissue and DeepLoc filters, '
+                       'and those among them annotated to a tissue this parasite infects. The '
+                       'second pool is what the predictions were drawn from, so a host with '
+                       'more predicted interactions than another may simply have more of it.')
+            st.dataframe(
+                get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
+                width='stretch', hide_index=True)
+
         # side by side: the bars are three columns wide whatever the parasite, which is a
         # figure that does not need the width of the page, and the matrix beside them says
         # what the sets of the bars are made of
@@ -756,15 +716,6 @@ else:
             st.plotly_chart(generate_link_matrix(links, all_hosts, config),
                             width='stretch')
 
-        st.subheader('Predicted interactions relative to the available host proteins')
-        st.caption('Interactions predicted in each host beside the pool of host proteins '
-                   'available: those passing the secretome, tissue and DeepLoc filters, and '
-                   'those among them annotated to a tissue this parasite infects. The second '
-                   'pool is what the predictions were drawn from, so a host with more '
-                   'predicted interactions than another may simply have more of it.')
-        st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
-                     width='stretch', hide_index=True)
-
         reasons = explain_host_specific(links, all_hosts, data_dir, config,
                                         edges['taxid1'].iloc[0], hosts_taxids)
         if reasons is not None and not reasons.empty:
@@ -789,17 +740,8 @@ else:
             links.loc[links['n_hosts'] == 1, 'group2']), 'target'].unique())
         taxids = tuple(sorted(set(edges['taxid2'])))
         comparison = get_go_comparison(data_dir, shared, specific, taxids)
-        per_tissue = count_interactions_per_host_tissue(df_pred, parasite, data_dir, config)
-
-        # what the proteins of the interactions do, beside where they can do it. The tissue
-        # dots are drawn at the width of their content and leave half a page empty on their
-        # own, which is the room the terms beside them take
-        terms, tissues = st.columns([1, 1], gap='large')
-        # both columns keep their heading whether or not there is a figure under it: these
-        # two sit side by side, and a column that empties itself reads as something broken
-        # rather than as an answer
         go_bars = generate_go_bars(comparison) if comparison is not None else None
-        with terms:
+        with st.container():
             st.subheader('Gene Ontology terms of shared and host-specific proteins')
             if go_bars is not None:
                 st.caption('Gene Ontology terms carried by the host proteins of the '
@@ -819,22 +761,6 @@ else:
             else:
                 st.caption('None of the host proteins of this parasite carries a Gene '
                            'Ontology term in the size range the figure selects on.')
-
-        with tissues:
-            st.subheader('Tissues in which the interactions can take place in each host')
-            if per_tissue is not None and per_tissue['Tissue'].nunique() >= MIN_TISSUES:
-                st.caption('Predicted interactions per host and tissue, broken down by the '
-                           'tissues this parasite is known to infect. A host absent from a '
-                           'row has no annotated protein in that tissue.')
-                st.plotly_chart(generate_host_tissue_dots(per_tissue, all_hosts, config),
-                                width='content')
-            elif per_tissue is not None:
-                only = per_tissue['Tissue'].iloc[0]
-                st.caption(f'Every predicted interaction of {parasite} that can take place '
-                           f'does so in a single tissue, the {only}.')
-            else:
-                st.caption('No host protein of this parasite is annotated to a tissue it is '
-                           'known to infect.')
 
 st.markdown("---")
 

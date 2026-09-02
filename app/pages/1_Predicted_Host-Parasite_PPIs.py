@@ -1252,7 +1252,7 @@ with col2:
 with col1:
     if df_select is not None:
         body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
-                                     selected_taxids, selected_tissues)
+                                     selected_taxids, selected_tissues, compact_human=True)
 
 
 def render_network_panel(host_taxid, host_label, host_df, G, net):

@@ -336,9 +336,8 @@ def generate_combination_bars(links, all_hosts, config):
 @st.cache_data(show_spinner=False)
 def generate_link_matrix(links, all_hosts, config):
     '''
-    Every transferred interaction of the parasite as one square: the parasite protein
-    across, the host protein family down, the colour saying which hosts it was predicted
-    in.
+    A tile matrix of every transferred interaction: parasite proteins run across, host
+    orthology groups run down, and a tile's colour says which hosts received that link.
 
     Two networks side by side is the other way of drawing this and is the wrong one: the
     reader has to hold one of them in their head to find what the other is missing, and
@@ -353,16 +352,23 @@ def generate_link_matrix(links, all_hosts, config):
         columns={'parasite_proteins': 'parasite protein'})
     squares['family'] = [group_label(p, g) for p, g in
                          zip(squares['host_proteins'], squares['group2'])]
+    # Gene symbols are only labels, and the same symbol can occur in separate orthology
+    # groups. Keep the group identifier as the categorical coordinate so those rows do
+    # not collapse into a single Plotly category.
+    squares['family_id'] = squares['group2']
     squares['host proteins'] = squares['host_proteins'].map(', '.join)
     squares['orthology groups'] = squares['group1'] + ' → ' + squares['group2']
+    squares['predicted in'] = squares['hosts'].map(
+        lambda hosts: ', '.join(sorted(hosts)))
 
     host_order = {
         host_label(taxid, config): index
         for index, taxid in enumerate(config['hosts'])
     }
-    rows = squares.groupby('family').agg(
+    rows = squares.groupby('family_id').agg(
+        family=('family', 'first'),
         hosts=('hosts', lambda values: frozenset().union(*values)),
-        links=('family', 'size'),
+        links=('family_id', 'size'),
     )
     rows['n_hosts'] = rows['hosts'].map(len)
     rows['host_order'] = rows['hosts'].map(
@@ -376,26 +382,34 @@ def generate_link_matrix(links, all_hosts, config):
     order = order_combinations(links)
     palette = combination_palette(links, all_hosts, config)
 
-    figure = px.scatter(squares, x='parasite protein', y='family', color='combination',
+    figure = px.scatter(squares, x='parasite protein', y='family_id', color='combination',
                         color_discrete_map=palette,
                         # plotly express flips category_orders on a y axis, so the most
                         # shared families first here puts them in the top rows
                         category_orders={'parasite protein': list(columns.index),
-                                         'family': list(rows.index),
+                                         'family_id': list(rows.index),
                                          'combination': order},
-                        hover_data={'family': False, 'host proteins': True,
-                                    'orthology groups': True, 'interactions': True,
-                                    'combination': True})
-    figure.update_traces(marker=dict(symbol='square', size=9, line=dict(width=0)))
+                        hover_data={'family_id': False, 'family': True,
+                                    'host proteins': True, 'orthology groups': True,
+                                    'interactions': True, 'combination': False,
+                                    'predicted in': True})
+    # White borders separate adjacent links into individually readable tiles while still
+    # keeping dense selections compact.
+    figure.update_traces(marker=dict(symbol='square', size=14,
+                                     line=dict(color='white', width=1.5)))
     figure.update_layout(height=max(420, 17 * len(rows) + 260), plot_bgcolor='white',
                          # the gene symbols down the side and the parasite proteins along the
                          # foot are long enough that plotly cuts them off if left to itself
-                         margin=dict(l=190, r=10, t=10, b=120), legend_title_text='',
+                         margin=dict(l=190, r=10, t=10, b=120),
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title='protein of the parasite',
-                         yaxis_title='host protein family')
-    figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#f7f7f7')
-    figure.update_yaxes(showgrid=True, gridcolor='#f7f7f7')
+                         yaxis_title='host protein family',
+                         legend_title_text='predicted in host(s)')
+    figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#eef1f4',
+                         gridwidth=1, zeroline=False)
+    figure.update_yaxes(showgrid=True, gridcolor='#eef1f4', gridwidth=1, zeroline=False,
+                         tickmode='array',
+                         tickvals=list(rows.index), ticktext=list(rows['family']))
 
     return figure
 
@@ -700,19 +714,17 @@ else:
             st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
                        'the matrix below the bars. Interactions are counted as pairs of '
                        'orthology groups rather than pairs of proteins, since the '
-                       'orthologous proteins of two hosts are distinct proteins. See the '
-                       'caveat below the figures before interpreting a host-specific bar as '
-                       'host specificity.')
+                       'orthologous proteins of two hosts are distinct proteins.')
             st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
 
         with matrix:
             st.subheader('Interactions per parasite protein and host protein family')
-            st.caption('One square per predicted interaction: parasite proteins on the x '
-                       'axis, families of host proteins on the y axis, coloured by the hosts '
-                       'the interaction was predicted in. Rows are orthology groups rather '
-                       'than genes, named on hover, and are ordered so that the shared '
-                       'interactions gather in the upper left.')
+            st.caption('One tile per predicted interaction: parasite proteins on the x '
+                       'axis, families of host proteins on the y axis, coloured by the host '
+                       'or host set that received the interaction. Rows are distinct '
+                       'orthology groups (the group ID and full family name are on hover), '
+                       'ordered so shared interactions gather in the upper left.')
             st.plotly_chart(generate_link_matrix(links, all_hosts, config),
                             width='stretch')
 

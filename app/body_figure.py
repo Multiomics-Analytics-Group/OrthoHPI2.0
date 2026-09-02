@@ -10,6 +10,7 @@ by scripts/build_figure_tissues.py, so nothing has to be mapped between the two.
 """
 import os
 import xml.etree.ElementTree as ET
+from copy import deepcopy
 
 import pandas as pd
 import streamlit as st
@@ -46,6 +47,15 @@ LEGEND_ID = 'Legend'
 
 # drawing units left between the bottom of the body and the edge of the cropped figure
 CROP_MARGIN = 10
+# Height of the anatomy row when several hosts are compared. The maps share this height
+# where their width permits, keeping the host labels directly above the human figure.
+COMPARISON_FIGURE_HEIGHT = 200
+# The human source SVG contains frontal and side views on one canvas. The compact
+# comparison uses only the frontal view, which covers the organs shown for comparisons.
+HUMAN_FRONT_VIEW = (220, 220)
+HUMAN_SIDE_VIEW = (600, 125)
+HUMAN_VIEW_GAP = 10
+COMPACT_HUMAN_FIGURE_HEIGHT = 360
 
 # The tissues a parasite infects are the 33 fine-grained BTO terms of config['tissues'];
 # the figure draws 21 coarser organs (20 for rat, which has no gall bladder). Most terms
@@ -359,23 +369,69 @@ def inline(svg):
     return ' '.join(svg.split('\n'))
 
 
-def legend_html(bounds):
+def bottom_aligned(svg):
+    '''Fits an SVG inside the comparison row and aligns its lower edge with the others.'''
+    root = ET.fromstring(svg)
+    if root.get('id') == 'human':
+        return frontal_human_view(root)
+
+    root.set('style', 'width: auto; height: 100%; max-width: 100%;')
+
+    return (f'<div style="height: {COMPARISON_FIGURE_HEIGHT}px; display: flex; '
+            f'align-items: flex-end; justify-content: center;">'
+            f'{inline(ET.tostring(root, encoding="unicode"))}</div>')
+
+
+def frontal_human_view(root):
+    '''Uses the frontal human anatomy view for the compact multi-host comparison.'''
+    _, y, _, height = (float(value) for value in root.get('viewBox').replace(',', ' ').split())
+    x, width = HUMAN_FRONT_VIEW
+    root.set('viewBox', f'{x} {y} {width} {height}')
+    root.set('style', 'width: auto; height: 100%; max-width: 100%;')
+
+    return (f'<div style="height: {COMPARISON_FIGURE_HEIGHT}px; display: flex; '
+            f'align-items: flex-end; justify-content: center;">'
+            f'{inline(ET.tostring(root, encoding="unicode"))}</div>')
+
+
+def compact_human_views(svg):
+    '''Places cropped frontal and side human views together for the detailed network page.'''
+    root = ET.fromstring(svg)
+    _, y, _, height = (float(value) for value in root.get('viewBox').replace(',', ' ').split())
+    views = []
+    for x, width in (HUMAN_FRONT_VIEW, HUMAN_SIDE_VIEW):
+        view = deepcopy(root)
+        view.set('viewBox', f'{x} {y} {width} {height}')
+        view.set('style', 'width: auto; height: 100%; max-width: 100%;')
+        views.append(inline(ET.tostring(view, encoding='unicode')))
+
+    return (f'<div style="height: {COMPACT_HUMAN_FIGURE_HEIGHT}px; display: flex; '
+            f'align-items: flex-end; justify-content: center; gap: {HUMAN_VIEW_GAP}px;">'
+            + ''.join(views) + '</div>')
+
+
+def legend_html(bounds, compact=False):
     '''The colour bins as a row of swatches, labelled with the counts they stand for.'''
     swatches = []
     previous = 0
+    swatch_height = 10 if compact else 14
+    label_size = '0.65rem' if compact else '0.7rem'
     for upper, color in bounds:
         label = str(upper) if upper == previous + 1 else f'{previous + 1}-{upper}'
         swatches.append(
             f'<div style="text-align: center; flex: 1;">'
-            f'<div style="background: {color}; border: 1px solid #939598; height: 14px;"></div>'
-            f'<div style="font-size: 0.7rem; color: #555;">{label}</div></div>')
+            f'<div style="background: {color}; border: 1px solid #939598; '
+            f'height: {swatch_height}px;"></div>'
+            f'<div style="font-size: {label_size}; color: #555;">{label}</div></div>')
         previous = upper
 
-    return ('<div style="display: flex; gap: 2px; margin-top: 0.5rem;">'
+    max_width = 'max-width: 240px;' if compact else ''
+    return (f'<div style="display: flex; gap: 2px; margin-top: 0.5rem; {max_width}">'
             + ''.join(swatches) + '</div>')
 
 
-def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
+def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
+                     shared_color_scale=False, compact_human=False, title_as_subheader=False):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
     predicted interactions reaching them. Each selected host species gets its own figure,
@@ -386,6 +442,10 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
     :param df: predictions dataframe, already filtered to what the network shows
     :param taxids: taxids of the selected host
     :param iterable selected_tissues: explicitly selected tissue display names, if any
+    :param bool shared_color_scale: use one interaction-count scale and legend across all
+                                    host figures
+    :param bool compact_human: bring the frontal and side human views closer together
+    :param bool title_as_subheader: match the surrounding page's section-heading size
     '''
     figure_tissues = load_figure_tissues(data_dir)
     if figure_tissues is None or df.empty:
@@ -400,7 +460,10 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
     # filtering; filter_tissues in web_utils reads it the same way
     infected = infected_organs(config, df['taxid1'].unique()[0])
     if not infected:
-        st.markdown('##### Where the predicted interactions can take place')
+        if title_as_subheader:
+            st.subheader('Where the predicted interactions can take place')
+        else:
+            st.markdown('##### Where the predicted interactions can take place')
         st.caption('The figure draws none of the tissues this parasite is recorded as '
                    'infecting, so there is nothing to shade.')
         return
@@ -409,33 +472,63 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None):
                        if selected_tissues else infected)
     shown_organs = infected & selected_organs
 
-    st.markdown('##### Where the predicted interactions can take place')
+    if title_as_subheader:
+        st.subheader('Where the predicted interactions can take place')
+    else:
+        st.markdown('##### Where the predicted interactions can take place')
     st.caption('Predicted interactions whose host protein is expressed in each organ, '
                'after the confidence score and the tissue filters, and only in the organs '
                'this parasite is recorded as infecting. TISSUES annotates a host protein '
                'to about three organs, so an interaction is counted in each of the ones '
                'shown and the organs can add up to more than the network.')
-    columns = st.columns(len(drawn))
-    for column, (taxid, species) in zip(columns, drawn):
+    figures = []
+    for taxid, species in drawn:
         svg, organs = load_figure(species)
         if svg is None:
             continue
 
         host_df = df[df['taxid2'] == str(taxid)]
         counts = count_interactions(host_df, figure_tissues)
-        # an organ the annotation knows but this figure does not draw would otherwise
+        # An organ the annotation knows but this figure does not draw would otherwise
         # stretch the colour scale to a range nothing on the figure can reach, and an
-        # organ the parasite does not infect is not somewhere the interaction can happen
+        # organ the parasite does not infect is not somewhere the interaction can happen.
         counts = {organ: count for organ, count in counts.items()
                   if organ in organs and organ in shown_organs}
-        bounds, highest = color_scale(counts)
+        figures.append((taxid, svg, counts))
+
+    if not figures:
+        return
+
+    shared_bounds = None
+    if shared_color_scale:
+        shared_counts = {(taxid, organ): count
+                         for taxid, _, counts in figures
+                         for organ, count in counts.items()}
+        shared_bounds, _ = color_scale(shared_counts)
+
+    if len(figures) > 1:
+        labels = st.columns(len(figures))
+        for column, (taxid, _, _) in zip(labels, figures):
+            with column:
+                st.caption(config['hosts'][int(taxid)]['label'])
+
+    columns = st.columns(len(figures))
+    for column, (taxid, svg, counts) in zip(columns, figures):
+        bounds, highest = (shared_bounds, max(counts.values(), default=0)
+                           ) if shared_bounds is not None else color_scale(counts)
 
         with column:
-            if len(drawn) > 1:
-                st.caption(config['hosts'][int(taxid)]['label'])
-            st.markdown(shade_figure(svg, counts, bounds), unsafe_allow_html=True)
-            if highest:
+            figure = shade_figure(svg, counts, bounds)
+            figure = bottom_aligned(figure) if shared_color_scale else figure
+            if compact_human and not shared_color_scale and get_species(config, taxid) == 'human':
+                figure = compact_human_views(figure)
+            st.markdown(figure, unsafe_allow_html=True)
+            if highest and not shared_color_scale:
                 st.markdown(legend_html(bounds), unsafe_allow_html=True)
             else:
-                st.caption('None of the host proteins of this network are annotated to '
-                           'an organ this parasite infects.')
+                if not highest:
+                    st.caption('None of the host proteins of this network are annotated to '
+                               'an organ this parasite infects.')
+
+    if shared_color_scale and shared_bounds:
+        st.markdown(legend_html(shared_bounds, compact=True), unsafe_allow_html=True)

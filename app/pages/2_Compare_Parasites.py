@@ -32,7 +32,7 @@ REST_COLOR = '#bdbdbd'
 # confidence the figures of shared interactors start at, and the range the slider spans.
 # The same default and range as the network page, so a parasite shows the same
 # interactions here as it does there
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # gradient the chords of the hovered parasite carry the number of shared host proteins
 # on: light blue through to the dark blue of the page headings, which is also the dark
 # end of the Blues the shared-interactor heatmap is drawn in. The palest steps of the ramp are

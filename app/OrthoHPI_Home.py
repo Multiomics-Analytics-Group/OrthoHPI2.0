@@ -35,7 +35,7 @@ MIN_COLUMN = 4
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # share of the height of a figure taken by the strip of taxonomic group under its columns.
 # Enough to read as a band of colour, not enough to be read as a quantity of its own
 BAND_HEIGHT = 0.06

@@ -25,7 +25,7 @@ data_dir = web_utils.get_data_dir()
 # tissues a parasite infects the usual 0.7 leaves two parasites on the page and one of them
 # a single host, so this page opens at the bottom of the range and is raised rather than
 # lowered
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.4, 0.9, 0.4
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # One colour per host, fixed here and not read from config['hosts'], which is where the
 # rest of the app takes them from. This page is the only one that draws the hosts against
 # each other rather than one at a time, and the config colours do not survive that: human

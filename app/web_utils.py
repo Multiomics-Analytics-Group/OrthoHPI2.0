@@ -65,6 +65,51 @@ def show_header(current=None, index=None):
 
     return selected
 
+# the width the figures that carry a size of their own are drawn for until the browser has
+# said how wide the page really is -- a laptop, the narrower of the screens the app is read
+# on, so that the first draw of a session is one that fits rather than one that is cut off
+DEFAULT_PAGE_WIDTH = 1150
+# what the page is measured with, run in the browser: the inner width of the block the app
+# is drawn in, which is the width the figures share between them, rather than the width of
+# the window, which also holds the padding either side of that block
+PAGE_WIDTH_SCRIPT = """(() => {
+    const block = document.querySelector('[data-testid="stMainBlockContainer"]');
+    if (!block) return null;
+    const style = getComputedStyle(block);
+    return block.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+})()"""
+# the gap streamlit leaves between two columns of a row, in pixels
+COLUMN_GAP = 16
+
+
+def page_width(default=DEFAULT_PAGE_WIDTH):
+    '''
+    Width of the page in pixels, on the screen the app is being read on.
+
+    Streamlit runs on the server and is told nothing about the window, so a figure that has
+    to know how much room it has -- one whose cells must come out square, say -- has to ask
+    the browser, which answers on a later run of the script. Nothing should depend on the
+    answer arriving: a figure is drawn at `default` until it does, and redrawn at the
+    measured width on the run it arrives on.
+
+    :return: the width the browser reported, or `default` before it has reported one, in a
+             browser that refused to answer, or outside a browser altogether (a test run)
+    '''
+    try:
+        from streamlit_extras.eval_javascript import eval_javascript
+        measured = int(eval_javascript(PAGE_WIDTH_SCRIPT, key='page_width'))
+    except Exception:
+        return default
+
+    # a page narrower than a phone is one that has not finished laying itself out
+    return measured if measured >= 320 else default
+
+
+def column_width(columns, **kwargs):
+    '''Width in pixels of one of `columns` equal columns of the page.'''
+    return (page_width(**kwargs) - COLUMN_GAP * (columns - 1)) / columns
+
+
 def get_data_dir():
     return st.session_state.get('data_dir', 'data')
 

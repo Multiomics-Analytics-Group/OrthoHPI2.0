@@ -28,16 +28,8 @@ UNKNOWN_COLOR = '#999999'
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # side of a cell of the shared-interactor heatmap, in pixels, which is what sizes that figure
 CELL = 22
-# how wide the shared-interactors matrix comes out, in pixels, on the window the app is
-# being read in. The figure cannot ask its column how wide it is -- it has to carry its
-# own size to keep its cells square -- so it is sized from this: raise it for a wider
-# window, lower it for a narrower one, and the figure follows.
-MATRIX_COLUMN = 900
-
-
-def matrix_width(columns):
-    '''Intrinsic width for sparse parasite matrices, capped at the page-width layout.'''
-    return min(MATRIX_COLUMN, max(460, 100 * columns + 260))
+# the smallest the parasite names under a matrix are written, in points
+SMALLEST_LABEL = 9
 
 
 # marker each surface class is drawn with in the shared-interactors matrix, and the order
@@ -112,8 +104,25 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
                   'Cell type'))
 
 
+def dot_size(parasites, labels, column):
+    '''
+    Diameter of the largest dot of a matrix of `parasites` columns whose rows are named by
+    `labels`, drawn in a column `column` pixels wide.
+
+    A column of the matrix is what the figure has left once the row labels have taken the
+    room they need, divided between the parasites: forty parasites beside a protein name is
+    a column of a few pixels, and a dot drawn at plotly's default fifteen there is a row of
+    dots run together into a bar.
+    '''
+    # 6.2 pixels a character is the width of the default axis font, and 30 the room the
+    # matrix keeps free at either end of the axis
+    free = column - (6.2 * max(len(str(l)) for l in labels) + 30)
+
+    return min(15, max(5, free / len(parasites)))
+
+
 @st.cache_data(show_spinner=False)
-def generate_tissue_dots(per_tissue, groups, group_order, palette):
+def generate_tissue_dots(per_tissue, groups, group_order, palette, column):
     '''
     A dot wherever a parasite is predicted to interact with a host protein expressed in a
     tissue it infects, sized by how many such interactions there are. The parasites are in
@@ -138,24 +147,29 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette):
                                        total=('interactions', 'sum'))
     tissues = list(reach.sort_values(['parasites', 'total'], ascending=False, kind='stable').index)
 
+    size = dot_size(parasites, tissues, column)
     figure = px.scatter(dots, x='parasite', y='Tissue', color='group',
                         # plotly express flips category_orders on a y axis, so most-reached
                         # first puts the tissue the most parasites infect in the top row
                         color_discrete_map=palette, category_orders={
                             'parasite': parasites, 'Tissue': tissues,
                             'group': [g for g in palette if g in set(dots['group'])]},
-                        size='interactions', size_max=18,
+                        size='interactions', size_max=size,
                         custom_data=['interactions'])
     figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
                          hovertemplate='%{y}<br>%{x}<br>predicted interactions: '
                                        '%{customdata[0]}<extra></extra>')
-    figure.update_layout(width=matrix_width(len(parasites)),
-                         height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
+    figure.update_layout(height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title='tissue the parasite infects')
-    figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#f0f0f0')
-    figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
+    # every parasite is named, however narrow its column: plotly thins the labels that no
+    # longer fit, and a matrix with every other column named cannot be read at all, so they
+    # are drawn at the size a column has room for instead
+    figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
+                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        showgrid=True, gridcolor='#f0f0f0')
+    figure.update_yaxes(automargin=True, showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 
@@ -265,95 +279,128 @@ def get_shared_interactor_counts(df_pred, groups, group_order):
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_COLUMN):
+def generate_shared_interactor_heatmap(counts, clades, palette, column):
     '''
     The shared-interactor count matrix, with a strip of the taxonomic group of each
     parasite down the side and along the bottom, so that the two axes are visibly the
-    same list of parasites in the same order. The cells are held square (scaleanchor),
-    which is the other half of reading the matrix as symmetric.
+    same list of parasites in the same order.
 
-    Squaring the cells means one of the two axes has to give up whatever space the figure
-    has beyond the square, which plotly takes off the range and turns into blank margins
-    inside the plot. So the figure is sized to the aspect the square already needs -- the
-    matrix at CELL pixels a side plus room for the labels around it -- and is drawn at that
-    size instead of being stretched to the page. scaleanchor is then only making up the
-    difference between the room the labels were given and the room they take.
+    The cells are square (scaleanchor), which is the other half of reading the matrix as
+    the symmetric thing it is. Squaring them is the axes' work, not the figure's: they are
+    constrained to their domain, so plotly shrinks the plot area to the square the cells
+    need rather than padding the range around it, and the labels come with it. The figure
+    holds its shape on any screen it is opened on, whatever `column` turns out to be wrong
+    about, and what it gets wrong is only the room left blank above the matrix.
+
+    The strips are drawn on the axes of the matrix rather than in subplots of their own,
+    which is what keeps them against it: a subplot has a domain of its own, and the plot
+    area shrinking to a square would leave the matrix floating away from its own labels.
 
     The diagonal carries the maximum shared-interactor count rather than being left
     blank. Blank renders as the white the colour scale starts at, so it could not be
     told from a pair sharing nothing.
 
-    :param column: pixels the column holding this figure is expected to be. The matrix takes
-                   what is left of it once the labels and the colour bar have taken theirs,
-                   so the figure comes out the width of the column instead of sitting in the
-                   middle of it -- and never wider than a cell of CELL pixels needs, since a
-                   matrix of four parasites drawn across a whole column is four huge squares.
+    :param column: pixels the column holding the figure is on the screen the page is being
+                   read on, which web_utils.column_width measures. It is the height that is
+                   sized from it -- the width belongs to the column -- so that the square
+                   the cells are held to is the whole of the figure rather than a part of it
     '''
     shown = [g for g in palette if g in set(clades)]
-    steps = [[i / len(shown), palette[g]] for i, g in enumerate(shown)]
-    steps += [[(i + 1) / len(shown), palette[g]] for i, g in enumerate(shown)]
+    # one flat band per group: the colour is repeated at both ends of the band so that
+    # nothing is interpolated between two groups. The steps have to be built in order --
+    # sorting them puts the two entries of a boundary in colour order rather than in band
+    # order, which hands a band the neighbouring group's colour
+    steps = [step for i, g in enumerate(shown)
+             for step in ([i / len(shown), palette[g]], [(i + 1) / len(shown), palette[g]])]
     x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
     y_names = list(counts.index)
-    strip = dict(colorscale=sorted(steps), zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
+    cells = list(range(len(y_names)))
+    codes = [shown.index(c) for c in clades]
+    strip = dict(colorscale=steps, zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
                  hovertemplate='%{text}<extra></extra>')
 
-    figure = make_subplots(rows=2, cols=2, column_widths=[0.03, 0.97], row_heights=[0.97, 0.03],
-                           horizontal_spacing=0.01, vertical_spacing=0.012)
-    figure.add_trace(go.Heatmap(z=[[shown.index(c)] for c in clades], y=y_names,
-                                text=[[c] for c in clades], xgap=0, ygap=1, **strip), row=1, col=1)
+    figure = go.Figure()
+    # the group of each parasite, beside its row and under its column. x0/y0 put the strip
+    # a cell clear of the matrix, dx/dy give it a cell of its own to fill
+    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1, y=cells,
+                                text=[[c] for c in clades], ygap=1, **strip))
+    figure.add_trace(go.Heatmap(z=[codes], x=cells, y0=len(cells) + 0.4, dy=1,
+                                text=[list(clades)], xgap=1, **strip))
 
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=x_names, y=y_names,
+    # the axes count cells rather than name parasites, the strips having to sit a cell out
+    # from the matrix, so the pair a cell stands for is carried in its hover text
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells,
+                                text=[[f'{row} and {other}' for other in y_names]
+                                      for row in y_names],
                                 colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
                                             '#3182bd', '#08519c'],
                                 zmin=0, zmax=counts.to_numpy().max(),
-                                hovertemplate='%{y} and %{x}<br>Shared interactors %{z:.0f}<extra></extra>',
-                                colorbar=dict(title='Shared<br>interactors',
-                                              thickness=12, len=0.6, y=1, yanchor='top')),
-                     row=1, col=2)
-
-    figure.add_trace(go.Heatmap(z=[[shown.index(c) for c in clades]], x=x_names,
-                                text=[list(clades)], xgap=1, ygap=0, **strip), row=2, col=2)
+                                hovertemplate='%{text}<br>Shared interactors %{z:.0f}'
+                                              '<extra></extra>',
+                                colorbar=dict(title=dict(text='Shared interactors',
+                                                         side='right'),
+                                              thickness=12, len=0.6, y=1, yanchor='top',
+                                              tickfont=dict(size=10))))
 
     # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
     # by empty traces whose only purpose is their legend entry
     for group in shown:
         figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
                                     marker=dict(size=10, symbol='square', color=palette[group]),
-                                    hoverinfo='skip', showlegend=True), row=1, col=2)
+                                    hoverinfo='skip', showlegend=True))
 
-    # square cells, so the matrix reads as the symmetric thing it is whatever width the
-    # browser gives it. The two strips follow the axes of the matrix rather than the other
-    # way around: keeping `matches` off the axis that carries the constraint means that
-    # when plotly pads a range to square the cells, the strips inherit the padding and stay
-    # lined up with the rows and columns they label
-    figure.update_yaxes(scaleanchor='x2', scaleratio=1, row=1, col=2)
-    figure.update_yaxes(matches='y2', row=1, col=1)
-    figure.update_xaxes(matches='x2', row=2, col=2)
+    # the same span on both axes -- the matrix, the strip beside it and the cell between
+    # them -- so that a square plot area is one of square cells
+    span = len(cells) + 1.6
+    right = 60
 
-    figure.update_xaxes(showticklabels=False, row=1, col=1)
-    figure.update_xaxes(showticklabels=False, row=1, col=2)
-    figure.update_yaxes(showticklabels=False, row=1, col=2)
+    # A line of text is about 1.1 times its point size tall, which is the room a cell has to
+    # give the label against it. The cells being square, one size would do for both axes --
+    # the names below the matrix are held to a floor of their own, being the only thing that
+    # names a column and the first to be lost.
+    def fits(room, smallest=6):
+        sizes = [size for size in (10, 9, 8, 7, 6) if size >= smallest]
+        return next(size for size in sizes if room >= 1.1 * size or size == sizes[-1])
+
+    longest = max(len(name) for name in y_names)
+
+    def square(size):
+        '''Side of the square and the left margin, with the names written `size` points.'''
+        # what the cells are held square to: what is left of the column once the labels and
+        # the colour bar have taken theirs, and never larger than the rows want to be
+        margin = 0.65 * size * longest + 12
+
+        return max(240, min(CELL * span, column - margin - right)), margin
+
+    # the room the labels need comes off the column before the square can be measured, and
+    # their size follows from the square, so it is measured once at the largest the names
+    # can be written and again at the size that left them
+    font = fits(square(10)[0] / span)
+    side, left = square(font)
+    # the names below the matrix are all that names a column, so they are not written
+    # smaller than they can be read: forty of them run into each other on a narrow screen
+    # rather than being drawn at a size nobody can make out on any screen
+    x_font = fits(side / span, smallest=SMALLEST_LABEL)
+
+    bottom = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
+    # room above the matrix for the group legend, two entries to a row. Left to the 60
+    # pixels a single row needs, plotly makes the room by taking it off the plot, and the
+    # square the cells are held to is that much smaller
+    top = 34 + 22 * -(-len(shown) // 2)
+
     # every parasite is named on both axes, however small the cells are drawn: plotly thins
     # tick labels that no longer fit, and a heatmap with every third row labelled cannot be
     # read at all
-    figure.update_xaxes(tickangle=-60, showticklabels=True, tickmode='linear', dtick=1,
-                        tickfont=dict(size=10), row=2, col=2)
-    figure.update_yaxes(showticklabels=False, row=2, col=2)
-    figure.update_yaxes(tickmode='linear', dtick=1, tickfont=dict(size=10), row=1, col=1)
-    figure.update_xaxes(visible=False, row=2, col=1)
-    figure.update_yaxes(visible=False, row=2, col=1)
-    figure.update_yaxes(autorange='reversed')
+    ticks = dict(tickmode='array', tickvals=cells, ticks='')
+    figure.update_xaxes(range=[-2, len(cells) - 0.4], constrain='domain',
+                        ticktext=x_names, tickangle=-60, tickfont=dict(size=x_font), **ticks)
+    # reversed, so that the first parasite is the top row and the diagonal runs the way it
+    # is read; the strip along the bottom is the last row of the range, not the first
+    figure.update_yaxes(range=[len(cells) + 1, -0.6], scaleanchor='x', scaleratio=1,
+                        constrain='domain', ticktext=y_names, tickfont=dict(size=font),
+                        **ticks)
 
-    # Full names need more room down the left; abbreviated names remain on the rotated
-    # x-axis so the bottom margin stays compact.
-    left = 6.5 * max(len(name) for name in y_names) + 12
-    bottom = 0.87 * (6.5 * max(len(name) for name in x_names) + 12) + 25
-    right, top = 105, 60
-    # 0.96 is the width the matrix is given of what is left, the rest going to the group
-    # strip beside it and the gap between the two, so the figure comes out at `column`
-    side = max(240, min((column - left - right) * 0.96, CELL * len(x_names)))
-    figure.update_layout(width=side / 0.96 + left + right, height=side / 0.958 + top + bottom,
-                         plot_bgcolor='white',
+    figure.update_layout(height=side + top + bottom, plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left',
                                      x=0, itemclick=False, itemdoubleclick=False,
@@ -365,11 +412,13 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column=MATRIX_CO
 # longest descriptive protein name written beside a gene symbol on the dot matrix. The
 # label is an axis tick and every character of it is taken off the width of the plot, so
 # the description is cut where it stops earning the space -- the whole of it is in the
-# hover, which is where a name that long is read anyway.
-DESCRIPTION_WIDTH = 38
+# hover, which is where a name that long is read anyway. Forty characters take more than
+# half of the column on a laptop, which leaves the forty parasites of a human a couple of
+# pixels of matrix each.
+DESCRIPTION_WIDTH = 26
 
 
-def label_proteins(df_pred, annotations, truncate=True):
+def label_proteins(df_pred, annotations, truncate=None):
     '''
     Names each host protein by its gene symbol and its descriptive protein name, since the
     symbol on its own identifies the protein only for someone who already knows it.
@@ -381,7 +430,8 @@ def label_proteins(df_pred, annotations, truncate=True):
 
     :param df_pred: tissue-expressed predictions of the host group
     :param dict annotations: STRING id --> descriptive protein name
-    :param bool truncate: shorten descriptions for labels that must fit an axis
+    :param int truncate: characters of the description a label has room for, or None for
+                         the whole of it
     :return: {gene symbol: protein label}
     '''
     described = {}
@@ -393,8 +443,8 @@ def label_proteins(df_pred, annotations, truncate=True):
     labels = {}
     for name in df_pred['target_name'].unique():
         description = described.get(name)
-        if truncate and description and len(description) > DESCRIPTION_WIDTH:
-            description = description[:DESCRIPTION_WIDTH - 1].rstrip() + '…'
+        if truncate and description and len(description) > truncate:
+            description = description[:truncate - 1].rstrip() + '…'
         labels[name] = f'{name} · {description}' if description else str(name)
 
     return labels
@@ -471,9 +521,9 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
     dots['parasites'] = dots['target_name'].map(counts)
     dots['degree'] = pd.MultiIndex.from_frame(dots[['taxid1_label', 'target_name']]).map(degree)
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
-    labels = label_proteins(df_pred, annotations)
+    labels = label_proteins(df_pred, annotations, DESCRIPTION_WIDTH)
     dots['protein'] = dots['target_name'].map(labels)
-    full_labels = label_proteins(df_pred, annotations, truncate=False)
+    full_labels = label_proteins(df_pred, annotations)
     dots['protein_full'] = dots['target_name'].map(full_labels)
     surface = summarise_localisations(df_pred, localisations)
     if surface is not None:
@@ -521,7 +571,7 @@ def split_dot_legend(figure, groups, surfaces, palette):
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
+def generate_shared_protein_dots(dots, proteins, parasites, most, palette, column):
     '''
     A dot wherever a parasite is predicted to interact with one of the proteins, the
     parasites in the order the other figures use so the taxonomic groups stay together, and the
@@ -556,31 +606,45 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette):
         hover_lines.append('P(cell membrane) %{customdata[3]:.2f}, '
                            'P(extracellular) %{customdata[4]:.2f}')
 
+    size = dot_size(parasites, proteins, column)
     figure = px.scatter(dots, x='parasite', y='protein', color='group',
                         # plotly express flips category_orders on a y axis, so `proteins`
                         # most-shared first puts the most-shared protein in the top row
                         color_discrete_map=palette, category_orders=orders,
                         symbol='surface' if localised else None,
                         symbol_map=SURFACE_SYMBOLS if localised else {},
-                        size='degree', size_max=15, labels=DEEPLOC_LABELS,
+                        size='degree', size_max=size, labels=DEEPLOC_LABELS,
                         custom_data=hover_columns)
     figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
                          hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
     if localised:
         split_dot_legend(figure, orders['group'], orders['surface'], palette)
-    figure.update_layout(width=matrix_width(len(parasites)),
-                         height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
+    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
                          margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
     # the labels are as long as a protein name, so plotly is left to take the room they
     # need off the plot rather than drawing them over it or cutting them at the margin
     figure.update_yaxes(automargin=True)
-    figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#f0f0f0')
+    # every parasite is named, however narrow its column: plotly thins the labels that no
+    # longer fit, and a matrix with every other column named cannot be read at all, so they
+    # are drawn at the size a column has room for instead. They are rotated, so they are as
+    # tall as they are long and are cut at the foot of the figure unless automargin takes
+    # the room they need off the plot
+    figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
+                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        showgrid=True, gridcolor='#f0f0f0')
     figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
 
     return figure
 
+
+# The figures below sit two to a row and are stretched to their column, which is all most
+# of them need. The shared-interactor matrix has to know how wide that column came out --
+# its cells are square, so its height is its width -- so the browser is asked as the page
+# opens and answers on the run after: until then the figures are drawn for a laptop
+# (web_utils.DEFAULT_PAGE_WIDTH) and the matrix is a square with room to spare above it.
+column = web_utils.column_width(2)
 
 st.caption('The parasites predicted against one host, compared with each other: which host '
            'interactors they share, which host proteins several of them reach, and the '
@@ -638,11 +702,10 @@ if selected_host != web_utils.NO_HOST:
                    'the taxonomic group runs along each axis. The diagonal is fixed to the '
                    'largest shared-interactor count.')
         if shared_counts is not None:
-            # the figure carries its own size, since a square matrix stretched to the page is
-            # a square with blank space either side of it rather than a wider square
+            # the figure is given the width of the column and keeps its cells square within
+            # it, so it follows whatever screen the page is read on
             st.plotly_chart(generate_shared_interactor_heatmap(
-                *shared_counts, config.get('parasite_groups', {})),
-                            width='content')
+                *shared_counts, config.get('parasite_groups', {}), column), width='stretch')
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
@@ -656,8 +719,9 @@ if selected_host != web_utils.NO_HOST:
                        'protein, circles cell membrane, diamonds extracellular, and hexagons '
                        'both; hover for the underlying probabilities.')
             st.plotly_chart(
-                generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {})),
-                width='content')
+                generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {}),
+                                             column),
+                width='stretch')
 
     per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
                                                               selected_taxids, score)
@@ -678,8 +742,8 @@ if selected_host != web_utils.NO_HOST:
                     'parasites are known to infect.')
         else:
             st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                                 config.get('parasite_groups', {})),
-                            width='content')
+                                                 config.get('parasite_groups', {}), column),
+                            width='stretch')
 
     with cell_types:
         if choices:

@@ -628,11 +628,20 @@ st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, sco
 # the localisation figures are drawn twice over: the proportions at the threshold, and the
 # boxes of the probability itself on every prediction. At 0.7 a parasite is left a median
 # of seventeen host proteins and eight of its own, which a proportion can still be read
-# off and a box cannot
+# off and a box cannot. The two proportions are drawn together, being the same split read
+# on the two sides of the interaction, and the boxes follow underneath
 host_proteins = get_interactor_proteins(data_dir, config, 'target')
 parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
 host_proteins_kept = get_interactor_proteins(data_dir, config, 'target', score)
 parasite_proteins_kept = get_interactor_proteins(data_dir, config, 'source', score)
+# the parasite figures are drawn over the unicellular parasites alone, which both the
+# proportion and the membrane boxes below need, so the subsets are taken once here
+unicellular = kept_unicellular = None
+if parasite_proteins is not None:
+    unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
+    kept_unicellular = parasite_proteins_kept[
+        parasite_proteins_kept['group'].isin(UNICELLULAR_GROUPS)]
+
 if host_proteins is not None:
     st.subheader("Proportion of host proteins per localization")
     st.caption('Subcellular localization predicted by DeepLoc 2 for the host proteins each '
@@ -644,6 +653,23 @@ if host_proteins is not None:
                                                                every=host_proteins),
                                             parasite_palette), width='stretch')
 
+if unicellular is not None and not unicellular.empty:
+    st.subheader("Proportion of parasite proteins per localization")
+    st.caption('DeepLoc 2 assigned localizations for the proteins each '
+               'unicellular parasite reaches its host with at or above the confidence set '
+               'above, divided into cell membrane, extracellular, or both. Multicellular '
+               'parasites are omitted, as the secretome filter admits only their secreted '
+               'proteins. The strip below the columns indicates taxonomic group, coloured '
+               'as above.')
+    st.plotly_chart(
+        generate_surface_split_per_parasite(get_surface_counts(kept_unicellular,
+                                                               every=unicellular),
+                                            parasite_palette,
+                                            y_title='proteins of the parasite',
+                                            hover_noun='its proteins'),
+        width='stretch')
+
+if host_proteins is not None:
     st.subheader("Localization confidence of host proteins")
     st.caption('Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
                'assigned localization, one column per class and one box per host. The dotted '
@@ -656,25 +682,6 @@ if host_proteins is not None:
     st.plotly_chart(generate_host_score_boxes(host_proteins), width='stretch')
 
 if parasite_proteins is not None:
-    unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
-    kept_unicellular = parasite_proteins_kept[
-        parasite_proteins_kept['group'].isin(UNICELLULAR_GROUPS)]
-    if not unicellular.empty:
-        st.subheader("Proportion of parasite proteins per localization")
-        st.caption('DeepLoc 2 assigned localizations for the proteins each '
-                   'unicellular parasite reaches its host with at or above the confidence set '
-                   'above, divided into cell membrane, extracellular, or both. Multicellular '
-                   'parasites are omitted, as the secretome filter admits only their secreted '
-                   'proteins. The strip below the columns indicates taxonomic group, coloured '
-                   'as above.')
-        st.plotly_chart(
-            generate_surface_split_per_parasite(get_surface_counts(kept_unicellular,
-                                                                   every=unicellular),
-                                                parasite_palette,
-                                                y_title='proteins of the parasite',
-                                                hover_noun='its proteins'),
-            width='stretch')
-
     st.subheader("Localization confidence of extracellular parasite proteins")
     st.caption('Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
                'extracellular or both classes for each parasite, over every prediction whatever '

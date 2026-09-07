@@ -673,8 +673,11 @@ if host_proteins is not None:
     st.subheader("Localization confidence of host proteins")
     st.caption('Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
                'assigned localization, one column per class and one box per host. The dotted '
-               'line in each column marks the DeepLoc 2 cut-off that class is called at, which '
-               'is what the proteins were filtered on, so every point is above its own '
+               'line in each column marks the cut-off that class is called at: DeepLoc 2\'s own '
+               'default threshold for the Accurate model, '
+               f'{web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f} for extracellular and '
+               f'{web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f} for cell membrane. '
+               'That is what the proteins were filtered on, so every point is above its own '
                'line. A protein over both cut-offs appears in both columns, in each at the '
                'probability of that class. Each host protein is counted once per class, '
                'irrespective of the number of parasites reaching it, and every prediction is '
@@ -685,7 +688,9 @@ if parasite_proteins is not None:
     st.subheader("Localization confidence of extracellular parasite proteins")
     st.caption('Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
                'extracellular or both classes for each parasite, over every prediction whatever '
-               'the slider is set to. The dotted line marks the DeepLoc 2 cut-off, which is '
+               'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
+               'threshold for extracellular under the Accurate model '
+               f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
                'what the secretome filter kept these proteins on. Individual proteins are '
                'shown as points behind each box; for parasites with a hundred or more proteins '
                'the points are read as density.')
@@ -707,7 +712,8 @@ if parasite_proteins is not None:
                'multicellular parasite nothing but its secreted proteins. Individual '
                'proteins are shown as points; boxes over very few proteins (one each for '
                '*G. lamblia* and *V. corneae*) should not be read as distributions. The '
-               'dotted line marks the cut-off.')
+               'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
+               f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}).')
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             unicellular[unicellular['surface'].isin(

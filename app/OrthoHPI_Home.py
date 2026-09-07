@@ -699,8 +699,8 @@ if parasite_proteins is not None:
                'unicellular parasites are represented, the secretome filter admitting a '
                'multicellular parasite nothing but its secreted proteins. Individual '
                'proteins are shown as points; boxes over very few proteins (one each for '
-               '*G. lamblia*, *T. hominis* and *V. corneae*) should not be read as '
-               'distributions. The dotted line marks the cut-off.')
+               '*G. lamblia* and *V. corneae*) should not be read as distributions. The '
+               'dotted line marks the cut-off.')
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             unicellular[unicellular['surface'].isin(

@@ -300,23 +300,20 @@ def get_surface_calls(data_dir):
     through a localisation filter to get here, the host proteins for being surface-exposed
     and the parasite proteins for being secreted, and this is what those filters read.
 
-    The score kept beside the class is the probability of that class -- the one the call
-    was made on -- and not both probabilities, since it is the one a tooltip has room for.
-
     :param str data_dir: directory holding deeploc_localisations.parquet
-    :return: dataframe of surface and score, indexed by STRING id; empty without the file
+    :return: dataframe of surface calls and probabilities, indexed by STRING id; empty without
+             the file
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
     if localisations.empty:
-        return pd.DataFrame(columns=['surface', 'score'])
+        return pd.DataFrame(columns=['surface', 'cell_membrane', 'extracellular'])
 
     surface = web_utils.classify_surface(localisations)
 
-    return pd.DataFrame({
-        'surface': surface.values,
-        'score': np.where(surface == web_utils.EXTRACELLULAR, localisations['extracellular'],
-                          localisations['cell_membrane'])},
-        index=localisations['protein'].values)
+    return pd.DataFrame({'surface': surface.values,
+                         'cell_membrane': localisations['cell_membrane'].values,
+                         'extracellular': localisations['extracellular'].values},
+                        index=localisations['protein'].values)
 
 
 def generate_node_titles(df, annotations, surface_calls=None):
@@ -343,7 +340,14 @@ def generate_node_titles(df, annotations, surface_calls=None):
             lines.append(str(species))
             call = calls.get(protein)
             if call:
-                lines.append(f"DeepLoc: {call['surface']} (p={call['score']:.2f})")
+                if call['surface'] == web_utils.BOTH_SURFACE:
+                    lines.append('DeepLoc: Both '
+                                 f"(P(cell membrane)={call['cell_membrane']:.2f}, "
+                                 f"P(extracellular)={call['extracellular']:.2f})")
+                else:
+                    score = (call['extracellular'] if call['surface'] == web_utils.EXTRACELLULAR
+                             else call['cell_membrane'])
+                    lines.append(f"DeepLoc: {call['surface']} (p={score:.2f})")
             lines.append(f'STRING: {protein}')
             if pd.notna(uniprot):
                 lines.append(f'UniProt: {uniprot}')
@@ -453,9 +457,9 @@ def generate_cell_type_filters(df, score):
     is read off the interactions above the confidence slider so that an option never
     promises proteins the network is not drawing.
 
-    A cell type holds the host proteins concentrated in it rather than those merely
-    detected there (web_utils.keep_peak_cell_types, which says why), and the filter that
-    reads these options keeps the same rows.
+    A cell type holds the host proteins with expression above 1 nTPM
+    (web_utils.keep_expressed_cell_types), and the filter that reads these options keeps
+    the same rows.
 
     :param dataframe df: the predictions of the parasite, annotated with tissues
     :param float score: confidence the network is drawn from
@@ -465,29 +469,30 @@ def generate_cell_type_filters(df, score):
     if annotated.empty:
         return pd.Series(dtype=int)
 
-    return (web_utils.keep_peak_cell_types(annotated)
+    return (web_utils.keep_expressed_cell_types(annotated)
                      .groupby('Cell type')['target_name'].nunique()
                      .sort_values(ascending=False, kind='stable'))
 
 def generate_surface_filters(df):
     '''
     The DeepLoc classes the host proteins of this parasite fall in, in the order they are
-    offered: the surface of the host cell first and the space around it second, which is
-    the order the home page splits its columns in. A class no host protein of this parasite
-    is in is left out, as an empty option filters to an empty network.
+    offered: the surface of the host cell first, the space around it second, and the
+    proteins DeepLoc assigns to both last. A class no host protein of this parasite is in
+    is left out, as an empty option filters to an empty network.
     '''
     if 'target_surface' not in df.columns:
         return []
     present = set(df['target_surface'].dropna())
 
-    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR) if c in present]
+    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR,
+                        web_utils.BOTH_SURFACE) if c in present]
 
 
 def cell_type_marks(df, score):
     '''
-    The host proteins of the network against the cell types they are concentrated in
-    (web_utils.keep_peak_cell_types), which is what both figures of the cell type section
-    are drawn from, and the tissues those cell types are grouped into.
+    The host proteins of the network against the cell types where they exceed 1 nTPM
+    (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
+    section are drawn from, and the tissues those cell types are grouped into.
 
     A cell type name repeats across tissues -- smooth muscle cells are in the lung and in
     the intestine -- so a column is a (tissue, cell type) pair and only the cell type is
@@ -504,7 +509,7 @@ def cell_type_marks(df, score):
     if annotated.empty:
         return None, None
 
-    marks = web_utils.keep_peak_cell_types(annotated).copy()
+    marks = web_utils.keep_expressed_cell_types(annotated).copy()
     # the row a protein reaches its maximum in is always kept, so the share is read off
     # the marks themselves and the darkest of a row is 100%
     marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
@@ -568,9 +573,10 @@ def generate_cell_type_bars(marks, blocks):
     tissue the cell types belong to: where the parasite is predicted to meet the host most
     often, read in one glance.
 
-    An interaction is counted in every cell type its host protein is concentrated in, so
-    the bars overlap and do not partition the network. They are the columns of the matrix
-    beside them added up, which is the trade the two tabs offer: how many against which.
+    An interaction is counted in every cell type where its host protein exceeds 1 nTPM,
+    so the bars overlap and do not partition the network. They are the columns of the
+    matrix beside them added up, which is the trade the two tabs offer: how many against
+    which.
 
     :param dataframe marks: rows from cell_type_marks
     :param list blocks: the blocks as (tissue, its columns)
@@ -597,7 +603,7 @@ def generate_cell_type_bars(marks, blocks):
 def generate_cell_type_matrix(marks, blocks):
     '''
     Where inside the tissue the host proteins of the network sit: a mark wherever a protein
-    is concentrated in a cell type, the cell types along the bottom in blocks of the tissue
+    exceeds 1 nTPM in a cell type, the cell types along the bottom in blocks of the tissue
     they belong to and the host proteins up the side.
 
     The network says which host proteins a parasite is predicted to reach and the body
@@ -621,7 +627,7 @@ def generate_cell_type_matrix(marks, blocks):
 
     figure = px.scatter(drawn, x='column', y='target_name', color='share',
                         color_continuous_scale=GO_SEQUENTIAL,
-                        range_color=(web_utils.PEAK_CELL_TYPE_FRACTION, 1),
+                        range_color=(0, 1),
                         # plotly express flips category_orders on a y axis, so the protein
                         # in the most cell types first puts it in the top row
                         category_orders={'column': columns, 'target_name': proteins},
@@ -1203,15 +1209,14 @@ with col2:
             selected_cell_types = st.multiselect(
                 'Select cell types to filter the predicted PPI', list(cell_type_counts.index),
                 format_func=cell_type_label,
-                help='A cell type is offered with the number of host proteins concentrated '
-                     'in it -- expressed there at half at least of what they reach anywhere '
-                     'in the tissue, since nearly every protein of a tissue is detected in '
-                     'nearly every one of its cell types. Cell-type annotation is available '
-                     'for human (HPA) and pig (Pig Cell Atlas); a host protein with no cell '
-                     'type is left out once a cell type is chosen.')
+                help='A cell type is offered with the number of host proteins expressed '
+                     'above 1 nTPM in it. Cell-type annotation is available for human (HPA) '
+                     'and pig (Pig Cell Atlas); a host protein with no cell type is left out '
+                     'once a cell type is chosen.')
             if len(selected_cell_types) > 0:
-                peak = web_utils.keep_peak_cell_types(df_select[df_select['Cell type'].notna()])
-                df_select = peak[peak['Cell type'].isin(selected_cell_types)]
+                expressed = web_utils.keep_expressed_cell_types(
+                    df_select[df_select['Cell type'].notna()])
+                df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
         # localisation is independent of the tissue, so it filters beside the tissues
         # rather than inside them: a host protein is on the cell surface or in the space
@@ -1221,8 +1226,8 @@ with col2:
             selected_surface = st.multiselect(
                 'Select where DeepLoc places the host proteins', surface_options,
                 help='The host proteins are in the predictions because DeepLoc called them '
-                     'surface-exposed: on the membrane of the host cell, or extracellular -- '
-                     'in the matrix and the fluid around it. Filtering to one of the two '
+                     'surface-exposed: on the membrane of the host cell, extracellular -- '
+                     'in the matrix and the fluid around it -- or both. Filtering to a class '
                      'leaves the interactions that can take place there, and drops any '
                      'parasite protein left with nothing to bind.')
             if len(selected_surface) > 0:
@@ -1338,24 +1343,23 @@ with st.container():
     if df_select is not None:
         marks, blocks = cell_type_marks(df_select, score)
         if marks is not None:
-            st.header('Cell types the host proteins are concentrated in')
-            st.caption('A host protein counts towards a cell type where it is concentrated: '
-                       'expressed there at half at least of what it reaches anywhere in that '
-                       'tissue. The columns of both tabs are those cell types, grouped into '
-                       'the tissues the parasite infects, and a cell type is written under '
-                       'its block alone, since the same kind of cell is annotated separately '
-                       'in each tissue. Cell-type annotation is available for human (HPA) and '
-                       'pig (Pig Cell Atlas).')
+            st.header('Cell types expressing the host proteins')
+            st.caption('A host protein counts towards a cell type when its expression is '
+                       'above 1 nTPM. The columns of both tabs are those cell types, grouped '
+                       'into the tissues the parasite infects, and a cell type is written '
+                       'under its block alone, since the same kind of cell is annotated '
+                       'separately in each tissue. Cell-type annotation is available for '
+                       'human (HPA) and pig (Pig Cell Atlas).')
             # the same columns twice, counted and then opened up: how many interactions a
             # cell type holds, and which host proteins they are
             per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
             with per_cell_type_tab:
                 st.caption('Predicted interactions per cell type. An interaction is counted '
-                           'in every cell type its host protein is concentrated in, so the '
+                           'in every cell type where its host protein exceeds 1 nTPM, so the '
                            'bars overlap and are not a partition of the network.')
                 st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
             with per_protein_tab:
-                st.caption('A mark wherever a host protein is concentrated in a cell type, '
+                st.caption('A mark wherever a host protein exceeds 1 nTPM in a cell type, '
                            'shaded by the share of its expression in that tissue the cell '
                            'type carries. A row of one mark is a protein the parasite meets '
                            'in a single kind of cell; a full row one it meets throughout the '

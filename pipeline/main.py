@@ -12,7 +12,9 @@ TISSUE_CUTOFF = 2.5
 
 # DeepLoc 2 (Accurate) probability cut-offs for keeping a host protein as surface-exposed.
 # Values are DeepLoc's own per-class thresholds for the Accurate (ProtT5) model
-# (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] -> threshold[i+1]).
+# (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] -> threshold[i+1], which
+# convert_label2string reads at i+1). The parasite secretome filter applies the same two
+# numbers in deeploc/build_secretome_fastas.py; docs/deeploc.md has the derivation.
 # A host protein is kept if it is at the cell membrane or secreted; set
 # DEEPLOC_EXTRACELLULAR_CUTOFF to None to keep only Cell membrane proteins.
 DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')

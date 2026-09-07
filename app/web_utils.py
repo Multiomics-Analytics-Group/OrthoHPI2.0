@@ -282,34 +282,47 @@ def load_deeploc_localisations(data_dir):
     return utils.read_parquet_file(input_file=input_file)
 
 
-# the DeepLoc 2 (Accurate) probabilities a host protein is kept as surface-exposed on,
-# the same cut-offs the pipeline filters with (pipeline/main.py). They are read in the app
-# to say which of the two reasons a protein was kept for, not to filter anything again
-DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
-DEEPLOC_EXTRACELLULAR_CUTOFF = 0.61728516
-# the two ways of being surface-exposed, and what a protein over neither cut-off is called
+# the two surface-accessible localization classes, the class of a protein over both
+# cut-offs, and the fallback for a protein over neither
 CELL_MEMBRANE = 'Cell membrane'
 EXTRACELLULAR = 'Extracellular'
+BOTH_SURFACE = 'Both'
 NOT_SURFACE = 'Neither'
+
+# DeepLoc 2's own per-class thresholds for the Accurate (ProtT5) model, the same values the
+# pipeline filters both sides with -- the host proteins in pipeline/main.py and the parasite
+# proteins in deeploc/build_secretome_fastas.py. Taken from DeepLoc2/deeploc2.py
+# label_threshold, which carries one entry more than there are classes and is read at i+1,
+# so Extracellular is labels[2] -> 0.61728516 and Cell membrane is labels[3] -> 0.56464844.
+# docs/deeploc.md has the derivation.
+DEEPLOC_CUTOFFS = {EXTRACELLULAR: 0.61728516, CELL_MEMBRANE: 0.56464844}
 
 
 def classify_surface(localisations):
     '''
-    Which of the two surface classes DeepLoc puts each protein in.
+    Which surface-accessible class DeepLoc puts each protein in, on the same cut-offs the
+    pipeline filtered it with. A protein over both is BOTH_SURFACE.
 
-    A protein over both cut-offs is called extracellular: the few there are (two of the
-    human ones, the laminins LAMA1 and LAMB2, each barely over the membrane cut-off) do
-    not earn a third class in every figure that shows one. A protein over neither is
-    NOT_SURFACE -- on the host side that is a host the filter was never run for, or a
-    data directory built with other cut-offs; on the parasite side it is ordinary, since
-    parasite proteins are selected by the secretome filter and not by DeepLoc.
+    NOT_SURFACE, over neither, does not occur in a data directory this pipeline built: both
+    sides came through a filter reading these same two numbers, the hosts in pipeline/main.py
+    and the parasites in deeploc/build_secretome_fastas.py. It stands for a species the
+    filter was never run for, or one of the snapshot directories built with other cut-offs.
+
+    Read from the probabilities and not from the `localizations` column beside them. That
+    column names a class even for a protein that crosses no threshold at all -- DeepLoc
+    falls back to whichever class came closest, by the largest probability minus its own
+    threshold (DeepLoc2/deeploc2.py) -- so it would put proteins in a class the filters
+    rejected and draw them below the cut-off line of every figure that shows one.
 
     :param localisations: DeepLoc table, as load_deeploc_localisations returns it
     :return: series of class names, aligned to the rows of the table
     '''
-    return pd.Series(np.select([localisations['extracellular'] >= DEEPLOC_EXTRACELLULAR_CUTOFF,
-                                localisations['cell_membrane'] >= DEEPLOC_MEMBRANE_CUTOFF],
-                               [EXTRACELLULAR, CELL_MEMBRANE], default=NOT_SURFACE),
+    extracellular = localisations['extracellular'] > DEEPLOC_CUTOFFS[EXTRACELLULAR]
+    membrane = localisations['cell_membrane'] > DEEPLOC_CUTOFFS[CELL_MEMBRANE]
+
+    return pd.Series(np.select([extracellular & membrane, extracellular, membrane],
+                               [BOTH_SURFACE, EXTRACELLULAR, CELL_MEMBRANE],
+                               default=NOT_SURFACE),
                      index=localisations.index)
 
 
@@ -388,33 +401,27 @@ def filter_tissues(config, df):
     return df
 
 
-# share of the nTPM a host protein reaches anywhere in a tissue that one of its cell
-# types has to carry for the protein to count as expressed in that cell type
-PEAK_CELL_TYPE_FRACTION = 0.5
+# Minimum atlas expression for a host protein to count in a cell type.
+CELL_TYPE_NTPM_CUTOFF = 1.0
 
 
-def keep_peak_cell_types(df, fraction=PEAK_CELL_TYPE_FRACTION):
+def keep_expressed_cell_types(df, cutoff=CELL_TYPE_NTPM_CUTOFF):
     '''
-    The rows of a tissue-annotated frame holding the cell types a host protein is
-    concentrated in: the ones where it reaches `fraction` of the nTPM it has anywhere in
-    that tissue.
+    The rows of a tissue-annotated frame where a host protein has expression above the
+    absolute cell-type cutoff.
 
-    The HPA rows are kept from nTPM > 0, at which the median protein is annotated in every
-    cell type of its tissue. Anything counted per cell type on presence alone therefore
-    comes out much the same for all the cell types of a tissue, and says how finely the HPA
-    annotates it rather than anything about the protein. What differs between cell types is
-    where the protein is abundant.
+    HPA rows are retained in the generated annotation from nTPM > 0. Applying this
+    cutoff when counting or filtering by cell type avoids treating negligible expression as
+    cell-type presence.
 
     Rows the HPA gives no cell type -- every host but human, its single cell data being
     human only -- carry no nTPM either and drop out.
 
     :param dataframe df: rows carrying target, Tissue and nTPM
-    :param float fraction: share of the per-protein, per-tissue maximum a cell type needs
+    :param float cutoff: minimum nTPM a cell type needs, exclusive
     :return: the subset of the rows
     '''
-    peak = df.groupby(['target', 'Tissue'])['nTPM'].transform('max')
-
-    return df[df['nTPM'] >= fraction * peak]
+    return df[df['nTPM'] > cutoff]
 
 
 def count_ticks(figure, largest, axis='x', **kwargs):

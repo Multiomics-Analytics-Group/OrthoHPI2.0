@@ -59,15 +59,50 @@ doesn't expire.
 
 ## Thresholds
 
-DeepLoc's own per-class cutoffs for the Accurate model (`label_threshold` in
-`DeepLoc2/deeploc2.py` — note the array is offset by one against the label
-list). Host values live in `pipeline/main.py`:
+Both sides of the pipeline filter on the per-class probability, against DeepLoc's
+own thresholds for the **Accurate** (ProtT5) model:
 
-```python
-DEEPLOC_EXTRACELLULAR_CUTOFF = None       # 0.61728516 to also keep secreted
-DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
-```
+| class | Accurate | Fast |
+| --- | --- | --- |
+| Extracellular | **0.61728516** | 0.64638672 |
+| Cell membrane | **0.56464844** | 0.52368164 |
 
-Parasite values are `build_secretome_fastas.py` flags (`--extracellular-cutoff`
-/ `--membrane-cutoff`, defaults 0.617 / 0.524); membrane only counts for species
-not flagged `multicellular: true` in `config.yml`.
+Two traps in reading these out of `DeepLoc2/deeploc2.py`:
+
+- **The array is offset by one.** `label_threshold` carries 11 entries for 10
+  classes, and `convert_label2string` (`DeepLoc2/utils.py`) tests `preds[0, i+1]`
+  against `threshold[i+1]`. The threshold of `labels[i]` is `label_threshold[i+1]`,
+  so Extracellular is `labels[2] -> [3]` and Cell membrane is `labels[3] -> [4]`.
+  Reading the array straight gives the wrong pair.
+- **There are two arrays**, one per model. Taking the Fast values for Accurate
+  output gives the wrong pair too — this is where the old 0.524 membrane cut-off
+  came from.
+
+DeepLoc calls a class with a strict `>`, and both filters match that.
+
+Where they live:
+
+- Hosts: `DEEPLOC_EXTRACELLULAR_CUTOFF` / `DEEPLOC_MEMBRANE_CUTOFF` in
+  `pipeline/main.py`, applied by `filters.apply_deeploc_filter`. Set the
+  extracellular one to `None` to keep only Cell membrane proteins.
+- Parasites: `EXTRACELLULAR_CUTOFF` / `MEMBRANE_CUTOFF` in
+  `deeploc/build_secretome_fastas.py`, overridable with `--extracellular-cutoff`
+  / `--membrane-cutoff`. Cell membrane only counts for species not flagged
+  `multicellular: true` in `config.yml`, a multicellular parasite reaching its
+  host with secreted proteins alone.
+- App: `web_utils.DEEPLOC_CUTOFFS`, which `classify_surface` reads to say which
+  class a protein was kept for and to draw the cut-off line on the confidence
+  figures. Display only — it filters nothing again.
+
+## Why not the `Localizations` column
+
+DeepLoc writes an assigned-class column beside the probabilities, and it is
+tempting to filter on that instead. Don't: it names a class even for a protein
+that crosses no threshold at all. `deeploc2.py` falls back to the class that came
+closest, `labels[argmax(P - threshold)]`, so every protein gets a localization
+whether or not the model is confident of any.
+
+Filtering the parasites on that column instead of the thresholds admitted 58,476
+proteins against 51,628, and 23% of the resulting membrane proteins scored below
+the cut-off. The extra proteins are the fallback assignments, which are not
+evidence of surface exposure.

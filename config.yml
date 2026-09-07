@@ -191,15 +191,6 @@ parasites:
             - 9606
             - 10116
             - 10090
-    6945:
-        label: Ixodes scapularis
-        group: Arachnida
-        multicellular: true
-        color: "#a6cee3"
-        tissues:
-            - "BTO:0001253"
-        hosts:
-            - 9606
     5671:
         label: Leishmania infantum
         group: Kinetoplastida

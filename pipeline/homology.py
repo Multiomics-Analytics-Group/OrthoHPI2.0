@@ -31,7 +31,12 @@ def get_eggnog_groups(filepath, proteins):
             group, gproteins = data[1], data[4].split(',')
             matched = protein_set.intersection(gproteins)
             if matched:
-                valid_groups[group] = list(matched)
+                # sorted rather than in set order, which python varies from run to run.
+                # A protein pair that two linked groups both hold is reached twice by
+                # get_links, once from each side, and the first one seen is the one kept
+                # -- so set order decided which group was recorded as the parasite's and
+                # which as the host's, and two runs over the same input disagreed
+                valid_groups[group] = sorted(matched)
 
     return valid_groups
 

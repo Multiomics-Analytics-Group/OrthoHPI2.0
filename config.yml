@@ -20,7 +20,7 @@ hosts:
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
     10116:
         label: Rattus norvegicus (rat)
-        color: "#0072B2"
+        color: "#D55E00"
         tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/rat_tissue_experiments_full.tsv
     10090:
@@ -82,24 +82,38 @@ parasite_groups:
     Kinetoplastida: "#CC79A7"
     Other protozoa: "#56B4E9"
     Microsporidia: "#C9A227"
-    Arachnida: "#414141"
 
+# `multicellular` and `niche` are the two sides of the interface, and are read
+# separately. `multicellular` constrains the parasite side: a multicellular
+# parasite's own cell membranes sit on cells buried inside it, so it reaches its
+# host with secreted proteins alone, while a unicellular parasite's plasma
+# membrane is its surface and its membrane proteins count too. `niche` constrains
+# the host side: which host proteins the parasite can reach at all. An
+# extracellular parasite meets the host surface and the space around it; an
+# intracellular one is inside a host cell and its cytosol and nucleus are open to
+# it as well. `both` is a life cycle with an intracellular and an extracellular
+# stage in the same host (Plasmodium, Trypanosoma cruzi). The two are
+# independent: Trichinella is multicellular and intracellular, Trypanosoma brucei
+# unicellular and extracellular.
 parasites:
     53326:
         label: Ancylostoma ceylanicum
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#33a02c"
         tissues:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     6279:
         label: Brugia malayi
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#ff7f00"
         tissues:
             - "BTO:0000752"
@@ -111,6 +125,7 @@ parasites:
         label: Brugia timori
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#fdb462"
         tissues:
             - "BTO:0000752"
@@ -122,6 +137,7 @@ parasites:
         label: Clonorchis sinensis
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#bc80bd"
         tissues:
             - "BTO:0000759"
@@ -131,6 +147,7 @@ parasites:
     441375:
         label: Cryptosporidium muris
         group: Apicomplexa
+        niche: intracellular
         color: "#8c510a"
         tissues:
             - "BTO:0001307"
@@ -143,9 +160,11 @@ parasites:
         label: Dracunculus medinensis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#c51b7d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
             - "BTO:0001253"
         hosts:
             - 9606
@@ -153,6 +172,7 @@ parasites:
         label: Echinococcus granulosus
         group: Cestoda
         multicellular: true
+        niche: extracellular
         color: "#d6604d"
         tissues:
             - "BTO:0000759"
@@ -162,9 +182,11 @@ parasites:
     5759:
         label: Entamoeba histolytica
         group: Other protozoa
+        niche: extracellular
         color: "#b2df8a"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0000759"
             - "BTO:0000142"
             - "BTO:0000763"
@@ -174,9 +196,11 @@ parasites:
         label: Enterobius vermicularis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#9f5511"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0001253"
         hosts:
             - 9606
@@ -184,25 +208,19 @@ parasites:
         label: Hymenolepis diminuta
         group: Cestoda
         multicellular: true
+        niche: extracellular
         color: "#1f78b4"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
             - 10116
             - 10090
-    6945:
-        label: Ixodes scapularis
-        group: Arachnida
-        multicellular: true
-        color: "#a6cee3"
-        tissues:
-            - "BTO:0001253"
-        hosts:
-            - 9606
     5671:
         label: Leishmania infantum
         group: Kinetoplastida
+        niche: intracellular
         color: "#e31a1c"
         tissues:
             - "BTO:0000759"
@@ -217,6 +235,7 @@ parasites:
     5664:
         label: Leishmania major
         group: Kinetoplastida
+        niche: intracellular
         color: "#fb9a99"
         tissues:
             - "BTO:0001253"
@@ -228,6 +247,7 @@ parasites:
         label: Loa loa
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#fdbf6f"
         tissues:
             - "BTO:0001253"
@@ -239,17 +259,20 @@ parasites:
         label: Necator americanus
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#80b1d3"
         tissues:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     6282:
         label: Onchocerca volvulus
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#fccde5"
         tissues:
             - "BTO:0001253"
@@ -260,16 +283,19 @@ parasites:
         label: Opisthorchis felineus
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#ccebc5"
         tissues:
             - "BTO:0000759"
             - "BTO:0000122"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     36329:
         label: Plasmodium falciparum
         group: Apicomplexa
+        niche: both
         color: "#6a3d9a"
         tissues:
             - "BTO:0001253"
@@ -282,6 +308,7 @@ parasites:
     5851:
         label: Plasmodium knowlesi
         group: Apicomplexa
+        niche: both
         color: "#ffff99"
         tissues:
             - "BTO:0001253"
@@ -292,6 +319,7 @@ parasites:
     126793:
         label: Plasmodium vivax
         group: Apicomplexa
+        niche: both
         color: "#b15928"
         tissues:
             - "BTO:0001253"
@@ -303,11 +331,13 @@ parasites:
         label: Schistosoma haematobium
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#2166ac"
         tissues:
             - "BTO:0001253"
             - "BTO:0001418"
             - "BTO:0001158"
+            - "BTO:0000648"
             - "BTO:0000759"
             - "BTO:0000089"
             - "BTO:0000763"
@@ -317,11 +347,13 @@ parasites:
         label: Schistosoma japonicum
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#bcbddc"
         tissues:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000651"
+            - "BTO:0000648"
             - "BTO:0000763"
             - "BTO:0000089"
         hosts:
@@ -330,6 +362,7 @@ parasites:
         label: Schistosoma mansoni
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#8dd3c7"
         tissues:
             - "BTO:0001253"
@@ -344,25 +377,30 @@ parasites:
         label: Strongyloides stercoralis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#3f007d"
         tissues:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     60517:
         label: Taenia asiatica
         group: Cestoda
         multicellular: true
+        niche: extracellular
         color: "#ffed6f"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     432359:
         label: Toxoplasma gondii
         group: Apicomplexa
+        niche: intracellular
         color: "#fb8072"
         tissues:
             - "BTO:0000089"
@@ -377,6 +415,7 @@ parasites:
     72359:
         label: Trachipleistophora hominis
         group: Microsporidia
+        niche: intracellular
         color: "#bebada"
         tissues:
             - "BTO:0000887"
@@ -387,6 +426,7 @@ parasites:
         label: Trichinella britovi
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#f16913"
         tissues:
             - "BTO:0000648"
@@ -400,6 +440,7 @@ parasites:
         label: Trichinella nativa
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#41ab5d"
         tissues:
             - "BTO:0000648"
@@ -413,6 +454,7 @@ parasites:
         label: Trichinella nelsoni
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#807dba"
         tissues:
             - "BTO:0000648"
@@ -425,6 +467,7 @@ parasites:
     5722:
         label: Trichomonas vaginalis
         group: Other protozoa
+        niche: extracellular
         color: "#b3de69"
         tissues:
             - "BTO:0000243"
@@ -435,19 +478,23 @@ parasites:
         label: Trichuris trichiura
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#e7298a"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
         hosts:
             - 9606
     353153:
         label: Trypanosoma cruzi
         group: Kinetoplastida
+        niche: both
         color: "#01665e"
         tissues:
             - "BTO:0001253"
             - "BTO:0000562"
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0000887"
             - "BTO:0000089"
             - "BTO:0000439"
@@ -456,6 +503,7 @@ parasites:
     993615:
         label: Vittaforma corneae
         group: Microsporidia
+        niche: intracellular
         color: "#66a61e"
         tissues:
             - "BTO:0000439"
@@ -465,6 +513,7 @@ parasites:
         label: Wuchereria bancrofti
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#e6ab02"
         tissues:
             - "BTO:0000089"
@@ -476,6 +525,7 @@ parasites:
         label: Angiostrongylus cantonensis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#a6761d"
         tissues:
             - "BTO:0000763"
@@ -487,9 +537,11 @@ parasites:
         label: Angiostrongylus costaricensis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#e6550d"
         tissues:
             - "BTO:0000779"
+            - "BTO:0000648"
             - "BTO:0000089"
         hosts:
             - 10116
@@ -497,6 +549,7 @@ parasites:
     5660:
         label: Leishmania braziliensis
         group: Kinetoplastida
+        niche: intracellular
         color: "#31a354"
         tissues:
             - "BTO:0001253"
@@ -511,6 +564,7 @@ parasites:
         label: Trichinella spiralis
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#756bb1"
         tissues:
             - "BTO:0000648"
@@ -525,6 +579,7 @@ parasites:
         label: Trichinella pseudospiralis
         group: Nematoda
         multicellular: true
+        niche: intracellular
         color: "#c994c7"
         tissues:
             - "BTO:0000648"
@@ -539,6 +594,7 @@ parasites:
         label: Opisthorchis viverrini
         group: Trematoda
         multicellular: true
+        niche: extracellular
         color: "#67001f"
         tissues:
             - "BTO:0000759"
@@ -549,6 +605,7 @@ parasites:
         label: Echinococcus multilocularis
         group: Cestoda
         multicellular: true
+        niche: extracellular
         color: "#276419"
         tissues:
             - "BTO:0000759"
@@ -559,6 +616,7 @@ parasites:
         label: Toxocara canis
         group: Nematoda
         multicellular: true
+        niche: extracellular
         color: "#023858"
         tissues:
             - "BTO:0000759"
@@ -572,6 +630,7 @@ parasites:
     185431:
         label: Trypanosoma brucei
         group: Kinetoplastida
+        niche: extracellular
         color: "#543005"
         tissues:
             - "BTO:0001253"
@@ -584,16 +643,20 @@ parasites:
     184922:
         label: Giardia lamblia
         group: Other protozoa
+        niche: extracellular
         color: "#4d4d4d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     353152:
         label: Cryptosporidium parvum
         group: Apicomplexa
+        niche: intracellular
         color: "#99000d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606

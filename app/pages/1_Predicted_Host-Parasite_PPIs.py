@@ -1,5 +1,6 @@
 import sys, os
 import json
+import re
 import textwrap
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import utils
@@ -23,6 +24,12 @@ web_utils.show_header('Host-parasite network')
 #Initialize variables
 df_select = None
 networks = []
+# the filters, named before the column that draws them so the sections further down the
+# page can say what they are showing even when a filter offered nothing to select
+selected_tissues = []
+selected_cell_types = []
+selected_surface = []
+surface_options = []
 selected_rows = []
 selected_terms = []
 enrichment_table = None
@@ -136,12 +143,30 @@ ENRICHMENT_COLUMN_NAMES = {
     'fdr_bh': 'FDR (BH)'}
 GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 
+# the filters are written as badges above each section below the fold, one colour per
+# kind, so a network read halfway down the page is not taken for the whole prediction set.
+# The confidence score is always one of them: it is never not filtering
+FILTER_BADGES = {'tissue': 'blue', 'cell type': 'green', 'localisation': 'violet'}
+# how many names of one kind are written into a download filename before they are counted
+# instead, since every selected cell type would otherwise end up in it
+FILENAME_MAX_NAMES = 2
+
 # rows to a page of either table. The grid is grown to the page rather than the page fitted
 # to a fixed height, so the last page of a short table is the only one drawn short
 TABLE_PAGE_SIZE = 10
 
 # the two sides of the network, tested separately for enrichment
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
+
+# the tissue filter is named so that a click on the body figure can set it: the figure is
+# drawn after the filter is created, so a click only reaches it on the following run
+TISSUE_FILTER_KEY = 'net_tissues'
+
+# the localisation tickboxes are drawn above the network they narrow rather than beside
+# the other filters, so they are named as well: their state has to be read where the
+# predictions are filtered, which is before they are drawn again
+SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
+                       web_utils.EXTRACELLULAR: 'net_surface_extracellular'}
 
 # what the host proteins of the network are tested against. The pipeline's filters are
 # the universe the network was drawn from, and the second option narrows that universe
@@ -300,23 +325,20 @@ def get_surface_calls(data_dir):
     through a localisation filter to get here, the host proteins for being surface-exposed
     and the parasite proteins for being secreted, and this is what those filters read.
 
-    The score kept beside the class is the probability of that class -- the one the call
-    was made on -- and not both probabilities, since it is the one a tooltip has room for.
-
     :param str data_dir: directory holding deeploc_localisations.parquet
-    :return: dataframe of surface and score, indexed by STRING id; empty without the file
+    :return: dataframe of surface calls and probabilities, indexed by STRING id; empty without
+             the file
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
     if localisations.empty:
-        return pd.DataFrame(columns=['surface', 'score'])
+        return pd.DataFrame(columns=['surface', 'cell_membrane', 'extracellular'])
 
     surface = web_utils.classify_surface(localisations)
 
-    return pd.DataFrame({
-        'surface': surface.values,
-        'score': np.where(surface == web_utils.EXTRACELLULAR, localisations['extracellular'],
-                          localisations['cell_membrane'])},
-        index=localisations['protein'].values)
+    return pd.DataFrame({'surface': surface.values,
+                         'cell_membrane': localisations['cell_membrane'].values,
+                         'extracellular': localisations['extracellular'].values},
+                        index=localisations['protein'].values)
 
 
 def generate_node_titles(df, annotations, surface_calls=None):
@@ -343,7 +365,14 @@ def generate_node_titles(df, annotations, surface_calls=None):
             lines.append(str(species))
             call = calls.get(protein)
             if call:
-                lines.append(f"DeepLoc: {call['surface']} (p={call['score']:.2f})")
+                if call['surface'] == web_utils.BOTH_SURFACE:
+                    lines.append('DeepLoc: Both '
+                                 f"(P(cell membrane)={call['cell_membrane']:.2f}, "
+                                 f"P(extracellular)={call['extracellular']:.2f})")
+                else:
+                    score = (call['extracellular'] if call['surface'] == web_utils.EXTRACELLULAR
+                             else call['cell_membrane'])
+                    lines.append(f"DeepLoc: {call['surface']} (p={score:.2f})")
             lines.append(f'STRING: {protein}')
             if pd.notna(uniprot):
                 lines.append(f'UniProt: {uniprot}')
@@ -441,6 +470,63 @@ def name_the_selection(table, parasite, host):
     return named[front + [c for c in named.columns if c not in front]]
 
 
+def active_filters(score, tissues, cell_types, surface):
+    """
+    The filters narrowing what the page shows, as (kind, name) pairs. The score comes
+    first and is always there; the rest appear only once something is selected.
+
+    :param float score: the confidence the network is drawn from
+    :param iterable tissues: selected tissues
+    :param iterable cell_types: selected cell types
+    :param iterable surface: selected DeepLoc classes
+    :return: list of (kind, name), the kinds being the keys of FILTER_BADGES
+    """
+    active = [('score', f'confidence \u2265 {score:g}')]
+    for kind, selected in (('tissue', tissues), ('cell type', cell_types),
+                           ('localisation', surface)):
+        active.extend((kind, str(name)) for name in selected)
+
+    return active
+
+
+def show_active_filters(filters):
+    """Writes the filters above a section, so it says what it is showing."""
+    badges = ' '.join(f':{FILTER_BADGES.get(kind, "gray")}-badge[{name}]'
+                      for kind, name in filters)
+    st.markdown(f'Showing {badges}')
+
+
+def download_name(parasite, filters, suffix):
+    """
+    Names a download after the filters it was taken under, rather than after the parasite
+    alone: an exported table of one tissue is otherwise indistinguishable from the whole
+    network of that parasite once it is on disk.
+
+    Names of one kind are written out while there are few of them and counted once there
+    are more, so selecting a dozen cell types does not produce a filename to match.
+
+    :param str parasite: the selected parasite
+    :param list filters: the filters, as returned by active_filters
+    :param str suffix: what the file is, extension included
+    :return: the filename
+    """
+    parts = [parasite]
+    for kind in ('score', 'tissue', 'cell type', 'localisation'):
+        names = [name for active_kind, name in filters if active_kind == kind]
+        if not names:
+            continue
+        if kind == 'score':
+            parts.append(names[0].split()[-1])
+        elif len(names) <= FILENAME_MAX_NAMES:
+            parts.extend(names)
+        else:
+            parts.append(f'{len(names)} {kind}s')
+
+    slug = '_'.join(re.sub(r'[^A-Za-z0-9.]+', '-', part).strip('-') for part in parts)
+
+    return f'{slug}_{suffix}'
+
+
 def generate_tissue_filters(df):
     options = df['Tissue'].unique().tolist()
 
@@ -453,9 +539,9 @@ def generate_cell_type_filters(df, score):
     is read off the interactions above the confidence slider so that an option never
     promises proteins the network is not drawing.
 
-    A cell type holds the host proteins concentrated in it rather than those merely
-    detected there (web_utils.keep_peak_cell_types, which says why), and the filter that
-    reads these options keeps the same rows.
+    A cell type holds the host proteins with expression above 1 nTPM
+    (web_utils.keep_expressed_cell_types), and the filter that reads these options keeps
+    the same rows.
 
     :param dataframe df: the predictions of the parasite, annotated with tissues
     :param float score: confidence the network is drawn from
@@ -465,29 +551,32 @@ def generate_cell_type_filters(df, score):
     if annotated.empty:
         return pd.Series(dtype=int)
 
-    return (web_utils.keep_peak_cell_types(annotated)
+    return (web_utils.keep_expressed_cell_types(annotated)
                      .groupby('Cell type')['target_name'].nunique()
                      .sort_values(ascending=False, kind='stable'))
 
 def generate_surface_filters(df):
     '''
-    The DeepLoc classes the host proteins of this parasite fall in, in the order they are
-    offered: the surface of the host cell first and the space around it second, which is
-    the order the home page splits its columns in. A class no host protein of this parasite
-    is in is left out, as an empty option filters to an empty network.
+    The DeepLoc classes offered as tickboxes, the surface of the host cell first and the
+    space around it second. The proteins DeepLoc puts in both are not a class of their
+    own here: they are on the membrane and outside it, so they answer to either box and
+    make either one worth offering. A class no host protein of this parasite is in is
+    left out, as an empty option filters to an empty network.
     '''
     if 'target_surface' not in df.columns:
         return []
     present = set(df['target_surface'].dropna())
+    in_both = web_utils.BOTH_SURFACE in present
 
-    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR) if c in present]
+    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR)
+            if in_both or c in present]
 
 
 def cell_type_marks(df, score):
     '''
-    The host proteins of the network against the cell types they are concentrated in
-    (web_utils.keep_peak_cell_types), which is what both figures of the cell type section
-    are drawn from, and the tissues those cell types are grouped into.
+    The host proteins of the network against the cell types where they exceed 1 nTPM
+    (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
+    section are drawn from, and the tissues those cell types are grouped into.
 
     A cell type name repeats across tissues -- smooth muscle cells are in the lung and in
     the intestine -- so a column is a (tissue, cell type) pair and only the cell type is
@@ -504,7 +593,7 @@ def cell_type_marks(df, score):
     if annotated.empty:
         return None, None
 
-    marks = web_utils.keep_peak_cell_types(annotated).copy()
+    marks = web_utils.keep_expressed_cell_types(annotated).copy()
     # the row a protein reaches its maximum in is always kept, so the share is read off
     # the marks themselves and the darkest of a row is 100%
     marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
@@ -568,9 +657,10 @@ def generate_cell_type_bars(marks, blocks):
     tissue the cell types belong to: where the parasite is predicted to meet the host most
     often, read in one glance.
 
-    An interaction is counted in every cell type its host protein is concentrated in, so
-    the bars overlap and do not partition the network. They are the columns of the matrix
-    beside them added up, which is the trade the two tabs offer: how many against which.
+    An interaction is counted in every cell type where its host protein exceeds 1 nTPM,
+    so the bars overlap and do not partition the network. They are the columns of the
+    matrix beside them added up, which is the trade the two tabs offer: how many against
+    which.
 
     :param dataframe marks: rows from cell_type_marks
     :param list blocks: the blocks as (tissue, its columns)
@@ -597,7 +687,7 @@ def generate_cell_type_bars(marks, blocks):
 def generate_cell_type_matrix(marks, blocks):
     '''
     Where inside the tissue the host proteins of the network sit: a mark wherever a protein
-    is concentrated in a cell type, the cell types along the bottom in blocks of the tissue
+    exceeds 1 nTPM in a cell type, the cell types along the bottom in blocks of the tissue
     they belong to and the host proteins up the side.
 
     The network says which host proteins a parasite is predicted to reach and the body
@@ -621,7 +711,7 @@ def generate_cell_type_matrix(marks, blocks):
 
     figure = px.scatter(drawn, x='column', y='target_name', color='share',
                         color_continuous_scale=GO_SEQUENTIAL,
-                        range_color=(web_utils.PEAK_CELL_TYPE_FRACTION, 1),
+                        range_color=(0, 1),
                         # plotly express flips category_orders on a y axis, so the protein
                         # in the most cell types first puts it in the top row
                         category_orders={'column': columns, 'target_name': proteins},
@@ -1166,10 +1256,7 @@ with col2:
             st.session_state.pop('net_par', None)
         selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
 
-    # Set info message on initial site load
-    if selected_parasite == "<select>":
-        st.text('Choose 1 parasite to visualize the predicted PPI network')
-    else:
+    if selected_parasite != "<select>":
         df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
         # where DeepLoc puts each host protein, carried on the predictions so the filter
@@ -1181,10 +1268,16 @@ with col2:
                 target_surface=df_select['target'].map(surface_calls['surface']))
         score = st.slider('Confidence score', 0.35, 0.9, 0.35)
 
-        selected_tissues = []
         tissues_options = generate_tissue_filters(df_select)
         if len(tissues_options) > 0:
-            selected_tissues = st.multiselect('Select tissues to filter the predicted PPI', tissues_options)
+            # an organ clicked on the body figure drawn below selects the lifecycle tissues
+            # it stands for. The figure is drawn after this column, so the click is read on
+            # the run that follows it -- and it has to be read here, before the filter is
+            # created, since that is the last point its value can still be set
+            body_figure.apply_organ_click(config, selected_taxids, tissues_options,
+                                          TISSUE_FILTER_KEY)
+            selected_tissues = st.multiselect('Select tissues to filter the predicted PPI',
+                                              tissues_options, key=TISSUE_FILTER_KEY)
             if len(selected_tissues) > 0:
                 df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
@@ -1203,30 +1296,31 @@ with col2:
             selected_cell_types = st.multiselect(
                 'Select cell types to filter the predicted PPI', list(cell_type_counts.index),
                 format_func=cell_type_label,
-                help='A cell type is offered with the number of host proteins concentrated '
-                     'in it -- expressed there at half at least of what they reach anywhere '
-                     'in the tissue, since nearly every protein of a tissue is detected in '
-                     'nearly every one of its cell types. Cell-type annotation is available '
-                     'for human (HPA) and pig (Pig Cell Atlas); a host protein with no cell '
-                     'type is left out once a cell type is chosen.')
+                help='A cell type is offered with the number of host proteins expressed '
+                     'above 1 nTPM in it. Cell-type annotation is available for human (HPA) '
+                     'and pig (Pig Cell Atlas); a host protein with no cell type is left out '
+                     'once a cell type is chosen.')
             if len(selected_cell_types) > 0:
-                peak = web_utils.keep_peak_cell_types(df_select[df_select['Cell type'].notna()])
-                df_select = peak[peak['Cell type'].isin(selected_cell_types)]
+                expressed = web_utils.keep_expressed_cell_types(
+                    df_select[df_select['Cell type'].notna()])
+                df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
         # localisation is independent of the tissue, so it filters beside the tissues
         # rather than inside them: a host protein is on the cell surface or in the space
-        # around it wherever it is expressed
+        # around it wherever it is expressed. The tickboxes are drawn above the network,
+        # which is what they narrow, so what is read here is the state they were left in
+        # -- Streamlit hands that over before the boxes are drawn again, which is what
+        # makes a tick reach the predictions on the run it is made
         surface_options = generate_surface_filters(df_select)
-        if len(surface_options) > 0:
-            selected_surface = st.multiselect(
-                'Select where DeepLoc places the host proteins', surface_options,
-                help='The host proteins are in the predictions because DeepLoc called them '
-                     'surface-exposed: on the membrane of the host cell, or extracellular -- '
-                     'in the matrix and the fluid around it. Filtering to one of the two '
-                     'leaves the interactions that can take place there, and drops any '
-                     'parasite protein left with nothing to bind.')
-            if len(selected_surface) > 0:
-                df_select = df_select[df_select['target_surface'].isin(selected_surface)]
+        ticked = [c for c in surface_options
+                  if st.session_state.get(SURFACE_FILTER_KEYS[c])]
+        # ticking both classes leaves every host protein in, exactly as ticking neither
+        # does, so only one ticked box is a filter
+        selected_surface = ticked if len(ticked) == 1 else []
+        if len(selected_surface) > 0:
+            # a protein DeepLoc puts in both classes is in the ticked one as well
+            df_select = df_select[df_select['target_surface'].isin(
+                selected_surface + [web_utils.BOTH_SURFACE])]
 
         annotations = web_utils.load_protein_annotations(data_dir)
         for host_taxid in selected_taxids:
@@ -1247,21 +1341,62 @@ with col2:
         #net.show_buttons(filter_=['nodes'])
         
         
+# resolved after the column that draws the filters, and read by every section below
+page_filters = active_filters(score, selected_tissues, selected_cell_types,
+                              selected_surface) if df_select is not None else []
+
 # drawn after the column that holds the selectors, which is where the predictions the
 # figure counts are read and filtered
 with col1:
     if df_select is not None:
         body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
-                                     selected_taxids, selected_tissues)
+                                     selected_taxids, selected_tissues, clickable=True)
+
+
+def network_legend(parasite_label, parasite_color, host_label, host_color):
+    '''
+    The key to the network: a node is read by its shape, which says whether the protein
+    is the parasite's or the host's, and by its colour, which says which species it
+    belongs to. Neither is written anywhere on the network itself, and the shapes are
+    drawn here the way vis.js draws the nodes -- a wash of the species colour inside a
+    border of the colour itself -- so the legend and the network cannot drift apart.
+
+    :param str parasite_label: species name of the parasite
+    :param str parasite_color: the colour its proteins are drawn in
+    :param str host_label: species name of the host
+    :param str host_color: the colour its proteins are drawn in
+    :return: the legend as an HTML string
+    '''
+    def entry(shape, color, label):
+        fill = tint(color, NODE_FILL_TINT)
+        mark = (f'<polygon points="11,2 20,11 11,20 2,11"'
+                if shape == 'diamond' else f'<circle cx="11" cy="11" r="8.5"')
+
+        return (f'<span style="display:inline-flex;align-items:center;gap:0.45em;">'
+                f'<svg width="22" height="22" viewBox="0 0 22 22">'
+                f'{mark} fill="{fill}" stroke="{color}" stroke-width="2"/></svg>'
+                f'<span>{label}</span></span>')
+
+    return (f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:1.6em;'
+            f'margin:0.2rem 0 0.6rem;font-size:0.8rem;color:{LABEL_FONT_COLOR};">'
+            f'{entry("diamond", parasite_color, parasite_label)}'
+            f'{entry("dot", host_color, host_label)}</div>')
 
 
 def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
-        st.subheader(host_label)
+        # the species name only distinguishes the panels when there is more than one,
+        # as on the rodent page; a single host already says which one it is
+        if len(networks) > 1:
+            st.subheader(host_label)
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
         if host_df.empty:
             st.info(f'No predicted interactions for this parasite in {host_label}.')
             return
+        st.markdown(network_legend(host_df['taxid1_label'].iloc[0],
+                                   host_df['source_color'].iloc[0],
+                                   host_label, host_df['target_color'].iloc[0]),
+                    unsafe_allow_html=True)
         filename = f'{selected_parasite}_{host_taxid}_network'
         html_data = ""
         # Save and read graph as HTML file, which is what the download button hands out.
@@ -1298,27 +1433,31 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                 st.download_button(
                     label="Download Network as Html",
                     data=html_data,
-                    file_name=f'{filename}.html',
+                    file_name=download_name(selected_parasite, page_filters,
+                                            f'{host_taxid}_network.html'),
                     mime='text/html',
                 )
             with c2:
                 st.download_button(
                     label="Download Network as GraphML",
                     data=open(f'{path}/{filename}.graphml','r',encoding='utf-8'),
-                    file_name=f'{filename}.graphml',
+                    file_name=download_name(selected_parasite, page_filters,
+                                            f'{host_taxid}_network.graphml'),
                     mime='text/plain',
                 )
             with c3:
                 st.download_button(
                     label="Download Network as Cytoscape",
                     data=open(f'{path}/{filename}.json','r',encoding='utf-8'),
-                    file_name=f'{filename}.json',
+                    file_name=download_name(selected_parasite, page_filters,
+                                            f'{host_taxid}_network.json'),
                     mime='text/plain',
                 )
 
 
 if networks:
     st.header('Network of host-parasite PPIs')
+    show_active_filters(page_filters)
     st.caption('Predicted interactions between parasite and host proteins above the '
                'selected confidence score. Nodes are proteins, diamonds parasite and '
                'circles host, coloured by organism and sized by centrality in the '
@@ -1328,6 +1467,19 @@ if networks:
     if selected_host == 'Rodent':
         st.caption('Rat and Mouse networks are shown separately; their host nodes use '
                    'their species-specific colors.')
+    if len(surface_options) > 0:
+        st.caption('The host proteins are in the predictions because DeepLoc called them '
+                   'surface-exposed: on the membrane of the host cell, extracellular -- '
+                   'in the matrix and the fluid around it -- or both. Ticking one class '
+                   'leaves the interactions that can take place there, and drops any '
+                   'parasite protein left with nothing to bind; the proteins DeepLoc '
+                   'places in both classes stay whichever one is ticked.')
+        # narrow columns beside each other rather than one box a row, and one column more
+        # than there are boxes so the boxes are not spread across the page
+        boxes = st.columns(len(surface_options) + 2)
+        for box, surface in zip(boxes, surface_options):
+            with box:
+                st.checkbox(surface, key=SURFACE_FILTER_KEYS[surface])
     columns = st.columns(len(networks))
     for column, network in zip(columns, networks):
         with column:
@@ -1338,24 +1490,24 @@ with st.container():
     if df_select is not None:
         marks, blocks = cell_type_marks(df_select, score)
         if marks is not None:
-            st.header('Cell types the host proteins are concentrated in')
-            st.caption('A host protein counts towards a cell type where it is concentrated: '
-                       'expressed there at half at least of what it reaches anywhere in that '
-                       'tissue. The columns of both tabs are those cell types, grouped into '
-                       'the tissues the parasite infects, and a cell type is written under '
-                       'its block alone, since the same kind of cell is annotated separately '
-                       'in each tissue. Cell-type annotation is available for human (HPA) and '
-                       'pig (Pig Cell Atlas).')
+            st.header('Cell types expressing the host proteins')
+            show_active_filters(page_filters)
+            st.caption('A host protein counts towards a cell type when its expression is '
+                       'above 1 nTPM. The columns of both tabs are those cell types, grouped '
+                       'into the tissues the parasite infects, and a cell type is written '
+                       'under its block alone, since the same kind of cell is annotated '
+                       'separately in each tissue. Cell-type annotation is available for '
+                       'human (HPA) and pig (Pig Cell Atlas).')
             # the same columns twice, counted and then opened up: how many interactions a
             # cell type holds, and which host proteins they are
             per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
             with per_cell_type_tab:
                 st.caption('Predicted interactions per cell type. An interaction is counted '
-                           'in every cell type its host protein is concentrated in, so the '
+                           'in every cell type where its host protein exceeds 1 nTPM, so the '
                            'bars overlap and are not a partition of the network.')
                 st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
             with per_protein_tab:
-                st.caption('A mark wherever a host protein is concentrated in a cell type, '
+                st.caption('A mark wherever a host protein exceeds 1 nTPM in a cell type, '
                            'shaded by the share of its expression in that tissue the cell '
                            'type carries. A row of one mark is a protein the parasite meets '
                            'in a single kind of cell; a full row one it meets throughout the '
@@ -1365,6 +1517,7 @@ with st.container():
 with st.container():
     if df_select is not None:
         st.header("Table of host-parasite PPIs")
+        show_active_filters(page_filters)
         table = generate_interactions_table(df_select, score,
                                             web_utils.load_protein_annotations(data_dir))
         st.caption('One row per predicted interaction, with the tissues the host protein is '
@@ -1396,13 +1549,14 @@ with st.container():
             label="Download Network Table",
             data=utils.convert_df(name_the_selection(table, selected_parasite,
                                                      selected_host)),
-            file_name=f'{selected_parasite}_network_table.tsv',
+            file_name=download_name(selected_parasite, page_filters, 'network_table.tsv'),
             mime='text/csv',
         )
 
 with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
+        show_active_filters(page_filters)
         st.caption('Biological processes over-represented among one side of the network. '
                    'Each side is tested against the proteins of its own species the '
                    'pipeline had to work with -- the ones its filters passed, the host '
@@ -1431,7 +1585,8 @@ with st.container():
         enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir, side,
                                     background, web_utils.get_config_file())
         if not enrichment.empty:
-            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
+            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                           horizontal=True,
                            help='The Benjamini-Hochberg corrected significance a process '
                                 'has to reach to be counted as enriched.')
             # the figures read the columns the enrichment is built with; only the grid and

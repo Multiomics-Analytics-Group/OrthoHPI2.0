@@ -66,9 +66,10 @@ def show_header(current=None, index=None):
     return selected
 
 # the width the figures that carry a size of their own are drawn for until the browser has
-# said how wide the page really is -- a laptop, the narrower of the screens the app is read
-# on, so that the first draw of a session is one that fits rather than one that is cut off
-DEFAULT_PAGE_WIDTH = 1150
+# said how wide the page really is. On the narrow side of the screens the app is read on, so
+# that the first draw of a session is one that fits its column rather than one that is cut
+# off at the edge of it: a figure too small for a moment is the better way to be wrong
+DEFAULT_PAGE_WIDTH = 1000
 # what the page is measured with, run in the browser: the inner width of the block the app
 # is drawn in, which is the width the figures share between them, rather than the width of
 # the window, which also holds the padding either side of that block

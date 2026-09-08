@@ -211,12 +211,12 @@ def infected_organs(config, taxid):
     The organs of the body figure that a parasite is recorded as infecting.
 
     The tissue filter that decides which predictions are shown at all keeps a host protein
-    expressed in one of those tissues, but TISSUES then annotates that protein to about
-    three organs, most of which the parasite never reaches: a Loa loa protein selected for
-    being expressed in skin also comes annotated to the nervous system, and the figure drew
-    the brain as the darkest organ on the page. Restricting the shading to the organs the
-    parasite actually infects is what keeps the figure about the parasite rather than about
-    how broadly its targets happen to be expressed.
+    expressed in one of those tissues, but TISSUES then annotates that protein to every
+    organ it is detected in, most of which the parasite never reaches: a Loa loa protein
+    selected for being expressed in skin also comes annotated to the nervous system, and
+    the figure drew the brain as the darkest organ on the page. Restricting the shading to
+    the organs the parasite actually infects is what keeps the figure about the parasite
+    rather than about how broadly its targets happen to be expressed.
 
     :param dict config: parsed configuration
     :param taxid: parasite taxid, as a string or an int
@@ -257,7 +257,8 @@ def count_interactions(df, figure_tissues):
     '''
     Counts the predicted interactions reaching each organ. An interaction is counted once
     per organ its host protein is annotated to, so the counts do not add up to the size
-    of the network -- a host protein is annotated to about three organs.
+    of the network -- most host proteins are annotated to a single organ, but a broadly
+    expressed one carries as many as twenty.
 
     The predictions are repeated once per tissue and single-cell cluster of their host
     protein, so they are reduced to one row per interaction first.
@@ -484,8 +485,8 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     st.caption('Predicted interactions whose host protein is expressed in each organ, '
                'after the confidence score and the tissue filters, and only in the organs '
                'this parasite is recorded as infecting. TISSUES annotates a host protein '
-               'to about three organs, so an interaction is counted in each of the ones '
-               'shown and the organs can add up to more than the network.')
+               'to every organ it is detected in, so an interaction is counted in each of '
+               'the ones shown and the organs can add up to more than the network.')
     figures = []
     for taxid, species in drawn:
         svg, organs = load_figure(species)

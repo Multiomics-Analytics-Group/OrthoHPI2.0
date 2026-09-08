@@ -1347,7 +1347,10 @@ with col1:
 
 def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
-        st.subheader(host_label)
+        # the species name only distinguishes the panels when there is more than one,
+        # as on the rodent page; a single host already says which one it is
+        if len(networks) > 1:
+            st.subheader(host_label)
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
         if host_df.empty:
             st.info(f'No predicted interactions for this parasite in {host_label}.')

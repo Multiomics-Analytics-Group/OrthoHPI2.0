@@ -152,6 +152,9 @@ claude/
 .claude
 CLAUDE.md
 
+# Local GitHub workflow artifacts
+.github/
+
 # Poster build outputs. poster-v2.svg is kept -- it is edited by hand in Inkscape -- but
 # everything else under poster/ is rebuilt by scripts/build_poster_figures.py and
 # scripts/build_poster.py, or exported from the svg.

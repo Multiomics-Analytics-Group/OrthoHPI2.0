@@ -1353,6 +1353,36 @@ with col1:
                                      selected_taxids, selected_tissues, clickable=True)
 
 
+def network_legend(parasite_label, parasite_color, host_label, host_color):
+    '''
+    The key to the network: a node is read by its shape, which says whether the protein
+    is the parasite's or the host's, and by its colour, which says which species it
+    belongs to. Neither is written anywhere on the network itself, and the shapes are
+    drawn here the way vis.js draws the nodes -- a wash of the species colour inside a
+    border of the colour itself -- so the legend and the network cannot drift apart.
+
+    :param str parasite_label: species name of the parasite
+    :param str parasite_color: the colour its proteins are drawn in
+    :param str host_label: species name of the host
+    :param str host_color: the colour its proteins are drawn in
+    :return: the legend as an HTML string
+    '''
+    def entry(shape, color, label):
+        fill = tint(color, NODE_FILL_TINT)
+        mark = (f'<polygon points="11,2 20,11 11,20 2,11"'
+                if shape == 'diamond' else f'<circle cx="11" cy="11" r="8.5"')
+
+        return (f'<span style="display:inline-flex;align-items:center;gap:0.45em;">'
+                f'<svg width="22" height="22" viewBox="0 0 22 22">'
+                f'{mark} fill="{fill}" stroke="{color}" stroke-width="2"/></svg>'
+                f'<span>{label}</span></span>')
+
+    return (f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:1.6em;'
+            f'margin:0.2rem 0 0.6rem;font-size:0.8rem;color:{LABEL_FONT_COLOR};">'
+            f'{entry("diamond", parasite_color, parasite_label)}'
+            f'{entry("dot", host_color, host_label)}</div>')
+
+
 def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
         # the species name only distinguishes the panels when there is more than one,
@@ -1363,6 +1393,10 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
         if host_df.empty:
             st.info(f'No predicted interactions for this parasite in {host_label}.')
             return
+        st.markdown(network_legend(host_df['taxid1_label'].iloc[0],
+                                   host_df['source_color'].iloc[0],
+                                   host_label, host_df['target_color'].iloc[0]),
+                    unsafe_allow_html=True)
         filename = f'{selected_parasite}_{host_taxid}_network'
         html_data = ""
         # Save and read graph as HTML file, which is what the download button hands out.

@@ -31,6 +31,12 @@ UNKNOWN_COLOR = '#999999'
 # are sized as if every host had at least this many parasites. Human has 35 against the
 # two of pig, and strictly proportional columns leave pig a strip its labels overrun.
 MIN_COLUMN = 4
+# what the strip under the columns is saying, written once for the four figures that
+# carry it. `niche` is the key in config.yml, but the term the literature uses for the
+# split is the two words themselves, so the caption spells it out instead
+NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives inside a '
+               'host cell or outside one; *both* is a life cycle with an intracellular and '
+               'an extracellular stage in the same host.')
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
@@ -127,20 +133,22 @@ def get_overview_predictions(data_dir, config):
     # the configuration declares it, then name, with an unclassified parasite last
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
     df['name'] = df['taxid1_label'].map(short_name)
+    df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
+        web_utils.UNKNOWN_NICHE)
 
     return df
 
 
-def host_columns(df, band=False):
+def host_columns(df, bands=0):
     '''
     The skeleton the figures are drawn on: one column per host, as wide as the number of
     parasites infecting it, sharing a y axis so a bar or a box can be compared straight
     across the hosts rather than only within one.
 
     :param df: overview predictions, as get_overview_predictions builds them
-    :param bool band: leave a shallow row under the columns for a strip of the taxonomic
-                      group of each parasite, for a figure whose bars carry a colour of
-                      their own and cannot also carry the group
+    :param int bands: shallow rows to leave under the columns for the strips add_band
+                      draws, one per fact about the parasites the bars themselves cannot
+                      carry -- their taxonomic group, their niche -- drawn from row 2 down
     :return: (figure, [(host, its predictions, its parasites in axis order), ...])
     '''
     hosts = []
@@ -151,45 +159,90 @@ def host_columns(df, band=False):
         hosts.append((host, host_df, parasites['name'].tolist()))
 
     widths = [max(len(names), MIN_COLUMN) for _, _, names in hosts]
-    figure = make_subplots(rows=2 if band else 1, cols=len(hosts), shared_yaxes=True,
+    figure = make_subplots(rows=1 + bands, cols=len(hosts), shared_yaxes=True,
                            column_widths=[w / sum(widths) for w in widths],
                            # the titles fill the top row, which is the row of the figure
                            subplot_titles=[host for host, _, _ in hosts],
-                           row_heights=[1 - BAND_HEIGHT, BAND_HEIGHT] if band else None,
-                           # enough of a gap that the strip is read as a second thing about
+                           row_heights=([1 - bands * BAND_HEIGHT] + [BAND_HEIGHT] * bands
+                                        if bands else None),
+                           # enough of a gap that a strip is read as a second thing about
                            # the columns rather than as the foot of the columns themselves
                            vertical_spacing=BAND_GAP, horizontal_spacing=0.02)
 
     return figure, hosts
 
 
-def add_group_band(figure, hosts, palette, labelled):
+def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
+             unknown=UNKNOWN_COLOR):
     '''
-    The strip of taxonomic group under each column, one segment per parasite in the colour
-    the other figures of the page draw that group in. The segments touch, so the strip
-    reads as a strip and the clades under a column are blocks rather than a row of bars.
+    A strip under each column saying one thing about each parasite of it -- the taxonomic
+    group it belongs to, the niche it occupies -- one segment per parasite in the colour
+    the palette gives that value. The segments touch, so the strip reads as a strip and the
+    parasites of a host sharing a value are a block rather than a row of bars.
 
-    The groups get a legend of their own (`legend2`), under the one naming the colours of
-    the bars: the two say different things about different parts of the figure, and in a
-    single row of entries the clades read as more of what the bars are split into.
+    A strip gets a legend of its own, under the one naming the colours of the bars: the two
+    say different things about different parts of the figure, and in a single row of entries
+    the values of the strip read as more of what the bars are split into.
 
-    :param figure: a figure host_columns built with band=True, modified in place
+    :param figure: a figure host_columns built with a band to spare, modified in place
     :param list hosts: the (host, its rows, its parasites in axis order) of host_columns
-    :param dict palette: {taxonomic group: colour}
-    :param set labelled: groups already in the legend, added to as they are drawn
+    :param str field: the column of the frame the strip is drawn from
+    :param dict palette: {value of that column: colour}
+    :param set labelled: values already in the legend, added to as they are drawn
+    :param int row: the row of the figure to draw the strip in, counting the columns as 1
+    :param str legend: the legend its entries belong to
+    :param str unknown: colour for a value the palette does not name
     '''
     for column, (host, host_df, names) in enumerate(hosts, start=1):
-        for group, rows in host_df.groupby('group', observed=True):
+        segments = dict(tuple(host_df.groupby(field, observed=True)))
+        # the palette declares the order the values are read in -- the clades in the order
+        # of the circos, the niches from outside the host cell to inside it -- and anything
+        # it does not name follows behind
+        ordered = ([v for v in palette if v in segments]
+                   + [v for v in segments if v not in palette])
+        for value in ordered:
+            rows = segments[value]
             figure.add_trace(
-                go.Bar(x=rows['name'], y=[1] * len(rows), name=group, width=1,
-                       marker_color=palette.get(group, UNKNOWN_COLOR),
-                       legend='legend2', legendgroup=group,
-                       showlegend=group not in labelled,
-                       hovertemplate='%{x}' f'<extra>{group}</extra>'),
-                row=2, col=column)
-            labelled.add(group)
-        figure.update_xaxes(categoryorder='array', categoryarray=names, row=2, col=column)
-    figure.update_yaxes(visible=False, range=[0, 1], row=2)
+                go.Bar(x=rows['name'], y=[1] * len(rows), name=value, width=1,
+                       marker_color=palette.get(value, unknown),
+                       legend=legend, legendgroup=value,
+                       showlegend=value not in labelled,
+                       hovertemplate='%{x}' f'<extra>{value}</extra>'),
+                row=row, col=column)
+            labelled.add(value)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=row, col=column)
+    figure.update_yaxes(visible=False, range=[0, 1], row=row)
+
+
+def add_niche_band(figure, hosts, labelled):
+    '''
+    The strip of niche under each column -- whether the parasite sits inside a host cell or
+    outside it -- and the two legends a figure needs once it carries one, the colours of the
+    bars above and the colours of the strip below being two keys to two different parts of
+    it.
+
+    Drawn for the figures whose bars are already spending their colour on something else.
+    It says which host proteins the parasite is in a position to reach at all, which is a
+    fact about the parasite and not about the quantity the bars are drawn from, so it
+    belongs under them rather than in them.
+
+    :param figure: a figure host_columns built with a band to spare, modified in place
+    :param list hosts: the (host, its rows, its parasites in axis order) of host_columns
+    :param set labelled: values already in the legend, added to as they are drawn
+    '''
+    add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, labelled,
+             unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+    figure.update_layout(margin=dict(t=125),
+                         legend=dict(y=1.28, title_text='taxonomic group',
+                                     title_font=dict(size=11)),
+                         legend2=dict(orientation='h', yanchor='bottom', y=1.14, x=0,
+                                      title_text=web_utils.NICHE_TITLE,
+                                      title_font=dict(size=11), font=dict(size=11)))
+    # the names belong under the strip, which is the foot of the figure now, and a column
+    # labelled twice is a column labelled once too often. The room they need is taken off
+    # the figure rather than out of the margin, which is where the strip has pushed them
+    figure.update_xaxes(showticklabels=False, row=1)
+    figure.update_xaxes(automargin=True, row=2)
 
 
 def style_host_columns(figure, y_title):
@@ -258,6 +311,8 @@ def get_interactor_proteins(data_dir, config, side, score=None):
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
     df['name'] = df['taxid1_label'].map(short_name)
+    df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
+        web_utils.UNKNOWN_NICHE)
 
     return df
 
@@ -326,7 +381,7 @@ def generate_surface_split_per_parasite(df, palette, y_title='host proteins reac
     moves to the strip under the columns and the clades of a host are read there as blocks
     of colour.
     '''
-    figure, hosts = host_columns(df, band=True)
+    figure, hosts = host_columns(df, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         counted = sum(host_df[surface_class] for surface_class in SURFACE_COLORS)
@@ -342,7 +397,7 @@ def generate_surface_split_per_parasite(df, palette, y_title='host proteins reac
                 row=1, col=column)
             labelled.add(surface_class)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
-    add_group_band(figure, hosts, palette, labelled)
+    add_band(figure, hosts, 'group', palette, labelled)
 
     figure = style_host_columns(figure, y_title)
     # two legends, one above the other and each named, since the colours of the bars and
@@ -405,7 +460,7 @@ def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_tit
                              narrower than its proteins are many comes out as a cloud rather
                              than as points that can be counted
     '''
-    figure, hosts = host_columns(proteins)
+    figure, hosts = host_columns(proteins, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         for group, rows in host_df.groupby('group', observed=True):
@@ -426,10 +481,12 @@ def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_tit
     figure = style_host_columns(figure, y_title)
     figure.update_yaxes(range=[score_floor(cutoff, proteins[score].min()), 1], automargin=True,
                         row=1, col=1)
-    figure.add_hline(y=cutoff, line_width=1, line_dash='dot', line_color='#969696')
-    # the names are as long as the columns are narrow, so the room they need comes off the
-    # figure rather than out of the margin they would otherwise be cut in
-    figure.update_xaxes(automargin=True)
+    # the cut-off belongs to the boxes and not to the strip under them, so it is drawn in
+    # the row of the columns rather than across the whole figure
+    figure.add_hline(y=cutoff, line_width=1, line_dash='dot', line_color='#969696',
+                     row=1, col='all')
+    add_niche_band(figure, hosts, set())
+
     return figure
 
 
@@ -523,7 +580,7 @@ def generate_interactions_per_parasite(df, palette, score):
     :param dict palette: {taxonomic group: colour}
     :param float score: the confidence to count from
     '''
-    figure, hosts = host_columns(df)
+    figure, hosts = host_columns(df, bands=1)
     labelled_groups = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         kept = host_df[host_df['weight'] >= score]
@@ -539,7 +596,10 @@ def generate_interactions_per_parasite(df, palette, score):
             labelled_groups.add(group)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
 
-    return style_host_columns(figure, 'predicted interactions')
+    figure = style_host_columns(figure, 'predicted interactions')
+    add_niche_band(figure, hosts, set())
+
+    return figure
 
 
 @st.cache_data(show_spinner=False)
@@ -562,7 +622,7 @@ def generate_confidence_per_parasite(df, palette, score):
     :param dict palette: {taxonomic group: colour}
     :param float score: where the counts above are cut, drawn as a line
     '''
-    figure, hosts = host_columns(df)
+    figure, hosts = host_columns(df, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         for group, rows in host_df.groupby('group', observed=True):
@@ -577,9 +637,16 @@ def generate_confidence_per_parasite(df, palette, score):
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
 
     figure = style_host_columns(figure, 'confidence score')
+    # the line belongs to the boxes and not to the strip under them, so it is drawn in the
+    # row of the columns rather than across the whole figure
     figure.add_hline(y=score, line_width=1, line_dash='dot', line_color='#969696',
-                     annotation_text='counted above', annotation_position='top left',
-                     annotation_font=dict(size=10, color='#969696'))
+                     row=1, col='all')
+    # the line is drawn in every column and named in the first: an annotation per column is
+    # the same three words written once for each host
+    figure.add_annotation(text='counted above', x=0, y=score, xref='x domain', yref='y',
+                          xanchor='left', yanchor='bottom', showarrow=False,
+                          font=dict(size=10, color='#969696'), row=1, col=1)
+    add_niche_band(figure, hosts, set())
 
     return figure
 
@@ -612,7 +679,7 @@ with st.columns(3)[1]:
 
 st.subheader("Number of predicted interactions per parasite")
 st.caption('Predicted interactions per parasite at or above the confidence set above, grouped '
-           'by host and coloured by parasite taxonomic group.')
+           'by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
 st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, score),
                 width='stretch')
 
@@ -621,7 +688,7 @@ st.caption('Boxplots of the distribution of confidence scores per parasite. Scor
            'the evidence supporting the orthologous interaction from which each prediction was '
            'transferred. Every prediction is counted here, whatever the slider is set to; the '
            'dotted line marks it, so the part of a box above the line is the part of that '
-           'parasite counted in the figure above.')
+           'parasite counted in the figure above. ' + NICHE_STRIP)
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, score),
                 width='stretch')
 
@@ -693,7 +760,7 @@ if parasite_proteins is not None:
                f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
                'what the secretome filter kept these proteins on. Individual proteins are '
                'shown as points behind each box; for parasites with a hundred or more proteins '
-               'the points are read as density.')
+               'the points are read as density. ' + NICHE_STRIP)
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             parasite_proteins[parasite_proteins['surface'].isin(
@@ -713,7 +780,8 @@ if parasite_proteins is not None:
                'proteins are shown as points; boxes over very few proteins (one each for '
                '*G. lamblia* and *V. corneae*) should not be read as distributions. The '
                'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
-               f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}).')
+               f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
+               + NICHE_STRIP)
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             unicellular[unicellular['surface'].isin(

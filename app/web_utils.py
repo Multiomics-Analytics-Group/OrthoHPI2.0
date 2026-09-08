@@ -372,6 +372,45 @@ def classify_surface(localisations):
                      index=localisations.index)
 
 
+# Where a parasite sits relative to the host cell, as `niche` records it in config.yml:
+# which host proteins it is in a position to reach at all. It is not the same statement as
+# `multicellular`, which is about the other side of the interface -- which of the parasite's
+# own proteins are exposed to the host -- and the two are independent: Trichinella is
+# multicellular and intracellular, Trypanosoma brucei unicellular and extracellular.
+# `Both` is a life cycle with an intracellular and an extracellular stage in the same host.
+UNKNOWN_NICHE = 'Unknown'
+# outside the host cell, through to inside it, which is the order the bands and the legend
+# draw the values in
+NICHE_ORDER = ['Extracellular', 'Both', 'Intracellular']
+# Greys, and deliberately not a hue of their own. The clades already have the Okabe-Ito set
+# and the DeepLoc classes the blues, and a third categorical palette beside those two would
+# be read as a third thing the bars are split into rather than as a fact about the parasite
+# under them. A ramp from pale to dark also carries the order of the values, which a set of
+# separate hues would not.
+NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Both': '#7a7a7a', 'Intracellular': '#3d3d3d',
+                UNKNOWN_NICHE: '#f0f0f0'}
+# what the band and its legend are called. `niche` is the config key, but it is not the
+# term the literature uses for this split -- that is the two words themselves -- so the
+# figures name the values rather than the key
+NICHE_TITLE = 'intracellular / extracellular'
+
+
+def get_niches(config):
+    '''
+    The niche of every parasite of the configuration, keyed by the label the predictions
+    name it with, so a figure can annotate a column without reading the config itself.
+
+    :param dict config: parsed configuration
+    :return: {parasite label: one of NICHE_ORDER, or UNKNOWN_NICHE}
+    '''
+    niches = {}
+    for parasite in config.get('parasites', {}).values():
+        niche = str(parasite.get('niche', '')).capitalize()
+        niches[parasite['label']] = niche if niche in NICHE_ORDER else UNKNOWN_NICHE
+
+    return niches
+
+
 def get_host_groups(config, predictions, include_rodents=False):
     '''
     Maps each host species offered in the app to its taxid. Hosts with no predicted

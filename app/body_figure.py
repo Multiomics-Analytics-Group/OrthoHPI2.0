@@ -91,13 +91,15 @@ ORGAN_PARENTS = {
 
 
 @st.cache_data(show_spinner=False)
-def load_figure_tissues(data_dir):
+def load_figure_tissues(data_dir, modified_at):
     '''
     Host proteins annotated with the organs of the body figure, written by
     scripts/build_figure_tissues.py. The file is not part of the older snapshot data
     directories, so a missing one only leaves the figure out.
 
     :param str data_dir: directory holding figure_tissues.parquet
+    :param float modified_at: figure_tissues.parquet modification time, used to invalidate
+                              cached annotations after a rebuild
     :return: dataframe of Gene and Organ, or None when it has not been built
     '''
     input_file = os.path.join(data_dir, 'figure_tissues.parquet')
@@ -447,7 +449,10 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     :param bool compact_human: bring the frontal and side human views closer together
     :param bool title_as_subheader: match the surrounding page's section-heading size
     '''
-    figure_tissues = load_figure_tissues(data_dir)
+    figure_tissues_file = os.path.join(data_dir, 'figure_tissues.parquet')
+    modified_at = (os.path.getmtime(figure_tissues_file)
+                   if os.path.exists(figure_tissues_file) else None)
+    figure_tissues = load_figure_tissues(data_dir, modified_at)
     if figure_tissues is None or df.empty:
         return
 

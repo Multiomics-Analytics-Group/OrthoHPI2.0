@@ -14,6 +14,10 @@ from copy import deepcopy
 
 import pandas as pd
 import streamlit as st
+try:
+    from st_click_detector import click_detector
+except ImportError:  # the figure is still drawn, it just cannot be clicked
+    click_detector = None
 
 import utils
 # the same BTO code -> organ map the annotation was built with, rather than a second copy
@@ -39,6 +43,20 @@ ORGAN_ALIASES = {
 # so it stays the white the figures are drawn in.
 NO_INTERACTIONS_COLOR = '#ffffff'
 PALETTE = ['#deebf7', '#9ecae1', '#6baed6', '#3182bd', '#08519c']
+
+# The organs of a clickable figure are anchors, and the component hands back the id of
+# the one that was clicked. The organ already standing for the tissue filter carries this
+# id instead of its own name, so clicking it a second time clears the filter rather than
+# setting what is already set -- and so two clicks on one organ never send the same value
+# twice, which is what a click has to do to be noticed.
+CLEAR_ORGAN = '__clear__'
+# session_state key the click of each host's figure is stored under, per taxid
+ORGAN_CLICK_KEY = 'organ_click'
+# the outline drawn around the organ the tissue filter is currently set to, and the one a
+# clickable organ takes on hover. The organs are filled by interaction count, so the
+# selection cannot be another fill without saying something about the count
+SELECTED_OUTLINE = '#2b8cbe'
+HOVER_OUTLINE = '#7fc0dd'
 
 # the legend is stripped and redrawn below the figure: it is labelled with the confidence
 # scores of the TISSUES website, which are not what is being shown here, and the pig
@@ -253,6 +271,125 @@ def tissue_organs(config, tissues):
     return organs
 
 
+def organ_tissues(config, organ):
+    """
+    The lifecycle tissues an organ of the figure stands for, which is what clicking it
+    puts in the tissue filter. The inverse of tissue_organs: `liver` selects liver and
+    bile duct, `intestine` the whole gut vocabulary.
+
+    :param dict config: parsed configuration
+    :param str organ: normalized organ name
+    :return: sorted lower-case display names, as the tissue filter offers them
+    """
+    tissues = []
+    for code, tissue in config['tissues'].items():
+        drawn = FIGURE_ORGANS.get(code, ORGAN_PARENTS.get(code))
+        if drawn is not None and ORGAN_ALIASES.get(drawn, drawn) == organ:
+            tissues.append(tissue.lower())
+
+    return sorted(tissues)
+
+
+def clicked_organ(taxids):
+    """
+    The organ clicked on one of the host figures since the last run, or None when the
+    click is one that has already been acted on.
+
+    Each figure keeps its own component value, which the component leaves in place across
+    reruns; an organ is therefore only acted on when the value it is read from changes.
+    Every figure's value is marked as seen whichever one carried the click, so a stale
+    click on a host that has since been hidden cannot fire later.
+
+    :param iterable taxids: taxids of the hosts whose figures were drawn
+    :return: the organ name, CLEAR_ORGAN, or None
+    """
+    organ = None
+    for taxid in taxids:
+        key = f'{ORGAN_CLICK_KEY}_{taxid}'
+        clicked = st.session_state.get(key)
+        if clicked and clicked != st.session_state.get(f'{key}_seen'):
+            st.session_state[f'{key}_seen'] = clicked
+            organ = organ or clicked
+
+    return organ
+
+
+def apply_organ_click(config, taxids, options, key):
+    """
+    Writes the tissues of a clicked organ into the tissue filter, and drops any tissue the
+    selected parasite does not reach -- switching parasite otherwise leaves the filter
+    holding an option it is no longer offered, which streamlit rejects.
+
+    Called before the filter widget is created, since that is the only point at which its
+    value can still be set.
+
+    :param dict config: parsed configuration
+    :param iterable taxids: taxids of the hosts whose figures were drawn
+    :param iterable options: the tissues the filter offers for this parasite
+    :param str key: session_state key of the tissue filter
+    """
+    organ = clicked_organ(taxids)
+    if organ == CLEAR_ORGAN:
+        st.session_state[key] = []
+    elif organ is not None:
+        st.session_state[key] = [tissue for tissue in organ_tissues(config, organ)
+                                 if tissue in options]
+    elif key in st.session_state:
+        st.session_state[key] = [tissue for tissue in st.session_state[key]
+                                 if tissue in options]
+
+
+def link_organs(svg, clickable, selected, config):
+    """
+    Turns the organs of a figure into links the click component can report, and says in
+    the tooltip what clicking one does.
+
+    Every organ the parasite infects is a link, whether or not any interaction reaches it,
+    so the filter can be moved straight from one organ to another rather than having to be
+    cleared in between.
+
+    :param str svg: the shaded figure
+    :param set clickable: organs to link
+    :param set selected: organs the tissue filter is currently set to
+    :param dict config: parsed configuration
+    :return: the figure with its organs wrapped in anchors
+    """
+    root = ET.fromstring(svg)
+    style = ET.Element(f'{{{SVG_NS}}}style')
+    style.text = (f'a {{ cursor: pointer; }} '
+                  f'a:hover [fill] {{ stroke: {HOVER_OUTLINE}; stroke-width: 2; }}')
+    root.insert(0, style)
+
+    # the parents are taken first: the organs are moved inside new elements, and the tree
+    # must not be rearranged while it is being walked
+    organs = [(parent, child) for parent in root.iter() for child in parent
+              if child.get('title')]
+    for parent, element in organs:
+        organ = ORGAN_ALIASES.get(element.get('title'), element.get('title'))
+        if organ not in clickable:
+            continue
+
+        if organ in selected:
+            for shape in element.iter():
+                if shape.get('fill') is not None:
+                    shape.set('stroke', SELECTED_OUTLINE)
+                    shape.set('stroke-width', '2')
+            hint = 'click to clear the tissue filter'
+        else:
+            hint = f"click to filter on {', '.join(organ_tissues(config, organ))}"
+
+        title = element.find(f'{{{SVG_NS}}}title')
+        if title is not None:
+            title.text = f'{title.text} -- {hint}'
+
+        link = ET.Element(f'{{{SVG_NS}}}a', {'id': CLEAR_ORGAN if organ in selected else organ})
+        parent.insert(list(parent).index(element), link)
+        parent.remove(element)
+        link.append(element)
+
+    return inline(ET.tostring(root, encoding='unicode'))
+
+
 def count_interactions(df, figure_tissues):
     '''
     Counts the predicted interactions reaching each organ. An interaction is counted once
@@ -434,7 +571,8 @@ def legend_html(bounds, compact=False):
 
 
 def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
-                     shared_color_scale=False, compact_human=False, title_as_subheader=False):
+                     shared_color_scale=False, compact_human=False, title_as_subheader=False,
+                     clickable=False):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
     predicted interactions reaching them. Each selected host species gets its own figure,
@@ -449,6 +587,8 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                                     host figures
     :param bool compact_human: bring the frontal and side human views closer together
     :param bool title_as_subheader: match the surrounding page's section-heading size
+    :param bool clickable: draw the organs as links that set the tissue filter. The click
+                           is read back by apply_organ_click on the run that follows it
     '''
     figure_tissues_file = os.path.join(data_dir, 'figure_tissues.parquet')
     modified_at = (os.path.getmtime(figure_tissues_file)
@@ -474,9 +614,11 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                    'infecting, so there is nothing to shade.')
         return
 
-    selected_organs = (tissue_organs(config, selected_tissues)
-                       if selected_tissues else infected)
-    shown_organs = infected & selected_organs
+    # the organs the filter is set to, which are outlined on a clickable figure, and the
+    # organs shaded: with nothing selected they are the same, every organ the parasite
+    # infects
+    filtered_organs = tissue_organs(config, selected_tissues) if selected_tissues else set()
+    shown_organs = infected & (filtered_organs or infected)
 
     if title_as_subheader:
         st.subheader('Where the predicted interactions can take place')
@@ -486,7 +628,9 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                'after the confidence score and the tissue filters, and only in the organs '
                'this parasite is recorded as infecting. TISSUES annotates a host protein '
                'to every organ it is detected in, so an interaction is counted in each of '
-               'the ones shown and the organs can add up to more than the network.')
+               'the ones shown and the organs can add up to more than the network.'
+               + (' Click an organ to filter the predictions on the tissues it stands for, '
+                  'and click it again to clear them.' if clickable else ''))
     figures = []
     for taxid, species in drawn:
         svg, organs = load_figure(species)
@@ -500,7 +644,7 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
         # organ the parasite does not infect is not somewhere the interaction can happen.
         counts = {organ: count for organ, count in counts.items()
                   if organ in organs and organ in shown_organs}
-        figures.append((taxid, svg, counts))
+        figures.append((taxid, svg, counts, infected & organs))
 
     if not figures:
         return
@@ -508,18 +652,18 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     shared_bounds = None
     if shared_color_scale:
         shared_counts = {(taxid, organ): count
-                         for taxid, _, counts in figures
+                         for taxid, _, counts, _ in figures
                          for organ, count in counts.items()}
         shared_bounds, _ = color_scale(shared_counts)
 
     if len(figures) > 1:
         labels = st.columns(len(figures))
-        for column, (taxid, _, _) in zip(labels, figures):
+        for column, (taxid, _, _, _) in zip(labels, figures):
             with column:
                 st.caption(config['hosts'][int(taxid)]['label'])
 
     columns = st.columns(len(figures))
-    for column, (taxid, svg, counts) in zip(columns, figures):
+    for column, (taxid, svg, counts, drawn_organs) in zip(columns, figures):
         bounds, highest = (shared_bounds, max(counts.values(), default=0)
                            ) if shared_bounds is not None else color_scale(counts)
 
@@ -528,7 +672,11 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
             figure = bottom_aligned(figure) if shared_color_scale else figure
             if compact_human and not shared_color_scale and get_species(config, taxid) == 'human':
                 figure = compact_human_views(figure)
-            st.markdown(figure, unsafe_allow_html=True)
+            if clickable and click_detector is not None:
+                figure = link_organs(figure, drawn_organs, filtered_organs, config)
+                click_detector(figure, key=f'{ORGAN_CLICK_KEY}_{taxid}')
+            else:
+                st.markdown(figure, unsafe_allow_html=True)
             if highest and not shared_color_scale:
                 st.markdown(legend_html(bounds), unsafe_allow_html=True)
             else:

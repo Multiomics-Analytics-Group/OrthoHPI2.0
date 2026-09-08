@@ -50,6 +50,9 @@ LEGEND_ENTRY = 40
 LEGEND_CHAR = 7.5
 # the smallest the parasite names on the axis of a matrix are written, in points
 SMALLEST_LABEL = 9
+# session key the shared-interactor matrix counts its remounts under, which is what lets
+# the same cell be opened twice running
+CELL_NONCE_KEY = 'shared_cell_nonce'
 
 
 # marker each surface class is drawn with in the shared-interactors matrix, and the order
@@ -367,10 +370,15 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     blank renders as the white the colour scale starts at, so it could not be told from a
     pair sharing nothing. It carries no count, only the name of the parasite.
 
+    Every cell off the diagonal carries an invisible marker as well, which is what a click
+    on it lands on and what its hover is read from, and the index of that trace is returned
+    beside the figure so the page can tell such a click from any other.
+
     :param column: pixels the column holding the figure is on the screen the page is being
                    read on, which web_utils.column_width measures. It is the height that is
                    sized from it -- the width belongs to the column -- so that the square
                    the cells are held to is the whole of the figure rather than a part of it
+    :return: the figure, and the index of the trace holding the clickable cells
     '''
     def flat_scale(values, colors):
         '''
@@ -461,16 +469,14 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                                     y0=-1.4 - offset, dy=1,
                                     text=[list(values)], xgap=1, **scale))
 
-    # the axes count cells rather than name parasites, the strips having to sit a cell out
-    # from the matrix, so the pair a cell stands for is carried in its hover text
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells,
-                                text=[[f'{row} and {other}' for other in y_names]
-                                      for row in y_names],
+    # the counts. The hover of a cell belongs to the clickable layer added below rather
+    # than to this trace: two traces answering the same pointer answer it differently,
+    # and the one that can be clicked is the one that should say what clicking it opens
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells, hoverinfo='skip',
                                 colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
                                             '#3182bd', '#08519c'],
                                 zmin=0, zmax=np.nanmax(counts.to_numpy()),
-                                hovertemplate='%{text}<br>Shared interactors %{z:.0f}'
-                                              '<extra></extra>', hoverongaps=False,
+                                hoverongaps=False,
                                 colorbar=dict(title=dict(text='Shared interactors',
                                                          side='right'),
                                               thickness=12, len=0.6, y=1, yanchor='top',
@@ -489,6 +495,28 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                                 colorscale=[[0, DIAGONAL_COLOUR], [1, DIAGONAL_COLOUR]],
                                 zmin=0, zmax=1, showscale=False, hoverongaps=False,
                                 hovertemplate='%{text}<extra></extra>'))
+
+    # what a click lands on, and what the hover of a cell is read from. A heatmap cell
+    # cannot be clicked at all: Streamlit picks a click up from the selection plotly makes
+    # of it, and a heatmap is not a trace plotly can select anything in, so the click
+    # reaches the page as nothing. A scatter is, so every cell of the matrix carries an
+    # invisible square marker the size of the cell, which puts the whole of the cell in
+    # reach of the pointer. The diagonal is left without one: it stands for no pair.
+    #
+    # The axes count cells rather than name parasites, so a marker is found again by the
+    # cell it sits on -- its x and y are the indices of the two parasites in `counts`.
+    click_targets = [(x, y) for y in cells for x in cells if x != y]
+    figure.add_trace(go.Scatter(
+        x=[x for x, _ in click_targets], y=[y for _, y in click_targets], mode='markers',
+        marker=dict(symbol='square', size=side / span, color='rgba(0,0,0,0)',
+                    line=dict(width=0)),
+        # plotly dims what was not selected, which on a click would leave the one cell
+        # that was clicked lit and wash the rest of the matrix out behind the dialog
+        selected=dict(marker=dict(opacity=1)), unselected=dict(marker=dict(opacity=1)),
+        text=[f'{y_names[y]} and {y_names[x]}<br>Shared interactors '
+              f'{counts.iat[y, x]:.0f}' for x, y in click_targets],
+        hovertemplate='%{text}<extra></extra>', showlegend=False))
+    click_layer = len(figure.data) - 1
 
     # the strips are heatmaps and cannot carry a legend of their own, so their values are
     # named by empty traces whose only purpose is their legend entry. Two legends and not
@@ -535,7 +563,7 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                          legend=dict(y=-0.01, **entries),
                          legend2=dict(y=-0.01 - LEGEND_ROW * clade_rows / side, **entries))
 
-    return figure
+    return figure, click_layer
 
 
 # longest descriptive protein name written beside a gene symbol on the dot matrix. The
@@ -613,6 +641,78 @@ def summarise_localisations(df_pred, localisations):
     called['surface'] = web_utils.classify_surface(called)
 
     return called[['surface', 'cell_membrane', 'extracellular', 'localizations']]
+
+
+@st.dialog('Host interactors shared by a pair of parasites', width='large')
+def show_shared_interactors_dialog(first, second, df_pred, annotations, localisations):
+    '''
+    The host proteins behind one cell of the shared-interactor matrix: the cell gives a
+    count, and this is what the count is made of.
+
+    Opened over the matrix rather than placed under it, as the network page opens the
+    AlphaFold models of an interaction, so that the figures below do not move on every
+    click.
+
+    The rows are host proteins and not gene symbols, since that is what the cell counts:
+    a gene with more than one STRING identifier is more than one interactor of the
+    matrix, and collapsing the two would put a number in the dialog that the cell the
+    dialog was opened from disagrees with. The identifier is written beside the name,
+    which is where the two rows of such a gene are told apart.
+
+    Each parasite has a column of its own, holding the number of its proteins predicted to
+    reach that host protein -- being reached by eighty-six proteins of a parasite and by
+    one are not the same prediction, and the pair is the whole subject here.
+
+    :param first: parasite of the row of the cell that was clicked
+    :param second: parasite of its column
+    :param df_pred: tissue-expressed predictions, as the matrix counted them, so the rows
+                    answer to the number in the cell
+    :param dict annotations: STRING id --> descriptive protein name
+    :param localisations: DeepLoc table, which the surface class is read from
+    '''
+    edges = df_pred[df_pred['taxid1_label'].isin([first, second])]
+    targets = {p: set(df['target']) for p, df in edges.groupby('taxid1_label')}
+    shared = targets.get(first, set()) & targets.get(second, set())
+
+    st.markdown(f'**{first}** and **{second}**', unsafe_allow_html=True)
+    st.caption(f'The {len(shared)} host proteins both parasites are predicted to interact '
+               f'with, at the confidence the page is set to and among the proteins '
+               f'expressed in a tissue each parasite infects. A column counts the proteins '
+               f'of that parasite predicted to reach the host protein.')
+    if not shared:
+        return
+
+    edges = edges[edges['target'].isin(shared)]
+    # one column per parasite, indexed by the host protein: both parasites reach every
+    # protein here, the rows being the ones they share
+    degree = edges.groupby(['taxid1_label', 'target'])['source'].nunique().unstack('taxid1_label')
+    names = edges.drop_duplicates('target').set_index('target')['target_name']
+    labels = label_proteins(edges, annotations)
+
+    table = pd.DataFrame({'Host protein': [labels.get(names[t], names[t]) for t in degree.index],
+                          'Identifier': list(degree.index)})
+    columns = []
+    for parasite in (first, second):
+        # named as the axes of the matrix name a parasite, so a column is read back to the
+        # row or the column of the cell the dialog was opened from
+        column_name = f'{parasite[0]}. {parasite.split(" ")[1]} proteins'
+        table[column_name] = degree[parasite].fillna(0).astype(int).values
+        columns.append(column_name)
+
+    surface = summarise_localisations(edges, localisations)
+    if surface is not None:
+        table['DeepLoc'] = [surface['surface'].get(names[t], NO_LOCALISATION)
+                            for t in degree.index]
+
+    # the proteins reached by the most parasite proteins first: the rows the pair has most
+    # of are the rows the pair is being read for
+    table = table.assign(_reach=table[columns].sum(axis=1)).sort_values(
+        ['_reach', 'Host protein'], ascending=[False, True], kind='stable').drop(columns='_reach')
+
+    st.dataframe(table, width='stretch', hide_index=True)
+    st.download_button('Download table', table.to_csv(index=False).encode('utf-8'),
+                       file_name=f'shared_interactors_{first}_{second}.csv'.replace(' ', '_'),
+                       mime='text/csv')
 
 
 @st.cache_data(show_spinner=False)
@@ -915,7 +1015,8 @@ if selected_host != web_utils.NO_HOST:
                    'run along each axis: the taxonomic group of the parasite, and whether it '
                    'lives inside a host cell or outside one. Whichever the parasites are '
                    'ordered by comes out in blocks. The diagonal, where a parasite meets '
-                   'itself, is greyed out.')
+                   'itself, is greyed out. Click a cell to see the shared host proteins '
+                   'it counts.')
         if shared_counts is not None:
             # the figure is given the width of the column and keeps its cells square within
             # it, so it follows whatever screen the page is read on
@@ -923,8 +1024,32 @@ if selected_host != web_utils.NO_HOST:
             # which is what keeps a square matrix square: stretched, the plot area is squared
             # by plotly on the fly, and it does not undo that when the figure is given its
             # column back after being opened full screen
-            st.plotly_chart(generate_shared_interactor_heatmap(
-                *shared_counts, config.get('parasite_groups', {}), column), width='content')
+            figure, click_layer = generate_shared_interactor_heatmap(
+                *shared_counts, config.get('parasite_groups', {}), column)
+            # The chart is remounted after every dialog, its key carrying a counter. Two
+            # things would otherwise keep the same cell from being opened twice running:
+            # Streamlit drops a selection identical to the one it is already holding, and
+            # plotly reads a second click on a selected point as a deselection. A key that
+            # has changed is a chart holding no selection at all, so the next click on any
+            # cell is a new one.
+            nonce = st.session_state.get(CELL_NONCE_KEY, 0)
+            clicked = st.plotly_chart(
+                figure, width='content', on_select='rerun', selection_mode='points',
+                key=f'shared_cells_{selected_host}_{order_by}_{score}_{nonce}')
+            # only the cells can be clicked, but the figure carries traces that could grow
+            # points of their own, so the layer the click came from is checked
+            cell = next((point for point
+                         in (clicked or {}).get('selection', {}).get('points', [])
+                         if point.get('curve_number') == click_layer), None)
+            if cell is not None:
+                # the axes of the matrix count cells, so the two parasites are the row and
+                # the column the marker sits on
+                parasites = list(shared_counts[0].index)
+                st.session_state[CELL_NONCE_KEY] = nonce + 1
+                show_shared_interactors_dialog(
+                    parasites[int(cell['y'])], parasites[int(cell['x'])], counted,
+                    web_utils.load_protein_annotations(data_dir),
+                    web_utils.load_deeploc_localisations(data_dir))
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 

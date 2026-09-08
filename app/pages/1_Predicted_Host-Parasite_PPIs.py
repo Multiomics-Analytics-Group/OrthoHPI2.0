@@ -29,6 +29,7 @@ networks = []
 selected_tissues = []
 selected_cell_types = []
 selected_surface = []
+surface_options = []
 selected_rows = []
 selected_terms = []
 enrichment_table = None
@@ -160,6 +161,12 @@ HOST, PARASITE = 'Host proteins', 'Parasite proteins'
 # the tissue filter is named so that a click on the body figure can set it: the figure is
 # drawn after the filter is created, so a click only reaches it on the following run
 TISSUE_FILTER_KEY = 'net_tissues'
+
+# the localisation tickboxes are drawn above the network they narrow rather than beside
+# the other filters, so they are named as well: their state has to be read where the
+# predictions are filtered, which is before they are drawn again
+SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
+                       web_utils.EXTRACELLULAR: 'net_surface_extracellular'}
 
 # what the host proteins of the network are tested against. The pipeline's filters are
 # the universe the network was drawn from, and the second option narrows that universe
@@ -550,17 +557,19 @@ def generate_cell_type_filters(df, score):
 
 def generate_surface_filters(df):
     '''
-    The DeepLoc classes the host proteins of this parasite fall in, in the order they are
-    offered: the surface of the host cell first, the space around it second, and the
-    proteins DeepLoc assigns to both last. A class no host protein of this parasite is in
-    is left out, as an empty option filters to an empty network.
+    The DeepLoc classes offered as tickboxes, the surface of the host cell first and the
+    space around it second. The proteins DeepLoc puts in both are not a class of their
+    own here: they are on the membrane and outside it, so they answer to either box and
+    make either one worth offering. A class no host protein of this parasite is in is
+    left out, as an empty option filters to an empty network.
     '''
     if 'target_surface' not in df.columns:
         return []
     present = set(df['target_surface'].dropna())
+    in_both = web_utils.BOTH_SURFACE in present
 
-    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR,
-                        web_utils.BOTH_SURFACE) if c in present]
+    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR)
+            if in_both or c in present]
 
 
 def cell_type_marks(df, score):
@@ -1298,18 +1307,20 @@ with col2:
 
         # localisation is independent of the tissue, so it filters beside the tissues
         # rather than inside them: a host protein is on the cell surface or in the space
-        # around it wherever it is expressed
+        # around it wherever it is expressed. The tickboxes are drawn above the network,
+        # which is what they narrow, so what is read here is the state they were left in
+        # -- Streamlit hands that over before the boxes are drawn again, which is what
+        # makes a tick reach the predictions on the run it is made
         surface_options = generate_surface_filters(df_select)
-        if len(surface_options) > 0:
-            selected_surface = st.multiselect(
-                'Select where DeepLoc places the host proteins', surface_options,
-                help='The host proteins are in the predictions because DeepLoc called them '
-                     'surface-exposed: on the membrane of the host cell, extracellular -- '
-                     'in the matrix and the fluid around it -- or both. Filtering to a class '
-                     'leaves the interactions that can take place there, and drops any '
-                     'parasite protein left with nothing to bind.')
-            if len(selected_surface) > 0:
-                df_select = df_select[df_select['target_surface'].isin(selected_surface)]
+        ticked = [c for c in surface_options
+                  if st.session_state.get(SURFACE_FILTER_KEYS[c])]
+        # ticking both classes leaves every host protein in, exactly as ticking neither
+        # does, so only one ticked box is a filter
+        selected_surface = ticked if len(ticked) == 1 else []
+        if len(selected_surface) > 0:
+            # a protein DeepLoc puts in both classes is in the ticked one as well
+            df_select = df_select[df_select['target_surface'].isin(
+                selected_surface + [web_utils.BOTH_SURFACE])]
 
         annotations = web_utils.load_protein_annotations(data_dir)
         for host_taxid in selected_taxids:
@@ -1422,6 +1433,19 @@ if networks:
     if selected_host == 'Rodent':
         st.caption('Rat and Mouse networks are shown separately; their host nodes use '
                    'their species-specific colors.')
+    if len(surface_options) > 0:
+        st.caption('The host proteins are in the predictions because DeepLoc called them '
+                   'surface-exposed: on the membrane of the host cell, extracellular -- '
+                   'in the matrix and the fluid around it -- or both. Ticking one class '
+                   'leaves the interactions that can take place there, and drops any '
+                   'parasite protein left with nothing to bind; the proteins DeepLoc '
+                   'places in both classes stay whichever one is ticked.')
+        # narrow columns beside each other rather than one box a row, and one column more
+        # than there are boxes so the boxes are not spread across the page
+        boxes = st.columns(len(surface_options) + 2)
+        for box, surface in zip(boxes, surface_options):
+            with box:
+                st.checkbox(surface, key=SURFACE_FILTER_KEYS[surface])
     columns = st.columns(len(networks))
     for column, network in zip(columns, networks):
         with column:

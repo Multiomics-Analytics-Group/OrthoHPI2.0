@@ -28,6 +28,23 @@ UNKNOWN_COLOR = '#999999'
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # side of a cell of the shared-interactor heatmap, in pixels, which is what sizes that figure
 CELL = 22
+# the diagonal of that heatmap, where a parasite meets itself: a mid grey, so that it reads
+# as a boundary between the two halves rather than as a count on the blue scale
+DIAGONAL_COLOUR = '#9e9e9e'
+# the room the colour bar of that heatmap takes to the right of the matrix, in pixels: the
+# gap it is set out from the matrix by, then the bar, the counts written beside it -- about
+# six and a half pixels a digit at ten points -- and its rotated title. The gap is held in
+# pixels, rather than the fraction of the plot a colour bar is set out by by default, so
+# that the room the bar needs is the same on every screen: plotly widens a margin that is
+# short of what sits in it, and a widened right margin is a plot area no longer square
+COLORBAR_GAP = 8
+COLORBAR_ROOM = 71
+COLORBAR_DIGIT = 6.5
+# the room one entry of the group legend takes across the top of that heatmap, in pixels:
+# its marker and the padding around it, and about seven and a half pixels a character of the
+# longest group name -- plotly gives every entry the room the longest of them needs
+LEGEND_ENTRY = 40
+LEGEND_CHAR = 7.5
 # the smallest the parasite names under a matrix are written, in points
 SMALLEST_LABEL = 9
 
@@ -258,8 +275,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
 def get_shared_interactor_counts(df_pred, groups, group_order):
     '''
     Number of host proteins each pair of parasites is predicted to interact with. The
-    diagonal is fixed at the largest off-diagonal count as a visual boundary; every
-    off-diagonal cell is the host proteins shared by that pair.
+    diagonal is left empty -- a parasite shares nothing with itself that is worth counting
+    against a pair -- and every off-diagonal cell is the host proteins shared by that pair.
 
     The parasites are in the order of the dot matrix -- taxonomic group, then name -- so
     that a row is the same parasite in both, and a clade is a block against the diagonal.
@@ -270,9 +287,9 @@ def get_shared_interactor_counts(df_pred, groups, group_order):
     if len(labels) < 3:
         return None
 
-    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels])
-    maximum_shared = np.triu(counts, k=1).max()
-    np.fill_diagonal(counts, maximum_shared)
+    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels],
+                      dtype=float)
+    np.fill_diagonal(counts, np.nan)
 
     return (pd.DataFrame(counts, index=labels, columns=labels),
             [groups.get(g, UNKNOWN_GROUP) for g in labels])
@@ -285,20 +302,21 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
     parasite down the side and along the bottom, so that the two axes are visibly the
     same list of parasites in the same order.
 
-    The cells are square (scaleanchor), which is the other half of reading the matrix as
-    the symmetric thing it is. Squaring them is the axes' work, not the figure's: they are
-    constrained to their domain, so plotly shrinks the plot area to the square the cells
-    need rather than padding the range around it, and the labels come with it. The figure
-    holds its shape on any screen it is opened on, whatever `column` turns out to be wrong
-    about, and what it gets wrong is only the room left blank above the matrix.
+    The cells are square because the figure is sized for it: both axes span the same number
+    of cells and the margins leave the same number of pixels between them, so the square is
+    arithmetic done here rather than a constraint plotly applies as it draws. Constraining
+    the axes to their domain is the more direct way of asking, but the domain plotly settles
+    on is written back into the figure, and Streamlit redraws the figure it last drew rather
+    than the one this function returns: opened full screen and closed again, the matrix came
+    back shrunk to the shape the full screen had wanted, and shrank again on every opening.
 
     The strips are drawn on the axes of the matrix rather than in subplots of their own,
-    which is what keeps them against it: a subplot has a domain of its own, and the plot
-    area shrinking to a square would leave the matrix floating away from its own labels.
+    which is what keeps them against it: a subplot has a domain of its own, and would leave
+    the matrix floating away from its own labels.
 
-    The diagonal carries the maximum shared-interactor count rather than being left
-    blank. Blank renders as the white the colour scale starts at, so it could not be
-    told from a pair sharing nothing.
+    The diagonal is drawn grey by a trace of its own rather than being left blank:
+    blank renders as the white the colour scale starts at, so it could not be told from a
+    pair sharing nothing. It carries no count, only the name of the parasite.
 
     :param column: pixels the column holding the figure is on the screen the page is being
                    read on, which web_utils.column_width measures. It is the height that is
@@ -319,40 +337,11 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
     strip = dict(colorscale=steps, zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
                  hovertemplate='%{text}<extra></extra>')
 
-    figure = go.Figure()
-    # the group of each parasite, beside its row and under its column. x0/y0 put the strip
-    # a cell clear of the matrix, dx/dy give it a cell of its own to fill
-    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1, y=cells,
-                                text=[[c] for c in clades], ygap=1, **strip))
-    figure.add_trace(go.Heatmap(z=[codes], x=cells, y0=len(cells) + 0.4, dy=1,
-                                text=[list(clades)], xgap=1, **strip))
-
-    # the axes count cells rather than name parasites, the strips having to sit a cell out
-    # from the matrix, so the pair a cell stands for is carried in its hover text
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells,
-                                text=[[f'{row} and {other}' for other in y_names]
-                                      for row in y_names],
-                                colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
-                                            '#3182bd', '#08519c'],
-                                zmin=0, zmax=counts.to_numpy().max(),
-                                hovertemplate='%{text}<br>Shared interactors %{z:.0f}'
-                                              '<extra></extra>',
-                                colorbar=dict(title=dict(text='Shared interactors',
-                                                         side='right'),
-                                              thickness=12, len=0.6, y=1, yanchor='top',
-                                              tickfont=dict(size=10))))
-
-    # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
-    # by empty traces whose only purpose is their legend entry
-    for group in shown:
-        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
-                                    marker=dict(size=10, symbol='square', color=palette[group]),
-                                    hoverinfo='skip', showlegend=True))
-
     # the same span on both axes -- the matrix, the strip beside it and the cell between
     # them -- so that a square plot area is one of square cells
     span = len(cells) + 1.6
-    right = 60
+    # the counts beside the colour bar are the whole of what varies in the room it needs
+    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(counts.to_numpy()):.0f}')
 
     # A line of text is about 1.1 times its point size tall, which is the room a cell has to
     # give the label against it. The cells being square, one size would do for both axes --
@@ -383,24 +372,75 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
     x_font = fits(side / span, smallest=SMALLEST_LABEL)
 
     bottom = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
-    # room above the matrix for the group legend, two entries to a row. Left to the 60
-    # pixels a single row needs, plotly makes the room by taking it off the plot, and the
-    # square the cells are held to is that much smaller
-    top = 34 + 22 * -(-len(shown) // 2)
+    # room above the matrix for the group legend. Plotly wraps the entries to the width of
+    # the plot, so the rows they take are counted here rather than assumed: a row that has
+    # not been paid for is one plotly makes by taking it off the plot, and a plot area that
+    # is no longer the square the cells are drawn in
+    entry = LEGEND_ENTRY + LEGEND_CHAR * max(len(group) for group in shown)
+    top = 34 + 22 * -(-len(shown) // max(1, int(side // entry)))
+
+    figure = go.Figure()
+    # the group of each parasite, beside its row and under its column. x0/y0 put the strip
+    # a cell clear of the matrix, dx/dy give it a cell of its own to fill
+    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1, y=cells,
+                                text=[[c] for c in clades], ygap=1, **strip))
+    figure.add_trace(go.Heatmap(z=[codes], x=cells, y0=len(cells) + 0.4, dy=1,
+                                text=[list(clades)], xgap=1, **strip))
+
+    # the axes count cells rather than name parasites, the strips having to sit a cell out
+    # from the matrix, so the pair a cell stands for is carried in its hover text
+    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells,
+                                text=[[f'{row} and {other}' for other in y_names]
+                                      for row in y_names],
+                                colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
+                                            '#3182bd', '#08519c'],
+                                zmin=0, zmax=np.nanmax(counts.to_numpy()),
+                                hovertemplate='%{text}<br>Shared interactors %{z:.0f}'
+                                              '<extra></extra>', hoverongaps=False,
+                                colorbar=dict(title=dict(text='Shared interactors',
+                                                         side='right'),
+                                              thickness=12, len=0.6, y=1, yanchor='top',
+                                              x=1 + COLORBAR_GAP / side,
+                                              tickfont=dict(size=10))))
+
+    # the diagonal, a cell of flat grey per parasite, drawn over the empty cells the count
+    # matrix leaves. Its hover names the parasite alone: the cell stands for no pair, so
+    # there is no shared-interactor count to give. It is laid over the whole grid, one cell
+    # of it drawn and the rest empty, so both traces turn hovering on gaps off -- left on,
+    # the empty cells of whichever trace is on top answer for the cells beneath them
+    diagonal = np.full(counts.shape, np.nan)
+    np.fill_diagonal(diagonal, 0)
+    figure.add_trace(go.Heatmap(z=diagonal, x=cells, y=cells,
+                                text=[[name] * len(y_names) for name in y_names],
+                                colorscale=[[0, DIAGONAL_COLOUR], [1, DIAGONAL_COLOUR]],
+                                zmin=0, zmax=1, showscale=False, hoverongaps=False,
+                                hovertemplate='%{text}<extra></extra>'))
+
+    # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
+    # by empty traces whose only purpose is their legend entry
+    for group in shown:
+        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
+                                    marker=dict(size=10, symbol='square', color=palette[group]),
+                                    hoverinfo='skip', showlegend=True))
 
     # every parasite is named on both axes, however small the cells are drawn: plotly thins
     # tick labels that no longer fit, and a heatmap with every third row labelled cannot be
     # read at all
     ticks = dict(tickmode='array', tickvals=cells, ticks='')
-    figure.update_xaxes(range=[-2, len(cells) - 0.4], constrain='domain',
+    figure.update_xaxes(range=[-2, len(cells) - 0.4],
                         ticktext=x_names, tickangle=-60, tickfont=dict(size=x_font), **ticks)
     # reversed, so that the first parasite is the top row and the diagonal runs the way it
     # is read; the strip along the bottom is the last row of the range, not the first
-    figure.update_yaxes(range=[len(cells) + 1, -0.6], scaleanchor='x', scaleratio=1,
-                        constrain='domain', ticktext=y_names, tickfont=dict(size=font),
-                        **ticks)
+    figure.update_yaxes(range=[len(cells) + 1, -0.6],
+                        ticktext=y_names, tickfont=dict(size=font), **ticks)
 
-    figure.update_layout(height=side + top + bottom, plot_bgcolor='white',
+    # the plot area is `side` pixels each way, the margins holding the labels, the legend
+    # and the colour bar out of it, and that is what makes the cells square. Plotly widens a
+    # margin of its own accord where what sits in it does not fit -- a legend wrapped onto
+    # more rows than there is room for above the matrix -- and the cells are then drawn a
+    # little wider than they are tall, which is the whole of what a bad measurement costs
+    figure.update_layout(width=left + side + right, height=side + top + bottom,
+                         plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left',
                                      x=0, itemclick=False, itemdoubleclick=False,
@@ -699,13 +739,17 @@ if selected_host != web_utils.NO_HOST:
     with matrix:
         st.subheader("Host interactors shared by each pair of parasites")
         st.caption('Number of host interactors shared by each pair of parasites. A strip of '
-                   'the taxonomic group runs along each axis. The diagonal is fixed to the '
-                   'largest shared-interactor count.')
+                   'the taxonomic group runs along each axis. The diagonal, where a '
+                   'parasite meets itself, is greyed out.')
         if shared_counts is not None:
             # the figure is given the width of the column and keeps its cells square within
             # it, so it follows whatever screen the page is read on
+            # the figure carries the width of the column rather than being stretched to it,
+            # which is what keeps a square matrix square: stretched, the plot area is squared
+            # by plotly on the fly, and it does not undo that when the figure is given its
+            # column back after being opened full screen
             st.plotly_chart(generate_shared_interactor_heatmap(
-                *shared_counts, config.get('parasite_groups', {}), column), width='stretch')
+                *shared_counts, config.get('parasite_groups', {}), column), width='content')
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 

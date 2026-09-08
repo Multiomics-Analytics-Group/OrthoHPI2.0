@@ -16,7 +16,7 @@ import utils
 # under) and nothing reads them, since the Streamlit sidebar is hidden in css/style.css.
 PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
          ('Parasites of a host', 'bug', 'pages/2_Compare_Parasites.py'),
-         ('Hosts of a parasite', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
+         ('Multi-host parasites', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
          ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
          ('About', 'info-circle', 'pages/3_About.py')]
 

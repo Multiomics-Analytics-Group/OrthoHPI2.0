@@ -1247,10 +1247,7 @@ with col2:
             st.session_state.pop('net_par', None)
         selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
 
-    # Set info message on initial site load
-    if selected_parasite == "<select>":
-        st.text('Choose 1 parasite to visualize the predicted PPI network')
-    else:
+    if selected_parasite != "<select>":
         df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
         # where DeepLoc puts each host protein, carried on the predictions so the filter

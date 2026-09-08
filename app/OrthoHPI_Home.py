@@ -41,6 +41,21 @@ NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+# the title over a column is the name of the host, and a host with two parasites has a
+# column narrower than its own name. The name is written smaller, and on two lines, until
+# it fits: plotly draws a subplot title at a size of its own choosing and centred, so two
+# of them over two narrow columns are drawn across each other.
+# About 0.55 of the font size a character, the names being proportional text, so this is an
+# average rather than a measurement of the string
+TITLE_CHAR = 0.55
+# and the pixels of a column its title is not written across: the gap between two columns,
+# so that two titles that both fill their columns still have a space between them
+COLUMN_PADDING = 12
+# plotly's own size for a subplot title, which is the largest one is written at here
+TITLE_SIZE = 16
+# and the smallest: below this the name of a host is no longer read, so a column too narrow
+# for it keeps this size and the title is drawn a little wider than the column
+SMALLEST_TITLE = 10
 # share of the height of a figure taken by the strip of taxonomic group under its columns.
 # Enough to read as a band of colour, not enough to be read as a quantity of its own
 BAND_HEIGHT = 0.06
@@ -91,6 +106,48 @@ def short_name(parasite):
     return f'{parasite[0]}. {parasite.split(" ")[1]}'
 
 
+def fit_titles(hosts, rooms):
+    '''
+    The names of the hosts, written to fit the columns they head.
+
+    Three forms, each narrower than the last: the name as it is given, the same over two
+    lines with the common name under the species, and the species abbreviated the way the
+    parasites of the columns are. The one used is whichever can be written largest, and not
+    the first that fits at all: a narrower form is worth the abbreviation when it buys a
+    size, and the widest form that fits is often the one that fits at the smallest size
+    there is.
+
+    One form and one size for the whole figure rather than the widest each column could
+    take on its own. The names are a row of labels across the top of one figure, and a row
+    in which one host is abbreviated and another spelt out, at two sizes and on a different
+    number of lines each, reads as four things rather than as four hosts.
+
+    :param list hosts: the labels of the hosts, `Rattus norvegicus (rat)`, in column order
+    :param list rooms: pixels each of those columns has for its name
+    :return: (the texts, in plotly markup and in the same order, the size to write them at)
+    '''
+    def forms(host):
+        species, _, common = host.partition(' (')
+        common = f'({common}' if common else ''
+        if not common:
+            return [[species]] * 3
+
+        return [[f'{species} {common}'], [species, common], [short_name(species), common]]
+
+    def size_of(lines, room):
+        return min(TITLE_SIZE, int(room / (TITLE_CHAR * max(len(line) for line in lines))))
+
+    written = [[forms(host)[form] for host in hosts] for form in range(3)]
+    # the size a form can be written at is the size its narrowest column allows, and the
+    # form chosen is the one that comes out largest -- the earliest of them where two do,
+    # a name spelt out being worth more than the same name abbreviated at the same size
+    sizes = [min(size_of(lines, room) for lines, room in zip(form, rooms))
+             for form in written]
+    best = sizes.index(max(sizes))
+
+    return ['<br>'.join(lines) for lines in written[best]], max(sizes[best], SMALLEST_TITLE)
+
+
 def host_coverage_caption(data_dir, config):
     '''A compact summary of the post-filter host pools behind cross-host comparisons.'''
     eligible = web_utils.load_eligible_proteins(data_dir)
@@ -139,13 +196,16 @@ def get_overview_predictions(data_dir, config):
     return df
 
 
-def host_columns(df, bands=0):
+def host_columns(df, width, bands=0):
     '''
     The skeleton the figures are drawn on: one column per host, as wide as the number of
     parasites infecting it, sharing a y axis so a bar or a box can be compared straight
     across the hosts rather than only within one.
 
     :param df: overview predictions, as get_overview_predictions builds them
+    :param float width: pixels the figure is drawn across, which is what the names over the
+                        columns are fitted to. A column is a share of it, and the share a
+                        host with two parasites gets is narrower than its own name
     :param int bands: shallow rows to leave under the columns for the strips add_band
                       draws, one per fact about the parasites the bars themselves cannot
                       carry -- their taxonomic group, their niche -- drawn from row 2 down
@@ -168,6 +228,15 @@ def host_columns(df, bands=0):
                            # enough of a gap that a strip is read as a second thing about
                            # the columns rather than as the foot of the columns themselves
                            vertical_spacing=BAND_GAP, horizontal_spacing=0.02)
+
+    # the titles as make_subplots left them are the first annotations of the figure, one per
+    # column and in the order the columns were given. Rewritten rather than passed in
+    # already fitted, since the room a title has is the share of the width its column came
+    # out with, which is settled here
+    texts, size = fit_titles([host for host, _, _ in hosts],
+                             [width * w / sum(widths) - COLUMN_PADDING for w in widths])
+    for title, text in zip(figure.layout.annotations, texts):
+        title.update(text=text, font=dict(size=size))
 
     return figure, hosts
 
@@ -355,7 +424,8 @@ def get_surface_counts(proteins, every=None):
 
 
 @st.cache_data(show_spinner=False)
-def generate_surface_split_per_parasite(df, palette, y_title='host proteins reached',
+def generate_surface_split_per_parasite(df, palette, width,
+                                       y_title='host proteins reached',
                                        hover_noun='the host proteins it reaches'):
     '''
     How a parasite's proteins are split between the surface classes -- cell membrane,
@@ -365,6 +435,7 @@ def generate_surface_split_per_parasite(df, palette, y_title='host proteins reac
 
     :param df: surface counts, as get_surface_counts builds them
     :param dict palette: {taxonomic group: colour} for the strip under the columns
+    :param float width: pixels the figure is drawn across, for the names over the columns
     :param str y_title: what the columns are a proportion of, named down the left
     :param str hover_noun: the same, phrased for the hover of a bar
 
@@ -381,7 +452,7 @@ def generate_surface_split_per_parasite(df, palette, y_title='host proteins reac
     moves to the strip under the columns and the clades of a host are read there as blocks
     of colour.
     '''
-    figure, hosts = host_columns(df, bands=1)
+    figure, hosts = host_columns(df, width, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         counted = sum(host_df[surface_class] for surface_class in SURFACE_COLORS)
@@ -423,7 +494,7 @@ def generate_surface_split_per_parasite(df, palette, y_title='host proteins reac
 
 
 @st.cache_data(show_spinner=False)
-def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_title,
+def generate_surface_scores_per_parasite(proteins, palette, width, score, cutoff, y_title,
                                          point_size=2.5):
     '''
     The spread of the probability itself, before it is a class: one box per parasite over
@@ -451,6 +522,7 @@ def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_tit
 
     :param proteins: the proteins of one surface class, as get_parasite_proteins builds them
     :param dict palette: {taxonomic group: colour}
+    :param float width: pixels the figure is drawn across, for the names over the columns
     :param str score: the probability column to draw
     :param float cutoff: the cut-off of that class, drawn as a dotted line
     :param str y_title: what the probability is called down the left of the figure
@@ -460,7 +532,7 @@ def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_tit
                              narrower than its proteins are many comes out as a cloud rather
                              than as points that can be counted
     '''
-    figure, hosts = host_columns(proteins, bands=1)
+    figure, hosts = host_columns(proteins, width, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         for group, rows in host_df.groupby('group', observed=True):
@@ -491,7 +563,7 @@ def generate_surface_scores_per_parasite(proteins, palette, score, cutoff, y_tit
 
 
 @st.cache_data(show_spinner=False)
-def generate_host_score_boxes(proteins, point_size=3):
+def generate_host_score_boxes(proteins, width, point_size=3):
     '''
     How sure DeepLoc was of the host proteins, one column per surface class and one box per
     host inside it.
@@ -519,6 +591,7 @@ def generate_host_score_boxes(proteins, point_size=3):
     protein of the host and not an interactor of anything.
 
     :param proteins: the host proteins, as get_interactor_proteins(side='target') builds them
+    :param float width: pixels the figure is drawn across, for the names over the columns
     :param float point_size: diameter of a protein drawn beside its box, in pixels
     '''
     counted = proteins.drop_duplicates(['host', 'protein'])
@@ -539,7 +612,7 @@ def generate_host_score_boxes(proteins, point_size=3):
     scored['group_rank'] = scored['host'].map(host_order)
     scored['host'] = scored['surface']
 
-    figure, classes = host_columns(scored)
+    figure, classes = host_columns(scored, width)
     for column, (surface_class, class_df, names) in enumerate(classes, start=1):
         figure.add_trace(
             go.Box(x=class_df['name'], y=class_df['score'], name=surface_class,
@@ -567,7 +640,7 @@ def generate_host_score_boxes(proteins, point_size=3):
 
 
 @st.cache_data(show_spinner=False)
-def generate_interactions_per_parasite(df, palette, score):
+def generate_interactions_per_parasite(df, palette, width, score):
     '''
     How many interactions are predicted for each parasite at or above a confidence, in one
     column per host. Bars are coloured by taxonomic group.
@@ -578,9 +651,10 @@ def generate_interactions_per_parasite(df, palette, score):
 
     :param df: overview predictions, as get_overview_predictions builds them
     :param dict palette: {taxonomic group: colour}
+    :param float width: pixels the figure is drawn across, for the names over the columns
     :param float score: the confidence to count from
     '''
-    figure, hosts = host_columns(df, bands=1)
+    figure, hosts = host_columns(df, width, bands=1)
     labelled_groups = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         kept = host_df[host_df['weight'] >= score]
@@ -603,7 +677,7 @@ def generate_interactions_per_parasite(df, palette, score):
 
 
 @st.cache_data(show_spinner=False)
-def generate_confidence_per_parasite(df, palette, score):
+def generate_confidence_per_parasite(df, palette, width, score):
     '''
     The spread of the confidence score of each parasite's predicted interactions, in the
     same columns and colours as the counts above, so the two figures are read together:
@@ -620,9 +694,10 @@ def generate_confidence_per_parasite(df, palette, score):
 
     :param df: overview predictions, as get_overview_predictions builds them
     :param dict palette: {taxonomic group: colour}
+    :param float width: pixels the figure is drawn across, for the names over the columns
     :param float score: where the counts above are cut, drawn as a line
     '''
-    figure, hosts = host_columns(df, bands=1)
+    figure, hosts = host_columns(df, width, bands=1)
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         for group, rows in host_df.groupby('group', observed=True):
@@ -659,6 +734,11 @@ st.caption('Protein-protein interactions between parasites and their hosts, pred
            'network** shows the network of one host-parasite pair.')
 st.markdown("---")
 
+# the figures are stretched to the page, and the names over their columns have to be
+# written to fit the column each of them came out with, so the page is measured once here
+# and every figure drawn to the width it reports. Nothing waits on it: page_width answers
+# with a laptop until the browser has replied, and the figures are redrawn on the run it does
+page = web_utils.page_width()
 overview = get_overview_predictions(data_dir, config)
 parasite_palette = config.get('parasite_groups', {})
 coverage = host_coverage_caption(data_dir, config)
@@ -680,7 +760,7 @@ with st.columns(3)[1]:
 st.subheader("Number of predicted interactions per parasite")
 st.caption('Predicted interactions per parasite at or above the confidence set above, grouped '
            'by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
-st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, score),
+st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 
 st.subheader("Confidence of the predicted interactions per parasite")
@@ -689,7 +769,7 @@ st.caption('Boxplots of the distribution of confidence scores per parasite. Scor
            'transferred. Every prediction is counted here, whatever the slider is set to; the '
            'dotted line marks it, so the part of a box above the line is the part of that '
            'parasite counted in the figure above. ' + NICHE_STRIP)
-st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, score),
+st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 
 # the localisation figures are drawn twice over: the proportions at the threshold, and the
@@ -718,7 +798,7 @@ if host_proteins is not None:
     st.plotly_chart(
         generate_surface_split_per_parasite(get_surface_counts(host_proteins_kept,
                                                                every=host_proteins),
-                                            parasite_palette), width='stretch')
+                                            parasite_palette, page), width='stretch')
 
 if unicellular is not None and not unicellular.empty:
     st.subheader("Proportion of parasite proteins per localization")
@@ -731,7 +811,7 @@ if unicellular is not None and not unicellular.empty:
     st.plotly_chart(
         generate_surface_split_per_parasite(get_surface_counts(kept_unicellular,
                                                                every=unicellular),
-                                            parasite_palette,
+                                            parasite_palette, page,
                                             y_title='proteins of the parasite',
                                             hover_noun='its proteins'),
         width='stretch')
@@ -749,7 +829,7 @@ if host_proteins is not None:
                'probability of that class. Each host protein is counted once per class, '
                'irrespective of the number of parasites reaching it, and every prediction is '
                'counted whatever the slider is set to.')
-    st.plotly_chart(generate_host_score_boxes(host_proteins), width='stretch')
+    st.plotly_chart(generate_host_score_boxes(host_proteins, page), width='stretch')
 
 if parasite_proteins is not None:
     st.subheader("Localization confidence of extracellular parasite proteins")
@@ -765,7 +845,7 @@ if parasite_proteins is not None:
         generate_surface_scores_per_parasite(
             parasite_proteins[parasite_proteins['surface'].isin(
                 [web_utils.EXTRACELLULAR, web_utils.BOTH_SURFACE])],
-            parasite_palette, 'extracellular',
+            parasite_palette, page, 'extracellular',
             web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR],
             # forty-five columns to a row and up to a hundred and eighty proteins in one of
             # them, so the smallest dot that still carries colour
@@ -786,7 +866,7 @@ if parasite_proteins is not None:
         generate_surface_scores_per_parasite(
             unicellular[unicellular['surface'].isin(
                 [web_utils.CELL_MEMBRANE, web_utils.BOTH_SURFACE])],
-            parasite_palette, 'cell_membrane',
+            parasite_palette, page, 'cell_membrane',
             web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE],
             # a third of the parasites and a fifth of the proteins of the figure above, so
             # the columns are wide enough for the proteins to be told apart

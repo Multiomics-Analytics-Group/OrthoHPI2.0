@@ -1551,7 +1551,8 @@ with st.container():
         enrichment = get_enrichment(df_select[df_select['weight'] >= score], data_dir, side,
                                     background, web_utils.get_config_file())
         if not enrichment.empty:
-            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), horizontal=True,
+            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                           horizontal=True,
                            help='The Benjamini-Hochberg corrected significance a process '
                                 'has to reach to be counted as enriched.')
             # the figures read the columns the enrichment is built with; only the grid and

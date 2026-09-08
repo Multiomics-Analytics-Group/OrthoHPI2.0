@@ -94,6 +94,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     6279:
@@ -146,6 +147,7 @@ parasites:
         color: "#c51b7d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
             - "BTO:0001253"
         hosts:
             - 9606
@@ -165,6 +167,7 @@ parasites:
         color: "#b2df8a"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0000759"
             - "BTO:0000142"
             - "BTO:0000763"
@@ -177,6 +180,7 @@ parasites:
         color: "#9f5511"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0001253"
         hosts:
             - 9606
@@ -187,6 +191,7 @@ parasites:
         color: "#1f78b4"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
             - 10116
@@ -235,6 +240,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     6282:
@@ -256,6 +262,7 @@ parasites:
             - "BTO:0000759"
             - "BTO:0000122"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     36329:
@@ -299,6 +306,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0001418"
             - "BTO:0001158"
+            - "BTO:0000648"
             - "BTO:0000759"
             - "BTO:0000089"
             - "BTO:0000763"
@@ -313,6 +321,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000759"
             - "BTO:0000651"
+            - "BTO:0000648"
             - "BTO:0000763"
             - "BTO:0000089"
         hosts:
@@ -340,6 +349,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000763"
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     60517:
@@ -349,6 +359,7 @@ parasites:
         color: "#ffed6f"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     432359:
@@ -429,6 +440,7 @@ parasites:
         color: "#e7298a"
         tissues:
             - "BTO:0000269"
+            - "BTO:0000648"
         hosts:
             - 9606
     353153:
@@ -439,6 +451,7 @@ parasites:
             - "BTO:0001253"
             - "BTO:0000562"
             - "BTO:0000269"
+            - "BTO:0000648"
             - "BTO:0000887"
             - "BTO:0000089"
             - "BTO:0000439"
@@ -481,6 +494,7 @@ parasites:
         color: "#e6550d"
         tissues:
             - "BTO:0000779"
+            - "BTO:0000648"
             - "BTO:0000089"
         hosts:
             - 10116
@@ -578,6 +592,7 @@ parasites:
         color: "#4d4d4d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606
     353152:
@@ -586,5 +601,6 @@ parasites:
         color: "#99000d"
         tissues:
             - "BTO:0000651"
+            - "BTO:0000648"
         hosts:
             - 9606

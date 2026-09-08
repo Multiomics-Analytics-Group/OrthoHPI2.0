@@ -40,15 +40,15 @@ DIAGONAL_COLOUR = '#9e9e9e'
 COLORBAR_GAP = 8
 COLORBAR_ROOM = 71
 COLORBAR_DIGIT = 6.5
-# the height of one row of a legend above that heatmap, in pixels, which is what the room
-# left above the matrix is counted in
+# the height of one row of a legend below that heatmap, in pixels, which is what the room
+# left under the matrix is counted in
 LEGEND_ROW = 22
-# the room one entry of a legend takes across the top of that heatmap, in pixels:
+# the room one entry of a legend takes across the foot of that heatmap, in pixels:
 # its marker and the padding around it, and about seven and a half pixels a character of the
 # longest name in it -- plotly gives every entry the room the longest of them needs
 LEGEND_ENTRY = 40
 LEGEND_CHAR = 7.5
-# the smallest the parasite names under a matrix are written, in points
+# the smallest the parasite names on the axis of a matrix are written, in points
 SMALLEST_LABEL = 9
 
 
@@ -337,8 +337,13 @@ def get_shared_interactor_counts(df_pred, groups, group_order, niches, order_by)
 def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     '''
     The shared-interactor count matrix, with a strip of the taxonomic group and a strip of
-    the niche of each parasite down the side and along the bottom, so that the two axes are
+    the niche of each parasite down the side and along the top, so that the two axes are
     visibly the same list of parasites in the same order.
+
+    The columns are named above the matrix, outside their own strips, and the two legends
+    sit below it. A name and the two colours that annotate it are then read together
+    rather than from opposite sides of the matrix, and the legends, which belong to no
+    part of the figure in particular, take the room nothing else wants.
 
     Both strips are drawn whichever of them the parasites are ordered on. The one that was
     ordered on comes out in blocks and is the question the figure is being read for; the
@@ -400,7 +405,7 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
 
     # A line of text is about 1.1 times its point size tall, which is the room a cell has to
     # give the label against it. The cells being square, one size would do for both axes --
-    # the names below the matrix are held to a floor of their own, being the only thing that
+    # the names above the matrix are held to a floor of their own, being the only thing that
     # names a column and the first to be lost.
     def fits(room, smallest=6):
         sizes = [size for size in (10, 9, 8, 7, 6) if size >= smallest]
@@ -421,13 +426,16 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     # can be written and again at the size that left them
     font = fits(square(10)[0] / span)
     side, left = square(font)
-    # the names below the matrix are all that names a column, so they are not written
+    # the names above the matrix are all that names a column, so they are not written
     # smaller than they can be read: forty of them run into each other on a narrow screen
     # rather than being drawn at a size nobody can make out on any screen
     x_font = fits(side / span, smallest=SMALLEST_LABEL)
 
-    bottom = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
-    # room above the matrix for the two legends. Plotly wraps the entries to the width of
+    # the room the names of the columns need above the matrix. Rotated sixty degrees they
+    # stand about 0.87 of their length tall, and reach half their length out to the right of
+    # the last column as well, which the margin the colour bar is given has the room for
+    top = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
+    # room below the matrix for the two legends. Plotly wraps the entries to the width of
     # the plot, so the rows they take are counted here rather than assumed: a row that has
     # not been paid for is one plotly makes by taking it off the plot, and a plot area that
     # is no longer the square the cells are drawn in
@@ -438,10 +446,10 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
 
     clade_rows = legend_rows(shown)
     niche_rows = legend_rows(niches_shown)
-    top = 34 + LEGEND_ROW * (clade_rows + niche_rows)
+    bottom = 34 + LEGEND_ROW * (clade_rows + niche_rows)
 
     figure = go.Figure()
-    # the group and the niche of each parasite, beside its row and under its column. x0/y0
+    # the group and the niche of each parasite, beside its row and above its column. x0/y0
     # put a strip a cell clear of the matrix, dx/dy give it a cell of its own to fill. The
     # group is the inner strip of the two, being the one the figure has always carried
     for offset, (values, code_list, scale) in enumerate([(clades, codes, strip),
@@ -450,7 +458,7 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                                     x0=-1.4 - offset, dx=1, y=cells,
                                     text=[[v] for v in values], ygap=1, **scale))
         figure.add_trace(go.Heatmap(z=[code_list], x=cells,
-                                    y0=len(cells) + 0.4 + offset, dy=1,
+                                    y0=-1.4 - offset, dy=1,
                                     text=[list(values)], xgap=1, **scale))
 
     # the axes count cells rather than name parasites, the strips having to sit a cell out
@@ -500,27 +508,32 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     # tick labels that no longer fit, and a heatmap with every third row labelled cannot be
     # read at all
     ticks = dict(tickmode='array', tickvals=cells, ticks='')
-    figure.update_xaxes(range=[-3, len(cells) - 0.4],
+    # named above the matrix, where the strips of a column are. The label starts at the
+    # tick it belongs to and leans up and to the right of it, which is the slant the names
+    # are drawn at under the other figures of the page: the same name is read the same way
+    # wherever on the page it is met
+    figure.update_xaxes(range=[-3, len(cells) - 0.4], side='top',
                         ticktext=x_names, tickangle=-60, tickfont=dict(size=x_font), **ticks)
     # reversed, so that the first parasite is the top row and the diagonal runs the way it
-    # is read; the strips along the bottom are the last rows of the range, not the first
-    figure.update_yaxes(range=[len(cells) + 2, -0.6],
+    # is read; the strips above the columns are drawn before the first row of the matrix,
+    # so the range runs back past them rather than on past the last row
+    figure.update_yaxes(range=[len(cells) - 0.4, -3],
                         ticktext=y_names, tickfont=dict(size=font), **ticks)
 
     # the plot area is `side` pixels each way, the margins holding the labels, the legend
     # and the colour bar out of it, and that is what makes the cells square. Plotly widens a
     # margin of its own accord where what sits in it does not fit -- a legend wrapped onto
-    # more rows than there is room for above the matrix -- and the cells are then drawn a
+    # more rows than there is room for below the matrix -- and the cells are then drawn a
     # little wider than they are tall, which is the whole of what a bad measurement costs
-    # the niche legend sits above the clade one, a row of it clear of the plot, so the
-    # rows counted into `top` are the rows the two of them actually take
-    entries = dict(orientation='h', yanchor='bottom', xanchor='left', x=0, itemclick=False,
+    # the niche legend sits below the clade one, a row of it clear of the plot, so the
+    # rows counted into `bottom` are the rows the two of them actually take
+    entries = dict(orientation='h', yanchor='top', xanchor='left', x=0, itemclick=False,
                    itemdoubleclick=False, font=dict(size=11), title_font=dict(size=11))
     figure.update_layout(width=left + side + right, height=side + top + bottom,
                          plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),
-                         legend=dict(y=1.01, **entries),
-                         legend2=dict(y=1.01 + LEGEND_ROW * clade_rows / side, **entries))
+                         legend=dict(y=-0.01, **entries),
+                         legend2=dict(y=-0.01 - LEGEND_ROW * clade_rows / side, **entries))
 
     return figure
 
@@ -713,10 +726,10 @@ def add_niche_strip(figure, dots, parasites):
     so a band drawn on them would be a row of the matrix and read as one. Shapes hang off
     the axes instead, on the columns in x and on the plot itself in y.
 
-    Above the columns and not under them, which is where the matrix beside it carries its
-    own. The names of the parasites are under the columns, rotated and as long as a species
-    name; a strip below them is a strip adrift from what it annotates, and one above them
-    is a strip drawn over them.
+    Above the columns and not under them, as on the matrix beside it. The names of the
+    parasites are under the columns here, rotated and as long as a species name; a strip
+    below them is a strip adrift from what it annotates, and one above them is a strip
+    drawn over them.
 
     :param figure: the dot plot, modified in place
     :param dots: the frame behind it, carrying a `niche` beside each `parasite`
@@ -755,10 +768,10 @@ def generate_shared_protein_dots(dots, proteins, parasites, most, palette, colum
     assigned it both. The hover carries the two probabilities behind that and everywhere
     else DeepLoc puts the protein.
 
-    Under the columns runs the same niche strip the matrix beside it carries, so that the
+    Above the columns runs the same niche strip the matrix beside it carries, so that the
     two figures are read as the same parasites in the same order. The colour of a dot is
     already spent on the clade and its shape on the localization of the host protein, so
-    the niche has nothing left to be drawn in and goes under the columns instead.
+    the niche has nothing left to be drawn in and goes above the columns instead.
     '''
     localised = 'surface' in dots.columns
     orders = {'parasite': parasites, 'protein': proteins,
@@ -923,7 +936,7 @@ if selected_host != web_utils.NO_HOST:
                        "parasite's proteins reaching it. Proteins reached by a single parasite "
                        'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
                        'protein, circles cell membrane, diamonds extracellular, and hexagons '
-                       'both; hover for the underlying probabilities. The strip under the '
+                       'both; hover for the underlying probabilities. The strip above the '
                        'columns shows whether the parasite lives inside a host cell or '
                        'outside one.')
             st.plotly_chart(

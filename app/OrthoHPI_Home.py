@@ -43,11 +43,6 @@ NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives
 BANDS_STRIP = ('The upper strip below the columns indicates the taxonomic group of the '
                'parasite, the lower one whether it lives inside a host cell or outside '
                'one. ' + INTRACELLULAR_NOTE)
-# what a link between two orthology groups had to carry in one of the two STRING channels
-# to be transferred at all, EVIDENCE_CUTOFF of pipeline/homology.py. Half of it is the foot
-# of the confidence scale, the score being the mean of the two channels: a group link over
-# the cut-off in one channel and absent from the other scores exactly there
-EVIDENCE_CUTOFF = 0.7
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
@@ -918,10 +913,11 @@ st.plotly_chart(
     width='stretch')
 
 st.subheader("Interaction confidence scores")
-st.caption('Boxplots of the distribution of confidence scores per parasite. The scores are '
-           'calculated as the average of the experimental and database evidence channels '
-           'of the KOG-KOG link it was transferred from. The '
-           'dotted line marks the threshold selected in the confidence slider. ' + NICHE_STRIP)
+st.caption('Boxplots of the distribution of confidence scores per parasite. Each score is '
+           'the average of the experimental and database evidence channels of the KOG-KOG '
+           'link the prediction was transferred from. Every prediction is counted here, '
+           'whatever the slider is set to; the dotted line marks the threshold it selects '
+           'instead. ' + NICHE_STRIP)
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 

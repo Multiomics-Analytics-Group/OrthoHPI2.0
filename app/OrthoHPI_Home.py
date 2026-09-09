@@ -21,7 +21,7 @@ data_dir = web_utils.get_data_dir()
 
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
-# the parasite groups the surface split can be drawn for. A multicellular parasite reaches
+# the parasite groups the membrane figure is drawn over. A multicellular parasite reaches
 # its host with secreted proteins alone -- the secretome filter keeps it nothing else -- so
 # its split is the filter and not the parasite; only the unicellular groups have both
 # surface classes open to them
@@ -31,13 +31,18 @@ UNKNOWN_COLOR = '#999999'
 # are sized as if every host had at least this many parasites. Human has 35 against the
 # two of pig, and strictly proportional columns leave pig a strip its labels overrun.
 MIN_COLUMN = 4
-# what the strip under the columns is saying, written once for the four figures that
-# carry it. `niche` is the key in config.yml, but the term the literature uses for the
+# what the strips under the columns are saying, written once for the figures that
+# carry them. `niche` is the key in config.yml, but the term the literature uses for the
 # split is the two words themselves, so the caption spells it out instead
+INTRACELLULAR_NOTE = ('A parasite with an intracellular stage in the host counts as '
+                      'intracellular, since the reach of that stage is the wider of the two.')
 NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives inside a '
-               'host cell or outside one. A parasite with an intracellular stage in the '
-               'host counts as intracellular, since the reach of that stage is the wider '
-               'of the two.')
+               'host cell or outside one. ' + INTRACELLULAR_NOTE)
+# and the same for the counts figure, which carries the taxonomic group under the columns as
+# well, its bars having spent their colour on the localization classes
+BANDS_STRIP = ('The upper strip below the columns indicates the taxonomic group of the '
+               'parasite, the lower one whether it lives inside a host cell or outside '
+               'one. ' + INTRACELLULAR_NOTE)
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
@@ -70,11 +75,22 @@ SURFACE_COLORS = web_utils.LOCALISATION_COLORS
 # outline the reader has to look for. No entry for the mixed classes, drawn as bars only
 SURFACE_LINE_COLORS = {'Extracellular': '#3690c0', 'Cell membrane': '#045a8d',
                        'Cytoplasm': '#e6550d', 'Nucleus': '#a63603'}
-# the classes each of the two split figures is drawn over, and so the bars of its columns
-# and the entries of its legend. The host side carries the four classes its filter reads;
-# the parasite side the surface pair, which is all the secretome filter selected on
+# the classes each side of an interaction is split over, and so the segments of a bar and
+# the entries of the legend. The host side carries the four classes its filter reads; the
+# parasite side the surface pair, which is all the secretome filter selected on
 HOST_SPLIT_CLASSES = web_utils.HOST_CLASSES + (web_utils.SEVERAL,)
 PARASITE_SPLIT_CLASSES = web_utils.SURFACE_CLASSES + (web_utils.BOTH_SURFACE,)
+# An interaction has a protein at either end of it, so the counts figure can be split by
+# either: what the parasite reaches its host with, or what of the host it reaches. Each is
+# read on the classes its own filter allowed, which is why the two are not the same list.
+# The label is what the toggle over the figure offers, the host side first as the side the
+# parasites can be compared on -- the parasite side is partly the secretome filter
+SPLIT_SIDES = {'Host proteins': ('target', HOST_SPLIT_CLASSES),
+               'Parasite proteins': ('source', PARASITE_SPLIT_CLASSES)}
+# and whether a column is a count or its own 100%. The counts run from 39 interactions to
+# two and a half thousand, so the split of the smaller parasites is only legible in shares,
+# while the counts are what the figure is about
+BAR_SCALES = ('Counts', 'Share')
 # how far under the lowest thing a probability scale has to show -- its cut-off, or a point
 # below it -- the scale starts. Enough that the line and the points sitting on it are not
 # drawn against the axis itself
@@ -170,7 +186,8 @@ def get_overview_predictions(data_dir, config):
 
     :param str data_dir: directory holding predictions.parquet
     :param dict config: parsed configuration
-    :return: one row per predicted interaction, with host, parasite, group and weight
+    :return: one row per predicted interaction, with host, parasite, group, niche, weight
+             and the two proteins it is between
     '''
     predictions = web_utils.load_predictions(data_dir)
     groups = {p['label']: p.get('group', UNKNOWN_GROUP) for p in config['parasites'].values()}
@@ -179,7 +196,7 @@ def get_overview_predictions(data_dir, config):
     frames = []
     for taxid, host in config['hosts'].items():
         frame = predictions.loc[predictions['taxid2'] == str(taxid),
-                                ['taxid1_label', 'weight']]
+                                ['taxid1_label', 'weight', 'source', 'target']]
         if not frame.empty:
             frames.append(frame.assign(host=host['label']))
     df = pd.concat(frames, ignore_index=True)
@@ -286,6 +303,42 @@ def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
     figure.update_yaxes(visible=False, range=[0, 1], row=row)
 
 
+def add_group_and_niche_bands(figure, hosts, palette):
+    '''
+    Two strips under each column for the figure whose bars are split by localization: the
+    taxonomic group of each parasite, and under it its niche. The colour of the bars is
+    spent on the classes, so both facts about the parasite itself move below the columns,
+    the clades of a host reading as blocks of colour in the upper strip.
+
+    Three legends then, one per key: the classes the bars are split into on top, the clades
+    of the upper strip under it, and the niche of the lower strip last, in the order the
+    three parts of the figure are met going down it.
+
+    :param figure: a figure host_columns built with two bands to spare, modified in place
+    :param list hosts: the (host, its rows, its parasites in axis order) of host_columns
+    :param dict palette: {taxonomic group: colour}
+    '''
+    add_band(figure, hosts, 'group', palette, set(), row=2, legend='legend2')
+    add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=3, legend='legend3',
+             unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+    figure.update_layout(height=520, margin=dict(t=175),
+                         legend=dict(y=1.42, title_text='DeepLoc',
+                                     title_font=dict(size=11)),
+                         legend2=dict(orientation='h', yanchor='bottom', y=1.28, x=0,
+                                      title_text='taxonomic group',
+                                      title_font=dict(size=11), font=dict(size=11)),
+                         legend3=dict(orientation='h', yanchor='bottom', y=1.14, x=0,
+                                      title_text=web_utils.NICHE_TITLE,
+                                      title_font=dict(size=11), font=dict(size=11)))
+    # the names belong under the strips, which are the foot of the figure now, and a column
+    # labelled three times is a column labelled twice too often
+    figure.update_xaxes(showticklabels=False, row=1)
+    figure.update_xaxes(showticklabels=False, row=2)
+    figure.update_xaxes(automargin=True, row=3)
+    # and the same for the counts down the left, which the strips have pushed off the figure
+    figure.update_yaxes(automargin=True, row=1, col=1)
+
+
 def add_niche_band(figure, hosts, labelled):
     '''
     The strip of niche under each column -- whether the parasite sits inside a host cell or
@@ -331,8 +384,71 @@ def style_host_columns(figure, y_title):
     return figure
 
 
+def classify_side(df, side):
+    '''
+    Which localization class DeepLoc puts the protein of `side` in, read on the classes
+    that side was filtered on.
+
+    The parasite side went through the secretome filter, which reads the surface pair
+    alone, so every parasite protein is read on the same two classes. The host side went
+    through apply_deeploc_filter, which reads the classes the niche of the parasite allowed
+    -- the surface pair for every parasite, the cytosol and the nucleus for the
+    intracellular ones on top -- so a host protein is classified once per parasite reaching
+    it and not once for itself: the same membrane protein is a cell membrane protein under
+    every parasite, and a cytosolic one as well only under the parasites let into the
+    cytosol.
+
+    :param df: rows carrying the DeepLoc probabilities and, for the host side, the `niche`
+               of the parasite each row belongs to
+    :param str side: 'source' for the parasite protein, 'target' for the host protein
+    :return: series of class names, aligned to the rows given
+    '''
+    if side == 'source':
+        return web_utils.classify_localisation(df, web_utils.SURFACE_CLASSES,
+                                               web_utils.BOTH_SURFACE)
+
+    surface = pd.Series(web_utils.NOT_SURFACE, index=df.index)
+    for niche, rows in df.groupby('niche'):
+        surface.loc[rows.index] = web_utils.classify_localisation(
+            rows, web_utils.niche_classes(niche), web_utils.SEVERAL)
+
+    return surface
+
+
 @st.cache_data(show_spinner=False)
-def get_interactor_proteins(data_dir, config, side, score=None):
+def get_interaction_localisations(df, data_dir, side):
+    '''
+    The overview predictions with the localization class of one of the two proteins each
+    interaction is between, so the bars counting the interactions can be split by where
+    that protein sits.
+
+    One row per interaction and not per protein, which is what makes this the same quantity
+    the bars already draw: the column keeps its height and only gains a split. The protein
+    tables below count a protein once however many interactions it is in, and answer a
+    different question -- what a parasite reaches -- from this one, which is where the
+    predictions themselves land.
+
+    An interaction whose protein the DeepLoc table does not carry keeps its place in the
+    count as NOT_SURFACE rather than being dropped, so the bars stay the counts of the
+    figure above them whatever the localisations cover.
+
+    :param df: overview predictions, as get_overview_predictions builds them
+    :param str data_dir: directory holding the localisations
+    :param str side: 'source' for the parasite proteins, 'target' for the host proteins
+    :return: the predictions with a `surface` column, or None without a localisation table
+    '''
+    localisations = web_utils.load_deeploc_localisations(data_dir)
+    if localisations.empty:
+        return None
+
+    df = df.merge(localisations, left_on=side, right_on='protein', how='left')
+    df['surface'] = classify_side(df, side)
+
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def get_interactor_proteins(data_dir, config, side):
     '''
     One side of the predicted interactions, protein by protein, with what DeepLoc says
     about where each protein sits: the probability of each localization class the side was
@@ -357,11 +473,6 @@ def get_interactor_proteins(data_dir, config, side, score=None):
     :param str data_dir: directory holding predictions.parquet and the localisations
     :param dict config: parsed configuration
     :param str side: 'source' for the parasite proteins, 'target' for the host proteins
-    :param score: keep only the proteins of interactions predicted at or above this
-                  confidence, or None for every prediction. The figures of the page take
-                  it both ways: the proportions are read at the threshold, the boxes of
-                  the probability itself at every prediction, since a box standing on the
-                  eight proteins a threshold leaves is not a distribution
     :return: one row per host, parasite and protein, or None without a localisation table
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
@@ -369,8 +480,6 @@ def get_interactor_proteins(data_dir, config, side, score=None):
         return None
 
     predictions = web_utils.load_predictions(data_dir)
-    if score is not None:
-        predictions = predictions[predictions['weight'] >= score]
     frames = []
     for taxid, host in config['hosts'].items():
         frame = predictions.loc[predictions['taxid2'] == str(taxid),
@@ -388,133 +497,9 @@ def get_interactor_proteins(data_dir, config, side, score=None):
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
         web_utils.UNKNOWN_NICHE)
 
-    if side == 'source':
-        df['surface'] = web_utils.classify_localisation(df, web_utils.SURFACE_CLASSES,
-                                                        web_utils.BOTH_SURFACE)
-    else:
-        # a host protein is read on the classes the niche of the parasite reaching it
-        # allowed, so it is classified per parasite and not once for the table: the same
-        # membrane protein is a cell membrane protein under every parasite, and a cytosolic
-        # one as well only under the parasites that were let into the cytosol
-        df['surface'] = web_utils.NOT_SURFACE
-        for niche, rows in df.groupby('niche'):
-            df.loc[rows.index, 'surface'] = web_utils.classify_localisation(
-                rows, web_utils.niche_classes(niche), web_utils.SEVERAL)
+    df['surface'] = classify_side(df, side)
 
     return df
-
-
-@st.cache_data(show_spinner=False)
-def get_surface_counts(proteins, classes, every=None):
-    '''
-    How many of each parasite's proteins fall in each of the localization classes.
-
-    The figure splits its columns over the assigned classes alone, so a parasite is
-    measured on what was called rather than on how much of the proteome the model was sure
-    about. The proteins in neither class are counted here all the same and are read in the
-    hover; a parasite with nothing in any of them has no column, which on the host side
-    happens to nobody -- every host protein is here because it was called at least one.
-
-    :param proteins: the proteins of one side, as get_interactor_proteins builds them
-    :param classes: the classes that side is split by, HOST_SPLIT_CLASSES or
-                    PARASITE_SPLIT_CLASSES, so a class nothing was called for is still a
-                    column of the table and an entry in the legend of the figure
-    :param every: the same proteins before the confidence threshold, to keep a parasite the
-                  threshold emptied as a column with nothing in it. Dropping it instead
-                  would take a column out of this figure and leave it in the figures above
-                  and below, which are read across the page as the same columns
-    :return: one row per host and parasite
-    '''
-    counts = proteins.pivot_table(index=['host', 'taxid1_label', 'name', 'group',
-                                         'group_rank'],
-                                  columns='surface', values='protein', aggfunc='count',
-                                  fill_value=0)
-    for surface_class in list(classes) + [web_utils.NOT_SURFACE]:
-        if surface_class not in counts.columns:
-            counts[surface_class] = 0
-    counts = counts.reset_index()
-
-    if every is not None:
-        keys = ['host', 'taxid1_label', 'name', 'group', 'group_rank']
-        counts = (every[keys].drop_duplicates()
-                  .merge(counts, on=keys, how='left').fillna(0))
-
-    return counts
-
-
-@st.cache_data(show_spinner=False)
-def generate_surface_split_per_parasite(df, palette, width, classes,
-                                       y_title='host proteins reached',
-                                       hover_noun='the host proteins it reaches'):
-    '''
-    How a parasite's proteins are split between the localization classes, in the same
-    columns and the same order as the figures around it, so they are read together. Drawn
-    for either side: the host proteins a parasite reaches, split over the four classes its
-    filter reads, or the proteins of the parasite itself, split over the surface pair the
-    secretome filter selected on.
-
-    :param df: surface counts, as get_surface_counts builds them
-    :param dict palette: {taxonomic group: colour} for the strip under the columns
-    :param float width: pixels the figure is drawn across, for the names over the columns
-    :param classes: the classes to stack, in the order they are stacked in
-    :param str y_title: what the columns are a proportion of, named down the left
-    :param str hover_noun: the same, phrased for the hover of a bar
-
-    Every column is the whole of what that parasite reaches on its host and is split up by
-    where DeepLoc puts those proteins, so the columns are compared on the split itself
-    rather than on how many proteins a parasite reaches. The two blues are the surface of
-    the host cell and the fluid and matrix around it, the two oranges the inside of the
-    cell, and the purple the proteins DeepLoc puts in more than one place at once.
-
-    On the host side the split is read against the niche in the strip below it, and the two
-    say different things. The niche is what the filter allowed: the oranges can only appear
-    under an intracellular parasite, apply_deeploc_filter keeping the cytosol and the
-    nucleus for those alone. How much orange there is, and how the blue above it divides,
-    is then a difference between parasites that were allowed the same classes.
-
-    The colour is spent on the classes, so the taxonomic group each parasite belongs to
-    moves to the strip under the columns and the clades of a host are read there as blocks
-    of colour.
-    '''
-    figure, hosts = host_columns(df, width, bands=1)
-    labelled = set()
-    for column, (host, host_df, names) in enumerate(hosts, start=1):
-        counted = sum(host_df[surface_class] for surface_class in classes)
-        for surface_class in classes:
-            figure.add_trace(
-                go.Bar(x=host_df['name'], y=host_df[surface_class] / counted,
-                       name=surface_class, marker_color=SURFACE_COLORS[surface_class],
-                       customdata=host_df[[surface_class]],
-                       legendgroup=surface_class, showlegend=surface_class not in labelled,
-                       hovertemplate='%{x}<br>%{y:.0%} of ' + hover_noun +
-                                     ' (%{customdata[0]} of them)'
-                                     f'<extra>{surface_class}</extra>'),
-                row=1, col=column)
-            labelled.add(surface_class)
-        figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
-    add_band(figure, hosts, 'group', palette, labelled)
-
-    figure = style_host_columns(figure, y_title)
-    # two legends, one above the other and each named, since the colours of the bars and
-    # the colours of the strip are two different keys to two different parts of the figure
-    figure.update_layout(barmode='stack', bargap=0.2, margin=dict(t=125),
-                         legend=dict(y=1.28, title_text='DeepLoc',
-                                     title_font=dict(size=11)),
-                         legend2=dict(orientation='h', yanchor='bottom', y=1.14, x=0,
-                                      title_text='taxonomic group',
-                                      title_font=dict(size=11), font=dict(size=11)))
-    figure.update_yaxes(range=[0, 1], tickformat='.0%', row=1)
-    # the names belong under the strip, which is the foot of the figure now, and a column
-    # labelled twice is a column labelled once too often. The room they need is taken off
-    # the figure rather than out of the margin, which is where the strip has pushed them
-    figure.update_xaxes(showticklabels=False, row=1)
-    figure.update_xaxes(automargin=True, row=2)
-    # and the same for the percentages down the left, which the two figures above have no
-    # room for either -- there they are a count anyone can read off the bars, here they
-    # are the scale the split is read on
-    figure.update_yaxes(automargin=True, row=1, col=1)
-
-    return figure
 
 
 @st.cache_data(show_spinner=False)
@@ -685,14 +670,87 @@ def generate_host_score_boxes(proteins, width, point_size=3):
 
 
 @st.cache_data(show_spinner=False)
-def generate_interactions_per_parasite(df, palette, width, score):
+def generate_interactions_per_parasite(df, palette, width, score, classes=None, share=False):
     '''
     How many interactions are predicted for each parasite at or above a confidence, in one
-    column per host. Bars are coloured by taxonomic group.
+    column per host, split by where DeepLoc puts the protein on one side of each of them.
 
     The columns are laid out from every prediction and only the bars are thresholded, so a
     parasite left with nothing keeps its place on the axis and is read as an absence rather
     than disappearing out of a figure the one below it still draws it in.
+
+    A bar is still the interactions of a parasite and the stack is the same interactions
+    divided up, so the figure is read two ways at once: how much a parasite is predicted to
+    interact, and where those interactions land. `share` normalises each column to itself
+    and asks the second question alone -- the counts run from 39 interactions to two and a
+    half thousand, and a segment of the smallest column is invisible beside the largest.
+
+    On the host side the split is read against the niche in the lower strip, and the two say
+    different things. The niche is what the filter allowed: the oranges can only appear
+    under an intracellular parasite, apply_deeploc_filter keeping the cytosol and the
+    nucleus for those alone. How much orange there is, and how the blue divides, is then a
+    difference between parasites that were allowed the same classes.
+
+    :param df: overview predictions, with a `surface` column where the bars are to be split
+    :param dict palette: {taxonomic group: colour}
+    :param float width: pixels the figure is drawn across, for the names over the columns
+    :param float score: the confidence to count from
+    :param classes: the classes to stack, in the order they are stacked in, or None to
+                    colour whole bars by taxonomic group instead -- which is what a data
+                    directory without a localisation table is left with
+    :param bool share: draw each column as its own 100% rather than as a count
+    '''
+    if classes is None:
+        return generate_interactions_by_group(df, palette, width, score)
+
+    # a class nothing was called for is still an entry of the legend, so the two sides are
+    # read on the classes their filter allowed and not on the ones that happen to be full.
+    # NOT_SURFACE is not one of them: it is a protein the localisations do not carry, kept
+    # in the count so the column stays the count, and drawn only where there is one
+    classes = list(classes)
+    if (df['surface'] == web_utils.NOT_SURFACE).any():
+        classes.append(web_utils.NOT_SURFACE)
+
+    figure, hosts = host_columns(df, width, bands=2)
+    labelled = set()
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        kept = host_df[host_df['weight'] >= score]
+        counts = (kept.pivot_table(index='name', columns='surface', values='weight',
+                                   aggfunc='count', fill_value=0)
+                  .reindex(index=names, columns=classes, fill_value=0).fillna(0))
+        # the whole column, which a segment is a share of and which the hover names: a
+        # parasite the threshold emptied has none, and is drawn as the absence it is
+        total = counts.sum(axis=1).replace(0, pd.NA)
+        for surface_class in classes:
+            figure.add_trace(
+                go.Bar(x=counts.index, y=counts[surface_class] / total if share
+                                         else counts[surface_class],
+                       name=surface_class, marker_color=SURFACE_COLORS[surface_class],
+                       customdata=pd.DataFrame({'n': counts[surface_class],
+                                                'share': counts[surface_class] / total}),
+                       legendgroup=surface_class, showlegend=surface_class not in labelled,
+                       hovertemplate='%{x}<br>%{customdata[0]} predicted interactions '
+                                     '(%{customdata[1]:.0%} of the parasite)'
+                                     f'<extra>{surface_class}</extra>'),
+                row=1, col=column)
+            labelled.add(surface_class)
+        figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
+
+    figure = style_host_columns(figure, 'share of predicted interactions' if share
+                                        else 'predicted interactions')
+    figure.update_layout(barmode='stack', bargap=0.2)
+    if share:
+        figure.update_yaxes(range=[0, 1], tickformat='.0%', row=1)
+    add_group_and_niche_bands(figure, hosts, palette)
+
+    return figure
+
+
+def generate_interactions_by_group(df, palette, width, score):
+    '''
+    The same counts with nothing to split them by: whole bars in the colour of the parasite's
+    taxonomic group, with the niche in the one strip under them. What a data directory
+    without a DeepLoc table is drawn as.
 
     :param df: overview predictions, as get_overview_predictions builds them
     :param dict palette: {taxonomic group: colour}
@@ -799,17 +857,60 @@ if coverage:
 # takes the whole width of the page, which is a metre of track for a range of half a point
 with st.columns(3)[1]:
     score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                      help='Interactions predicted below this confidence are left out of '
-                           'the counts and the proportions. The boxplots keep every '
-                           'prediction: the confidence figure draws this threshold as a '
-                           'line instead, and the localization figures stand on too few '
-                           'proteins to be thresholded as well.')
+                      help='Interactions predicted below this confidence are left out '
+                           'of the counts and of the localization split drawn on them. The '
+                           'boxplots keep every prediction: the confidence figure draws '
+                           'this threshold as a line instead, and the localization ones '
+                           'stand on too few proteins to be thresholded as well.')
 
 st.subheader("Number of predicted interactions per parasite")
-st.caption('Predicted interactions per parasite at or above the confidence set above, grouped '
-           'by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
-st.plotly_chart(generate_interactions_per_parasite(overview, parasite_palette, page, score),
-                width='stretch')
+# the two toggles over the figure: which end of the interaction the bars are split by, and
+# whether the columns are counts or shares. Narrow columns, since a segmented control left
+# to itself is stretched over the width of the page
+controls = st.columns([1.4, 1, 1.6])
+with controls[0]:
+    split_side = st.segmented_control(
+        'Colour by the localization of', list(SPLIT_SIDES), default=list(SPLIT_SIDES)[0],
+        key='split_side',
+        help='Every prediction is between one parasite protein and one host protein, and '
+             'the bars can be split by where DeepLoc 2 puts either of them.')
+with controls[1]:
+    bar_scale = st.segmented_control(
+        'Bars show', BAR_SCALES, default=BAR_SCALES[0], key='bar_scale',
+        help='Counts are the predicted interactions themselves; shares divide each column '
+             'by its own total, which is how the split of a parasite with few interactions '
+             'is compared with one that has thousands.')
+side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
+interactions = get_interaction_localisations(overview, data_dir, side)
+
+if interactions is None:
+    st.caption('Predicted interactions per parasite at or above the confidence set above, '
+               'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
+elif side == 'target':
+    st.caption('Predicted interactions per parasite at or above the confidence set above, '
+               'grouped by host and split by the subcellular localization DeepLoc 2 '
+               'predicts for the host protein of each interaction, over the four classes '
+               'the host filter reads — extracellular, cell membrane, cytoplasm and '
+               'nucleus. Each parasite is read on the classes its niche let the filter keep '
+               'a host protein for: the surface pair for every parasite, the cytosol and '
+               'the nucleus for the ones with an intracellular stage, which is why the two '
+               'oranges appear under those alone. A host protein called for more than one '
+               'of the classes its parasite can reach is counted as several. ' + BANDS_STRIP)
+else:
+    st.caption('Predicted interactions per parasite at or above the confidence set above, '
+               'grouped by host and split by the localization DeepLoc 2 assigns the '
+               'parasite protein of each interaction — cell membrane, extracellular, '
+               'or both. The secretome filter admits a multicellular parasite nothing but '
+               'its secreted proteins, so under the cestodes, nematodes and trematodes the '
+               'split is the filter rather than the parasite; only the unicellular '
+               'parasites had both classes open to them. ' + BANDS_STRIP)
+
+st.plotly_chart(
+    generate_interactions_per_parasite(overview if interactions is None else interactions,
+                                       parasite_palette, page, score,
+                                       classes=None if interactions is None else split_classes,
+                                       share=bar_scale == BAR_SCALES[1]),
+    width='stretch')
 
 st.subheader("Confidence of the predicted interactions per parasite")
 st.caption('Boxplots of the distribution of confidence scores per parasite. Scores derive from '
@@ -820,58 +921,16 @@ st.caption('Boxplots of the distribution of confidence scores per parasite. Scor
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 
-# the localisation figures are drawn twice over: the proportions at the threshold, and the
-# boxes of the probability itself on every prediction. At 0.7 a parasite is left a median
-# of seventeen host proteins and eight of its own, which a proportion can still be read
-# off and a box cannot. The two proportions are drawn together, being the same split read
-# on the two sides of the interaction, and the boxes follow underneath
+# the boxes of the probability itself, one protein per row rather than one interaction:
+# they are asking how sure DeepLoc was of a protein, which the interactions it turns up in
+# do not bear on. Drawn on every prediction and not at the threshold, since at 0.7 a
+# parasite is left a median of eight of its own proteins, which is not a distribution
 host_proteins = get_interactor_proteins(data_dir, config, 'target')
 parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
-host_proteins_kept = get_interactor_proteins(data_dir, config, 'target', score)
-parasite_proteins_kept = get_interactor_proteins(data_dir, config, 'source', score)
-# the parasite figures are drawn over the unicellular parasites alone, which both the
-# proportion and the membrane boxes below need, so the subsets are taken once here
-unicellular = kept_unicellular = None
+# the membrane figure is drawn over the unicellular parasites alone
+unicellular = None
 if parasite_proteins is not None:
     unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
-    kept_unicellular = parasite_proteins_kept[
-        parasite_proteins_kept['group'].isin(UNICELLULAR_GROUPS)]
-
-if host_proteins is not None:
-    st.subheader("Proportion of host proteins per localization")
-    st.caption('Subcellular localization predicted by DeepLoc 2 for the host proteins each '
-               'parasite reaches at or above the confidence set above, divided into the four '
-               'classes the host filter reads — extracellular, cell membrane, cytoplasm and '
-               'nucleus. Each parasite is read on the classes its niche let the filter keep a '
-               'host protein for: the surface pair for every parasite, the cytosol and the '
-               'nucleus for the ones with an intracellular stage, which is why the two oranges '
-               'appear under those alone. A protein called for more than one of the classes '
-               'its parasite can reach is counted as several. The strip below the '
-               'columns indicates taxonomic group, coloured as above.')
-    st.plotly_chart(
-        generate_surface_split_per_parasite(get_surface_counts(host_proteins_kept,
-                                                               HOST_SPLIT_CLASSES,
-                                                               every=host_proteins),
-                                            parasite_palette, page,
-                                            classes=HOST_SPLIT_CLASSES), width='stretch')
-
-if unicellular is not None and not unicellular.empty:
-    st.subheader("Proportion of parasite proteins per localization")
-    st.caption('DeepLoc 2 assigned localizations for the proteins each '
-               'unicellular parasite reaches its host with at or above the confidence set '
-               'above, divided into cell membrane, extracellular, or both. Multicellular '
-               'parasites are omitted, as the secretome filter admits only their secreted '
-               'proteins. The strip below the columns indicates taxonomic group, coloured '
-               'as above.')
-    st.plotly_chart(
-        generate_surface_split_per_parasite(get_surface_counts(kept_unicellular,
-                                                               PARASITE_SPLIT_CLASSES,
-                                                               every=unicellular),
-                                            parasite_palette, page,
-                                            classes=PARASITE_SPLIT_CLASSES,
-                                            y_title='proteins of the parasite',
-                                            hover_noun='its proteins'),
-        width='stretch')
 
 if host_proteins is not None:
     st.subheader("Localization confidence of host proteins")

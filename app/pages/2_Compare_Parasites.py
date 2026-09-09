@@ -1360,7 +1360,11 @@ if selected_host != web_utils.NO_HOST:
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
     annotated = set(per_cell_type['Tissue'])
-    choices = [t for t in ranked.index if t in annotated]
+    # every tissue the parasites reach is offered, and not only the ones the HPA gives cell
+    # types for: a reader looking for pig muscle should find it and be told the single cell
+    # data is missing, rather than be left to guess whether the tissue or its annotation is
+    # what is absent
+    choices = list(ranked.index)
     tissues, cell_types = st.columns(2)
     with tissues:
         st.subheader("Tissues in which the predicted interactions can take place")
@@ -1389,10 +1393,14 @@ if selected_host != web_utils.NO_HOST:
                        'in several cell types counts in each, so the bars are not a partition '
                        'of the tissue.')
             tissue = st.selectbox('Tissue', choices, index=0,
-                                  help='Tissues with cell type annotation, most interactions first')
-            st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
-                                                    config.get('parasite_groups', {})),
-                            width='stretch')
+                                  help='Tissues the parasites infect, most interactions first')
+            if tissue in annotated:
+                st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
+                                                        config.get('parasite_groups', {})),
+                                width='stretch')
+            else:
+                st.info(f'No single cell data available for {tissue} in {selected_host}, so '
+                        'the interactions there cannot be split by cell type.')
 
 st.markdown("---")
 

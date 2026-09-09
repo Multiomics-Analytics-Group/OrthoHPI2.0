@@ -38,6 +38,12 @@ def _filter_by_annotation(annotation_file, valid_proteins, cutoff, taxid, valid_
     Scan a jensenlab TSV and keep proteins whose annotation (column 2) is in valid_values
     with a confidence score (score_col) of at least cutoff.
 
+    A protein is listed once per value it is annotated with. The file carries a line per
+    experiment rather than per annotation -- GNF, ENCODE and MIT each state the placenta
+    of the same protein separately -- so a value already recorded is not appended again.
+    Repeating it multiplied the rows the annotation artifact carries for that protein and
+    tissue, one per experiment behind it, without saying anything more.
+
     :param str annotation_file: path to the jensenlab tissue/compartment TSV
     :param dict valid_proteins: {protein_id: name} candidates for this host
     :param float cutoff: minimum confidence score accepted
@@ -58,7 +64,10 @@ def _filter_by_annotation(annotation_file, valid_proteins, cutoff, taxid, valid_
             value = data[2]
             score = float(data[score_col])
             if protein in valid_proteins and score >= cutoff and value in valid_values:
-                annotations.setdefault(protein, []).append(transform(value))
+                values = annotations.setdefault(protein, [])
+                transformed = transform(value)
+                if transformed not in values:
+                    values.append(transformed)
                 kept[protein] = valid_proteins[protein]
 
     return annotations, kept

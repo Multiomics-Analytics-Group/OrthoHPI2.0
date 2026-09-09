@@ -4,7 +4,8 @@ interactor sits in the cell.
 
 DeepLoc is run outside the pipeline (see docs/deeploc.md) and the main pipeline
 only ever reads its results as a filter: a host protein is kept if it is called
-surface-exposed, and the probabilities behind that call are then thrown away.
+somewhere the parasite can reach it, and the probabilities behind that call are
+then thrown away.
 This script keeps them for the proteins that survived into the predictions and
 writes them to a small parquet the app reads alongside the predictions, so a
 figure can show whether a host protein is a membrane protein or a secreted one
@@ -37,12 +38,15 @@ import utils
 # the DeepLoc results directory, relative to the data directory. The same one the
 # pipeline filters on (pipeline/main.py: DEEPLOC_ACCURATE_DIR)
 DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')
-# columns kept out of the results file: the two surface classes the host filter is made
-# of, and the three text columns naming what DeepLoc called the protein. The other eight
-# compartment probabilities are of no use to a page about surface interactions
+# columns kept out of the results file: the four classes the host filter is made of --
+# the surface pair either kind of parasite meets and the cytosol and nucleus an
+# intracellular one reaches as well (pipeline/main.py DEEPLOC_NICHE_CLASSES) -- and the
+# three text columns naming what DeepLoc called the protein. The other six compartment
+# probabilities are behind a membrane no parasite crosses and are of no use to the app
 COLUMNS = {'Protein_ID': 'protein', 'Localizations': 'localizations', 'Signals': 'signals',
            'Membrane types': 'membrane_types', 'Extracellular': 'extracellular',
-           'Cell membrane': 'cell_membrane'}
+           'Cell membrane': 'cell_membrane', 'Cytoplasm': 'cytoplasm',
+           'Nucleus': 'nucleus'}
 
 
 def get_predicted_proteins(data_dir):

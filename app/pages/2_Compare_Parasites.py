@@ -48,6 +48,8 @@ LEGEND_ROW = 22
 # longest name in it -- plotly gives every entry the room the longest of them needs
 LEGEND_ENTRY = 40
 LEGEND_CHAR = 7.5
+# the room left under the last legend of the dot plot, in pixels
+LEGEND_PAD = 14
 # the smallest the parasite names on the axis of a matrix are written, in points
 SMALLEST_LABEL = 9
 # session key the shared-interactor matrix counts its remounts under, which is what lets
@@ -55,24 +57,24 @@ SMALLEST_LABEL = 9
 CELL_NONCE_KEY = 'shared_cell_nonce'
 
 
-# marker each surface class is drawn with in the shared-interactors matrix, and the order
-# they are offered in the legend. Colour there is already the parasite's taxonomic group
-# and size is the degree, so the localisation of the host protein goes on the shape --
-# constant down a row, since it is a property of the protein and not of the interaction.
+# The localization of a host protein is a band beside its row of the shared-interactors
+# dot plot, in the colours web_utils keys every localization figure of the app with, and
+# in this order. It is a property of the protein and so constant along a row, which is
+# what makes it a band: as the shape of the dot it was drawn once per parasite reaching
+# the protein, at a size where a circle and a diamond cannot be told apart anyway, and it
+# distorted the degree the same marker carries in its area.
 # NO_LOCALISATION is a protein DeepLoc was never run on, or one whose data directory
 # predates pipeline/build_deeploc_localisations.py
 NO_LOCALISATION = 'Not available'
-# All of them filled: the dots are drawn without an outline, which is what an open
-# symbol is made of
-SURFACE_SYMBOLS = {web_utils.CELL_MEMBRANE: 'circle', web_utils.EXTRACELLULAR: 'diamond',
-                   web_utils.BOTH_SURFACE: 'hexagon', web_utils.NOT_SURFACE: 'square',
-                   NO_LOCALISATION: 'cross'}
-# grey the surface classes are drawn in the legend in. The markers on the plot carry the
-# colour of the parasite's group, so a colour here would say the class had one
-SURFACE_LEGEND_COLOR = '#525252'
+LOCALISATION_ORDER = list(web_utils.HOST_CLASSES) + [web_utils.SEVERAL,
+                                                     web_utils.NOT_SURFACE, NO_LOCALISATION]
+# paler than the grey of a protein the filter had a call for and rejected, a row DeepLoc
+# says nothing at all about being the emptier of the two
+LOCALISATION_COLORS = {**web_utils.LOCALISATION_COLORS, NO_LOCALISATION: '#f0f0f0'}
 # names the DeepLoc columns are read under in the hover of the shared-interactors matrix
-DEEPLOC_LABELS = {'surface': 'DeepLoc', 'cell_membrane': 'P(cell membrane)',
-                  'extracellular': 'P(extracellular)', 'localizations': 'localizations'}
+DEEPLOC_LABELS = {'surface': 'DeepLoc', 'localizations': 'localizations',
+                  **{column: f'P({name.lower()})'
+                     for name, column in web_utils.DEEPLOC_SCORES.items()}}
 
 
 @st.cache_data(show_spinner=False)
@@ -191,7 +193,7 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette, column):
     # are drawn at the size a column has room for instead
     figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
                         tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
-                        showgrid=True, gridcolor='#f0f0f0')
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False)
     figure.update_yaxes(automargin=True, showgrid=True, gridcolor='#f0f0f0')
 
     return figure
@@ -337,6 +339,29 @@ def get_shared_interactor_counts(df_pred, groups, group_order, niches, order_by)
 
 
 @st.cache_data(show_spinner=False)
+def flat_colour_scale(values, colors):
+    '''
+    The colour scale of a strip of flat bands -- one band per value, nothing interpolated
+    between two of them -- and the codes that index it, which is what a strip is drawn from.
+
+    The colour is repeated at both ends of a band so that nothing is interpolated between
+    two values; the steps have to be built in order, since sorting them puts the two
+    entries of a boundary in colour order rather than in band order, which hands a band its
+    neighbour's colour.
+
+    :param values: the value of each cell of the strip, in the order it is drawn
+    :param dict colors: {value: colour}, in the order the bands are numbered
+    :return: (heatmap keywords for the scale, the code of each value)
+    '''
+    steps = [step for i, value in enumerate(colors)
+             for step in ([i / len(colors), colors[value]],
+                          [(i + 1) / len(colors), colors[value]])]
+
+    return dict(colorscale=steps, zmin=-0.5, zmax=len(colors) - 0.5, showscale=False,
+                hovertemplate='%{text}<extra></extra>'), \
+        [list(colors).index(v) for v in values]
+
+
 def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     '''
     The shared-interactor count matrix, with a strip of the taxonomic group and a strip of
@@ -380,29 +405,14 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                    the cells are held to is the whole of the figure rather than a part of it
     :return: the figure, and the index of the trace holding the clickable cells
     '''
-    def flat_scale(values, colors):
-        '''
-        One flat band per value, and the codes that index it. The colour is repeated at
-        both ends of a band so that nothing is interpolated between two values; the steps
-        have to be built in order, since sorting them puts the two entries of a boundary in
-        colour order rather than in band order, which hands a band its neighbour's colour.
-        '''
-        steps = [step for i, value in enumerate(colors)
-                 for step in ([i / len(colors), colors[value]],
-                              [(i + 1) / len(colors), colors[value]])]
-
-        return dict(colorscale=steps, zmin=-0.5, zmax=len(colors) - 0.5, showscale=False,
-                    hovertemplate='%{text}<extra></extra>'), \
-            [list(colors).index(v) for v in values]
-
     shown = [g for g in palette if g in set(clades)]
     niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
                     if n in set(niches)]
     x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
     y_names = list(counts.index)
     cells = list(range(len(y_names)))
-    strip, codes = flat_scale(clades, {g: palette[g] for g in shown})
-    niche_strip, niche_codes = flat_scale(
+    strip, codes = flat_colour_scale(clades, {g: palette[g] for g in shown})
+    niche_strip, niche_codes = flat_colour_scale(
         niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})
 
     # the same span on both axes -- the matrix, the two strips beside it and the cell
@@ -612,15 +622,21 @@ def summarise_localisations(df_pred, localisations):
     The DeepLoc call of each host protein of the matrix, keyed by the gene symbol the
     rows are drawn under rather than by the STRING id DeepLoc wrote it against.
 
-    A host protein reaches this page only because DeepLoc called it surface-exposed, but
-    the ways of being surface-exposed are not the same interaction: a cell membrane protein
-    is met on the surface of the host cell, an extracellular one is met in the fluid around
-    it, and a protein DeepLoc assigns both classes is met either way. Which of them a
-    protein was kept for is web_utils.classify_surface, which the home page reads the
-    parasite proteins with.
+    A host protein reaches this page only because DeepLoc put it somewhere a parasite of
+    its host can reach, but those places are not the same interaction: a cell membrane
+    protein is met on the surface of the host cell, an extracellular one in the fluid
+    around it, and a cytosolic or nuclear one only by a parasite with an intracellular
+    stage, which is inside the cell to meet it. Which of them a protein was kept for is
+    web_utils.classify_localisation, which the home page reads both sides with.
+
+    Read on all four classes, and not on the ones the niche of a parasite allows, as the
+    home page reads a host protein. A row of the figures here is a protein across every
+    parasite that reaches it, of either niche, so there is no one niche to read it on: what
+    the band says is where DeepLoc puts the protein, and the strip above the columns is
+    where the parasite is that meets it there.
 
     A gene can have more than one STRING protein identifier, so the id DeepLoc is most
-    sure is surface-exposed is the one the row is described by.
+    sure of is the one the row is described by.
 
     :param df_pred: tissue-expressed predictions of the host group
     :param localisations: DeepLoc table written by pipeline/build_deeploc_localisations.py
@@ -634,13 +650,14 @@ def summarise_localisations(df_pred, localisations):
     if called.empty:
         return None
 
-    called['best'] = called[['cell_membrane', 'extracellular']].max(axis=1)
+    scores = [c for c in web_utils.DEEPLOC_SCORES.values() if c in called]
+    called['best'] = called[scores].max(axis=1)
     called = called.sort_values('best', ascending=False, kind='stable')
     called = called.drop_duplicates('target_name').set_index('target_name')
 
-    called['surface'] = web_utils.classify_surface(called)
+    called['surface'] = web_utils.classify_localisation(called)
 
-    return called[['surface', 'cell_membrane', 'extracellular', 'localizations']]
+    return called[['surface'] + scores + ['localizations']]
 
 
 @st.dialog('Host interactors shared by a pair of parasites', width='large')
@@ -767,173 +784,275 @@ def get_top_shared_proteins(df_pred, groups, group_order, niches, order_by,
             [f'{p[0]}. {p.split(" ")[1]}' for p in order], int(counts.max()))
 
 
-def split_dot_legend(figure, groups, surfaces, palette, niches=()):
+def localisation_labels(dots, proteins):
     '''
-    Splits the legend of the shared-interactors matrix back into the channels it is
-    drawn from.
+    What the band beside a row of the dot plot says when it is hovered: the class of the
+    host protein, and for a protein called for more than one, which classes those are.
 
-    Plotly express draws a trace per combination of the two channels it is given and names
-    it after both, so a matrix coloured by taxonomic group and shaped by surface class
-    comes out with a legend of "Nematoda, Cell membrane" entries, one per combination that
-    occurs. Every drawn trace is taken out of the legend and the legend is built from
-    entries carrying no data instead: one per taxonomic group, in its colour and always as
-    a circle so the shape of whichever combination came first says nothing, one per
-    surface class, in grey since the shape means the same whatever the colour it is drawn
-    in, and one per niche of the strip above the columns. The group entries keep the
-    legendgroup of the traces they name, so clicking one still hides that parasite group.
+    `Several` is one colour over two different statements -- a protein on the cell membrane
+    and in the fluid around it, and one in the cytosol and the nucleus, which are opposite
+    sides of that membrane -- and a legend of one entry cannot tell them apart. The band
+    names them instead, where a reader who wonders what a purple cell is made of asks.
 
-    :param figure: the matrix figure, modified in place
-    :param list groups: taxonomic groups that occur, in the order of the legend
-    :param list surfaces: surface classes that occur, in the order of the legend
-    :param dict palette: {taxonomic group: colour}
-    :param niches: niches that occur, in the order of the legend, named by a square: the
-                   strip above the columns is a band of solid colour, and a square is what
-                   a band of colour is keyed by. Its greys are the greys of the strip and
-                   not the one grey the surface classes are drawn in, the colour being the
-                   whole of what a niche is told by
+    :param dots: the frame behind the figure, carrying `surface` and the probability of
+                 each class beside each protein
+    :param list proteins: the host proteins in the order of the rows
+    :return: the label of each row, in that order
     '''
-    for trace in figure.data:
-        trace.update(legendgroup=trace.name.split(',')[0].strip(), showlegend=False)
+    called = dots.drop_duplicates('protein').set_index('protein')
+    scores = {c: web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
+              if web_utils.DEEPLOC_SCORES[c] in called}
+    labels = []
+    for protein in proteins:
+        row = called.loc[protein]
+        crossed = [c for c, column in scores.items()
+                   if row[column] > web_utils.DEEPLOC_CUTOFFS[c]]
+        # a protein of one class is named by it, and one the filter had nothing to say
+        # about -- no localisation at all -- by what the legend calls it
+        labels.append(' + '.join(crossed) if len(crossed) > 1 else row['surface'])
 
-    def add_key(name, symbol, color, legendgroup):
-        figure.add_scatter(x=[None], y=[None], mode='markers', name=name,
-                           marker=dict(symbol=symbol, size=9, color=color),
-                           legendgroup=legendgroup, hoverinfo='skip', showlegend=True)
-
-    for group in groups:
-        add_key(group, 'circle', palette.get(group, UNKNOWN_COLOR), group)
-    for surface in surfaces:
-        add_key(surface, SURFACE_SYMBOLS[surface], SURFACE_LEGEND_COLOR, 'surface')
-    for niche in niches:
-        add_key(niche, 'square', web_utils.NICHE_COLORS[niche], 'niche')
-
-
-# where the niche strip of the dot plot sits, as a fraction of the height of the plot:
-# its own height, and the gap between it and the top of the plot. Shallow enough to read
-# as a strip about the columns rather than as a row of the matrix, which is what a band of
-# the height of a row of dots would be taken for
-STRIP_HEIGHT = 0.022
-STRIP_GAP = 0.006
+    return labels
 
 
-def add_niche_strip(figure, dots, parasites):
+def add_dot_strips(figure, dots, parasites, proteins, palette, localised):
     '''
-    The niche of each parasite as a band of colour across the top of the dot plot, drawn as
-    shapes rather than as a trace.
+    The bands that annotate the two axes of the dot plot: the taxonomic group and the niche
+    of each parasite above its column, and the localization of each host protein beside its
+    row. Everything about a parasite is then above the plot and everything about a protein
+    beside it, each axis annotated by the thing it lists.
 
-    A trace would have to sit on the axes of the plot, and both of them are categorical and
-    already spoken for -- the host proteins down one and the parasites across the other --
-    so a band drawn on them would be a row of the matrix and read as one. Shapes hang off
-    the axes instead, on the columns in x and on the plot itself in y.
+    Drawn as heatmap cells inside the axes rather than as shapes hung off them, which is
+    how the matrix beside this figure draws the same two strips. A shape has to be placed
+    against the plot area, and the plot area here is whatever the protein names leave of
+    the column once automargin has taken the room they need; a cell is placed on the axes
+    themselves, at negative coordinates the range is opened up to hold, and follows the
+    plot wherever the labels leave it.
 
-    Above the columns and not under them, as on the matrix beside it. The names of the
-    parasites are under the columns here, rotated and as long as a species name; a strip
-    below them is a strip adrift from what it annotates, and one above them is a strip
-    drawn over them.
+    The group is the inner strip of the two above the columns, as on the matrix: it is the
+    one both figures have always carried, and the two are read in the same order on both.
 
     :param figure: the dot plot, modified in place
-    :param dots: the frame behind it, carrying a `niche` beside each `parasite`
+    :param dots: the frame behind it, carrying `group`, `niche` and `surface`
     :param list parasites: the parasites in the order of the x axis
-    :return: the niches drawn, in the order they are read in
+    :param list proteins: the host proteins in the order of the y axis
+    :param dict palette: {taxonomic group: colour}
+    :return: (groups, localizations, niches) drawn, each in the order it is keyed in
     '''
+    clade_of = dict(zip(dots['parasite'], dots['group']))
     niche_of = dict(zip(dots['parasite'], dots['niche']))
-    for position, parasite in enumerate(parasites):
-        niche = niche_of.get(parasite, web_utils.UNKNOWN_NICHE)
-        # the columns are categories, so a band is placed by the index of its column and
-        # spans the half cell either side of it that the column itself takes
-        figure.add_shape(type='rect', xref='x', yref='paper', layer='below',
-                         x0=position - 0.5, x1=position + 0.5,
-                         y0=1 + STRIP_GAP, y1=1 + STRIP_GAP + STRIP_HEIGHT,
-                         fillcolor=web_utils.NICHE_COLORS[niche], line_width=0)
+    clades = [clade_of.get(p, UNKNOWN_GROUP) for p in parasites]
+    niches = [niche_of.get(p, web_utils.UNKNOWN_NICHE) for p in parasites]
+    groups_shown = [g for g in list(palette) + [UNKNOWN_GROUP] if g in set(clades)]
+    niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
+                    if n in set(niches)]
 
-    return [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
-            if n in set(niche_of.values())]
+    # above the columns, the group a cell clear of the first row and the niche outside it
+    for offset, (values, colors) in enumerate(
+            [(clades, {g: palette.get(g, UNKNOWN_COLOR) for g in groups_shown}),
+             (niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})]):
+        scale, codes = flat_colour_scale(values, colors)
+        figure.add_trace(go.Heatmap(z=[codes], x=list(range(len(parasites))),
+                                    y0=-1.4 - offset, dy=1, text=[values], xgap=1, **scale))
+
+    if not localised:
+        return groups_shown, [], niches_shown
+
+    surface_of = dict(zip(dots['protein'], dots['surface']))
+    localisations = [surface_of.get(p, NO_LOCALISATION) for p in proteins]
+    shown = [c for c in LOCALISATION_ORDER if c in set(localisations)]
+    scale, codes = flat_colour_scale(localisations,
+                                     {c: LOCALISATION_COLORS[c] for c in shown})
+    # the colour of a cell is the class, its hover the classes behind that class
+    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1,
+                                y=list(range(len(proteins))),
+                                text=[[label] for label in
+                                      localisation_labels(dots, proteins)],
+                                ygap=1, **scale))
+
+    return groups_shown, shown, niches_shown
+
+
+def add_dot_legend(figure, groups, localisations, niches, palette, width, height):
+    '''
+    Names the two strips the dot plot carries no legend for, and lays the three keys of the
+    figure out under it as three legends of their own.
+
+    The taxonomic groups are the colour of the dots themselves and are named by the traces
+    that draw them -- clicking one still takes that group off the plot -- while a strip is a
+    heatmap, which carries no legend entry of its own, so its values are named by empty
+    traces whose only purpose is the entry they leave behind. A square, being what a band of
+    colour is keyed by.
+
+    Three legends and not one. The three channels have values that read alike -- a parasite
+    outside the host cell and a host protein outside it are both "Extracellular" -- and run
+    together as one key of fourteen colours there is nothing to say which of them a colour
+    belongs to. Named and set apart, each key is read against the strip it annotates.
+
+    The rows each legend takes are counted rather than assumed, since the next legend is
+    placed under the last: plotly wraps the entries to the width of the plot, and a row
+    that has not been paid for is a row drawn over the legend below it.
+
+    :param figure: the dot plot, modified in place
+    :param list groups: the taxonomic groups drawn, which the dot traces already name
+    :param list localisations: the localization classes drawn, in the order of the legend
+    :param list niches: the niches drawn, in the order of the legend
+    :param dict palette: {taxonomic group: colour}
+    :param float width: pixels of the plot the legends wrap inside
+    :param float height: pixels the figure is drawn down, which the offsets are a share of
+    :return: the pixels the three legends take, which is the room to leave under the plot
+    '''
+    # the dots of a group are sized by their degree, so the entry plotly would write for
+    # such a trace carries the size of whichever dot came first -- a Cestoda of degree one
+    # is a speck beside a Nematoda of eighty-six. The traces are taken out of the legend and
+    # named by a marker of one size instead, keeping their legendgroup so that clicking the
+    # entry still takes the group off the plot
+    for trace in figure.data:
+        trace.update(legendgroup=trace.name, showlegend=False)
+    for name, color in [(g, palette.get(g, UNKNOWN_COLOR)) for g in groups]:
+        figure.add_scatter(x=[None], y=[None], mode='markers', name=name, legendgroup=name,
+                           marker=dict(symbol='circle', size=10, color=color),
+                           hoverinfo='skip', showlegend=True)
+    for name, color, legend in ([(c, LOCALISATION_COLORS[c], 'legend2') for c in localisations]
+                                + [(n, web_utils.NICHE_COLORS[n], 'legend3') for n in niches]):
+        figure.add_scatter(x=[None], y=[None], mode='markers', name=name, legend=legend,
+                           marker=dict(symbol='square', size=10, color=color),
+                           hoverinfo='skip', showlegend=True)
+
+    def rows(names, title):
+        '''Rows the entries wrap onto, the title taking its room on the first of them.'''
+        entry = LEGEND_ENTRY + LEGEND_CHAR * max(len(name) for name in names)
+        room = width - LEGEND_CHAR * len(title) - LEGEND_ENTRY
+
+        return -(-len(names) // max(1, int(room // entry)))
+
+    keys = [(legend, title, names, rows(names, title))
+            for legend, title, names in [('legend', 'taxonomic group', groups),
+                                         ('legend2', 'DeepLoc', localisations),
+                                         ('legend3', web_utils.NICHE_TITLE, niches)]
+            if names]
+    room = LEGEND_ROW * sum(taken for *_, taken in keys) + LEGEND_PAD
+
+    # measured from the foot of the figure and not from the foot of the plot: a legend
+    # placed against the plot moves with the margin the rotated names take off the top,
+    # which is measured by plotly as it draws and is not known here, and three legends that
+    # move by a margin nobody counted are three legends drawn over each other
+    offset = room / height
+    for legend, title, names, taken in keys:
+        figure.update_layout({legend: dict(
+            orientation='h', yanchor='top', y=offset, yref='container', x=0,
+            traceorder='normal', title_text=title, title_font=dict(size=11),
+            font=dict(size=11))})
+        offset -= taken * LEGEND_ROW / height
+
+    return room
 
 
 @st.cache_data(show_spinner=False)
 def generate_shared_protein_dots(dots, proteins, parasites, most, palette, column):
     '''
     A dot wherever a parasite is predicted to interact with one of the proteins, the
-    parasites in the order the other figures use so the taxonomic groups stay together, and the
-    proteins ordered by how many parasites reach them. The dot is sized by how many
+    parasites in the order the other figures use so the taxonomic groups stay together, and
+    the proteins ordered by how many parasites reach them. The dot is sized by how many
     proteins of that parasite reach that host protein.
 
-    The area of the dot is what carries the degree (plotly's default), since that is the
-    channel size is read on, and sizemin keeps the single-protein dots -- the largest group
-    of them -- from collapsing to a speck next to a degree of eighty-six.
+    The area of the dot is what carries the degree (as plotly express drew it), since that
+    is the channel size is read on, and sizemin keeps the single-protein dots -- the
+    largest group of them -- from collapsing to a speck next to a degree of eighty-six.
 
-    Where the dots carry a DeepLoc call the shape of the marker is the surface class of
-    the host protein, which is constant down a row: a circle is met on the cell membrane,
-    a diamond in the fluid around the cell, and a hexagon either way, DeepLoc having
-    assigned it both. The hover carries the two probabilities behind that and everywhere
-    else DeepLoc puts the protein.
+    The dot is left with the one shape and the one channel. Where DeepLoc puts the host
+    protein runs beside the row instead, in the colours the home page splits its bars in:
+    it is a property of the protein, so as a marker shape it was drawn once for every
+    parasite reaching it, at sizes where a circle and a diamond are the same dot, and it
+    took the area of that marker away from the degree it is supposed to say.
 
-    Above the columns runs the same niche strip the matrix beside it carries, so that the
-    two figures are read as the same parasites in the same order. The colour of a dot is
-    already spent on the clade and its shape on the localization of the host protein, so
-    the niche has nothing left to be drawn in and goes above the columns instead.
+    The parasites are named above the columns, with the group and the niche between the
+    names and the plot, which is how the matrix beside this figure is laid out: the two
+    figures are the same parasites in the same order, and are read the same way round.
+
+    The axes count cells rather than name a parasite or a protein, the names being ticks
+    written against them. Categorical axes would place a dot as readily, but the strips
+    could not be drawn on them: a band on a categorical axis is a category of its own, and
+    would be read as another parasite or another protein.
+
+    :param dots: one row per predicted (parasite, host protein) pair, as
+                 get_top_shared_proteins builds them
+    :param list proteins: the host proteins, most-shared first, as the rows are labelled
+    :param list parasites: the parasites in the order of the columns
+    :param int most: the largest number of parasites any of the proteins is reached by
+    :param dict palette: {taxonomic group: colour}
+    :param float column: pixels the figure is drawn across, which sizes the dots
     '''
     localised = 'surface' in dots.columns
-    orders = {'parasite': parasites, 'protein': proteins,
-              'group': [g for g in palette if g in set(dots['group'])]}
-    # the hover is written out rather than left to plotly express, which prints the raw
-    # column name of whatever it is given. The protein and the parasite are the two axes
-    # already, and `parasites` and `degree` are two different counts of two different
-    # things, which as bare numbers under their column names they do not say
-    hover_columns = ['protein_full', 'parasites', 'degree']
+    cells = {'x': {p: i for i, p in enumerate(parasites)},
+             'y': {p: i for i, p in enumerate(proteins)}}
+    dots = dots.assign(x=dots['parasite'].map(cells['x']),
+                       y=dots['protein'].map(cells['y'])).dropna(subset=['x', 'y'])
+
+    # the hover is written out rather than left to a column name: the protein and the
+    # parasite are the two axes already, and `parasites` and `degree` are two different
+    # counts of two different things, which as bare numbers under their column names they
+    # do not say. The axes count cells, so the parasite is named from the row behind the
+    # dot rather than from the x it sits on
+    hover_columns = ['protein_full', 'parasites', 'degree', 'parasite']
     hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
-                   'proteins of %{x} reaching it: %{customdata[2]}']
+                   'proteins of %{customdata[3]} reaching it: %{customdata[2]}']
     if localised:
-        orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
-        hover_columns += ['cell_membrane', 'extracellular']
-        # the class is the shape of the dot, so the hover carries the two probabilities
-        # behind it rather than naming it a second time
-        hover_lines.append('P(cell membrane) %{customdata[3]:.2f}, '
-                           'P(extracellular) %{customdata[4]:.2f}')
+        # the class is the band beside the row, so the hover carries the probabilities
+        # behind it rather than naming it a second time: the four classes the host filter
+        # reads, two to a line, the surface of the cell first and the inside of it second
+        scores = [web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
+                  if web_utils.DEEPLOC_SCORES[c] in dots]
+        parts = [f'{DEEPLOC_LABELS[name]} %{{customdata[{len(hover_columns) + i}]:.2f}}'
+                 for i, name in enumerate(scores)]
+        hover_columns += scores
+        hover_lines += [', '.join(parts[i:i + 2]) for i in range(0, len(parts), 2)]
 
     size = dot_size(parasites, proteins, column)
-    figure = px.scatter(dots, x='parasite', y='protein', color='group',
-                        # plotly express flips category_orders on a y axis, so `proteins`
-                        # most-shared first puts the most-shared protein in the top row
-                        color_discrete_map=palette, category_orders=orders,
-                        symbol='surface' if localised else None,
-                        symbol_map=SURFACE_SYMBOLS if localised else {},
-                        size='degree', size_max=size, labels=DEEPLOC_LABELS,
-                        custom_data=hover_columns)
-    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
-                         hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
-    # the strip goes on before the legend is built: split_dot_legend takes every drawn
-    # trace out of the legend, and the keys naming the strip are drawn traces of their own
-    niches_shown = add_niche_strip(figure, dots, parasites)
-    if localised:
-        split_dot_legend(figure, orders['group'], orders['surface'], palette, niches_shown)
-    else:
-        # nothing to split the legend apart from, so the clade entries plotly express drew
-        # are left as they are and the strip is named beside them
-        for niche in niches_shown:
-            figure.add_scatter(x=[None], y=[None], mode='markers', name=niche,
-                               marker=dict(symbol='square', size=9,
-                                           color=web_utils.NICHE_COLORS[niche]),
-                               legendgroup='niche', hoverinfo='skip', showlegend=True)
-    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
-                         margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
-                         # clear of the strip above the columns, which the legend would
-                         # otherwise be drawn across
-                         legend=dict(orientation='h', yanchor='bottom',
-                                     y=1 + 2 * STRIP_GAP + STRIP_HEIGHT, x=0),
+    # the area of the largest dot stands for the largest degree, which is the size plotly
+    # express solved for when it drew this figure
+    sizeref = max(1, dots['degree'].max()) / size ** 2
+    figure = go.Figure()
+    # one trace per group rather than one for every dot, so the groups are the legend and
+    # clicking one takes that group off the plot
+    for group in [g for g in list(palette) + [UNKNOWN_GROUP] if g in set(dots['group'])]:
+        rows = dots[dots['group'] == group]
+        figure.add_trace(go.Scatter(
+            x=rows['x'], y=rows['y'], mode='markers', name=group,
+            marker=dict(color=palette.get(group, UNKNOWN_COLOR), size=rows['degree'],
+                        sizemode='area', sizeref=sizeref, sizemin=4, line=dict(width=0)),
+            customdata=rows[hover_columns].to_numpy(),
+            hovertemplate='<br>'.join(hover_lines) + '<extra></extra>'))
+
+    groups_shown, localisations, niches = add_dot_strips(figure, dots, parasites, proteins,
+                                                         palette, localised)
+    # what the legends wrap inside is what the row labels leave of the column, which is what
+    # the dots were sized on as well
+    height = max(420, 19 * len(proteins) + 240)
+    room = add_dot_legend(figure, groups_shown, localisations, niches, palette,
+                          column - (6.2 * max(len(str(p)) for p in proteins) + 30), height)
+
+    figure.update_layout(height=height, plot_bgcolor='white',
+                         # the room the legends take is left under the plot rather than
+                         # taken out of it: they are placed against the foot of the figure
+                         margin=dict(l=0, r=0, t=10, b=room),
                          xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
-    # the labels are as long as a protein name, so plotly is left to take the room they
-    # need off the plot rather than drawing them over it or cutting them at the margin
-    figure.update_yaxes(automargin=True)
     # every parasite is named, however narrow its column: plotly thins the labels that no
     # longer fit, and a matrix with every other column named cannot be read at all, so they
-    # are drawn at the size a column has room for instead. They are rotated, so they are as
-    # tall as they are long and are cut at the foot of the figure unless automargin takes
-    # the room they need off the plot
-    figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
+    # are drawn at the size a column has room for instead. The names lean up and to the
+    # right of the tick they belong to, the slant they are drawn at everywhere on the page.
+    # The range runs back past the two strips above the columns rather than on past the
+    # last of them, which is what puts them between the names and the plot
+    figure.update_xaxes(range=[-1.9 if localised else -0.5, len(parasites) - 0.5],
+                        side='top', tickmode='array', tickvals=list(range(len(parasites))),
+                        ticktext=parasites, tickangle=-60, automargin=True, ticks='',
                         tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
-                        showgrid=True, gridcolor='#f0f0f0')
-    figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False)
+    # reversed, so that the most-shared protein is the top row. The labels are as long as a
+    # protein name, so plotly is left to take the room they need off the plot rather than
+    # drawing them over it or cutting them at the margin
+    figure.update_yaxes(range=[len(proteins) - 0.5, -3], tickmode='array',
+                        tickvals=list(range(len(proteins))), ticktext=proteins, ticks='',
+                        automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
 
     return figure
 
@@ -1059,11 +1178,12 @@ if selected_host != web_utils.NO_HOST:
             st.caption('Host proteins reached by the most parasites, with a dot wherever a '
                        'parasite is predicted to interact with one, sized by the number of that '
                        "parasite's proteins reaching it. Proteins reached by a single parasite "
-                       'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
-                       'protein, circles cell membrane, diamonds extracellular, and hexagons '
-                       'both; hover for the underlying probabilities. The strip above the '
-                       'columns shows whether the parasite lives inside a host cell or '
-                       'outside one.')
+                       'are omitted. The band beside each row gives the DeepLoc 2 localization '
+                       'of the host protein, in the colours the home page splits its bars in; '
+                       'hover a dot for the probabilities behind it. Above the columns run the '
+                       'taxonomic group of the parasite and whether it lives inside a host cell '
+                       'or outside one, the same two strips the matrix beside this figure '
+                       'carries.')
             st.plotly_chart(
                 generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {}),
                                              column),

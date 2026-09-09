@@ -90,13 +90,37 @@ predictions.
 
 ### 5. DeepLoc host filter (`filters.apply_deeploc_filter`)
 
-Keeps only surface-exposed host proteins, using DeepLoc 2 (Accurate)
-subcellular-localization predictions read from
+Keeps only the host proteins a parasite is in a position to reach, using
+DeepLoc 2 (Accurate) subcellular-localization predictions read from
 `data/deeploc/output_accurate/deeploc_output_accurate/<taxid>/results_*.csv`.
-A host protein passes if `P(Extracellular) >= 0.617` or
-`P(Cell membrane) >= 0.565` — i.e. the protein is at the cell surface or
-secreted, somewhere the parasite could physically reach it. Hosts without a
-DeepLoc run are left unfiltered (with a warning).
+Which localizations count depends on the parasite's `niche` in `config.yml`
+(`main.DEEPLOC_NICHE_CLASSES`):
+
+- **extracellular**: `P(Extracellular) > 0.617` or `P(Cell membrane) > 0.565` —
+  the host surface and the space around it.
+- **intracellular**: those two, plus `P(Cytoplasm) > 0.476` or
+  `P(Nucleus) > 0.501` — the parasite is inside a host cell and its effectors
+  reach the cytosol and the nucleus, but it still has an extracellular stage
+  that engages the surface.
+
+The niche belongs to the parasite and the pool is per host, so the filter does
+two things. It narrows `valid_proteins[taxid]` to the union of the niches of the
+parasites that infect that host, and it returns `{niche: set of host proteins}`,
+which `homology.get_links` applies parasite by parasite — without it, an
+extracellular parasite would be handed the cytosolic proteins that a host's
+intracellular parasites put in the pool. Hosts without a DeepLoc run are left
+unfiltered (with a warning). A parasite with no usable `niche` is filtered as
+extracellular, the narrower of the two.
+
+The filter is much weaker for the intracellular niche: on human it keeps 85% of
+the proteins DeepLoc was run on against 29% for the extracellular niche, so
+interaction counts are not comparable across niches on their own.
+
+`main.save_eligible_proteins` records the split as a `reachable_<niche>` column
+per niche in `eligible_proteins.parquet`, which is what the app's enrichment
+background reads so that a parasite is tested against the pool it could actually
+have drawn on (parasite proteins are true in every column — the niche constrains
+the host side).
 
 After steps 3–5, `proteins = utils.merge_dict_of_dicts(proteins)` flattens
 the per-taxid dicts into one `{protein_id: name}` dict for the rest of the
@@ -213,7 +237,7 @@ $ python scripts/build_host_orthologs.py
 ```
 
 Output: `data/host_orthologs.parquet` (`group`, `taxid`, `n_proteins`,
-`proteins`) — a few hundred rows, since only the ~200 groups the predictions
+`proteins`) — a few thousand rows, since only the ~1,000 groups the predictions
 reach are kept. Re-run it after `pipeline/main.py` whenever the hosts or the
 parasites change. The page treats a missing file as "not known" and leaves
 that section out rather than failing.

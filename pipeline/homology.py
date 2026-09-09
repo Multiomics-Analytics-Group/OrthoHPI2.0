@@ -1,5 +1,7 @@
 import pandas as pd
+
 import utils
+from . import filters
 
 # STRING evidence scores are stored as integers 0-1000; divide to get a 0-1 score.
 STRING_SCORE_SCALE = 1000
@@ -41,23 +43,35 @@ def get_eggnog_groups(filepath, proteins):
     return valid_groups
 
 
-def get_links(filepath, valid_groups, proteins, config_file):
+def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
+              default_niche=None):
     """
     Obtain the transferred interactions at the EggNOG group level from STRING and
     return them as a DataFrame (columns: LINK_COLUMNS). Each link is a parasite-host
     protein pair whose orthology groups interact in STRING, restricted to hosts the
-    parasite infects. The caller is responsible for writing the result.
+    parasite infects and to the host proteins its niche puts it in reach of. The caller
+    is responsible for writing the result.
+
+    The niche restriction is made here and not in the pool, because the pool is per host
+    and the niche is a property of the parasite: a host infected by both an intracellular
+    and an extracellular parasite carries the cytosolic and nuclear proteins of the first,
+    which the second must not be handed.
 
     :param str filepath: path to STRING file with the groups links
     :param dict valid_groups: dictionary with all the valid groups
     :param dict proteins: mapping from ENSP to protein name
     :param str config_file: path to the configuration file
+    :param dict reachable: {niche: set of host proteins}, from filters.apply_deeploc_filter;
+                           None leaves every host protein open to every parasite
+    :param str default_niche: niche for a parasite the config records none for
     :return: DataFrame of predicted links (columns: LINK_COLUMNS)
     """
     links = []
     seen = set()
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
+    niches = (filters.get_parasite_niches(config_file, set(reachable), default_niche)
+              if reachable else {})
 
     print("  Scanning COG links...")
     with utils.read_gzipped_file(filepath) as cog_links:
@@ -93,6 +107,9 @@ def get_links(filepath, valid_groups, proteins, config_file):
                     # restrict to hosts this parasite actually infects
                     allowed_hosts = parasites[int(source_taxid)].get('hosts')
                     if allowed_hosts is not None and int(target_taxid) not in allowed_hosts:
+                        continue
+                    # and to the host proteins its niche reaches
+                    if reachable and target_protein not in reachable[niches[int(source_taxid)]]:
                         continue
                     links.append([source_taxid, parasites[int(source_taxid)]['label'],
                                 parasites[int(source_taxid)]['color'], 'diamond', source_protein,

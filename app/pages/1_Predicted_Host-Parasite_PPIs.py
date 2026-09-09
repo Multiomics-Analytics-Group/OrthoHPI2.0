@@ -166,7 +166,9 @@ TISSUE_FILTER_KEY = 'net_tissues'
 # the other filters, so they are named as well: their state has to be read where the
 # predictions are filtered, which is before they are drawn again
 SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
-                       web_utils.EXTRACELLULAR: 'net_surface_extracellular'}
+                       web_utils.EXTRACELLULAR: 'net_surface_extracellular',
+                       web_utils.CYTOPLASM: 'net_surface_cytoplasm',
+                       web_utils.NUCLEUS: 'net_surface_nucleus'}
 
 # what the host proteins of the network are tested against. The pipeline's filters are
 # the universe the network was drawn from, and the second option narrows that universe
@@ -318,26 +320,38 @@ def generate_node_labels(df, annotations):
 
 
 @st.cache_data(show_spinner=False)
-def get_surface_calls(data_dir):
+def get_surface_calls(data_dir, host_taxids):
     '''
     What DeepLoc 2 called each protein and how sure it was of that call, keyed by STRING
     id. Both sides of the interactions are in it: every protein of the predictions went
-    through a localisation filter to get here, the host proteins for being surface-exposed
-    and the parasite proteins for being secreted, and this is what those filters read.
+    through a localisation filter to get here, the host proteins for sitting somewhere a
+    parasite of theirs can reach and the parasite proteins for being secreted, and this is
+    what those filters read.
+
+    The two sides are called on their own classes, which is why the hosts are named: a host
+    protein is read on all four -- the cytosol and the nucleus being open to a parasite with
+    an intracellular stage -- and a parasite protein on the surface pair its secretome
+    filter selected on.
 
     :param str data_dir: directory holding deeploc_localisations.parquet
+    :param tuple host_taxids: taxids of the hosts, as strings
     :return: dataframe of surface calls and probabilities, indexed by STRING id; empty without
              the file
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
     if localisations.empty:
-        return pd.DataFrame(columns=['surface', 'cell_membrane', 'extracellular'])
+        return pd.DataFrame(columns=['surface'] + list(web_utils.DEEPLOC_SCORES.values()))
 
-    surface = web_utils.classify_surface(localisations)
+    hosts = localisations['protein'].str.split('.').str[0].isin(host_taxids)
+    surface = pd.Series(index=localisations.index, dtype=object)
+    surface[hosts] = web_utils.classify_localisation(
+        localisations[hosts], web_utils.HOST_CLASSES, web_utils.SEVERAL)
+    surface[~hosts] = web_utils.classify_localisation(
+        localisations[~hosts], web_utils.SURFACE_CLASSES, web_utils.BOTH_SURFACE)
+    scores = {column: localisations[column].values
+              for column in web_utils.DEEPLOC_SCORES.values() if column in localisations}
 
-    return pd.DataFrame({'surface': surface.values,
-                         'cell_membrane': localisations['cell_membrane'].values,
-                         'extracellular': localisations['extracellular'].values},
+    return pd.DataFrame({'surface': surface.values, **scores},
                         index=localisations['protein'].values)
 
 
@@ -355,7 +369,10 @@ def generate_node_titles(df, annotations, surface_calls=None):
     '''
     calls = {} if surface_calls is None or surface_calls.empty else surface_calls.to_dict('index')
     titles = {}
-    for prefix, taxid_col in [('source', 'taxid1_label'), ('target', 'taxid2_label')]:
+    # each side is read on the classes its own filter was made of, the same pairing
+    # get_surface_calls classified them with
+    for prefix, taxid_col, classes in [('source', 'taxid1_label', web_utils.SURFACE_CLASSES),
+                                       ('target', 'taxid2_label', web_utils.HOST_CLASSES)]:
         cols = [prefix, f'{prefix}_name', f'{prefix}_uniprot', taxid_col]
         for protein, name, uniprot, species in df[cols].drop_duplicates(subset=prefix).values:
             lines = [str(name)]
@@ -365,14 +382,17 @@ def generate_node_titles(df, annotations, surface_calls=None):
             lines.append(str(species))
             call = calls.get(protein)
             if call:
-                if call['surface'] == web_utils.BOTH_SURFACE:
-                    lines.append('DeepLoc: Both '
-                                 f"(P(cell membrane)={call['cell_membrane']:.2f}, "
-                                 f"P(extracellular)={call['extracellular']:.2f})")
+                # every class the protein was called for, each at its own probability: the
+                # call of a protein in several places is not one number, and the class name
+                # alone would not say which places
+                called = [(c, call[web_utils.DEEPLOC_SCORES[c]]) for c in classes
+                          if web_utils.DEEPLOC_SCORES[c] in call
+                          and call[web_utils.DEEPLOC_SCORES[c]] > web_utils.DEEPLOC_CUTOFFS[c]]
+                if called:
+                    lines.append('DeepLoc: '
+                                 + ', '.join(f'{c} (p={p:.2f})' for c, p in called))
                 else:
-                    score = (call['extracellular'] if call['surface'] == web_utils.EXTRACELLULAR
-                             else call['cell_membrane'])
-                    lines.append(f"DeepLoc: {call['surface']} (p={score:.2f})")
+                    lines.append(f"DeepLoc: {call['surface']}")
             lines.append(f'STRING: {protein}')
             if pd.notna(uniprot):
                 lines.append(f'UniProt: {uniprot}')
@@ -555,21 +575,29 @@ def generate_cell_type_filters(df, score):
                      .groupby('Cell type')['target_name'].nunique()
                      .sort_values(ascending=False, kind='stable'))
 
-def generate_surface_filters(df):
+def generate_surface_filters(df, surface_calls, niche):
     '''
-    The DeepLoc classes offered as tickboxes, the surface of the host cell first and the
-    space around it second. The proteins DeepLoc puts in both are not a class of their
-    own here: they are on the membrane and outside it, so they answer to either box and
-    make either one worth offering. A class no host protein of this parasite is in is
-    left out, as an empty option filters to an empty network.
-    '''
-    if 'target_surface' not in df.columns:
-        return []
-    present = set(df['target_surface'].dropna())
-    in_both = web_utils.BOTH_SURFACE in present
+    The DeepLoc classes offered as tickboxes: the surface of the host cell and the space
+    around it, and for a parasite with an intracellular stage the cytosol and the nucleus
+    as well, those being the classes its niche let the filter keep a host protein for.
 
-    return [c for c in (web_utils.CELL_MEMBRANE, web_utils.EXTRACELLULAR)
-            if in_both or c in present]
+    Read from the probabilities rather than from the class of each protein. A protein
+    called for several classes carries one name for all of them, and it belongs to each of
+    the boxes it is over the cut-off of. A class no host protein of this parasite is over
+    is left out, as an empty option filters to an empty network.
+
+    :param df: the predictions of the parasite
+    :param surface_calls: DeepLoc calls, as get_surface_calls returns them
+    :param str niche: niche of the parasite, as web_utils.get_niches names it
+    :return: the classes worth offering, in the order they are drawn in
+    '''
+    if surface_calls is None or surface_calls.empty or 'target' not in df.columns:
+        return []
+    called = surface_calls.reindex(df['target'].dropna().unique())
+
+    return [c for c in web_utils.niche_classes(niche)
+            if web_utils.DEEPLOC_SCORES[c] in called
+            and (called[web_utils.DEEPLOC_SCORES[c]] > web_utils.DEEPLOC_CUTOFFS[c]).any()]
 
 
 def cell_type_marks(df, score):
@@ -769,8 +797,17 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
     # so the exact selection is still applied afterwards)
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    # The background pool is read from exactly the species included in the selected view.
-    pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species))
+    # The background pool is read from exactly the species included in the selected view,
+    # and its host half from the niche of the parasite the view is of: an extracellular
+    # parasite could never have been given the cytosolic and nuclear host proteins an
+    # intracellular one was, so they are no part of the background it is read against. A
+    # view of several parasites at once is left on the union, having no single niche.
+    niche = None
+    if side == HOST:
+        niches = {web_utils.parasite_niche(utils.read_config(config_file), taxid)
+                  for taxid in pred_df['taxid1'].unique()}
+        niche = niches.pop() if len(niches) == 1 else None
+    pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species), niche=niche)
     if side == HOST and background == BACKGROUND_TISSUES:
         parasite = pred_df['taxid1'].iloc[0]
         pool = pool & web_utils.infected_tissue_proteins(
@@ -1261,7 +1298,7 @@ with col2:
         df_select = web_utils.filter_tissues(config, df_select)
         # where DeepLoc puts each host protein, carried on the predictions so the filter
         # below, the table and the network all read the same call
-        surface_calls = get_surface_calls(data_dir)
+        surface_calls = get_surface_calls(data_dir, tuple(str(t) for t in selected_taxids))
         if not surface_calls.empty:
             df_select = df_select.assign(
                 source_surface=df_select['source'].map(surface_calls['surface']),
@@ -1311,16 +1348,21 @@ with col2:
         # which is what they narrow, so what is read here is the state they were left in
         # -- Streamlit hands that over before the boxes are drawn again, which is what
         # makes a tick reach the predictions on the run it is made
-        surface_options = generate_surface_filters(df_select)
+        surface_options = generate_surface_filters(
+            df_select, surface_calls,
+            web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE))
         ticked = [c for c in surface_options
                   if st.session_state.get(SURFACE_FILTER_KEYS[c])]
-        # ticking both classes leaves every host protein in, exactly as ticking neither
-        # does, so only one ticked box is a filter
-        selected_surface = ticked if len(ticked) == 1 else []
-        if len(selected_surface) > 0:
-            # a protein DeepLoc puts in both classes is in the ticked one as well
-            df_select = df_select[df_select['target_surface'].isin(
-                selected_surface + [web_utils.BOTH_SURFACE])]
+        # ticking every class offered leaves every host protein in, exactly as ticking none
+        # does, so a filter is anything in between
+        selected_surface = ticked if 0 < len(ticked) < len(surface_options) else []
+        if selected_surface:
+            # the host proteins over the cut-off of any ticked class, read from the
+            # probabilities so that a protein called for several answers to each of them
+            over = pd.concat([surface_calls[web_utils.DEEPLOC_SCORES[c]]
+                              > web_utils.DEEPLOC_CUTOFFS[c]
+                              for c in selected_surface], axis=1).any(axis=1)
+            df_select = df_select[df_select['target'].map(over).fillna(False)]
 
         annotations = web_utils.load_protein_annotations(data_dir)
         for host_taxid in selected_taxids:
@@ -1469,11 +1511,12 @@ if networks:
                    'their species-specific colors.')
     if len(surface_options) > 0:
         st.caption('The host proteins are in the predictions because DeepLoc called them '
-                   'surface-exposed: on the membrane of the host cell, extracellular -- '
-                   'in the matrix and the fluid around it -- or both. Ticking one class '
-                   'leaves the interactions that can take place there, and drops any '
-                   'parasite protein left with nothing to bind; the proteins DeepLoc '
-                   'places in both classes stay whichever one is ticked.')
+                   'where DeepLoc puts them: on the membrane of the host cell, '
+                   'extracellular -- in the matrix and the fluid around it -- or, for a '
+                   'parasite with an intracellular stage, in the cytosol or the nucleus. '
+                   'Ticking a class leaves the interactions that can take place there, and '
+                   'drops any parasite protein left with nothing to bind; a protein DeepLoc '
+                   'places in several classes stays whichever of them is ticked.')
         # narrow columns beside each other rather than one box a row, and one column more
         # than there are boxes so the boxes are not spread across the page
         boxes = st.columns(len(surface_options) + 2)

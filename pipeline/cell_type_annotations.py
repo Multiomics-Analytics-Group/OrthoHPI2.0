@@ -14,9 +14,16 @@ CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 # source of cell types for any of the four, so those three are written out under their own
 # name as well as under `intestine`. Sending them to `intestine` alone, as this did, left
 # every colon, rectum and small intestine row of the annotation without a cell type.
+#
+# `pbmc` is HPA's blood: it is the only single cell data HPA has for blood, and a name
+# missing from this table is dropped by the tissue filter, so leaving it out left blood
+# without a human cell type at all. It is the mononuclear fraction alone -- no
+# erythrocytes, no granulocytes -- so a blood cell type a parasite meets can be missing
+# from it, the red cell Plasmodium invades most of all.
 HPA_TISSUE_LABELS = {
     'heart muscle': ['heart'],
     'bronchus': ['lung'],
+    'pbmc': ['blood'],
     'colon': ['colon', 'intestine'],
     'rectum': ['rectum', 'intestine'],
     'small intestine': ['small intestine', 'intestine'],

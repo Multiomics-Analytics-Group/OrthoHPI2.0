@@ -40,6 +40,11 @@ DIAGONAL_COLOUR = '#9e9e9e'
 COLORBAR_GAP = 8
 COLORBAR_ROOM = 71
 COLORBAR_DIGIT = 6.5
+# how a similarity is written wherever the figure gives one: beside the colour bar, where
+# it sets the room the bar needs, and in the hover of a cell. Two decimals: most pairs of a
+# host sit under a tenth -- the median pair of a human is 0.08 -- and written to one they
+# are all the same number
+TICK = '.2f'
 # the height of one row of a legend below that heatmap, in pixels, which is what the room
 # left under the matrix is counted in
 LEGEND_ROW = 22
@@ -359,15 +364,31 @@ def parasite_order(labels, groups, group_order, niches, order_by):
 
 
 @st.cache_data(show_spinner=False)
-def get_shared_interactor_counts(df_pred, groups, group_order, niches, order_by):
+def get_shared_interactor_similarity(df_pred, groups, group_order, niches, order_by):
     '''
-    Number of host proteins each pair of parasites is predicted to interact with. The
-    diagonal is left empty -- a parasite shares nothing with itself that is worth counting
-    against a pair -- and every off-diagonal cell is the host proteins shared by that pair.
+    How alike the host interactors of each pair of parasites are, as the Jaccard similarity
+    of the two sets: the host proteins both parasites reach, over the host proteins either
+    of them reaches. The diagonal is left empty -- a parasite is identical to itself, which
+    says nothing about any pair and would be the darkest cell of every row.
+
+    The ratio and not the count of shared proteins. A count follows how many interactors
+    the two parasites have between them, so the pairs it puts at the top are the pairs of
+    the best-predicted parasites: two nematodes of eight hundred interactors share more
+    proteins by having more, and a pair that share almost everything they have is a pale
+    cell beside them. Divided by the union, a cell is the overlap of the pair and nothing
+    else, and the blocks against the diagonal are blocks of parasites reaching the same
+    host proteins rather than blocks of parasites with many.
+
+    The count is returned beside the ratio: it is what the hover of a cell gives the ratio
+    in terms of, and what the dialog behind a click then lists.
 
     The parasites are in the order of the dot matrix, whichever annotation that order is
     taken from, so that a row is the same parasite in both and a block against the
     diagonal is a block in both.
+
+    :return: (similarity, shared counts, clades, niches), the two frames on the same
+             parasites in the same order, or None where there are fewer than three
+             parasites to compare
     '''
     targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
     targets = {g: t for g, t in targets.items() if t}
@@ -375,11 +396,17 @@ def get_shared_interactor_counts(df_pred, groups, group_order, niches, order_by)
     if len(labels) < 3:
         return None
 
-    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels],
+    shared = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels],
                       dtype=float)
-    np.fill_diagonal(counts, np.nan)
+    # the union of two non-empty sets is non-empty, and the sets are filtered to those
+    union = np.array([[len(targets[a] | targets[b]) for b in labels] for a in labels],
+                     dtype=float)
+    similarity = shared / union
+    np.fill_diagonal(similarity, np.nan)
+    np.fill_diagonal(shared, np.nan)
 
-    return (pd.DataFrame(counts, index=labels, columns=labels),
+    return (pd.DataFrame(similarity, index=labels, columns=labels),
+            pd.DataFrame(shared, index=labels, columns=labels),
             [groups.get(g, UNKNOWN_GROUP) for g in labels],
             [niches.get(g, web_utils.UNKNOWN_NICHE) for g in labels])
 
@@ -408,10 +435,10 @@ def flat_colour_scale(values, colors):
         [list(colors).index(v) for v in values]
 
 
-def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
+def generate_shared_interactor_heatmap(similarity, shared, clades, niches, palette, column):
     '''
-    The shared-interactor count matrix, with a strip of the taxonomic group and a strip of
-    the niche of each parasite down the side and along the top, so that the two axes are
+    The shared-interactor similarity matrix, with a strip of the taxonomic group and a strip
+    of the niche of each parasite down the side and along the top, so that the two axes are
     visibly the same list of parasites in the same order.
 
     The columns are named above the matrix, outside their own strips, and the two legends
@@ -439,12 +466,17 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
 
     The diagonal is drawn grey by a trace of its own rather than being left blank:
     blank renders as the white the colour scale starts at, so it could not be told from a
-    pair sharing nothing. It carries no count, only the name of the parasite.
+    pair sharing nothing. It carries no value, only the name of the parasite.
 
     Every cell off the diagonal carries an invisible marker as well, which is what a click
     on it lands on and what its hover is read from, and the index of that trace is returned
     beside the figure so the page can tell such a click from any other.
 
+    :param similarity: the Jaccard similarity of every pair, as
+                       get_shared_interactor_similarity builds it, which is what the cells
+                       are coloured by
+    :param shared: the host proteins each pair has in common, which the hover gives the
+                   similarity of a cell in terms of
     :param column: pixels the column holding the figure is on the screen the page is being
                    read on, which web_utils.column_width measures. It is the height that is
                    sized from it -- the width belongs to the column -- so that the square
@@ -454,8 +486,8 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     shown = [g for g in palette if g in set(clades)]
     niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
                     if n in set(niches)]
-    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
-    y_names = list(counts.index)
+    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
+    y_names = list(similarity.index)
     cells = list(range(len(y_names)))
     strip, codes = flat_colour_scale(clades, {g: palette[g] for g in shown})
     niche_strip, niche_codes = flat_colour_scale(
@@ -464,8 +496,9 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     # the same span on both axes -- the matrix, the two strips beside it and the cell
     # between them and it -- so that a square plot area is one of square cells
     span = len(cells) + 2.6
-    # the counts beside the colour bar are the whole of what varies in the room it needs
-    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(counts.to_numpy()):.0f}')
+    # the ticks beside the colour bar are the whole of what varies in the room it needs,
+    # and a similarity is written to two decimals however large the largest of them is
+    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(similarity.to_numpy()):{TICK}}')
 
     # A line of text is about 1.1 times its point size tall, which is the room a cell has to
     # give the label against it. The cells being square, one size would do for both axes --
@@ -525,18 +558,27 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
                                     y0=-1.4 - offset, dy=1,
                                     text=[list(values)], xgap=1, **scale))
 
-    # the counts. The hover of a cell belongs to the clickable layer added below rather
-    # than to this trace: two traces answering the same pointer answer it differently,
-    # and the one that can be clicked is the one that should say what clicking it opens
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells, hoverinfo='skip',
+    # the similarities. The hover of a cell belongs to the clickable layer added below
+    # rather than to this trace: two traces answering the same pointer answer it
+    # differently, and the one that can be clicked is the one that should say what
+    # clicking it opens.
+    #
+    # The scale runs to the largest similarity on the matrix rather than to the 1.0 a
+    # Jaccard can reach, as it ran to the largest count before it. The pairs of a host are
+    # nothing like evenly spread -- a human's run to 0.8 between sibling species, with the
+    # median pair at 0.08 -- so a host whose parasites are less alike would be drawn in the
+    # pale end of a fixed scale and could not be read at all. The colour bar states the
+    # values either way
+    figure.add_trace(go.Heatmap(z=similarity.to_numpy(), x=cells, y=cells, hoverinfo='skip',
                                 colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
                                             '#3182bd', '#08519c'],
-                                zmin=0, zmax=np.nanmax(counts.to_numpy()),
+                                zmin=0, zmax=np.nanmax(similarity.to_numpy()),
                                 hoverongaps=False,
-                                colorbar=dict(title=dict(text='Shared interactors',
+                                colorbar=dict(title=dict(text='Jaccard similarity',
                                                          side='right'),
                                               thickness=12, len=0.6, y=1, yanchor='top',
                                               x=1 + COLORBAR_GAP / side,
+                                              tickformat=TICK,
                                               tickfont=dict(size=10))))
 
     # the diagonal, a cell of flat grey per parasite, drawn over the empty cells the count
@@ -544,7 +586,7 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
     # there is no shared-interactor count to give. It is laid over the whole grid, one cell
     # of it drawn and the rest empty, so both traces turn hovering on gaps off -- left on,
     # the empty cells of whichever trace is on top answer for the cells beneath them
-    diagonal = np.full(counts.shape, np.nan)
+    diagonal = np.full(similarity.shape, np.nan)
     np.fill_diagonal(diagonal, 0)
     figure.add_trace(go.Heatmap(z=diagonal, x=cells, y=cells,
                                 text=[[name] * len(y_names) for name in y_names],
@@ -569,8 +611,12 @@ def generate_shared_interactor_heatmap(counts, clades, niches, palette, column):
         # plotly dims what was not selected, which on a click would leave the one cell
         # that was clicked lit and wash the rest of the matrix out behind the dialog
         selected=dict(marker=dict(opacity=1)), unselected=dict(marker=dict(opacity=1)),
-        text=[f'{y_names[y]} and {y_names[x]}<br>Shared interactors '
-              f'{counts.iat[y, x]:.0f}' for x, y in click_targets],
+        # the count beside the ratio: a similarity of 0.12 says how alike the pair are
+        # and nothing about how much there is of it, and the two of them are what the
+        # dialog behind the click then lists
+        text=[f'{y_names[y]} and {y_names[x]}<br>'
+              f'Jaccard similarity {similarity.iat[y, x]:{TICK}}<br>'
+              f'Shared interactors {shared.iat[y, x]:.0f}' for x, y in click_targets],
         hovertemplate='%{text}<extra></extra>', showlegend=False))
     click_layer = len(figure.data) - 1
 
@@ -1180,8 +1226,8 @@ if selected_host != web_utils.NO_HOST:
                                  'other on their axes. The strips beside the axes show both '
                                  'either way; this is which of them comes out in blocks.')
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
-    shared_counts = get_shared_interactor_counts(counted, parasite_groups, group_order,
-                                                niches, order_by)
+    shared_similarity = get_shared_interactor_similarity(counted, parasite_groups,
+                                                        group_order, niches, order_by)
     top_shared = get_top_shared_proteins(counted, parasite_groups, group_order, niches,
                                          order_by,
                                          web_utils.load_protein_annotations(data_dir),
@@ -1190,14 +1236,19 @@ if selected_host != web_utils.NO_HOST:
     matrix, shared = st.columns(2)
 
     with matrix:
-        st.subheader("Host interactors shared by each pair of parasites")
-        st.caption('Number of host interactors shared by each pair of parasites. Two strips '
+        st.subheader("Overlap of the host interactors of each pair of parasites")
+        st.caption('How alike the host interactors of each pair of parasites are, as the '
+                   'Jaccard similarity of the two sets: the host proteins both reach, over '
+                   'the host proteins either of them reaches. A count of shared proteins on '
+                   'its own follows how many interactors the pair have between them, and '
+                   'ranks the best-predicted parasites above the most alike; this does not. '
+                   'Two strips '
                    'run along each axis: the taxonomic group of the parasite, and whether it '
                    'lives inside a host cell or outside one. Whichever the parasites are '
                    'ordered by comes out in blocks. The diagonal, where a parasite meets '
-                   'itself, is greyed out. Click a cell to see the shared host proteins '
-                   'it counts.')
-        if shared_counts is not None:
+                   'itself, is greyed out. Hover a cell for the count behind its ratio, or '
+                   'click it to see the shared host proteins.')
+        if shared_similarity is not None:
             # the figure is given the width of the column and keeps its cells square within
             # it, so it follows whatever screen the page is read on
             # the figure carries the width of the column rather than being stretched to it,
@@ -1205,7 +1256,7 @@ if selected_host != web_utils.NO_HOST:
             # by plotly on the fly, and it does not undo that when the figure is given its
             # column back after being opened full screen
             figure, click_layer = generate_shared_interactor_heatmap(
-                *shared_counts, config.get('parasite_groups', {}), column)
+                *shared_similarity, config.get('parasite_groups', {}), column)
             # The chart is remounted after every dialog, its key carrying a counter. Two
             # things would otherwise keep the same cell from being opened twice running:
             # Streamlit drops a selection identical to the one it is already holding, and
@@ -1224,7 +1275,7 @@ if selected_host != web_utils.NO_HOST:
             if cell is not None:
                 # the axes of the matrix count cells, so the two parasites are the row and
                 # the column the marker sits on
-                parasites = list(shared_counts[0].index)
+                parasites = list(shared_similarity[0].index)
                 st.session_state[CELL_NONCE_KEY] = nonce + 1
                 show_shared_interactors_dialog(
                     parasites[int(cell['y'])], parasites[int(cell['x'])], counted,

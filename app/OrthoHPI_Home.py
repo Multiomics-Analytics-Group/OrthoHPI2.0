@@ -303,6 +303,25 @@ def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
     figure.update_yaxes(visible=False, range=[0, 1], row=row)
 
 
+def stack_bands(figure, upper=2, lower=3):
+    '''
+    Sit the two strips on one another. make_subplots leaves the same gap between every pair
+    of rows, and the gap that keeps the strips apart from the columns is a line between the
+    strips themselves, which say one thing each about the same parasite and read as one
+    block under it. The upper strip drops onto the lower one and the columns take back the
+    room it left, so the figure keeps its height and its gap under the columns.
+
+    :param figure: a figure host_columns built with two bands, modified in place
+    :param int upper: the row of the strip that moves down
+    :param int lower: the row of the strip it comes to rest on
+    '''
+    top = figure.get_subplot(lower, 1).yaxis.domain[1]
+    bottom, ceiling = figure.get_subplot(upper, 1).yaxis.domain
+    figure.update_yaxes(domain=[top, top + ceiling - bottom], row=upper)
+    figure.update_yaxes(domain=[top + ceiling - bottom + BAND_GAP,
+                                figure.get_subplot(1, 1).yaxis.domain[1]], row=1)
+
+
 def add_group_and_niche_bands(figure, hosts, palette):
     '''
     Two strips under each column for the figure whose bars are split by localization: the
@@ -321,6 +340,7 @@ def add_group_and_niche_bands(figure, hosts, palette):
     add_band(figure, hosts, 'group', palette, set(), row=2, legend='legend2')
     add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=3, legend='legend3',
              unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+    stack_bands(figure)
     figure.update_layout(height=520, margin=dict(t=175),
                          legend=dict(y=1.42, title_text='DeepLoc',
                                      title_font=dict(size=11)),

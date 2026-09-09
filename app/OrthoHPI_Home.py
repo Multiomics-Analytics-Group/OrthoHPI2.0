@@ -274,6 +274,10 @@ def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
             figure.add_trace(
                 go.Bar(x=rows['name'], y=[1] * len(rows), name=value, width=1,
                        marker_color=palette.get(value, unknown),
+                       # one segment per parasite and one slot per parasite: the values are
+                       # a trace each for the legend's sake, and traces left in slots of
+                       # their own are dealt half a column each and drawn off centre
+                       offsetgroup=field,
                        legend=legend, legendgroup=value,
                        showlegend=value not in labelled,
                        hovertemplate='%{x}' f'<extra>{value}</extra>'),
@@ -663,6 +667,9 @@ def generate_interactions_per_parasite(df, palette, width, score):
             figure.add_trace(
                 go.Bar(x=rows['name'], y=rows['count'], name=group,
                        marker_color=palette.get(group, UNKNOWN_COLOR),
+                       # a bar per parasite, whatever group it is drawn in the colour of,
+                       # so the bars stand over the segments of the strip below them
+                       offsetgroup='parasite',
                        legendgroup=group, showlegend=group not in labelled_groups,
                        hovertemplate='%{x}<br>%{y} predicted interactions'
                                      f'<extra>{group}</extra>'),

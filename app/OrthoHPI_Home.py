@@ -43,6 +43,11 @@ NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives
 BANDS_STRIP = ('The upper strip below the columns indicates the taxonomic group of the '
                'parasite, the lower one whether it lives inside a host cell or outside '
                'one. ' + INTRACELLULAR_NOTE)
+# what a link between two orthology groups had to carry in one of the two STRING channels
+# to be transferred at all, EVIDENCE_CUTOFF of pipeline/homology.py. Half of it is the foot
+# of the confidence scale, the score being the mean of the two channels: a group link over
+# the cut-off in one channel and absent from the other scores exactly there
+EVIDENCE_CUTOFF = 0.7
 # the confidence the counts of the page are drawn at, and the range the slider spans, the
 # same default and range as the network page: a parasite counted here then agrees with the
 # network the reader opens next instead of being several times larger than it
@@ -912,12 +917,11 @@ st.plotly_chart(
                                        share=bar_scale == BAR_SCALES[1]),
     width='stretch')
 
-st.subheader("Confidence of the predicted interactions per parasite")
-st.caption('Boxplots of the distribution of confidence scores per parasite. Scores derive from '
-           'the evidence supporting the orthologous interaction from which each prediction was '
-           'transferred. Every prediction is counted here, whatever the slider is set to; the '
-           'dotted line marks it, so the part of a box above the line is the part of that '
-           'parasite counted in the figure above. ' + NICHE_STRIP)
+st.subheader("Interaction confidence scores")
+st.caption('Boxplots of the distribution of confidence scores per parasite. The scores are '
+           'calculated as the average of the experimental and database evidence channels '
+           'of the KOG-KOG link it was transferred from. The '
+           'dotted line marks the threshold selected in the confidence slider. ' + NICHE_STRIP)
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 
@@ -933,7 +937,7 @@ if parasite_proteins is not None:
     unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
 
 if host_proteins is not None:
-    st.subheader("Localization confidence of host proteins")
+    st.subheader("Localization probabilities of host proteins")
     st.caption('Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
                'assigned localization, one column per class and one box per host. The dotted '
                'line in each column marks the cut-off that class is called at, DeepLoc 2\'s own '
@@ -950,7 +954,7 @@ if host_proteins is not None:
     st.plotly_chart(generate_host_score_boxes(host_proteins, page), width='stretch')
 
 if parasite_proteins is not None:
-    st.subheader("Localization confidence of extracellular parasite proteins")
+    st.subheader("Localization probabilities of extracellular parasite proteins")
     st.caption('Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
                'extracellular or both classes for each parasite, over every prediction whatever '
                'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
@@ -970,7 +974,7 @@ if parasite_proteins is not None:
             'P(extracellular)', point_size=2),
         width='stretch')
 
-    st.subheader("Localization confidence of membrane parasite proteins")
+    st.subheader("Localization probabilities of membrane parasite proteins")
     st.caption('The equivalent for parasite proteins assigned to cell membrane or both '
                'classes, scored on that probability, again over every prediction. Only '
                'unicellular parasites are represented, the secretome filter admitting a '

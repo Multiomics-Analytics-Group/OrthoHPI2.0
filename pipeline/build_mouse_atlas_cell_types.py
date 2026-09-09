@@ -50,6 +50,13 @@ TISSUE_MAPPING = {
     'Spleen': 'spleen',
 }
 
+# TISSUES records the large intestine both under `colon` and under the coarser
+# `intestine`, and `Large_Intestine` is the atlas's only source of mouse cell types for
+# either, so its rows are written out under both labels; the droplet cells it holds are
+# largely colonic epithelium. `small intestine` and `rectum` have no atlas tissue of
+# their own and stay without cell types rather than borrowing these.
+SHARED_TISSUE_LABELS = {'intestine': ['colon']}
+
 
 def normalized_tissues(obs):
     """Map source tissue labels to the OrthoHPI vocabulary without inventing matches."""
@@ -64,6 +71,22 @@ def normalized_tissues(obs):
             .fillna(source.loc[heart_or_aorta]).astype(object)
         )
     return source.map(TISSUE_MAPPING)
+
+
+def add_shared_labels(data):
+    """Write the rows of a tissue out under the other labels TISSUES also gives it."""
+    extra = []
+    for tissue, labels in SHARED_TISSUE_LABELS.items():
+        sources = [source for source, mapped in TISSUE_MAPPING.items() if mapped == tissue]
+        # the labels are shared with one atlas tissue, not with whatever else may later be
+        # mapped onto the same OrthoHPI tissue, so a second source has to be looked at
+        if len(sources) != 1:
+            raise ValueError(f'{tissue} is mapped from {sorted(sources)}, so it cannot be '
+                             f'labelled {labels} as well')
+        rows = data[data['Tissue'] == tissue]
+        extra.extend(rows.assign(Tissue=label) for label in labels)
+
+    return pd.concat([data, *extra], ignore_index=True) if extra else data
 
 
 def is_hdf5(filename):
@@ -213,8 +236,9 @@ def aggregate_expression(input_file, config_file, age):
     if not rows:
         return pd.DataFrame(columns=['Gene', 'Tissue', 'Cell type', 'nTPM'])
     data = pd.concat(rows, ignore_index=True)
-    return (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nTPM']
+    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nTPM']
             .mean())
+    return add_shared_labels(data)
 
 
 def build(input_file, config_file, output_file, age):

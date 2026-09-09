@@ -66,6 +66,10 @@ DOT_LEGEND_CHAR = 6.0
 LEGEND_TITLE_ROW = 18
 # the smallest the parasite names on the axis of a matrix are written, in points
 SMALLEST_LABEL = 9
+# pixels a row of the shared-interactor dot plot is drawn down, and what the rest of its
+# height goes on: the parasite names above the columns and the three legends under them
+DOT_ROW = 19
+DOT_CHROME = 240
 # session key the shared-interactor matrix counts its remounts under, which is what lets
 # the same cell be opened twice running
 CELL_NONCE_KEY = 'shared_cell_nonce'
@@ -143,6 +147,16 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
                   'Cell type'))
 
 
+def plot_room(labels, column):
+    '''
+    Pixels of a `column`-wide figure left for the plot itself, once rows named by `labels`
+    have taken the room their names need.
+    '''
+    # 6.2 pixels a character is the width of the default axis font, and 30 the room the
+    # matrix keeps free at either end of the axis
+    return column - (6.2 * max(len(str(l)) for l in labels) + 30)
+
+
 def dot_size(parasites, labels, column):
     '''
     Diameter of the largest dot of a matrix of `parasites` columns whose rows are named by
@@ -153,11 +167,7 @@ def dot_size(parasites, labels, column):
     a column of a few pixels, and a dot drawn at plotly's default fifteen there is a row of
     dots run together into a bar.
     '''
-    # 6.2 pixels a character is the width of the default axis font, and 30 the room the
-    # matrix keeps free at either end of the axis
-    free = column - (6.2 * max(len(str(l)) for l in labels) + 30)
-
-    return min(15, max(5, free / len(parasites)))
+    return min(15, max(5, plot_room(labels, column) / len(parasites)))
 
 
 @st.cache_data(show_spinner=False)
@@ -950,7 +960,33 @@ def add_parasite_strips(figure, dots, parasites, palette):
     return groups_shown, niches_shown
 
 
-def add_localisation_strip(figure, dots, proteins):
+def strip_width(parasites, proteins, height, room):
+    '''
+    Width in x units of the band beside the rows of the dot plot, at which its cells come
+    out as wide as they are high.
+
+    A cell of the band is one row high, and drawn on the axes of the dots it was one
+    parasite wide -- which on a host reached by five parasites is a lozenge lying on its
+    side, and on one reached by forty-five a sliver standing on end. The width is solved
+    for in x units instead: the pixels an x unit is drawn across are the plot divided by
+    the units it spans -- the parasites, the band, and the half-band of gap between the
+    two -- and the width wanted is the one that makes that as many pixels as a row is high.
+
+    :param int parasites: columns the plot carries
+    :param int proteins: rows it carries
+    :param float height: pixels the figure is drawn down
+    :param float room: pixels of it the plot itself is drawn across
+    :return: the width of a cell of the band, in x units
+    '''
+    # the y axis is opened up past the top row to hold the two strips above the columns,
+    # which the rows share the height with; the height itself is the plot and the room the
+    # names and the legends take around it
+    row = (height - DOT_CHROME) / (proteins + 2.5)
+    # room = row * (parasites + 1.5 * width) / width, solved for the width
+    return row * parasites / max(room - 1.5 * row, row)
+
+
+def add_localisation_strip(figure, dots, proteins, width):
     '''
     Where DeepLoc puts each host protein, as a band beside its row. It is a property of the
     protein and so constant along the row, which is what makes it a band rather than a
@@ -960,6 +996,8 @@ def add_localisation_strip(figure, dots, proteins):
     :param figure: the dot plot, modified in place
     :param dots: the frame behind it, carrying `surface` beside each `protein`
     :param list proteins: the host proteins in the order of the y axis
+    :param float width: x units a cell of the band is drawn across, which is what keeps it
+                        square whatever the number of parasites
     :return: the localization classes drawn, in the order they are keyed in
     '''
     surface_of = dict(zip(dots['protein'], dots['surface']))
@@ -967,8 +1005,11 @@ def add_localisation_strip(figure, dots, proteins):
     shown = [c for c in LOCALISATION_ORDER if c in set(localisations)]
     scale, codes = flat_colour_scale(localisations,
                                      {c: LOCALISATION_COLORS[c] for c in shown})
-    # the colour of a cell is the class, its hover the classes behind that class
-    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1,
+    # the colour of a cell is the class, its hover the classes behind that class. The band
+    # is `width` x units across rather than the one unit a cell of a heatmap is: an x unit
+    # is a parasite, and a host with five of them is a column wide enough to draw the row
+    # of a protein three times over
+    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-0.5 - width, dx=width,
                                 y=list(range(len(proteins))),
                                 text=[[label] for label in
                                       localisation_labels(dots, proteins)],
@@ -1131,25 +1172,28 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
             hovertemplate='<br>'.join(hover_lines) + '<extra></extra>'))
 
     groups_shown, niches = add_parasite_strips(figure, dots, parasites, palette)
-    localisations = add_localisation_strip(figure, dots, proteins) if localised else []
     # what the legends wrap inside is what the row labels leave of the column, which is what
-    # the dots were sized on as well
-    height = max(420, 19 * len(proteins) + 240)
-    room = add_dot_legend(figure, groups_shown, localisations, niches, palette,
-                          column - (6.2 * max(len(str(p)) for p in proteins) + 30), height)
+    # the dots were sized on as well, and what the band beside the rows is squared against
+    height = max(420, DOT_ROW * len(proteins) + DOT_CHROME)
+    room = plot_room(proteins, column)
+    band = strip_width(len(parasites), len(proteins), height, room) if localised else 0
+    localisations = add_localisation_strip(figure, dots, proteins, band) if localised else []
+    legends = add_dot_legend(figure, groups_shown, localisations, niches, palette, room,
+                             height)
 
     figure.update_layout(height=height, plot_bgcolor='white',
                          # the room the legends take is left under the plot rather than
                          # taken out of it: they are placed against the foot of the figure
-                         margin=dict(l=0, r=0, t=10, b=room),
+                         margin=dict(l=0, r=0, t=10, b=legends),
                          xaxis_title=None, yaxis_title='host protein')
     # every parasite is named, however narrow its column: plotly thins the labels that no
     # longer fit, and a matrix with every other column named cannot be read at all, so they
     # are drawn at the size a column has room for instead. The names lean up and to the
     # right of the tick they belong to, the slant they are drawn at everywhere on the page.
-    # The range runs back past the two strips above the columns rather than on past the
-    # last of them, which is what puts them between the names and the plot
-    figure.update_xaxes(range=[-1.9 if localised else -0.5, len(parasites) - 0.5],
+    # The range runs back past the band beside the rows -- its own width, and the half of
+    # one left as a gap between it and the first column -- rather than on past the last
+    # parasite, which is what puts the names of the columns over the plot and not the band
+    figure.update_xaxes(range=[-0.5 - 1.5 * band, len(parasites) - 0.5],
                         side='top', tickmode='array', tickvals=list(range(len(parasites))),
                         ticktext=parasites, tickangle=-60, automargin=True, ticks='',
                         tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),

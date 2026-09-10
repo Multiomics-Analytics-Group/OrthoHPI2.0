@@ -10,16 +10,42 @@ from . import cell_type_annotations, homology, filters, go
 # ignored. A host can override it with hosts.<taxid>.tissue_cutoff in config.yml.
 TISSUE_CUTOFF = 2.5
 
-# DeepLoc 2 (Accurate) probability cut-offs for keeping a host protein as surface-exposed.
-# Values are DeepLoc's own per-class thresholds for the Accurate (ProtT5) model
-# (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] -> threshold[i+1], which
-# convert_label2string reads at i+1). The parasite secretome filter applies the same two
-# numbers in deeploc/build_secretome_fastas.py; docs/deeploc.md has the derivation.
-# A host protein is kept if it is at the cell membrane or secreted; set
-# DEEPLOC_EXTRACELLULAR_CUTOFF to None to keep only Cell membrane proteins.
+# DeepLoc 2 (Accurate) probability cut-offs for the localisation classes a parasite can
+# reach in its host. Values are DeepLoc's own per-class thresholds for the Accurate
+# (ProtT5) model (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] ->
+# threshold[i+1], which convert_label2string reads at i+1). The parasite secretome filter
+# applies the two surface numbers in deeploc/build_secretome_fastas.py; docs/deeploc.md
+# has the derivation.
 DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')
-DEEPLOC_EXTRACELLULAR_CUTOFF = 0.61728516  # None to disable
-DEEPLOC_MEMBRANE_CUTOFF = 0.56464844
+DEEPLOC_CUTOFFS = {
+    'Extracellular': 0.61728516,
+    'Cell membrane': 0.56464844,
+    'Cytoplasm': 0.47612305,
+    'Nucleus': 0.50136719,
+}
+
+# Which of those classes each niche of config.yml reaches, and so which host proteins are
+# open to a parasite that lives there. Both niches keep the host surface: an intracellular
+# parasite has an invasive extracellular stage that has to engage it, and the config
+# records the wider of a parasite's stages. What the intracellular niche adds is the
+# cytosol and the nucleus, which its effectors reach whether the parasite lies free in the
+# cytoplasm (T. cruzi, Trichinella) or exports them across a parasitophorous vacuole
+# membrane (Plasmodium, Toxoplasma, Leishmania, Cryptosporidium, microsporidia).
+#
+# The other DeepLoc classes are deliberately left out. Mitochondrion, Endoplasmic
+# reticulum, Golgi apparatus, Lysosome/Vacuole and Peroxisome are lumen- and matrix-facing
+# proteomes behind a membrane the parasite does not cross; a vacuole recruiting host ER or
+# mitochondria touches their cytosolic face, and those proteins already carry Cytoplasm.
+# Adding them would keep 93% of the human proteome, which is no filter at all.
+DEEPLOC_NICHE_CLASSES = {
+    'extracellular': ('Extracellular', 'Cell membrane'),
+    'intracellular': ('Extracellular', 'Cell membrane', 'Cytoplasm', 'Nucleus'),
+}
+# the niche a parasite is filtered on when config.yml records none for it: the narrower of
+# the two, so a missing value cannot widen a host pool by accident
+DEEPLOC_DEFAULT_NICHE = 'extracellular'
+DEEPLOC_NICHE_CUTOFFS = {niche: {c: DEEPLOC_CUTOFFS[c] for c in classes}
+                         for niche, classes in DEEPLOC_NICHE_CLASSES.items()}
 
 
 def get_proteins(config_file):
@@ -68,8 +94,8 @@ def filter_proteins(config_file, data_dir, proteins):
     """
     Narrow every species to the proteins an interaction could be predicted between: the
     parasite proteins the secretome predictions call secreted or membrane-bound, and the
-    host proteins expressed in a tissue some parasite of the config infects and called
-    surface-exposed by DeepLoc.
+    host proteins expressed in a tissue some parasite of the config infects and put by
+    DeepLoc in a localisation a parasite infecting that host can reach.
 
     Kept apart from run() so that the pool can be rebuilt for a data directory without
     repeating the orthology transfer, which is the expensive half of the pipeline.
@@ -77,22 +103,25 @@ def filter_proteins(config_file, data_dir, proteins):
     :param str config_file: path to the configuration file
     :param str data_dir: directory holding the secretome and DeepLoc inputs
     :param dict proteins: {taxid: {protein: name}} before filtering; filtered in place
-    :return: ({protein: name} over every species, {protein: [tissue, ...]} for the hosts)
+    :return: ({protein: name} over every species, {protein: [tissue, ...]} for the hosts,
+             {niche: set of host proteins it reaches})
     """
     # proteins stays a {taxid: {protein: name}} dict through all three filters,
     # then is flattened to one {protein: name} dict for the homology transfer
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
-    # host proteins kept if DeepLoc calls them Extracellular or Cell membrane (surface-exposed)
-    filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
-                                 deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
-                                 extracellular_cutoff=DEEPLOC_EXTRACELLULAR_CUTOFF,
-                                 membrane_cutoff=DEEPLOC_MEMBRANE_CUTOFF)
+    # host proteins kept if DeepLoc puts them in a class the parasites infecting that host
+    # reach; the per-niche halves of that pool go on to get_links, which applies them
+    # parasite by parasite
+    reachable = filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
+                                             deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
+                                             niche_cutoffs=DEEPLOC_NICHE_CUTOFFS,
+                                             default_niche=DEEPLOC_DEFAULT_NICHE)
 
-    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues
+    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues, reachable
 
 
-def save_eligible_proteins(proteins, output_file):
+def save_eligible_proteins(proteins, output_file, reachable=None):
     """
     Write the proteins the filters passed, over every species of the config.
 
@@ -103,11 +132,26 @@ def save_eligible_proteins(proteins, output_file):
     -- whichever parasite is being asked about. The parasites need this file, having no
     tissue table to be read out of.
 
+    The pool is not the same for every parasite once the hosts are filtered by niche, so
+    a reachable_<niche> column says which half of it each protein belongs to: a network of
+    an extracellular parasite has to be read against the surface proteins alone, while the
+    cytosolic and nuclear ones were only ever available to the intracellular parasites.
+    Parasite proteins are true in every column -- the niche constrains the host side.
+
     :param dict proteins: {protein: name} after the filters, over every species
     :param str output_file: parquet path to write
+    :param dict reachable: {niche: set of host proteins}, as filter_proteins returns it;
+                           None writes the pool without the per-niche columns
     """
     eligible = pd.DataFrame(sorted(proteins.items()), columns=['protein', 'name'])
     eligible['taxid'] = eligible['protein'].str.split('.').str[0]
+    if reachable:
+        # every host protein of the pool is in some niche's set -- the filter dropped the
+        # ones no niche reaches -- so what is in none of them is a parasite protein
+        parasite_side = ~eligible['protein'].isin(set().union(*reachable.values()))
+        for niche, host_proteins in sorted(reachable.items()):
+            eligible[f'reachable_{niche}'] = (eligible['protein'].isin(host_proteins)
+                                              | parasite_side)
 
     utils.save_to_parquet(eligible, output_file)
 
@@ -215,12 +259,12 @@ def run(config_file, data_dir, verbose=False):
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/DeepLoc filters...")
-    proteins, tissues = filter_proteins(config_file=config_file, data_dir=data_dir,
-                                        proteins=proteins)
+    proteins, tissues, reachable = filter_proteins(config_file=config_file,
+                                                  data_dir=data_dir, proteins=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 
     print("Writing the proteins the filters passed...")
-    save_eligible_proteins(proteins=proteins,
+    save_eligible_proteins(proteins=proteins, reachable=reachable,
                            output_file=os.path.join(data_dir, 'eligible_proteins.parquet'))
 
     print("Annotating tissue and cell type expression...")
@@ -237,7 +281,8 @@ def run(config_file, data_dir, verbose=False):
     if verbose:
         print_group_counts(valid_groups)
     predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups,
-              proteins=proteins, config_file=config_file)
+              proteins=proteins, config_file=config_file, reachable=reachable,
+              default_niche=DEEPLOC_DEFAULT_NICHE)
 
     print("Annotating predictions with UniProt accessions...")
     predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)

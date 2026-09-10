@@ -84,13 +84,14 @@ def tissues_pass(config_file, pool, cutoff, channel):
 
 
 def deeploc_pass(config_file, pool):
-    """Proteins kept by the DeepLoc surface filter, per host."""
+    """Proteins kept by the DeepLoc localisation filter, per host: the union over
+    the niches of the parasites that infect it."""
     proteins = {taxid: dict(p) for taxid, p in pool.items()}
     filters.apply_deeploc_filter(
         config_file=config_file, valid_proteins=proteins,
         deeploc_dir=os.path.join('data', main.DEEPLOC_ACCURATE_DIR),
-        extracellular_cutoff=main.DEEPLOC_EXTRACELLULAR_CUTOFF,
-        membrane_cutoff=main.DEEPLOC_MEMBRANE_CUTOFF)
+        niche_cutoffs=main.DEEPLOC_NICHE_CUTOFFS,
+        default_niche=main.DEEPLOC_DEFAULT_NICHE)
     return {taxid: set(p) for taxid, p in proteins.items()}
 
 

@@ -7,6 +7,28 @@ PIG_TAXID = '9823'
 MOUSE_TAXID = '10090'
 CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 
+# HPA names its own tissues; they have to be rewritten as the labels of config['tissues']
+# before the cell types can be merged onto the rows of the TISSUES annotation. One HPA
+# name can stand for more than one label: TISSUES annotates the gut both under `colon`,
+# `rectum` and `small intestine` and under the coarser `intestine`, and HPA is the only
+# source of cell types for any of the four, so those three are written out under their own
+# name as well as under `intestine`. Sending them to `intestine` alone, as this did, left
+# every colon, rectum and small intestine row of the annotation without a cell type.
+#
+# `pbmc` is HPA's blood: it is the only single cell data HPA has for blood, and a name
+# missing from this table is dropped by the tissue filter, so leaving it out left blood
+# without a human cell type at all. It is the mononuclear fraction alone -- no
+# erythrocytes, no granulocytes -- so a blood cell type a parasite meets can be missing
+# from it, the red cell Plasmodium invades most of all.
+HPA_TISSUE_LABELS = {
+    'heart muscle': ['heart'],
+    'bronchus': ['lung'],
+    'pbmc': ['blood'],
+    'colon': ['colon', 'intestine'],
+    'rectum': ['rectum', 'intestine'],
+    'small intestine': ['small intestine', 'intestine'],
+}
+
 
 def read_hpa(config_file):
     '''
@@ -36,13 +58,22 @@ def map_hpa_data(config_file, hpa_data):
     :return: mapped dataframe
     '''
     aliases = utils.parse_string_aliases(config_file, sources=['Ensembl_gene'])
-    tissues_mapping = {'heart muscle':'heart', 'small intestine':'intestine', 'rectum':'intestine', 'bronchus':'lung', 'colon':'intestine'}
+    tissues = {t.lower() for t in utils.read_config(filepath=config_file, field='tissues').values()}
+    # a tissue HPA reports keeps only the labels of config['tissues'] it stands for, so the
+    # rows of the tissues OrthoHPI does not use are dropped before they are duplicated
+    labels = {tissue: [label for label in HPA_TISSUE_LABELS.get(tissue, [tissue]) if label in tissues]
+              for tissue in hpa_data['Tissue'].unique()}
+
     hpa_data = hpa_data.copy()
-    hpa_data['Tissue'] = hpa_data['Tissue'].replace(tissues_mapping)
+    hpa_data['Tissue'] = hpa_data['Tissue'].map(labels)
+    hpa_data = hpa_data[hpa_data['Tissue'].str.len() > 0].explode('Tissue', ignore_index=True)
     hpa_data['Gene'] = hpa_data['Gene'].map(aliases)
 
-    tissues = utils.read_config(filepath=config_file, field='tissues')
-    hpa_data = hpa_data[hpa_data['Tissue'].isin([t.lower() for t in tissues.values()])]
+    # the rewrite brings several HPA tissues under one label (bronchus onto lung, the three
+    # gut tissues onto intestine) and several Ensembl genes onto one STRING protein, so a
+    # cell type can now stand twice for the same gene and tissue; keep the highest nTPM of
+    # each, as read_hpa does for the rows it reads
+    hpa_data = hpa_data.sort_values(by='nTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
 
     return hpa_data
 

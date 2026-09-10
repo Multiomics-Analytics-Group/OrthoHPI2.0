@@ -220,10 +220,15 @@ def load_eligible_proteins(data_dir):
     return utils.read_parquet_file(input_file=eligible_file)
 
 
-def filtered_pool(data_dir, taxids):
+def filtered_pool(data_dir, taxids, niche=None):
     '''
     The proteins of these species that the pipeline had to work with: the ones that came
     through every filter, whether or not an interaction was predicted for them.
+
+    The host half of that pool depends on the niche of the parasite being asked about --
+    the cytosolic and nuclear proteins were only ever open to the intracellular parasites
+    -- so a niche narrows it to the column pipeline/main.py wrote for that niche. A pool
+    built before those columns existed is returned whole, as it was read before.
 
     This is the set a network is drawn from, so it is the background any enrichment of
     that network has to be read against. Tested against the whole proteome instead, a
@@ -237,11 +242,17 @@ def filtered_pool(data_dir, taxids):
 
     :param str data_dir: directory holding eligible_proteins.parquet
     :param tuple taxids: taxids as strings, of either side
+    :param str niche: niche of the parasite the pool is a background for, as config.yml
+                      records it; None leaves the pool at its union over the niches
     :return: set of STRING protein ids, empty where the directory carries neither table
     '''
     eligible = load_eligible_proteins(data_dir)
     if eligible is not None:
-        return set(eligible.loc[eligible['taxid'].isin(taxids), 'protein'])
+        rows = eligible['taxid'].isin(taxids)
+        column = niche_pool_column(niche)
+        if column is not None and column in eligible.columns:
+            rows = rows & eligible[column]
+        return set(eligible.loc[rows, 'protein'])
 
     tissues = load_tissue_annotation(data_dir)
     if tissues is None:
@@ -317,22 +328,28 @@ def load_deeploc_localisations(data_dir):
     missing file only leaves the localisations out of the figures that show them.
 
     :param str data_dir: directory holding deeploc_localisations.parquet
-    :return: dataframe of protein, localizations, signals, membrane_types,
-             extracellular, cell_membrane; empty if the file is not there
+    :return: dataframe of protein, localizations, signals, membrane_types and the
+             probability of each class of DEEPLOC_SCORES; empty if the file is not there
     '''
     input_file = os.path.join(data_dir, 'deeploc_localisations.parquet')
     if not os.path.exists(input_file):
-        return pd.DataFrame(columns=['protein', 'localizations', 'signals', 'membrane_types',
-                                     'extracellular', 'cell_membrane'])
+        return pd.DataFrame(columns=['protein', 'localizations', 'signals',
+                                     'membrane_types'] + list(DEEPLOC_SCORES.values()))
 
     return utils.read_parquet_file(input_file=input_file)
 
 
-# the two surface-accessible localization classes, the class of a protein over both
-# cut-offs, and the fallback for a protein over neither
+# the localization classes a parasite can reach: the two surface ones either kind of
+# parasite meets, and the two an intracellular parasite reaches inside the host cell
 CELL_MEMBRANE = 'Cell membrane'
 EXTRACELLULAR = 'Extracellular'
+CYTOPLASM = 'Cytoplasm'
+NUCLEUS = 'Nucleus'
+# the class of a protein called for more than one of them -- BOTH_SURFACE where only the
+# two surface classes are being read, SEVERAL where all four are -- and the fallback for a
+# protein called for none of the classes it is read on
 BOTH_SURFACE = 'Both'
+SEVERAL = 'Several'
 NOT_SURFACE = 'Neither'
 
 # DeepLoc 2's own per-class thresholds for the Accurate (ProtT5) model, the same values the
@@ -341,18 +358,71 @@ NOT_SURFACE = 'Neither'
 # label_threshold, which carries one entry more than there are classes and is read at i+1,
 # so Extracellular is labels[2] -> 0.61728516 and Cell membrane is labels[3] -> 0.56464844.
 # docs/deeploc.md has the derivation.
-DEEPLOC_CUTOFFS = {EXTRACELLULAR: 0.61728516, CELL_MEMBRANE: 0.56464844}
+DEEPLOC_CUTOFFS = {EXTRACELLULAR: 0.61728516, CELL_MEMBRANE: 0.56464844,
+                   CYTOPLASM: 0.47612305, NUCLEUS: 0.50136719}
+# the column of deeploc_localisations.parquet each class is scored on
+DEEPLOC_SCORES = {EXTRACELLULAR: 'extracellular', CELL_MEMBRANE: 'cell_membrane',
+                  CYTOPLASM: 'cytoplasm', NUCLEUS: 'nucleus'}
+# The classes each side of an interaction is read on, mirroring the two filters that built
+# it (pipeline/main.py DEEPLOC_NICHE_CLASSES, deeploc/build_secretome_fastas.py). A host
+# protein is kept for any of four, the cytosol and the nucleus being open to a parasite
+# with an intracellular stage; a parasite protein is kept by the secretome filter, which
+# reads the surface pair alone, so its own cytosolic proteins say nothing about what it
+# reaches its host with and are not a class it is split by.
+SURFACE_CLASSES = (EXTRACELLULAR, CELL_MEMBRANE)
+HOST_CLASSES = (EXTRACELLULAR, CELL_MEMBRANE, CYTOPLASM, NUCLEUS)
+
+# The colour of each class, wherever a figure of the app shows one -- the bars of the home
+# page and the strip beside the rows of the shared-interactor dot plot -- so that a class
+# learned on one page is read on the next without a second key. Each pair is two shades of
+# one hue: the blue the pages are headed in for the two surface classes, an orange for the
+# two inside the cell, so a figure reads as two places a parasite can meet its host rather
+# than as four unrelated categories, and the shades within a pair say it is one whole split
+# up. A protein called for more than one class is neither shade of either and gets a purple
+# of its own; one called for none of them, which is a species the filter never ran on, a
+# grey. The dark shade of each pair is darker than the taxonomic group nearest it -- the
+# strips carry Okabe-Ito, whose vermillion #D55E00 is the nearest thing to these oranges --
+# so a bar is not read as the clade of the parasite it stands over.
+LOCALISATION_COLORS = {EXTRACELLULAR: '#a6bddb', CELL_MEMBRANE: '#045a8d',
+                       CYTOPLASM: '#fdae6b', NUCLEUS: '#a63603',
+                       BOTH_SURFACE: '#756bb1', SEVERAL: '#756bb1',
+                       NOT_SURFACE: '#d9d9d9'}
 
 
-def classify_surface(localisations):
+def niche_classes(niche):
     '''
-    Which surface-accessible class DeepLoc puts each protein in, on the same cut-offs the
-    pipeline filtered it with. A protein over both is BOTH_SURFACE.
+    The classes a host protein of this parasite is read on: the four of HOST_CLASSES for a
+    parasite with an intracellular stage, the surface pair for one without.
 
-    NOT_SURFACE, over neither, does not occur in a data directory this pipeline built: both
-    sides came through a filter reading these same two numbers, the hosts in pipeline/main.py
-    and the parasites in deeploc/build_secretome_fastas.py. It stands for a species the
-    filter was never run for, or one of the snapshot directories built with other cut-offs.
+    A host protein can be called for a class its parasite's niche never gave it -- plenty
+    of cell membrane proteins are cytosolic as well -- and reading it on that class would
+    say the parasite meets it there, which is what apply_deeploc_filter did not allow. So
+    the classes follow the niche, and a parasite whose niche is unknown is read on the
+    surface pair, the narrower of the two, exactly as the filter treated it.
+
+    :param str niche: niche of the parasite, as get_niches names it
+    :return: the classes to read its host proteins on
+    '''
+    return HOST_CLASSES if niche == 'Intracellular' else SURFACE_CLASSES
+
+
+def classify_localisation(localisations, classes=HOST_CLASSES, multiple=SEVERAL):
+    '''
+    Which localization class DeepLoc puts each protein in, on the same cut-offs the pipeline
+    filtered it with. A protein called for more than one of them is `multiple`.
+
+    The classes are the caller's, because the two sides of an interaction were filtered on
+    different ones: HOST_CLASSES for a host protein, which an intracellular parasite reaches
+    in the cytosol and the nucleus as well as at the surface, and SURFACE_CLASSES for a
+    parasite protein, which the secretome filter kept for the surface pair alone. A class
+    whose probability the table does not carry is dropped, so a snapshot data directory
+    written before pipeline/build_deeploc_localisations.py kept the cytosolic
+    probabilities is read on the classes it does carry rather than failing.
+
+    NOT_SURFACE, called for none of them, is a protein of a species the filter was never
+    run for, or one of the snapshot directories built with other cut-offs. It does not
+    occur in a data directory this pipeline built and read on the classes that built it:
+    every protein of the predictions is over the cut-off of at least one of them.
 
     Read from the probabilities and not from the `localizations` column beside them. That
     column names a class even for a protein that crosses no threshold at all -- DeepLoc
@@ -361,15 +431,90 @@ def classify_surface(localisations):
     rejected and draw them below the cut-off line of every figure that shows one.
 
     :param localisations: DeepLoc table, as load_deeploc_localisations returns it
+    :param classes: the classes to read the table on, HOST_CLASSES or SURFACE_CLASSES
+    :param str multiple: what to call a protein over the cut-off of more than one of them:
+                         BOTH_SURFACE where there are two classes, SEVERAL where there are
+                         more, the word being what the legend of a figure carries
     :return: series of class names, aligned to the rows of the table
     '''
-    extracellular = localisations['extracellular'] > DEEPLOC_CUTOFFS[EXTRACELLULAR]
-    membrane = localisations['cell_membrane'] > DEEPLOC_CUTOFFS[CELL_MEMBRANE]
+    read = [c for c in classes if DEEPLOC_SCORES[c] in localisations]
+    called = {c: localisations[DEEPLOC_SCORES[c]] > DEEPLOC_CUTOFFS[c] for c in read}
+    if not called:
+        return pd.Series(NOT_SURFACE, index=localisations.index)
 
-    return pd.Series(np.select([extracellular & membrane, extracellular, membrane],
-                               [BOTH_SURFACE, EXTRACELLULAR, CELL_MEMBRANE],
-                               default=NOT_SURFACE),
+    # np.select takes the first condition that holds, so more than one class is tested for
+    # before any single class, which would otherwise claim the protein
+    over_several = sum(called.values()) > 1
+
+    return pd.Series(np.select([over_several] + [called[c] for c in read],
+                               [multiple] + list(read), default=NOT_SURFACE),
                      index=localisations.index)
+
+
+# Where a parasite sits relative to the host cell, as `niche` records it in config.yml:
+# which host proteins it is in a position to reach at all. It is not the same statement as
+# `multicellular`, which is about the other side of the interface -- which of the parasite's
+# own proteins are exposed to the host -- and the two are independent: Trichinella is
+# multicellular and intracellular, Trypanosoma brucei unicellular and extracellular.
+UNKNOWN_NICHE = 'Unknown'
+# outside the host cell, through to inside it, which is the order the bands and the legend
+# draw the values in
+NICHE_ORDER = ['Extracellular', 'Intracellular']
+# Greys, and deliberately not a hue of their own. The clades already have the Okabe-Ito set
+# and the DeepLoc classes the blues, and a third categorical palette beside those two would
+# be read as a third thing the bars are split into rather than as a fact about the parasite
+# under them. A ramp from pale to dark also carries the order of the values, which a set of
+# separate hues would not.
+NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Intracellular': '#3d3d3d',
+                UNKNOWN_NICHE: '#f0f0f0'}
+# what the band and its legend are called. `niche` is the config key, but it is not the
+# term the literature uses for this split -- that is the two words themselves -- so the
+# figures name the values rather than the key
+NICHE_TITLE = 'intracellular / extracellular'
+
+
+def parasite_niche(config, taxid):
+    '''
+    The niche config.yml records for one parasite, keyed by taxid rather than by label, so
+    a page holding predictions can look it up from the column they carry.
+
+    :param dict config: parsed configuration
+    :param taxid: parasite taxid, as an int or the string the predictions carry
+    :return: the niche as the config spells it, or None where it records none
+    '''
+    parasite = config.get('parasites', {}).get(int(taxid), {})
+
+    return str(parasite.get('niche', '')).strip().lower() or None
+
+
+def niche_pool_column(niche):
+    '''
+    The eligible_proteins column holding the half of the pool a niche reaches, as
+    pipeline/main.py names it, or None where there is no niche to narrow by.
+
+    :param str niche: niche as config.yml records it, or a display value of NICHE_ORDER
+    :return: column name, or None
+    '''
+    if not niche or str(niche).capitalize() not in NICHE_ORDER:
+        return None
+
+    return f'reachable_{str(niche).strip().lower()}'
+
+
+def get_niches(config):
+    '''
+    The niche of every parasite of the configuration, keyed by the label the predictions
+    name it with, so a figure can annotate a column without reading the config itself.
+
+    :param dict config: parsed configuration
+    :return: {parasite label: one of NICHE_ORDER, or UNKNOWN_NICHE}
+    '''
+    niches = {}
+    for parasite in config.get('parasites', {}).values():
+        niche = str(parasite.get('niche', '')).capitalize()
+        niches[parasite['label']] = niche if niche in NICHE_ORDER else UNKNOWN_NICHE
+
+    return niches
 
 
 def get_host_groups(config, predictions, include_rodents=False):

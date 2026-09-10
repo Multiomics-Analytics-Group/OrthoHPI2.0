@@ -2,10 +2,13 @@
 
 DeepLoc predicts subcellular localization and is run on a GPU, outside
 `pipeline/main.py`, in its own venv. Two consumers: the parasite secretome
-filter and the host surface filter ([pipeline.md](pipeline.md) steps 3 and 5).
-A third keeps the probabilities for the app — `build_deeploc_localisations.py`,
-run after the main pipeline, which is where the shape of the dots in the
-shared-interactors matrix of the "Parasites in a host" page comes from.
+filter and the host localization filter ([pipeline.md](pipeline.md) steps 3 and
+5). A third keeps the probabilities for the app —
+`build_deeploc_localisations.py`, run after the main pipeline, which writes the
+four probabilities the host filter reads (extracellular, cell membrane,
+cytoplasm, nucleus) and is where the shape of the dots in the shared-interactors
+matrix of the "Parasites in a host" page comes from. Re-run it after every
+`pipeline/main.py`, the table holding the proteins of the predictions.
 
 ## Scripts
 
@@ -82,17 +85,26 @@ DeepLoc calls a class with a strict `>`, and both filters match that.
 
 Where they live:
 
-- Hosts: `DEEPLOC_EXTRACELLULAR_CUTOFF` / `DEEPLOC_MEMBRANE_CUTOFF` in
-  `pipeline/main.py`, applied by `filters.apply_deeploc_filter`. Set the
-  extracellular one to `None` to keep only Cell membrane proteins.
+- Hosts: `DEEPLOC_CUTOFFS` in `pipeline/main.py`, applied per niche by
+  `filters.apply_deeploc_filter` — `DEEPLOC_NICHE_CLASSES` says which classes
+  each niche of `config.yml` reaches. Extracellular parasites get Extracellular
+  and Cell membrane; intracellular ones get Cytoplasm (`0.47612305`) and Nucleus
+  (`0.50136719`) as well, their effectors reaching the cytosol and the nucleus
+  whether the parasite lies free there or exports across a parasitophorous
+  vacuole membrane. The surface stays in for both, an intracellular parasite
+  having an invasive extracellular stage that has to engage it. The rest of
+  DeepLoc's classes are lumen- and matrix-facing proteomes behind a membrane the
+  parasite does not cross, and adding them would keep 93% of the human proteome.
 - Parasites: `EXTRACELLULAR_CUTOFF` / `MEMBRANE_CUTOFF` in
   `deeploc/build_secretome_fastas.py`, overridable with `--extracellular-cutoff`
   / `--membrane-cutoff`. Cell membrane only counts for species not flagged
   `multicellular: true` in `config.yml`, a multicellular parasite reaching its
   host with secreted proteins alone.
-- App: `web_utils.DEEPLOC_CUTOFFS`, which `classify_surface` reads to say which
-  class a protein was kept for and to draw the cut-off line on the confidence
-  figures. Display only — it filters nothing again.
+- App: `web_utils.DEEPLOC_CUTOFFS`, which `classify_localisation` reads to say
+  which class a protein was kept for and to draw the cut-off line on the
+  confidence figures. It reads a protein on the classes of its own side --
+  `HOST_CLASSES` for a host protein, `SURFACE_CLASSES` for a parasite one, the
+  same split the two filters make. Display only — it filters nothing again.
 
 ## Why not the `Localizations` column
 

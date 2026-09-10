@@ -91,8 +91,9 @@ parasite_groups:
 # the host side: which host proteins the parasite can reach at all. An
 # extracellular parasite meets the host surface and the space around it; an
 # intracellular one is inside a host cell and its cytosol and nucleus are open to
-# it as well. `both` is a life cycle with an intracellular and an extracellular
-# stage in the same host (Plasmodium, Trypanosoma cruzi). The two are
+# it as well, so a parasite with an intracellular stage in the host is recorded as
+# intracellular even when another stage is extracellular (Plasmodium, Trypanosoma
+# cruzi): that stage's reach is the wider of the two. The two fields are
 # independent: Trichinella is multicellular and intracellular, Trypanosoma brucei
 # unicellular and extracellular.
 parasites:
@@ -295,7 +296,7 @@ parasites:
     36329:
         label: Plasmodium falciparum
         group: Apicomplexa
-        niche: both
+        niche: intracellular
         color: "#6a3d9a"
         tissues:
             - "BTO:0001253"
@@ -308,7 +309,7 @@ parasites:
     5851:
         label: Plasmodium knowlesi
         group: Apicomplexa
-        niche: both
+        niche: intracellular
         color: "#ffff99"
         tissues:
             - "BTO:0001253"
@@ -319,7 +320,7 @@ parasites:
     126793:
         label: Plasmodium vivax
         group: Apicomplexa
-        niche: both
+        niche: intracellular
         color: "#b15928"
         tissues:
             - "BTO:0001253"
@@ -478,7 +479,7 @@ parasites:
         label: Trichuris trichiura
         group: Nematoda
         multicellular: true
-        niche: intracellular
+        niche: extracellular
         color: "#e7298a"
         tissues:
             - "BTO:0000269"
@@ -488,7 +489,7 @@ parasites:
     353153:
         label: Trypanosoma cruzi
         group: Kinetoplastida
-        niche: both
+        niche: intracellular
         color: "#01665e"
         tissues:
             - "BTO:0001253"

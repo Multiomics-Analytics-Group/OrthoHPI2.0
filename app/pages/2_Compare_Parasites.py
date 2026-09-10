@@ -40,33 +40,59 @@ DIAGONAL_COLOUR = '#9e9e9e'
 COLORBAR_GAP = 8
 COLORBAR_ROOM = 71
 COLORBAR_DIGIT = 6.5
-# the room one entry of the group legend takes across the top of that heatmap, in pixels:
+# how a similarity is written wherever the figure gives one: beside the colour bar, where
+# it sets the room the bar needs, and in the hover of a cell. Two decimals: most pairs of a
+# host sit under a tenth -- the median pair of a human is 0.08 -- and written to one they
+# are all the same number
+TICK = '.2f'
+# the height of one row of a legend below that heatmap, in pixels, which is what the room
+# left under the matrix is counted in
+LEGEND_ROW = 22
+# the room one entry of a legend takes across the foot of that heatmap, in pixels:
 # its marker and the padding around it, and about seven and a half pixels a character of the
-# longest group name -- plotly gives every entry the room the longest of them needs
+# longest name in it -- plotly gives every entry the room the longest of them needs
 LEGEND_ENTRY = 40
 LEGEND_CHAR = 7.5
-# the smallest the parasite names under a matrix are written, in points
+# the room left under the last legend of a dot matrix, in pixels
+LEGEND_PAD = 14
+# and about six pixels a character of the longest name in a legend of one, which is the
+# room plotly gives every entry of it. Narrower than the LEGEND_CHAR of the heatmap: the
+# entries there are set out to the width of the longest, the eleven-point names here pack
+# closer than that, and a legend measured too wide is a blank row between two legends
+DOT_LEGEND_CHAR = 6.0
+# and the room the title of one takes above its entries. A horizontal legend is titled on
+# top -- plotly defaults `title.side` to that on an orientation of `h` -- so the title is a
+# row of the legend and not a first entry set beside the others
+LEGEND_TITLE_ROW = 18
+# the smallest the parasite names on the axis of a matrix are written, in points
 SMALLEST_LABEL = 9
+# pixels a row of the shared-interactor dot plot is drawn down, and what the rest of its
+# height goes on: the parasite names above the columns and the three legends under them
+DOT_ROW = 19
+DOT_CHROME = 240
+# session key the shared-interactor matrix counts its remounts under, which is what lets
+# the same cell be opened twice running
+CELL_NONCE_KEY = 'shared_cell_nonce'
 
 
-# marker each surface class is drawn with in the shared-interactors matrix, and the order
-# they are offered in the legend. Colour there is already the parasite's taxonomic group
-# and size is the degree, so the localisation of the host protein goes on the shape --
-# constant down a row, since it is a property of the protein and not of the interaction.
+# The localization of a host protein is a band beside its row of the shared-interactors
+# dot plot, in the colours web_utils keys every localization figure of the app with, and
+# in this order. It is a property of the protein and so constant along a row, which is
+# what makes it a band: as the shape of the dot it was drawn once per parasite reaching
+# the protein, at a size where a circle and a diamond cannot be told apart anyway, and it
+# distorted the degree the same marker carries in its area.
 # NO_LOCALISATION is a protein DeepLoc was never run on, or one whose data directory
 # predates pipeline/build_deeploc_localisations.py
 NO_LOCALISATION = 'Not available'
-# All of them filled: the dots are drawn without an outline, which is what an open
-# symbol is made of
-SURFACE_SYMBOLS = {web_utils.CELL_MEMBRANE: 'circle', web_utils.EXTRACELLULAR: 'diamond',
-                   web_utils.BOTH_SURFACE: 'hexagon', web_utils.NOT_SURFACE: 'square',
-                   NO_LOCALISATION: 'cross'}
-# grey the surface classes are drawn in the legend in. The markers on the plot carry the
-# colour of the parasite's group, so a colour here would say the class had one
-SURFACE_LEGEND_COLOR = '#525252'
+LOCALISATION_ORDER = list(web_utils.HOST_CLASSES) + [web_utils.SEVERAL,
+                                                     web_utils.NOT_SURFACE, NO_LOCALISATION]
+# paler than the grey of a protein the filter had a call for and rejected, a row DeepLoc
+# says nothing at all about being the emptier of the two
+LOCALISATION_COLORS = {**web_utils.LOCALISATION_COLORS, NO_LOCALISATION: '#f0f0f0'}
 # names the DeepLoc columns are read under in the hover of the shared-interactors matrix
-DEEPLOC_LABELS = {'surface': 'DeepLoc', 'cell_membrane': 'P(cell membrane)',
-                  'extracellular': 'P(extracellular)', 'localizations': 'localizations'}
+DEEPLOC_LABELS = {'surface': 'DeepLoc', 'localizations': 'localizations',
+                  **{column: f'P({name.lower()})'
+                     for name, column in web_utils.DEEPLOC_SCORES.items()}}
 
 
 @st.cache_data(show_spinner=False)
@@ -121,6 +147,16 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
                   'Cell type'))
 
 
+def plot_room(labels, column):
+    '''
+    Pixels of a `column`-wide figure left for the plot itself, once rows named by `labels`
+    have taken the room their names need.
+    '''
+    # 6.2 pixels a character is the width of the default axis font, and 30 the room the
+    # matrix keeps free at either end of the axis
+    return column - (6.2 * max(len(str(l)) for l in labels) + 30)
+
+
 def dot_size(parasites, labels, column):
     '''
     Diameter of the largest dot of a matrix of `parasites` columns whose rows are named by
@@ -131,15 +167,11 @@ def dot_size(parasites, labels, column):
     a column of a few pixels, and a dot drawn at plotly's default fifteen there is a row of
     dots run together into a bar.
     '''
-    # 6.2 pixels a character is the width of the default axis font, and 30 the room the
-    # matrix keeps free at either end of the axis
-    free = column - (6.2 * max(len(str(l)) for l in labels) + 30)
-
-    return min(15, max(5, free / len(parasites)))
+    return min(15, max(5, plot_room(labels, column) / len(parasites)))
 
 
 @st.cache_data(show_spinner=False)
-def generate_tissue_dots(per_tissue, groups, group_order, palette, column):
+def generate_tissue_dots(per_tissue, groups, group_order, niches, palette, column):
     '''
     A dot wherever a parasite is predicted to interact with a host protein expressed in a
     tissue it infects, sized by how many such interactions there are. The parasites are in
@@ -153,10 +185,25 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette, column):
 
     The tissues are ordered by how many parasites reach them, as the host proteins of the
     dot matrix are, so the tissues every parasite has in common are the top rows.
+
+    The parasites are named above the columns, over the same two strips the figures above
+    carry. The clade is on every dot as well, but a dot is all this matrix has: a parasite
+    infects a median of two tissues, so a column is two or three dots with white between
+    them, and a clade read off them alone is a colour hunted for down a sparse column. The
+    strip states the boundary the dots leave to be inferred.
+
+    :param per_tissue: interactions per parasite and tissue, as
+                       count_interactions_per_tissue counts them
+    :param dict groups: {parasite label: taxonomic group}
+    :param dict group_order: {taxonomic group: its place in the order}
+    :param dict niches: {parasite label: niche}
+    :param dict palette: {taxonomic group: colour}
+    :param float column: pixels the figure is drawn across, which sizes the dots
     '''
     dots = per_tissue.copy()
     dots['group'] = dots['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
+    dots['niche'] = dots['taxid1_label'].map(niches).fillna(web_utils.UNKNOWN_NICHE)
     order = sorted(dots['taxid1_label'].unique(),
                    key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
     parasites = [f'{p[0]}. {p.split(" ")[1]}' for p in order]
@@ -164,29 +211,51 @@ def generate_tissue_dots(per_tissue, groups, group_order, palette, column):
                                        total=('interactions', 'sum'))
     tissues = list(reach.sort_values(['parasites', 'total'], ascending=False, kind='stable').index)
 
+    # the axes count cells and the names are ticks written against them, which is what lets
+    # the strips be drawn: a band on a categorical axis is a category of its own, and would
+    # be read as another parasite or another tissue
+    dots = dots.assign(x=dots['parasite'].map({p: i for i, p in enumerate(parasites)}),
+                       y=dots['Tissue'].map({t: i for i, t in enumerate(tissues)}))
+
     size = dot_size(parasites, tissues, column)
-    figure = px.scatter(dots, x='parasite', y='Tissue', color='group',
-                        # plotly express flips category_orders on a y axis, so most-reached
-                        # first puts the tissue the most parasites infect in the top row
-                        color_discrete_map=palette, category_orders={
-                            'parasite': parasites, 'Tissue': tissues,
-                            'group': [g for g in palette if g in set(dots['group'])]},
-                        size='interactions', size_max=size,
-                        custom_data=['interactions'])
-    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
-                         hovertemplate='%{y}<br>%{x}<br>predicted interactions: '
-                                       '%{customdata[0]}<extra></extra>')
-    figure.update_layout(height=max(420, 19 * len(tissues) + 240), plot_bgcolor='white',
-                         margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
-                         legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
+    sizeref = max(1, dots['interactions'].max()) / size ** 2
+    figure = go.Figure()
+    # one trace per group rather than one for every dot, so the groups are the legend and
+    # clicking one takes that group off the plot
+    for group in [g for g in list(palette) + [UNKNOWN_GROUP] if g in set(dots['group'])]:
+        rows = dots[dots['group'] == group]
+        figure.add_trace(go.Scatter(
+            x=rows['x'], y=rows['y'], mode='markers', name=group,
+            marker=dict(color=palette.get(group, UNKNOWN_COLOR), size=rows['interactions'],
+                        sizemode='area', sizeref=sizeref, sizemin=4, line=dict(width=0)),
+            customdata=rows[['Tissue', 'parasite', 'interactions']].to_numpy(),
+            hovertemplate='%{customdata[0]}<br>%{customdata[1]}<br>predicted interactions: '
+                          '%{customdata[2]}<extra></extra>'))
+
+    groups_shown, niches_shown = add_parasite_strips(figure, dots, parasites, palette)
+    height = max(420, 19 * len(tissues) + 240)
+    room = add_dot_legend(figure, groups_shown, [], niches_shown, palette,
+                          column - (6.2 * max(len(str(t)) for t in tissues) + 30), height)
+
+    figure.update_layout(height=height, plot_bgcolor='white',
+                         # the room the legends take is left under the plot rather than
+                         # taken out of it: they are placed against the foot of the figure
+                         margin=dict(l=0, r=0, t=10, b=room),
                          xaxis_title=None, yaxis_title='tissue the parasite infects')
     # every parasite is named, however narrow its column: plotly thins the labels that no
     # longer fit, and a matrix with every other column named cannot be read at all, so they
-    # are drawn at the size a column has room for instead
-    figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
+    # are drawn at the size a column has room for instead. The range runs back past the two
+    # strips rather than on past the last column, which is what puts them between the names
+    # and the plot
+    figure.update_xaxes(range=[-0.5, len(parasites) - 0.5], side='top', tickmode='array',
+                        tickvals=list(range(len(parasites))), ticktext=parasites,
+                        tickangle=-60, automargin=True, ticks='',
                         tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
-                        showgrid=True, gridcolor='#f0f0f0')
-    figure.update_yaxes(automargin=True, showgrid=True, gridcolor='#f0f0f0')
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False)
+    # reversed, so that the tissue the most parasites reach is the top row
+    figure.update_yaxes(range=[len(tissues) - 0.5, -3], tickmode='array',
+                        tickvals=list(range(len(tissues))), ticktext=tissues, ticks='',
+                        automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
 
     return figure
 
@@ -271,36 +340,127 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     return aux[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
 
 
-@st.cache_data(show_spinner=False)
-def get_shared_interactor_counts(df_pred, groups, group_order):
-    '''
-    Number of host proteins each pair of parasites is predicted to interact with. The
-    diagonal is left empty -- a parasite shares nothing with itself that is worth counting
-    against a pair -- and every off-diagonal cell is the host proteins shared by that pair.
+# what the two axes of the matrix and the columns of the dot plot can be ordered on.
+# Ordering is what makes a block visible: parasites next to each other are compared by
+# eye, so the order decides which question the figure answers -- whether a clade shares
+# its interactors, or whether the parasites inside a host cell do
+ORDER_BY_GROUP = 'taxonomic group'
+ORDER_BY_NICHE = 'intracellular / extracellular'
 
-    The parasites are in the order of the dot matrix -- taxonomic group, then name -- so
-    that a row is the same parasite in both, and a clade is a block against the diagonal.
+
+def parasite_order(labels, groups, group_order, niches, order_by):
+    '''
+    The parasites in the order the figures put them on their axes: the chosen annotation
+    first, so its values are contiguous, then the other one, then the name. Ordering on
+    the niche keeps the clades blocked inside each niche rather than scattering them, so
+    the figure gains the niche blocks without losing the ones it already had.
+
+    :param labels: the parasite labels to order
+    :param dict groups: {parasite label: taxonomic group}
+    :param dict group_order: {taxonomic group: its rank in the config}
+    :param dict niches: {parasite label: niche}, as web_utils.get_niches builds them
+    :param str order_by: ORDER_BY_GROUP or ORDER_BY_NICHE
+    :return: the labels, sorted
+    '''
+    def rank(parasite):
+        clade = group_order.get(groups.get(parasite), len(group_order))
+        niche = web_utils.NICHE_ORDER.index(niches[parasite]) \
+            if niches.get(parasite) in web_utils.NICHE_ORDER else len(web_utils.NICHE_ORDER)
+
+        return (niche, clade, parasite) if order_by == ORDER_BY_NICHE else (clade, niche,
+                                                                           parasite)
+
+    return sorted(labels, key=rank)
+
+
+@st.cache_data(show_spinner=False)
+def get_shared_interactor_similarity(df_pred, groups, group_order, niches, order_by):
+    '''
+    How alike the host interactors of each pair of parasites are, as the Jaccard similarity
+    of the two sets: the host proteins both parasites reach, over the host proteins either
+    of them reaches. The diagonal is left empty -- a parasite is identical to itself, which
+    says nothing about any pair and would be the darkest cell of every row.
+
+    The ratio and not the count of shared proteins. A count follows how many interactors
+    the two parasites have between them, so the pairs it puts at the top are the pairs of
+    the best-predicted parasites: two nematodes of eight hundred interactors share more
+    proteins by having more, and a pair that share almost everything they have is a pale
+    cell beside them. Divided by the union, a cell is the overlap of the pair and nothing
+    else, and the blocks against the diagonal are blocks of parasites reaching the same
+    host proteins rather than blocks of parasites with many.
+
+    The count is returned beside the ratio: it is what the hover of a cell gives the ratio
+    in terms of, and what the dialog behind a click then lists.
+
+    The parasites are in the order of the dot matrix, whichever annotation that order is
+    taken from, so that a row is the same parasite in both and a block against the
+    diagonal is a block in both.
+
+    :return: (similarity, shared counts, clades, niches), the two frames on the same
+             parasites in the same order, or None where there are fewer than three
+             parasites to compare
     '''
     targets = {g: set(df['target']) for g, df in df_pred.groupby('taxid1_label')}
     targets = {g: t for g, t in targets.items() if t}
-    labels = sorted(targets, key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
+    labels = parasite_order(targets, groups, group_order, niches, order_by)
     if len(labels) < 3:
         return None
 
-    counts = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels],
+    shared = np.array([[len(targets[a] & targets[b]) for b in labels] for a in labels],
                       dtype=float)
-    np.fill_diagonal(counts, np.nan)
+    # the union of two non-empty sets is non-empty, and the sets are filtered to those
+    union = np.array([[len(targets[a] | targets[b]) for b in labels] for a in labels],
+                     dtype=float)
+    similarity = shared / union
+    np.fill_diagonal(similarity, np.nan)
+    np.fill_diagonal(shared, np.nan)
 
-    return (pd.DataFrame(counts, index=labels, columns=labels),
-            [groups.get(g, UNKNOWN_GROUP) for g in labels])
+    return (pd.DataFrame(similarity, index=labels, columns=labels),
+            pd.DataFrame(shared, index=labels, columns=labels),
+            [groups.get(g, UNKNOWN_GROUP) for g in labels],
+            [niches.get(g, web_utils.UNKNOWN_NICHE) for g in labels])
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_interactor_heatmap(counts, clades, palette, column):
+def flat_colour_scale(values, colors):
     '''
-    The shared-interactor count matrix, with a strip of the taxonomic group of each
-    parasite down the side and along the bottom, so that the two axes are visibly the
-    same list of parasites in the same order.
+    The colour scale of a strip of flat bands -- one band per value, nothing interpolated
+    between two of them -- and the codes that index it, which is what a strip is drawn from.
+
+    The colour is repeated at both ends of a band so that nothing is interpolated between
+    two values; the steps have to be built in order, since sorting them puts the two
+    entries of a boundary in colour order rather than in band order, which hands a band its
+    neighbour's colour.
+
+    :param values: the value of each cell of the strip, in the order it is drawn
+    :param dict colors: {value: colour}, in the order the bands are numbered
+    :return: (heatmap keywords for the scale, the code of each value)
+    '''
+    steps = [step for i, value in enumerate(colors)
+             for step in ([i / len(colors), colors[value]],
+                          [(i + 1) / len(colors), colors[value]])]
+
+    return dict(colorscale=steps, zmin=-0.5, zmax=len(colors) - 0.5, showscale=False,
+                hovertemplate='%{text}<extra></extra>'), \
+        [list(colors).index(v) for v in values]
+
+
+def generate_shared_interactor_heatmap(similarity, shared, clades, niches, palette, column):
+    '''
+    The shared-interactor similarity matrix, with a strip of the taxonomic group and a strip
+    of the niche of each parasite down the side and along the top, so that the two axes are
+    visibly the same list of parasites in the same order.
+
+    The columns are named above the matrix, outside their own strips, and the two legends
+    sit below it. A name and the two colours that annotate it are then read together
+    rather than from opposite sides of the matrix, and the legends, which belong to no
+    part of the figure in particular, take the room nothing else wants.
+
+    Both strips are drawn whichever of them the parasites are ordered on. The one that was
+    ordered on comes out in blocks and is the question the figure is being read for; the
+    other stays there to be read against it, which is where a block that does not follow
+    the order is seen -- a clade whose parasites share their interactors across two niches,
+    or the other way about.
 
     The cells are square because the figure is sized for it: both axes span the same number
     of cells and the margins leave the same number of pixels between them, so the square is
@@ -316,36 +476,43 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
 
     The diagonal is drawn grey by a trace of its own rather than being left blank:
     blank renders as the white the colour scale starts at, so it could not be told from a
-    pair sharing nothing. It carries no count, only the name of the parasite.
+    pair sharing nothing. It carries no value, only the name of the parasite.
 
+    Every cell off the diagonal carries an invisible marker as well, which is what a click
+    on it lands on and what its hover is read from, and the index of that trace is returned
+    beside the figure so the page can tell such a click from any other.
+
+    :param similarity: the Jaccard similarity of every pair, as
+                       get_shared_interactor_similarity builds it, which is what the cells
+                       are coloured by
+    :param shared: the host proteins each pair has in common, which the hover gives the
+                   similarity of a cell in terms of
     :param column: pixels the column holding the figure is on the screen the page is being
                    read on, which web_utils.column_width measures. It is the height that is
                    sized from it -- the width belongs to the column -- so that the square
                    the cells are held to is the whole of the figure rather than a part of it
+    :return: the figure, and the index of the trace holding the clickable cells
     '''
     shown = [g for g in palette if g in set(clades)]
-    # one flat band per group: the colour is repeated at both ends of the band so that
-    # nothing is interpolated between two groups. The steps have to be built in order --
-    # sorting them puts the two entries of a boundary in colour order rather than in band
-    # order, which hands a band the neighbouring group's colour
-    steps = [step for i, g in enumerate(shown)
-             for step in ([i / len(shown), palette[g]], [(i + 1) / len(shown), palette[g]])]
-    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in counts.index]
-    y_names = list(counts.index)
+    niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
+                    if n in set(niches)]
+    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
+    y_names = list(similarity.index)
     cells = list(range(len(y_names)))
-    codes = [shown.index(c) for c in clades]
-    strip = dict(colorscale=steps, zmin=-0.5, zmax=len(shown) - 0.5, showscale=False,
-                 hovertemplate='%{text}<extra></extra>')
+    strip, codes = flat_colour_scale(clades, {g: palette[g] for g in shown})
+    niche_strip, niche_codes = flat_colour_scale(
+        niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})
 
-    # the same span on both axes -- the matrix, the strip beside it and the cell between
-    # them -- so that a square plot area is one of square cells
-    span = len(cells) + 1.6
-    # the counts beside the colour bar are the whole of what varies in the room it needs
-    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(counts.to_numpy()):.0f}')
+    # the same span on both axes -- the matrix, the two strips beside it and the cell
+    # between them and it -- so that a square plot area is one of square cells
+    span = len(cells) + 2.6
+    # the ticks beside the colour bar are the whole of what varies in the room it needs,
+    # and a similarity is written to two decimals however large the largest of them is
+    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(similarity.to_numpy()):{TICK}}')
 
     # A line of text is about 1.1 times its point size tall, which is the room a cell has to
     # give the label against it. The cells being square, one size would do for both axes --
-    # the names below the matrix are held to a floor of their own, being the only thing that
+    # the names above the matrix are held to a floor of their own, being the only thing that
     # names a column and the first to be lost.
     def fits(room, smallest=6):
         sizes = [size for size in (10, 9, 8, 7, 6) if size >= smallest]
@@ -366,41 +533,62 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
     # can be written and again at the size that left them
     font = fits(square(10)[0] / span)
     side, left = square(font)
-    # the names below the matrix are all that names a column, so they are not written
+    # the names above the matrix are all that names a column, so they are not written
     # smaller than they can be read: forty of them run into each other on a narrow screen
     # rather than being drawn at a size nobody can make out on any screen
     x_font = fits(side / span, smallest=SMALLEST_LABEL)
 
-    bottom = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
-    # room above the matrix for the group legend. Plotly wraps the entries to the width of
+    # the room the names of the columns need above the matrix. Rotated sixty degrees they
+    # stand about 0.87 of their length tall, and reach half their length out to the right of
+    # the last column as well, which the margin the colour bar is given has the room for
+    top = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
+    # room below the matrix for the two legends. Plotly wraps the entries to the width of
     # the plot, so the rows they take are counted here rather than assumed: a row that has
     # not been paid for is one plotly makes by taking it off the plot, and a plot area that
     # is no longer the square the cells are drawn in
-    entry = LEGEND_ENTRY + LEGEND_CHAR * max(len(group) for group in shown)
-    top = 34 + 22 * -(-len(shown) // max(1, int(side // entry)))
+    def legend_rows(names):
+        entry = LEGEND_ENTRY + LEGEND_CHAR * max(len(name) for name in names)
+
+        return -(-len(names) // max(1, int(side // entry)))
+
+    clade_rows = legend_rows(shown)
+    niche_rows = legend_rows(niches_shown)
+    bottom = 34 + LEGEND_ROW * (clade_rows + niche_rows)
 
     figure = go.Figure()
-    # the group of each parasite, beside its row and under its column. x0/y0 put the strip
-    # a cell clear of the matrix, dx/dy give it a cell of its own to fill
-    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-1.4, dx=1, y=cells,
-                                text=[[c] for c in clades], ygap=1, **strip))
-    figure.add_trace(go.Heatmap(z=[codes], x=cells, y0=len(cells) + 0.4, dy=1,
-                                text=[list(clades)], xgap=1, **strip))
+    # the group and the niche of each parasite, beside its row and above its column. x0/y0
+    # put a strip a cell clear of the matrix, dx/dy give it a cell of its own to fill. The
+    # group is the inner strip of the two, being the one the figure has always carried
+    for offset, (values, code_list, scale) in enumerate([(clades, codes, strip),
+                                                         (niches, niche_codes, niche_strip)]):
+        figure.add_trace(go.Heatmap(z=[[code] for code in code_list],
+                                    x0=-1.4 - offset, dx=1, y=cells,
+                                    text=[[v] for v in values], ygap=1, **scale))
+        figure.add_trace(go.Heatmap(z=[code_list], x=cells,
+                                    y0=-1.4 - offset, dy=1,
+                                    text=[list(values)], xgap=1, **scale))
 
-    # the axes count cells rather than name parasites, the strips having to sit a cell out
-    # from the matrix, so the pair a cell stands for is carried in its hover text
-    figure.add_trace(go.Heatmap(z=counts.to_numpy(), x=cells, y=cells,
-                                text=[[f'{row} and {other}' for other in y_names]
-                                      for row in y_names],
+    # the similarities. The hover of a cell belongs to the clickable layer added below
+    # rather than to this trace: two traces answering the same pointer answer it
+    # differently, and the one that can be clicked is the one that should say what
+    # clicking it opens.
+    #
+    # The scale runs to the largest similarity on the matrix rather than to the 1.0 a
+    # Jaccard can reach, as it ran to the largest count before it. The pairs of a host are
+    # nothing like evenly spread -- a human's run to 0.8 between sibling species, with the
+    # median pair at 0.08 -- so a host whose parasites are less alike would be drawn in the
+    # pale end of a fixed scale and could not be read at all. The colour bar states the
+    # values either way
+    figure.add_trace(go.Heatmap(z=similarity.to_numpy(), x=cells, y=cells, hoverinfo='skip',
                                 colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
                                             '#3182bd', '#08519c'],
-                                zmin=0, zmax=np.nanmax(counts.to_numpy()),
-                                hovertemplate='%{text}<br>Shared interactors %{z:.0f}'
-                                              '<extra></extra>', hoverongaps=False,
-                                colorbar=dict(title=dict(text='Shared interactors',
+                                zmin=0, zmax=np.nanmax(similarity.to_numpy()),
+                                hoverongaps=False,
+                                colorbar=dict(title=dict(text='Jaccard similarity',
                                                          side='right'),
                                               thickness=12, len=0.6, y=1, yanchor='top',
                                               x=1 + COLORBAR_GAP / side,
+                                              tickformat=TICK,
                                               tickfont=dict(size=10))))
 
     # the diagonal, a cell of flat grey per parasite, drawn over the empty cells the count
@@ -408,7 +596,7 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
     # there is no shared-interactor count to give. It is laid over the whole grid, one cell
     # of it drawn and the rest empty, so both traces turn hovering on gaps off -- left on,
     # the empty cells of whichever trace is on top answer for the cells beneath them
-    diagonal = np.full(counts.shape, np.nan)
+    diagonal = np.full(similarity.shape, np.nan)
     np.fill_diagonal(diagonal, 0)
     figure.add_trace(go.Heatmap(z=diagonal, x=cells, y=cells,
                                 text=[[name] * len(y_names) for name in y_names],
@@ -416,37 +604,78 @@ def generate_shared_interactor_heatmap(counts, clades, palette, column):
                                 zmin=0, zmax=1, showscale=False, hoverongaps=False,
                                 hovertemplate='%{text}<extra></extra>'))
 
-    # the strips are heatmaps and cannot carry a legend of their own, so the groups are named
-    # by empty traces whose only purpose is their legend entry
+    # what a click lands on, and what the hover of a cell is read from. A heatmap cell
+    # cannot be clicked at all: Streamlit picks a click up from the selection plotly makes
+    # of it, and a heatmap is not a trace plotly can select anything in, so the click
+    # reaches the page as nothing. A scatter is, so every cell of the matrix carries an
+    # invisible square marker the size of the cell, which puts the whole of the cell in
+    # reach of the pointer. The diagonal is left without one: it stands for no pair.
+    #
+    # The axes count cells rather than name parasites, so a marker is found again by the
+    # cell it sits on -- its x and y are the indices of the two parasites in `counts`.
+    click_targets = [(x, y) for y in cells for x in cells if x != y]
+    figure.add_trace(go.Scatter(
+        x=[x for x, _ in click_targets], y=[y for _, y in click_targets], mode='markers',
+        marker=dict(symbol='square', size=side / span, color='rgba(0,0,0,0)',
+                    line=dict(width=0)),
+        # plotly dims what was not selected, which on a click would leave the one cell
+        # that was clicked lit and wash the rest of the matrix out behind the dialog
+        selected=dict(marker=dict(opacity=1)), unselected=dict(marker=dict(opacity=1)),
+        # the count beside the ratio: a similarity of 0.12 says how alike the pair are
+        # and nothing about how much there is of it, and the two of them are what the
+        # dialog behind the click then lists
+        text=[f'{y_names[y]} and {y_names[x]}<br>'
+              f'Jaccard similarity {similarity.iat[y, x]:{TICK}}<br>'
+              f'Shared interactors {shared.iat[y, x]:.0f}' for x, y in click_targets],
+        hovertemplate='%{text}<extra></extra>', showlegend=False))
+    click_layer = len(figure.data) - 1
+
+    # the strips are heatmaps and cannot carry a legend of their own, so their values are
+    # named by empty traces whose only purpose is their legend entry. Two legends and not
+    # one: the strips are two different facts about the parasite, and run together they
+    # read as one key of nine colours
     for group in shown:
         figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
                                     marker=dict(size=10, symbol='square', color=palette[group]),
                                     hoverinfo='skip', showlegend=True))
+    for niche in niches_shown:
+        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=niche,
+                                    marker=dict(size=10, symbol='square',
+                                                color=web_utils.NICHE_COLORS[niche]),
+                                    legend='legend2', hoverinfo='skip', showlegend=True))
 
     # every parasite is named on both axes, however small the cells are drawn: plotly thins
     # tick labels that no longer fit, and a heatmap with every third row labelled cannot be
     # read at all
     ticks = dict(tickmode='array', tickvals=cells, ticks='')
-    figure.update_xaxes(range=[-2, len(cells) - 0.4],
+    # named above the matrix, where the strips of a column are. The label starts at the
+    # tick it belongs to and leans up and to the right of it, which is the slant the names
+    # are drawn at under the other figures of the page: the same name is read the same way
+    # wherever on the page it is met
+    figure.update_xaxes(range=[-3, len(cells) - 0.4], side='top',
                         ticktext=x_names, tickangle=-60, tickfont=dict(size=x_font), **ticks)
     # reversed, so that the first parasite is the top row and the diagonal runs the way it
-    # is read; the strip along the bottom is the last row of the range, not the first
-    figure.update_yaxes(range=[len(cells) + 1, -0.6],
+    # is read; the strips above the columns are drawn before the first row of the matrix,
+    # so the range runs back past them rather than on past the last row
+    figure.update_yaxes(range=[len(cells) - 0.4, -3],
                         ticktext=y_names, tickfont=dict(size=font), **ticks)
 
     # the plot area is `side` pixels each way, the margins holding the labels, the legend
     # and the colour bar out of it, and that is what makes the cells square. Plotly widens a
     # margin of its own accord where what sits in it does not fit -- a legend wrapped onto
-    # more rows than there is room for above the matrix -- and the cells are then drawn a
+    # more rows than there is room for below the matrix -- and the cells are then drawn a
     # little wider than they are tall, which is the whole of what a bad measurement costs
+    # the niche legend sits below the clade one, a row of it clear of the plot, so the
+    # rows counted into `bottom` are the rows the two of them actually take
+    entries = dict(orientation='h', yanchor='top', xanchor='left', x=0, itemclick=False,
+                   itemdoubleclick=False, font=dict(size=11), title_font=dict(size=11))
     figure.update_layout(width=left + side + right, height=side + top + bottom,
                          plot_bgcolor='white',
                          margin=dict(l=left, r=right, t=top, b=bottom),
-                         legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left',
-                                     x=0, itemclick=False, itemdoubleclick=False,
-                                     font=dict(size=11)))
+                         legend=dict(y=-0.01, **entries),
+                         legend2=dict(y=-0.01 - LEGEND_ROW * clade_rows / side, **entries))
 
-    return figure
+    return figure, click_layer
 
 
 # longest descriptive protein name written beside a gene symbol on the dot matrix. The
@@ -495,15 +724,21 @@ def summarise_localisations(df_pred, localisations):
     The DeepLoc call of each host protein of the matrix, keyed by the gene symbol the
     rows are drawn under rather than by the STRING id DeepLoc wrote it against.
 
-    A host protein reaches this page only because DeepLoc called it surface-exposed, but
-    the ways of being surface-exposed are not the same interaction: a cell membrane protein
-    is met on the surface of the host cell, an extracellular one is met in the fluid around
-    it, and a protein DeepLoc assigns both classes is met either way. Which of them a
-    protein was kept for is web_utils.classify_surface, which the home page reads the
-    parasite proteins with.
+    A host protein reaches this page only because DeepLoc put it somewhere a parasite of
+    its host can reach, but those places are not the same interaction: a cell membrane
+    protein is met on the surface of the host cell, an extracellular one in the fluid
+    around it, and a cytosolic or nuclear one only by a parasite with an intracellular
+    stage, which is inside the cell to meet it. Which of them a protein was kept for is
+    web_utils.classify_localisation, which the home page reads both sides with.
+
+    Read on all four classes, and not on the ones the niche of a parasite allows, as the
+    home page reads a host protein. A row of the figures here is a protein across every
+    parasite that reaches it, of either niche, so there is no one niche to read it on: what
+    the band says is where DeepLoc puts the protein, and the strip above the columns is
+    where the parasite is that meets it there.
 
     A gene can have more than one STRING protein identifier, so the id DeepLoc is most
-    sure is surface-exposed is the one the row is described by.
+    sure of is the one the row is described by.
 
     :param df_pred: tissue-expressed predictions of the host group
     :param localisations: DeepLoc table written by pipeline/build_deeploc_localisations.py
@@ -517,18 +752,91 @@ def summarise_localisations(df_pred, localisations):
     if called.empty:
         return None
 
-    called['best'] = called[['cell_membrane', 'extracellular']].max(axis=1)
+    scores = [c for c in web_utils.DEEPLOC_SCORES.values() if c in called]
+    called['best'] = called[scores].max(axis=1)
     called = called.sort_values('best', ascending=False, kind='stable')
     called = called.drop_duplicates('target_name').set_index('target_name')
 
-    called['surface'] = web_utils.classify_surface(called)
+    called['surface'] = web_utils.classify_localisation(called)
 
-    return called[['surface', 'cell_membrane', 'extracellular', 'localizations']]
+    return called[['surface'] + scores + ['localizations']]
+
+
+@st.dialog('Host interactors shared by a pair of parasites', width='large')
+def show_shared_interactors_dialog(first, second, df_pred, annotations, localisations):
+    '''
+    The host proteins behind one cell of the shared-interactor matrix: the cell gives a
+    count, and this is what the count is made of.
+
+    Opened over the matrix rather than placed under it, as the network page opens the
+    AlphaFold models of an interaction, so that the figures below do not move on every
+    click.
+
+    The rows are host proteins and not gene symbols, since that is what the cell counts:
+    a gene with more than one STRING identifier is more than one interactor of the
+    matrix, and collapsing the two would put a number in the dialog that the cell the
+    dialog was opened from disagrees with. The identifier is written beside the name,
+    which is where the two rows of such a gene are told apart.
+
+    Each parasite has a column of its own, holding the number of its proteins predicted to
+    reach that host protein -- being reached by eighty-six proteins of a parasite and by
+    one are not the same prediction, and the pair is the whole subject here.
+
+    :param first: parasite of the row of the cell that was clicked
+    :param second: parasite of its column
+    :param df_pred: tissue-expressed predictions, as the matrix counted them, so the rows
+                    answer to the number in the cell
+    :param dict annotations: STRING id --> descriptive protein name
+    :param localisations: DeepLoc table, which the surface class is read from
+    '''
+    edges = df_pred[df_pred['taxid1_label'].isin([first, second])]
+    targets = {p: set(df['target']) for p, df in edges.groupby('taxid1_label')}
+    shared = targets.get(first, set()) & targets.get(second, set())
+
+    st.markdown(f'**{first}** and **{second}**', unsafe_allow_html=True)
+    st.caption(f'The {len(shared)} host proteins both parasites are predicted to interact '
+               f'with, at the confidence the page is set to and among the proteins '
+               f'expressed in a tissue each parasite infects. A column counts the proteins '
+               f'of that parasite predicted to reach the host protein.')
+    if not shared:
+        return
+
+    edges = edges[edges['target'].isin(shared)]
+    # one column per parasite, indexed by the host protein: both parasites reach every
+    # protein here, the rows being the ones they share
+    degree = edges.groupby(['taxid1_label', 'target'])['source'].nunique().unstack('taxid1_label')
+    names = edges.drop_duplicates('target').set_index('target')['target_name']
+    labels = label_proteins(edges, annotations)
+
+    table = pd.DataFrame({'Host protein': [labels.get(names[t], names[t]) for t in degree.index],
+                          'Identifier': list(degree.index)})
+    columns = []
+    for parasite in (first, second):
+        # named as the axes of the matrix name a parasite, so a column is read back to the
+        # row or the column of the cell the dialog was opened from
+        column_name = f'{parasite[0]}. {parasite.split(" ")[1]} proteins'
+        table[column_name] = degree[parasite].fillna(0).astype(int).values
+        columns.append(column_name)
+
+    surface = summarise_localisations(edges, localisations)
+    if surface is not None:
+        table['DeepLoc'] = [surface['surface'].get(names[t], NO_LOCALISATION)
+                            for t in degree.index]
+
+    # the proteins reached by the most parasite proteins first: the rows the pair has most
+    # of are the rows the pair is being read for
+    table = table.assign(_reach=table[columns].sum(axis=1)).sort_values(
+        ['_reach', 'Host protein'], ascending=[False, True], kind='stable').drop(columns='_reach')
+
+    st.dataframe(table, width='stretch', hide_index=True)
+    st.download_button('Download table', table.to_csv(index=False).encode('utf-8'),
+                       file_name=f'shared_interactors_{first}_{second}.csv'.replace(' ', '_'),
+                       mime='text/csv')
 
 
 @st.cache_data(show_spinner=False)
-def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
-                            localisations=None, top=40):
+def get_top_shared_proteins(df_pred, groups, group_order, niches, order_by,
+                            annotations=None, localisations=None, top=40):
     '''
     The host proteins that the most parasites are predicted to interact with. The heatmap
     counts how much two parasites have in common but does not say what they have in common,
@@ -544,6 +852,9 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
                              labelled with beside the gene symbol
     :param localisations: DeepLoc table, which the dots carry the surface class and the
                           two surface probabilities of the host protein from
+    :return: the dots, the row labels, the column labels, and how many host proteins more
+             than one parasite reaches -- the rows are the `top` of those, and the caption
+             says so where that leaves some of them out
     '''
     edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
     # One row per dot, keyed by the display gene name rather than a protein identifier, so
@@ -570,111 +881,329 @@ def get_top_shared_proteins(df_pred, groups, group_order, annotations=None,
         dots = dots.join(surface, on='target_name')
         dots['surface'] = dots['surface'].fillna(NO_LOCALISATION)
         dots['localizations'] = dots['localizations'].fillna('')
-    order = sorted(dots['taxid1_label'].unique(),
-                   key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
+    order = parasite_order(dots['taxid1_label'].unique(), groups, group_order, niches,
+                           order_by)
+    dots['niche'] = dots['taxid1_label'].map(niches).fillna(web_utils.UNKNOWN_NICHE)
 
     return (dots, [labels[p] for p in proteins],
-            [f'{p[0]}. {p.split(" ")[1]}' for p in order], int(counts.max()))
+            [f'{p[0]}. {p.split(" ")[1]}' for p in order], len(counts))
 
 
-def split_dot_legend(figure, groups, surfaces, palette):
+def localisation_labels(dots, proteins):
     '''
-    Splits the legend of the shared-interactors matrix back into its two channels.
+    What the band beside a row of the dot plot says when it is hovered: the class of the
+    host protein, and for a protein called for more than one, which classes those are.
 
-    Plotly express draws a trace per combination of the two channels it is given and names
-    it after both, so a matrix coloured by taxonomic group and shaped by surface class
-    comes out with a legend of "Nematoda, Cell membrane" entries, one per combination that
-    occurs. Every drawn trace is taken out of the legend and the legend is built from
-    entries carrying no data instead: one per taxonomic group, in its colour and always as
-    a circle so the shape of whichever combination came first says nothing, and one per
-    surface class, in grey since the shape means the same whatever the colour it is drawn
-    in. The group entries keep the legendgroup of the traces they name, so clicking one
-    still hides that parasite group.
+    `Several` is one colour over two different statements -- a protein on the cell membrane
+    and in the fluid around it, and one in the cytosol and the nucleus, which are opposite
+    sides of that membrane -- and a legend of one entry cannot tell them apart. The band
+    names them instead, where a reader who wonders what a purple cell is made of asks.
 
-    :param figure: the matrix figure, modified in place
-    :param list groups: taxonomic groups that occur, in the order of the legend
-    :param list surfaces: surface classes that occur, in the order of the legend
+    :param dots: the frame behind the figure, carrying `surface` and the probability of
+                 each class beside each protein
+    :param list proteins: the host proteins in the order of the rows
+    :return: the label of each row, in that order
+    '''
+    called = dots.drop_duplicates('protein').set_index('protein')
+    scores = {c: web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
+              if web_utils.DEEPLOC_SCORES[c] in called}
+    labels = []
+    for protein in proteins:
+        row = called.loc[protein]
+        crossed = [c for c, column in scores.items()
+                   if row[column] > web_utils.DEEPLOC_CUTOFFS[c]]
+        # a protein of one class is named by it, and one the filter had nothing to say
+        # about -- no localisation at all -- by what the legend calls it
+        labels.append(' + '.join(crossed) if len(crossed) > 1 else row['surface'])
+
+    return labels
+
+
+def add_parasite_strips(figure, dots, parasites, palette):
+    '''
+    The taxonomic group and the niche of each parasite, as two bands above its column.
+    Drawn on both dot matrices of the page and on the shared-interactor heatmap, so that
+    the three figures the parasites run across are read the same way round and a column is
+    found by the same two colours wherever it is met.
+
+    Drawn as heatmap cells inside the axes rather than as shapes hung off them. A shape has
+    to be placed against the plot area, and the plot area is whatever the row labels leave
+    of the column once automargin has taken the room they need; a cell is placed on the
+    axes themselves, at negative coordinates the range is opened up to hold, and follows
+    the plot wherever the labels leave it.
+
+    The group is the inner strip of the two, as on the heatmap: it is the one every figure
+    has always carried, and the two are read in the same order on all of them.
+
+    :param figure: the figure, modified in place
+    :param dots: the frame behind it, carrying `group` and `niche` beside each `parasite`
+    :param list parasites: the parasites in the order of the x axis
     :param dict palette: {taxonomic group: colour}
+    :return: (groups, niches) drawn, each in the order it is keyed in
     '''
+    clade_of = dict(zip(dots['parasite'], dots['group']))
+    niche_of = dict(zip(dots['parasite'], dots['niche']))
+    clades = [clade_of.get(p, UNKNOWN_GROUP) for p in parasites]
+    niches = [niche_of.get(p, web_utils.UNKNOWN_NICHE) for p in parasites]
+    groups_shown = [g for g in list(palette) + [UNKNOWN_GROUP] if g in set(clades)]
+    niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
+                    if n in set(niches)]
+
+    # the group a cell clear of the first row and the niche outside it
+    for offset, (values, colors) in enumerate(
+            [(clades, {g: palette.get(g, UNKNOWN_COLOR) for g in groups_shown}),
+             (niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})]):
+        scale, codes = flat_colour_scale(values, colors)
+        figure.add_trace(go.Heatmap(z=[codes], x=list(range(len(parasites))),
+                                    y0=-1.4 - offset, dy=1, text=[values], xgap=1, **scale))
+
+    return groups_shown, niches_shown
+
+
+def strip_width(parasites, proteins, height, room):
+    '''
+    Width in x units of the band beside the rows of the dot plot, at which its cells come
+    out as wide as they are high.
+
+    A cell of the band is one row high, and drawn on the axes of the dots it was one
+    parasite wide -- which on a host reached by five parasites is a lozenge lying on its
+    side, and on one reached by forty-five a sliver standing on end. The width is solved
+    for in x units instead: the pixels an x unit is drawn across are the plot divided by
+    the units it spans -- the parasites, the band, and the half-band of gap between the
+    two -- and the width wanted is the one that makes that as many pixels as a row is high.
+
+    :param int parasites: columns the plot carries
+    :param int proteins: rows it carries
+    :param float height: pixels the figure is drawn down
+    :param float room: pixels of it the plot itself is drawn across
+    :return: the width of a cell of the band, in x units
+    '''
+    # the y axis is opened up past the top row to hold the two strips above the columns,
+    # which the rows share the height with; the height itself is the plot and the room the
+    # names and the legends take around it
+    row = (height - DOT_CHROME) / (proteins + 2.5)
+    # room = row * (parasites + 1.5 * width) / width, solved for the width
+    return row * parasites / max(room - 1.5 * row, row)
+
+
+def add_localisation_strip(figure, dots, proteins, width):
+    '''
+    Where DeepLoc puts each host protein, as a band beside its row. It is a property of the
+    protein and so constant along the row, which is what makes it a band rather than a
+    channel of the dots: everything about a parasite is above the plot and everything about
+    a protein beside it, each axis annotated by the thing it lists.
+
+    :param figure: the dot plot, modified in place
+    :param dots: the frame behind it, carrying `surface` beside each `protein`
+    :param list proteins: the host proteins in the order of the y axis
+    :param float width: x units a cell of the band is drawn across, which is what keeps it
+                        square whatever the number of parasites
+    :return: the localization classes drawn, in the order they are keyed in
+    '''
+    surface_of = dict(zip(dots['protein'], dots['surface']))
+    localisations = [surface_of.get(p, NO_LOCALISATION) for p in proteins]
+    shown = [c for c in LOCALISATION_ORDER if c in set(localisations)]
+    scale, codes = flat_colour_scale(localisations,
+                                     {c: LOCALISATION_COLORS[c] for c in shown})
+    # the colour of a cell is the class, its hover the classes behind that class. The band
+    # is `width` x units across rather than the one unit a cell of a heatmap is: an x unit
+    # is a parasite, and a host with five of them is a column wide enough to draw the row
+    # of a protein three times over
+    figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-0.5 - width, dx=width,
+                                y=list(range(len(proteins))),
+                                text=[[label] for label in
+                                      localisation_labels(dots, proteins)],
+                                ygap=1, **scale))
+
+    return shown
+
+
+def add_dot_legend(figure, groups, localisations, niches, palette, width, height):
+    '''
+    Names the two strips the dot plot carries no legend for, and lays the three keys of the
+    figure out under it as three legends of their own.
+
+    The taxonomic groups are the colour of the dots themselves and are named by the traces
+    that draw them -- clicking one still takes that group off the plot -- while a strip is a
+    heatmap, which carries no legend entry of its own, so its values are named by empty
+    traces whose only purpose is the entry they leave behind. A square, being what a band of
+    colour is keyed by.
+
+    Three legends and not one. The three channels have values that read alike -- a parasite
+    outside the host cell and a host protein outside it are both "Extracellular" -- and run
+    together as one key of fourteen colours there is nothing to say which of them a colour
+    belongs to. Named and set apart, each key is read against the strip it annotates.
+
+    The room each legend takes is counted rather than assumed, since the next legend is
+    placed under the last: plotly wraps the entries to the width of the plot, and a row
+    that has not been paid for is a row drawn over by the legend below it. The title is
+    paid for as a row of its own, being where plotly puts it on a horizontal legend, and
+    the entries wrap inside the whole width rather than what a title beside them would
+    leave.
+
+    :param figure: the dot plot, modified in place
+    :param list groups: the taxonomic groups drawn, which the dot traces already name
+    :param list localisations: the localization classes drawn, in the order of the legend
+    :param list niches: the niches drawn, in the order of the legend
+    :param dict palette: {taxonomic group: colour}
+    :param float width: pixels of the plot the legends wrap inside
+    :param float height: pixels the figure is drawn down, which the offsets are a share of
+    :return: the pixels the three legends take, which is the room to leave under the plot
+    '''
+    # the dots of a group are sized by their degree, so the entry plotly would write for
+    # such a trace carries the size of whichever dot came first -- a Cestoda of degree one
+    # is a speck beside a Nematoda of eighty-six. The traces are taken out of the legend and
+    # named by a marker of one size instead, keeping their legendgroup so that clicking the
+    # entry still takes the group off the plot
     for trace in figure.data:
-        trace.update(legendgroup=trace.name.split(',')[0].strip(), showlegend=False)
+        trace.update(legendgroup=trace.name, showlegend=False)
+    for name, color in [(g, palette.get(g, UNKNOWN_COLOR)) for g in groups]:
+        figure.add_scatter(x=[None], y=[None], mode='markers', name=name, legendgroup=name,
+                           marker=dict(symbol='circle', size=10, color=color),
+                           hoverinfo='skip', showlegend=True)
+    for name, color, legend in ([(c, LOCALISATION_COLORS[c], 'legend2') for c in localisations]
+                                + [(n, web_utils.NICHE_COLORS[n], 'legend3') for n in niches]):
+        figure.add_scatter(x=[None], y=[None], mode='markers', name=name, legend=legend,
+                           marker=dict(symbol='square', size=10, color=color),
+                           hoverinfo='skip', showlegend=True)
 
-    def add_key(name, symbol, color, legendgroup):
-        figure.add_scatter(x=[None], y=[None], mode='markers', name=name,
-                           marker=dict(symbol=symbol, size=9, color=color),
-                           legendgroup=legendgroup, hoverinfo='skip', showlegend=True)
+    def pixels(names):
+        '''The room a legend takes: its title, and the rows its entries wrap onto.'''
+        entry = LEGEND_ENTRY + DOT_LEGEND_CHAR * max(len(name) for name in names)
 
-    for group in groups:
-        add_key(group, 'circle', palette.get(group, UNKNOWN_COLOR), group)
-    for surface in surfaces:
-        add_key(surface, SURFACE_SYMBOLS[surface], SURFACE_LEGEND_COLOR, 'surface')
+        return LEGEND_TITLE_ROW + LEGEND_ROW * -(-len(names)
+                                                 // max(1, int(width // entry)))
+
+    keys = [(legend, title, names, pixels(names))
+            for legend, title, names in [('legend', 'taxonomic group', groups),
+                                         ('legend2', 'DeepLoc', localisations),
+                                         ('legend3', web_utils.NICHE_TITLE, niches)]
+            if names]
+    room = sum(taken for *_, taken in keys) + LEGEND_PAD
+
+    # measured from the foot of the figure and not from the foot of the plot: a legend
+    # placed against the plot moves with the margin the rotated names take off the top,
+    # which is measured by plotly as it draws and is not known here, and three legends that
+    # move by a margin nobody counted are three legends drawn over each other
+    offset = room / height
+    for legend, title, names, taken in keys:
+        figure.update_layout({legend: dict(
+            orientation='h', yanchor='top', y=offset, yref='container', x=0,
+            traceorder='normal', title_text=title, title_font=dict(size=11),
+            font=dict(size=11))})
+        offset -= taken / height
+
+    return room
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_protein_dots(dots, proteins, parasites, most, palette, column):
+def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
     '''
     A dot wherever a parasite is predicted to interact with one of the proteins, the
-    parasites in the order the other figures use so the taxonomic groups stay together, and the
-    proteins ordered by how many parasites reach them. The dot is sized by how many
+    parasites in the order the other figures use so the taxonomic groups stay together, and
+    the proteins ordered by how many parasites reach them. The dot is sized by how many
     proteins of that parasite reach that host protein.
 
-    The area of the dot is what carries the degree (plotly's default), since that is the
-    channel size is read on, and sizemin keeps the single-protein dots -- the largest group
-    of them -- from collapsing to a speck next to a degree of eighty-six.
+    The area of the dot is what carries the degree (as plotly express drew it), since that
+    is the channel size is read on, and sizemin keeps the single-protein dots -- the
+    largest group of them -- from collapsing to a speck next to a degree of eighty-six.
 
-    Where the dots carry a DeepLoc call the shape of the marker is the surface class of
-    the host protein, which is constant down a row: a circle is met on the cell membrane,
-    a diamond in the fluid around the cell, and a hexagon either way, DeepLoc having
-    assigned it both. The hover carries the two probabilities behind that and everywhere
-    else DeepLoc puts the protein.
+    The dot is left with the one shape and the one channel. Where DeepLoc puts the host
+    protein runs beside the row instead, in the colours the home page splits its bars in:
+    it is a property of the protein, so as a marker shape it was drawn once for every
+    parasite reaching it, at sizes where a circle and a diamond are the same dot, and it
+    took the area of that marker away from the degree it is supposed to say.
+
+    The parasites are named above the columns, with the group and the niche between the
+    names and the plot, which is how the matrix beside this figure is laid out: the two
+    figures are the same parasites in the same order, and are read the same way round.
+
+    The axes count cells rather than name a parasite or a protein, the names being ticks
+    written against them. Categorical axes would place a dot as readily, but the strips
+    could not be drawn on them: a band on a categorical axis is a category of its own, and
+    would be read as another parasite or another protein.
+
+    :param dots: one row per predicted (parasite, host protein) pair, as
+                 get_top_shared_proteins builds them
+    :param list proteins: the host proteins, most-shared first, as the rows are labelled
+    :param list parasites: the parasites in the order of the columns
+    :param dict palette: {taxonomic group: colour}
+    :param float column: pixels the figure is drawn across, which sizes the dots
     '''
     localised = 'surface' in dots.columns
-    orders = {'parasite': parasites, 'protein': proteins,
-              'group': [g for g in palette if g in set(dots['group'])]}
-    # the hover is written out rather than left to plotly express, which prints the raw
-    # column name of whatever it is given. The protein and the parasite are the two axes
-    # already, and `parasites` and `degree` are two different counts of two different
-    # things, which as bare numbers under their column names they do not say
-    hover_columns = ['protein_full', 'parasites', 'degree']
+    cells = {'x': {p: i for i, p in enumerate(parasites)},
+             'y': {p: i for i, p in enumerate(proteins)}}
+    dots = dots.assign(x=dots['parasite'].map(cells['x']),
+                       y=dots['protein'].map(cells['y'])).dropna(subset=['x', 'y'])
+
+    # the hover is written out rather than left to a column name: the protein and the
+    # parasite are the two axes already, and `parasites` and `degree` are two different
+    # counts of two different things, which as bare numbers under their column names they
+    # do not say. The axes count cells, so the parasite is named from the row behind the
+    # dot rather than from the x it sits on
+    hover_columns = ['protein_full', 'parasites', 'degree', 'parasite']
     hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
-                   'proteins of %{x} reaching it: %{customdata[2]}']
+                   'proteins of %{customdata[3]} reaching it: %{customdata[2]}']
     if localised:
-        orders['surface'] = [s for s in SURFACE_SYMBOLS if s in set(dots['surface'])]
-        hover_columns += ['cell_membrane', 'extracellular']
-        # the class is the shape of the dot, so the hover carries the two probabilities
-        # behind it rather than naming it a second time
-        hover_lines.append('P(cell membrane) %{customdata[3]:.2f}, '
-                           'P(extracellular) %{customdata[4]:.2f}')
+        # the class is the band beside the row, so the hover carries the probabilities
+        # behind it rather than naming it a second time: the four classes the host filter
+        # reads, two to a line, the surface of the cell first and the inside of it second
+        scores = [web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
+                  if web_utils.DEEPLOC_SCORES[c] in dots]
+        parts = [f'{DEEPLOC_LABELS[name]} %{{customdata[{len(hover_columns) + i}]:.2f}}'
+                 for i, name in enumerate(scores)]
+        hover_columns += scores
+        hover_lines += [', '.join(parts[i:i + 2]) for i in range(0, len(parts), 2)]
 
     size = dot_size(parasites, proteins, column)
-    figure = px.scatter(dots, x='parasite', y='protein', color='group',
-                        # plotly express flips category_orders on a y axis, so `proteins`
-                        # most-shared first puts the most-shared protein in the top row
-                        color_discrete_map=palette, category_orders=orders,
-                        symbol='surface' if localised else None,
-                        symbol_map=SURFACE_SYMBOLS if localised else {},
-                        size='degree', size_max=size, labels=DEEPLOC_LABELS,
-                        custom_data=hover_columns)
-    figure.update_traces(marker=dict(sizemin=4, line=dict(width=0)),
-                         hovertemplate='<br>'.join(hover_lines) + '<extra></extra>')
-    if localised:
-        split_dot_legend(figure, orders['group'], orders['surface'], palette)
-    figure.update_layout(height=max(420, 19 * len(proteins) + 240), plot_bgcolor='white',
-                         margin=dict(l=0, r=0, t=10, b=10), legend_title_text='',
-                         legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
-                         xaxis_title=None, yaxis_title=f'host protein (up to {most} parasites)')
-    # the labels are as long as a protein name, so plotly is left to take the room they
-    # need off the plot rather than drawing them over it or cutting them at the margin
-    figure.update_yaxes(automargin=True)
+    # the area of the largest dot stands for the largest degree, which is the size plotly
+    # express solved for when it drew this figure
+    sizeref = max(1, dots['degree'].max()) / size ** 2
+    figure = go.Figure()
+    # one trace per group rather than one for every dot, so the groups are the legend and
+    # clicking one takes that group off the plot
+    for group in [g for g in list(palette) + [UNKNOWN_GROUP] if g in set(dots['group'])]:
+        rows = dots[dots['group'] == group]
+        figure.add_trace(go.Scatter(
+            x=rows['x'], y=rows['y'], mode='markers', name=group,
+            marker=dict(color=palette.get(group, UNKNOWN_COLOR), size=rows['degree'],
+                        sizemode='area', sizeref=sizeref, sizemin=4, line=dict(width=0)),
+            customdata=rows[hover_columns].to_numpy(),
+            hovertemplate='<br>'.join(hover_lines) + '<extra></extra>'))
+
+    groups_shown, niches = add_parasite_strips(figure, dots, parasites, palette)
+    # what the legends wrap inside is what the row labels leave of the column, which is what
+    # the dots were sized on as well, and what the band beside the rows is squared against
+    height = max(420, DOT_ROW * len(proteins) + DOT_CHROME)
+    room = plot_room(proteins, column)
+    band = strip_width(len(parasites), len(proteins), height, room) if localised else 0
+    localisations = add_localisation_strip(figure, dots, proteins, band) if localised else []
+    legends = add_dot_legend(figure, groups_shown, localisations, niches, palette, room,
+                             height)
+
+    figure.update_layout(height=height, plot_bgcolor='white',
+                         # the room the legends take is left under the plot rather than
+                         # taken out of it: they are placed against the foot of the figure
+                         margin=dict(l=0, r=0, t=10, b=legends),
+                         xaxis_title=None, yaxis_title='host protein')
     # every parasite is named, however narrow its column: plotly thins the labels that no
     # longer fit, and a matrix with every other column named cannot be read at all, so they
-    # are drawn at the size a column has room for instead. They are rotated, so they are as
-    # tall as they are long and are cut at the foot of the figure unless automargin takes
-    # the room they need off the plot
-    figure.update_xaxes(tickangle=-60, tickmode='linear', dtick=1, automargin=True,
+    # are drawn at the size a column has room for instead. The names lean up and to the
+    # right of the tick they belong to, the slant they are drawn at everywhere on the page.
+    # The range runs back past the band beside the rows -- its own width, and the half of
+    # one left as a gap between it and the first column -- rather than on past the last
+    # parasite, which is what puts the names of the columns over the plot and not the band
+    figure.update_xaxes(range=[-0.5 - 1.5 * band, len(parasites) - 0.5],
+                        side='top', tickmode='array', tickvals=list(range(len(parasites))),
+                        ticktext=parasites, tickangle=-60, automargin=True, ticks='',
                         tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
-                        showgrid=True, gridcolor='#f0f0f0')
-    figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0')
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False)
+    # reversed, so that the most-shared protein is the top row. The labels are as long as a
+    # protein name, so plotly is left to take the room they need off the plot rather than
+    # drawing them over it or cutting them at the margin
+    figure.update_yaxes(range=[len(proteins) - 0.5, -3], tickmode='array',
+                        tickvals=list(range(len(proteins))), ticktext=proteins, ticks='',
+                        automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
 
     return figure
 
@@ -715,6 +1244,7 @@ if selected_host != web_utils.NO_HOST:
     parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
                        for p in config['parasites'].values()}
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
+    niches = web_utils.get_niches(config)
 
     # one slider for the three figures below it, which are the same interactions read three
     # ways -- filtering them apart would put different numbers in figures whose captions
@@ -723,48 +1253,106 @@ if selected_host != web_utils.NO_HOST:
     # It sits in the middle of three columns, as the host selector above it does: left to
     # itself a slider takes the whole width of the page, which is a metre of track for a
     # range of half a point
-    with st.columns(3)[1]:
+    slider_column, order_column = st.columns([2, 1])
+    with slider_column:
         score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
                           help='Interactions predicted below this confidence are left out of '
                                'the three figures below. The tissue plot at the foot of the '
                                'page counts every prediction.')
+    with order_column:
+        # ordering the parasites is what decides which blocks the two figures can show:
+        # the values of whichever annotation is chosen come out contiguous, so a set of
+        # parasites sharing their interactors is a square against the diagonal rather than
+        # a scatter of cells to be found by reading the labels
+        order_by = st.radio('Order the parasites by', [ORDER_BY_GROUP, ORDER_BY_NICHE],
+                            horizontal=True,
+                            help='Which annotation the two figures below put next to each '
+                                 'other on their axes. The strips beside the axes show both '
+                                 'either way; this is which of them comes out in blocks.')
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
-    shared_counts = get_shared_interactor_counts(counted, parasite_groups, group_order)
-    top_shared = get_top_shared_proteins(counted, parasite_groups, group_order,
+    shared_similarity = get_shared_interactor_similarity(counted, parasite_groups,
+                                                        group_order, niches, order_by)
+    top_shared = get_top_shared_proteins(counted, parasite_groups, group_order, niches,
+                                         order_by,
                                          web_utils.load_protein_annotations(data_dir),
                                          web_utils.load_deeploc_localisations(data_dir))
 
     matrix, shared = st.columns(2)
 
     with matrix:
-        st.subheader("Host interactors shared by each pair of parasites")
-        st.caption('Number of host interactors shared by each pair of parasites. A strip of '
-                   'the taxonomic group runs along each axis. The diagonal, where a '
-                   'parasite meets itself, is greyed out.')
-        if shared_counts is not None:
+        st.subheader("Overlap of the host interactors of each pair of parasites")
+        st.caption('How alike the host interactors of each pair of parasites are, as the '
+                   'Jaccard similarity of the two sets: the host proteins both reach, over '
+                   'the host proteins either of them reaches. A count of shared proteins on '
+                   'its own follows how many interactors the pair have between them, and '
+                   'ranks the best-predicted parasites above the most alike; this does not. '
+                   'Two strips '
+                   'run along each axis: the taxonomic group of the parasite, and whether it '
+                   'lives inside a host cell or outside one. Whichever the parasites are '
+                   'ordered by comes out in blocks. The diagonal, where a parasite meets '
+                   'itself, is greyed out. Hover a cell for the count behind its ratio, or '
+                   'click it to see the shared host proteins.')
+        if shared_similarity is not None:
             # the figure is given the width of the column and keeps its cells square within
             # it, so it follows whatever screen the page is read on
             # the figure carries the width of the column rather than being stretched to it,
             # which is what keeps a square matrix square: stretched, the plot area is squared
             # by plotly on the fly, and it does not undo that when the figure is given its
             # column back after being opened full screen
-            st.plotly_chart(generate_shared_interactor_heatmap(
-                *shared_counts, config.get('parasite_groups', {}), column), width='content')
+            figure, click_layer = generate_shared_interactor_heatmap(
+                *shared_similarity, config.get('parasite_groups', {}), column)
+            # The chart is remounted after every dialog, its key carrying a counter. Two
+            # things would otherwise keep the same cell from being opened twice running:
+            # Streamlit drops a selection identical to the one it is already holding, and
+            # plotly reads a second click on a selected point as a deselection. A key that
+            # has changed is a chart holding no selection at all, so the next click on any
+            # cell is a new one.
+            nonce = st.session_state.get(CELL_NONCE_KEY, 0)
+            clicked = st.plotly_chart(
+                figure, width='content', on_select='rerun', selection_mode='points',
+                key=f'shared_cells_{selected_host}_{order_by}_{score}_{nonce}')
+            # only the cells can be clicked, but the figure carries traces that could grow
+            # points of their own, so the layer the click came from is checked
+            cell = next((point for point
+                         in (clicked or {}).get('selection', {}).get('points', [])
+                         if point.get('curve_number') == click_layer), None)
+            if cell is not None:
+                # the axes of the matrix count cells, so the two parasites are the row and
+                # the column the marker sits on
+                parasites = list(shared_similarity[0].index)
+                st.session_state[CELL_NONCE_KEY] = nonce + 1
+                show_shared_interactors_dialog(
+                    parasites[int(cell['y'])], parasites[int(cell['x'])], counted,
+                    web_utils.load_protein_annotations(data_dir),
+                    web_utils.load_deeploc_localisations(data_dir))
         else:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
     with shared:
         if top_shared is not None:
+            # the figure draws the rows it is given; the count of what they were taken from
+            # belongs to the caption, which is the only place saying what is on screen and
+            # what is not
+            *figure_arguments, shareable = top_shared
+            shown = len(figure_arguments[1])
             st.subheader("Host interactors common to several parasites")
-            st.caption('Host proteins reached by the most parasites, with a dot wherever a '
-                       'parasite is predicted to interact with one, sized by the number of that '
-                       "parasite's proteins reaching it. Proteins reached by a single parasite "
-                       'are omitted. Dot shape gives the DeepLoc 2 localization of the host '
-                       'protein, circles cell membrane, diamonds extracellular, and hexagons '
-                       'both; hover for the underlying probabilities.')
+            # a truncated figure says what it is a top of: with hundreds of proteins tied
+            # a few parasites apart, a reader who is not told 40 of 810 reads the last row
+            # as the last protein several parasites reach
+            selection = (f'The {shown} host proteins reached by the most parasites, of the '
+                         f'{shareable} reached by more than one.' if shareable > shown else
+                         f'The {shown} host proteins reached by more than one parasite, '
+                         'most first.')
+            st.caption(selection + ' A dot wherever a parasite is predicted to interact with '
+                       "one, sized by the number of that parasite's proteins reaching it. "
+                       'The band beside each row gives the DeepLoc 2 localization '
+                       'of the host protein; '
+                       'hover a dot for the probabilities behind it. Above the columns run the '
+                       'taxonomic group of the parasite and whether it lives inside a host cell '
+                       'or outside one.')
             st.plotly_chart(
-                generate_shared_protein_dots(*top_shared, config.get('parasite_groups', {}),
-                                             column),
+                generate_shared_protein_dots(*figure_arguments,
+                                             config.get('parasite_groups', {}), column),
                 width='stretch')
 
     per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
@@ -772,21 +1360,28 @@ if selected_host != web_utils.NO_HOST:
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
     annotated = set(per_cell_type['Tissue'])
-    choices = [t for t in ranked.index if t in annotated]
+    # every tissue the parasites reach is offered, and not only the ones the HPA gives cell
+    # types for: a reader looking for pig muscle should find it and be told the single cell
+    # data is missing, rather than be left to guess whether the tissue or its annotation is
+    # what is absent
+    choices = list(ranked.index)
     tissues, cell_types = st.columns(2)
     with tissues:
         st.subheader("Tissues in which the predicted interactions can take place")
         st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
                    'each parasite is known to infect and sized by the number of interactions with '
                    'proteins expressed there. Tissues are ordered by the number of parasites '
-                   'infecting them. An interaction is counted once per tissue, irrespective of '
-                   'the number of cell types the host protein is expressed in.')
+                   'infecting them. Above the columns run the taxonomic group of the parasite and '
+                   'whether it lives inside a host cell or outside one, the same two strips the '
+                   'figures above carry. An interaction is counted once per tissue, irrespective '
+                   'of the number of cell types the host protein is expressed in.')
         if per_tissue.empty:
             st.info('No predicted interaction is left at this confidence in a tissue the '
                     'parasites are known to infect.')
         else:
             st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                                 config.get('parasite_groups', {}), column),
+                                                 niches, config.get('parasite_groups', {}),
+                                                 column),
                             width='stretch')
 
     with cell_types:
@@ -798,10 +1393,14 @@ if selected_host != web_utils.NO_HOST:
                        'in several cell types counts in each, so the bars are not a partition '
                        'of the tissue.')
             tissue = st.selectbox('Tissue', choices, index=0,
-                                  help='Tissues with cell type annotation, most interactions first')
-            st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
-                                                    config.get('parasite_groups', {})),
-                            width='stretch')
+                                  help='Tissues the parasites infect, most interactions first')
+            if tissue in annotated:
+                st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
+                                                        config.get('parasite_groups', {})),
+                                width='stretch')
+            else:
+                st.info(f'No single cell data available for {tissue} in {selected_host}, so '
+                        'the interactions there cannot be split by cell type.')
 
 st.markdown("---")
 

@@ -41,8 +41,15 @@ spleen. The droplet atlas's `tissue_free_annotation` is used where present, so
 aorta cells in the combined `Heart_and_Aorta` source category are not labelled
 as heart.
 
+`Large_Intestine` is written out under both `colon` and the coarser `intestine`,
+the two labels TISSUES records the large intestine under and the only mouse cell
+types either can have; its cells are largely colonic epithelium. `small intestine`
+and `rectum` have no atlas tissue of their own and stay without cell types rather
+than borrowing those rows.
+
 Tabula Muris Senis does not provide equivalent standalone data for every
-mouse-relevant lifecycle tissue. In particular, it does not provide stomach,
-mesenteric artery, nose, or mouth. Marrow remains `bone marrow`; it is not
+mouse-relevant lifecycle tissue. In particular, it does not provide blood,
+stomach, mesenteric artery, nose, or mouth -- neither the droplet nor the FACS
+dataset has a blood tissue at all. Marrow remains `bone marrow`; it is not
 silently treated as blood. The app shows cell-type resolution only where the
 atlas has a retained, mapped tissue.

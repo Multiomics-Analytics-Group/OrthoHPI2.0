@@ -2,6 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import web_utils
+import hosts_parasites
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -858,6 +859,12 @@ st.caption('Protein-protein interactions between parasites and their hosts, pred
            '**Parasites of a host** compares the parasites of a single host, **Hosts of a '
            'parasite** follows one parasite across the hosts it infects, and **Host-parasite '
            'network** shows the network of one host-parasite pair.')
+st.markdown("---")
+
+# the overview of what is in the database, first since it is what every other figure is
+# drawn on
+st.subheader('Hosts and parasites')
+hosts_parasites.show(config)
 st.markdown("---")
 
 # the figures are stretched to the page, and the names over their columns have to be

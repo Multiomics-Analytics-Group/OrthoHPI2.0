@@ -41,13 +41,16 @@ STYLE = '''
 .hp-host span { display: block; color: var(--c); font-weight: 600; margin-top: 0.5rem; }
 .hp-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
              gap: 1rem; align-items: start; }
-.hp-group { position: relative; border-radius: 14px; padding: 1rem 0.9rem 0.7rem;
+.hp-group { position: relative; border-radius: 14px; padding: 1rem 0.75rem 0.7rem;
             background: color-mix(in srgb, currentColor 4%, transparent); overflow: hidden; }
 .hp-group::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px;
                     background: var(--c); }
-.hp-group.wide { grid-column: span 2; grid-row: span 2; }
+.hp-group.wide { grid-column: span 2; }
 .hp-group.wide ul { columns: 2; column-gap: 1rem; }
-@media (max-width: 560px) { .hp-group.wide { grid-column: auto; grid-row: auto; }
+/* on a page five panels wide the seven fill two rows exactly if Nematoda takes both;
+   with fewer across, the span leaves a hole under it instead */
+@media (min-width: 1400px) { .hp-group.wide { grid-row: span 2; } }
+@media (max-width: 560px) { .hp-group.wide { grid-column: auto; }
                             .hp-group.wide ul { columns: 1; } }
 .hp-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
 .hp-head svg { flex: none; width: 40px; height: 40px; }
@@ -56,10 +59,12 @@ STYLE = '''
 .hp-head em { margin-left: auto; font-style: normal; font-size: 1.35rem; font-weight: 700;
               color: var(--c); }
 .hp ul { list-style: none; margin: 0; padding: 0; }
-.hp li { display: flex; align-items: center; gap: 0.15rem; line-height: 1.9;
-         break-inside: avoid; white-space: nowrap; }
-.hp li i { margin-left: 0.4rem; font-size: 0.9rem; }
+.hp li { display: flex; align-items: flex-start; gap: 0.1rem; padding: 0.3rem 0;
+         break-inside: avoid; }
+.hp li i { margin-left: 0.35rem; font-size: 0.85rem; line-height: 1.3; min-width: 0; }
 .hp-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+/* a name that wraps keeps its dots on the first line, centred on it */
+.hp li .hp-dot { margin-top: calc(0.85rem * 0.65 - 4.5px); }
 .hp-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.9rem;
              margin-top: 0.9rem; font-size: 0.8rem; opacity: 0.75; }
 .hp-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }

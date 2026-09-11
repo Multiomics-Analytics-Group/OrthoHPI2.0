@@ -114,12 +114,14 @@ def group_panel(group, color, members, host_ids, hosts):
             f'<em>{len(members)}</em></div><ul>{items}</ul></div>')
 
 
-def show(config):
+def show(config, interactions=None):
     '''
     Draws the overview: the hosts across the top, the parasites grouped below them, and a
     legend for the dots.
 
     :param dict config: the configuration of the study
+    :param int interactions: number of predicted interactions, counted once per host a
+                             parasite infects, to state in the caption with the species
     '''
     hosts = config['hosts']
     parasites = config['parasites']
@@ -144,7 +146,10 @@ def show(config):
         f'{html.escape(split_label(host["label"])[0])}</span>'
         for host in hosts.values())
 
-    st.caption(f'{len(parasites)} parasite species in {len(hosts)} host species.')
+    caption = f'{len(parasites)} parasite species in {len(hosts)} host species'
+    if interactions is not None:
+        caption += f', {interactions:,} predicted host-parasite interactions'
+    st.caption(caption + '.')
     st.markdown(
         STYLE + f'<div class="hp"><div class="hp-label">HOSTS</div><div class="hp-hosts">{cards}</div>'
         f'<div class="hp-label">PARASITES</div><div class="hp-groups">{panels}</div>'

@@ -864,7 +864,8 @@ st.markdown("---")
 # the overview of what is in the database, first since it is what every other figure is
 # drawn on
 st.subheader('Hosts and parasites')
-hosts_parasites.show(config)
+overview = get_overview_predictions(data_dir, config)
+hosts_parasites.show(config, interactions=len(overview))
 st.markdown("---")
 
 # the figures are stretched to the page, and the names over their columns have to be
@@ -872,7 +873,6 @@ st.markdown("---")
 # and every figure drawn to the width it reports. Nothing waits on it: page_width answers
 # with a laptop until the browser has replied, and the figures are redrawn on the run it does
 page = web_utils.page_width()
-overview = get_overview_predictions(data_dir, config)
 parasite_palette = config.get('parasite_groups', {})
 coverage = host_coverage_caption(data_dir, config)
 if coverage:
@@ -889,6 +889,10 @@ with st.columns(3)[1]:
                            'boxplots keep every prediction: the confidence figure draws '
                            'this threshold as a line instead, and the localization ones '
                            'stand on too few proteins to be thresholded as well.')
+    # what the threshold keeps, under the slider so that a nudge shows what it costs
+    kept = int((overview['weight'] >= score).sum())
+    st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '
+               f'at or above {score:g}.')
 
 st.subheader("Number of predicted interactions per parasite")
 # the two toggles over the figure: which end of the interaction the bars are split by, and

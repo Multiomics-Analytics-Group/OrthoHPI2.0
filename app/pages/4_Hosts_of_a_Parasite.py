@@ -53,6 +53,11 @@ def short_name(parasite):
     return f'{parasite[0]}. {parts[1]}' if len(parts) > 1 else parasite
 
 
+def common_name(host):
+    '''`Homo sapiens (human)` as `human`, the name the hosts are listed under.'''
+    return host[host.rfind('(') + 1:].rstrip(')') if '(' in host else host
+
+
 @st.cache_data(show_spinner=False)
 def load_host_orthologs(data_dir):
     '''
@@ -471,26 +476,6 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
                                           'Predicted in', 'Missing from', 'Why'])
 
 
-@st.cache_data(show_spinner=False)
-def get_overview(df_pred, config):
-    '''
-    Every parasite that has more than one host, and how much of it carried over between
-    them.
-    '''
-    overview = []
-    for parasite, edges in df_pred.groupby('taxid1_label'):
-        hosts = sorted(edges['host'].unique())
-        links = get_link_combinations(df_pred, parasite)
-        counts = edges.groupby('host').size()
-        overview.append([parasite, ', '.join(hosts),
-                         ' · '.join(f'{short_name(h)} {counts[h]}' for h in hosts),
-                         int((links['n_hosts'] == len(hosts)).sum()),
-                         int((links['n_hosts'] == 1).sum())])
-
-    return pd.DataFrame(overview, columns=['Parasite', 'Hosts', 'Predicted interactions',
-                                           'Links in every host', 'Links in one host only'])
-
-
 st.caption('One parasite across the hosts it is predicted against: which interactions '
            'carried over to every host, which are found in a single host, and how the '
            'predictions compare with the host proteins available in each.')
@@ -509,17 +494,13 @@ df_pred = get_multi_host_predictions(data_dir, config, score)
 if df_pred.empty:
     st.text('No parasite is predicted against more than one host at this confidence')
 else:
-    st.subheader('Parasites with more than one host')
-    st.caption('Parasites predicted against more than one host, with the number of '
-               'interactions predicted in each. The last two columns count interactions as '
-               'pairs of orthology groups, the level at which the hosts can be compared: a '
-               'link present in every host carried over, a link present in one host only did '
-               'not.')
-    st.dataframe(get_overview(df_pred, config), width='stretch', hide_index=True)
-
-    parasites = sorted(df_pred['taxid1_label'].unique())
+    # each parasite is listed with its hosts, `Trichinella spiralis (human, pig)`
+    hosts_of = df_pred.groupby('taxid1_label')['host'].agg(
+        lambda h: ', '.join(common_name(host) for host in sorted(set(h))))
+    parasites = sorted(hosts_of.index)
     with st.columns(3)[1]:
         parasite = st.selectbox('Select a parasite to compare its hosts', parasites,
+                                format_func=lambda p: f'{p} ({hosts_of[p]})',
                                 index=None, placeholder='<select>')
 
     if parasite is not None:

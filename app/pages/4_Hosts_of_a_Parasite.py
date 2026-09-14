@@ -576,21 +576,15 @@ else:
             # fill in
             absent = counts.get(ABSENT_FAMILY, 0) or 'none'
             said = [f'**Of the {len(reasons)} host–link combinations missing from a host, '
-                    f'{absent} are missing because that host has no protein of the family '
-                    'at all** — the only reason of the four that is about the host\'s own '
-                    'biology rather than about what is known of it.']
+                    f'{absent} are missing because the host lacks the family entirely.**']
             if counts.get(NOT_EXPRESSED):
-                said.append(f'{counts[NOT_EXPRESSED]} are a family the host does have, with no '
-                            'protein of it annotated to a tissue this parasite infects, so the '
-                            'transfer was never attempted. TISSUES cannot tell a protein that '
-                            'is not expressed there from one nobody has looked for, and it '
-                            'covers human far more deeply than pig, so these are the limit of '
-                            'the annotation at least as much as the reach of the parasite.')
+                said.append(f'In {counts[NOT_EXPRESSED]} cases the host has the family, but '
+                            'none of its members is annotated to a tissue the parasite '
+                            'infects.')
             if counts.get(OUT_OF_REACH):
-                said.append(f'{counts[OUT_OF_REACH]} are a family the host does express in an '
-                            'infected tissue, whose proteins DeepLoc puts where this parasite '
-                            'cannot reach them — inside the cell, for a parasite that stays '
-                            'outside it.')
+                said.append(f'In {counts[OUT_OF_REACH]} cases the family is expressed in an '
+                            'infected tissue, but DeepLoc places its members in compartments '
+                            'the parasite cannot reach.')
             if counts.get(NOT_TRANSFERRED):
                 said.append(f'{counts[NOT_TRANSFERRED]} are a family the host has, expresses '
                             'and the parasite reaches, whose link is not recorded under this '

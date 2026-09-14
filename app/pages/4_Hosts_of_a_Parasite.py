@@ -14,48 +14,37 @@ st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
 web_utils.show_header('Multi-host parasites')
 
-# Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-# The confidence the figures start at, and the range the slider spans, the same as the
-# other two pages. Worth knowing while reading it: the parasites with more than one host
-# are the small interactomes of the set, and once the predictions are restricted to the
-# tissues a parasite infects the usual 0.7 leaves two parasites on the page and one of them
-# a single host, so this page opens at the bottom of the range and is raised rather than
-# lowered
+# opens at the bottom of the range: the multi-host parasites are the small interactomes, and
+# 0.7 leaves two of them on the page
 MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
-# One colour per host, fixed here and not read from config['hosts'], which is where the
-# rest of the app takes them from. This page is the only one that draws the hosts against
-# each other rather than one at a time, and the config colours do not survive that: human
-# is a dark grey there, which is the colour of a host a set does not include (ABSENT_COLOR)
-# and close to the colour of a link shared by every host. These are the colourblind-safe
-# Okabe-Ito set the config already uses for the parasite groups, with the blues left out --
-# blue says how far a link carried over on this page, and nothing else may use it.
-# A host without an entry falls back to its config colour (see host_palette).
+# Okabe-Ito without the blues, which say how far a link carried over; the config colours
+# give human the grey of an absent host. A host without an entry falls back to its config
+# colour
 HOST_COLORS = {'Homo sapiens (human)': '#D55E00', 'Sus scrofa (pig)': '#CC79A7',
                'Mus musculus (mouse)': '#009E73', 'Rattus norvegicus (rat)': '#E69F00'}
-# colour of a link predicted against every host of the parasite, and the shades of it a
-# link predicted against some but not all of them is drawn in -- only reachable with three
-# hosts or more, where there is more than one way of being partly shared, so they are
-# separated within the blue rather than sharing one colour. A link found in one host only
-# is drawn in that host's own colour, from HOST_COLORS
+# a link shared by every host, and the shades a link shared by some of three or more hosts
+# is drawn in
 SHARED_COLOR = '#08519c'
 PARTIAL_COLORS = ['#6baed6', '#9ecae1', '#4292c6', '#c6dbef']
-# how far toward white each host after the first sharing a colour with another is mixed,
-# for hosts falling back to their config colour: the config gives rat and mouse the same
-# one, since they are one clade and every other page reads them as one host
+# how far toward white each host after the first sharing a config colour is mixed (rat and
+# mouse share one)
 SPECIES_TINT = 0.45
-# what a host is drawn in on the combination matrix when the combination does not include
-# it. No host is drawn in a grey, so an empty dot cannot be read as a host colour
+# a host the combination does not include; no host is drawn in a grey
 ABSENT_COLOR = '#e0e0e0'
-# most gene symbols written into the label of an orthology group before the rest are left
-# to the hover. A group is a family, not a gene, and the families here run to 18 proteins
+# why a host missed a link, in the order explain_host_specific tests them; the paragraph
+# under the table counts the rows of each
+ABSENT_FAMILY = 'no protein of the family in this host'
+NOT_EXPRESSED = 'family present, but no protein of it reaches the infected tissues'
+OUT_OF_REACH = 'family expressed, but not where this parasite can reach it'
+NOT_TRANSFERRED = 'protein available, link not transferred'
+# most gene symbols in an orthology group label before the rest are left to the hover
 SYMBOLS_IN_LABEL = 3
-# and the label is cut here whatever the count reached, since a name is not a symbol on
-# both axes: a parasite protein with no symbol is drawn under its locus, and three of
-# those joined is a label wider than the margin holding it
+# the label is cut here whatever the count, since parasite proteins without a symbol are
+# drawn under their locus
 LABEL_CHARS = 24
 def short_name(parasite):
     '''`Trichinella spiralis` as `T. spiralis`, the abbreviation the other pages use.'''
@@ -69,15 +58,6 @@ def load_host_orthologs(data_dir):
     '''
     Which proteins of each host belong to each of the orthology groups the predictions
     reach, written by scripts/build_host_orthologs.py.
-
-    It answers the question the predictions cannot: a group with no predicted interaction
-    in pig is missing from predictions.parquet whether pig has no protein in it at all or
-    whether pig's proteins were filtered out before the transfer, and those two are not
-    the same finding. A data directory built before that script simply leaves the section
-    that reads this out.
-
-    :param str data_dir: directory holding host_orthologs.parquet
-    :return: dataframe of group, taxid, n_proteins, proteins; or None if not built
     '''
     input_file = os.path.join(data_dir, 'host_orthologs.parquet')
     if not os.path.exists(input_file):
@@ -92,9 +72,11 @@ def host_label(host, config):
 
 
 def host_color(host_label, config):
-    '''The colour this page fixes for the host (HOST_COLORS), falling back to the one the
-    config gives it -- a host added to the config and not to HOST_COLORS still gets drawn
-    in the colour the rest of the app knows it by.'''
+    '''
+    The colour this page fixes for the host (HOST_COLORS), falling back to the one the
+    config gives it -- a host added to the config and not to HOST_COLORS still gets
+    drawn in the colour the rest of the app knows it by.
+    '''
     if host_label in HOST_COLORS:
         return HOST_COLORS[host_label]
 
@@ -110,15 +92,6 @@ def get_multi_host_predictions(data_dir, config, score=MIN_SCORE):
     '''
     Every prediction of the parasites that are predicted against more than one host,
     labelled with the host it was predicted against.
-
-    Every prediction is kept whatever tissue the host protein is annotated to. The tissue
-    filter of the pipeline keeps a host protein expressed in a tissue *any* parasite
-    infects, so a host protein can carry a predicted interaction with a parasite that
-    never reaches the tissue it was kept for; the figure at the foot of the page is where
-    that is read, and restricting the whole page to it would empty two of the comparisons.
-
-    :param float score: interactions predicted below this confidence are left out
-    :return: predictions of the multi-host parasites, with a `host` column
     '''
     predictions = web_utils.load_predictions(data_dir)
     predictions = predictions[predictions['weight'] >= score].copy()
@@ -130,8 +103,10 @@ def get_multi_host_predictions(data_dir, config, score=MIN_SCORE):
 
 
 def combination_label(hosts):
-    '''The name of a set of hosts: the hosts abbreviated and joined, in a fixed order so
-    that the same set is always the same label and the same column of the figures.'''
+    '''
+    The name of a set of hosts: the hosts abbreviated and joined, in a fixed order so
+    that the same set is always the same label and the same column of the figures.
+    '''
     return ' + '.join(short_name(host) for host in sorted(hosts))
 
 
@@ -139,10 +114,6 @@ def tint(color, amount):
     '''
     Mixes a colour toward white, the same way the network page lightens a species colour
     into a node fill.
-
-    :param str color: '#rrggbb'
-    :param float amount: 0 leaves the colour alone, 1 turns it white
-    :return: the mixed colour, or the colour unchanged if it is not a hex triplet
     '''
     color = str(color)
     if not color.startswith('#') or len(color) != 7:
@@ -153,12 +124,7 @@ def tint(color, amount):
 
 
 def host_palette(all_hosts, config):
-    '''
-    One colour per host of the parasite. A repeated configured colour is tinted for later
-    hosts so each species remains distinguishable.
-
-    :return: {host label: colour}
-    '''
+    '''One colour per host of the parasite.'''
     sharing = {}
     for host in all_hosts:
         sharing.setdefault(host_color(host, config), []).append(host)
@@ -169,16 +135,8 @@ def host_palette(all_hosts, config):
 
 def combination_palette(links, all_hosts, config):
     '''
-    The colour each set of hosts is drawn in, over both figures, so that a set is the same
-    colour wherever it is read.
-
-    The colouring says how far a link carried over and not which host it is: everything
-    shared is one colour, a link in one host only is that host's own, and the sets in
-    between -- which only exist for a parasite with three hosts -- take shades of the
-    shared colour, one each, since three of them in one blue cannot be told apart in a
-    legend.
-
-    :return: {combination label: colour}
+    The colour each set of hosts is drawn in, over both figures, so that a set is the
+    same colour wherever it is read.
     '''
     members = links.drop_duplicates('combination').set_index('combination')['hosts']
     hosts_palette = host_palette(all_hosts, config)
@@ -200,33 +158,15 @@ def combination_palette(links, all_hosts, config):
 def get_link_combinations(df_pred, parasite):
     '''
     The predicted interactions of one parasite at the level they can be compared between
-    hosts: the orthology group of the parasite protein against the orthology group of the
-    host protein.
-
-    A human protein and a pig protein are different proteins and cannot be intersected,
-    which is why counting host proteins per host says nothing about whether the same
-    interaction was predicted twice. The pair of orthology groups can be: it is what the
-    pipeline transferred the link at (homology.get_links reads the COG links between two
-    groups), so two hosts carrying the same pair carry the same transferred interaction,
-    and a pair in one host only is an interaction that did not carry over.
-
-    Two things are worth keeping in mind reading it. A group is a protein family and not
-    a gene -- KOG0994 is LAMA1, LAMB1 and LAMB2 in human -- so a shared pair means the
-    same family was reached, not necessarily the same gene. And the host proteins of the
-    pair are named per host, so the label of a row is the union of what the hosts call it.
-
-    :param df_pred: multi-host predictions
-    :param str parasite: label of the parasite to read
-    :return: one row per (parasite group, host group) pair, with the hosts it was
-             predicted in, the proteins on both sides, and the parasite protein names
+    hosts: the orthology group of the parasite protein against the orthology group of
+    the host protein.
     '''
     edges = df_pred[df_pred['taxid1_label'] == parasite]
     links = edges.groupby(['group1', 'group2']).agg(
         hosts=('host', lambda h: frozenset(h)),
         interactions=('target', 'size'),
-        # tuples and not lists: the frame is passed into the cached figure functions, and
-        # streamlit hashes a dataframe through pandas, which cannot factorize a column of
-        # unhashable values and falls back to pickling the whole frame
+        # tuples, not lists: streamlit hashes a dataframe through pandas, which cannot
+        # factorize unhashable values
         parasite_proteins=('source_name', lambda n: tuple(sorted(set(n)))),
         host_proteins=('target_name', lambda n: tuple(sorted(set(str(x).upper() for x in n)))),
         weight=('weight', 'max')).reset_index()
@@ -237,19 +177,17 @@ def get_link_combinations(df_pred, parasite):
 
 
 def group_label(proteins, group):
-    '''The name an orthology group is drawn under, on either axis of the matrix: the
-    names its proteins carry, since the group id names nothing to read. On the host side
-    the names are the gene symbols of the group, the union over the hosts; on the parasite
-    side they are the proteins of the parasite. Either is cut where the axis stops earning
-    the space -- the whole of it is in the hover -- and the id is kept as the label of a
-    group whose proteins have no name.'''
+    '''
+    The name an orthology group is drawn under, on either axis of the matrix: the names
+    its proteins carry, since the group id names nothing to read.
+    '''
     if not proteins:
         return group
 
     named = []
     for protein in proteins[:SYMBOLS_IN_LABEL]:
-        # the first name goes in whatever its length, so that a group is never drawn
-        # under an ellipsis alone; the ones after it only while the budget holds
+        # the first name goes in whatever its length, so a group is never drawn under an
+        # ellipsis alone
         if named and len(', '.join(named + [protein])) > LABEL_CHARS:
             break
         named.append(protein)
@@ -259,27 +197,22 @@ def group_label(proteins, group):
 
 
 def label_margin(labels):
-    """
+    '''
     How much room the labels along the foot of the matrix need, which plotly does not
     work out for itself: the ticks are forced (see generate_link_matrix), so a label
     longer than the margin is drawn over the edge of the figure rather than dropped.
-
-    The labels are written at -60 degrees, so the height of the longest one is its width
-    times sin(60); the width is the character count at roughly half the font size. The
-    cap is there because a family with three long symbols would otherwise take the figure.
-
-    :param labels: the tick labels of the x axis
-    :return: bottom margin in pixels
-    """
+    '''
     longest = max((len(str(label)) for label in labels), default=0)
 
     return int(min(220, 40 + 4.3 * longest))
 
 
 def order_combinations(links):
-    '''The combinations in the order the figures read them: everything shared first, then
+    '''
+    The combinations in the order the figures read them: everything shared first, then
     the smaller sets, and within a size the biggest first, so a figure is read from
-    "carried over everywhere" on the left to "one host only" on the right.'''
+    "carried over everywhere" on the left to "one host only" on the right.
+    '''
     counts = links.groupby('combination').agg(links=('group2', 'size'),
                                               n_hosts=('n_hosts', 'first'))
 
@@ -290,15 +223,8 @@ def order_combinations(links):
 @st.cache_data(show_spinner=False)
 def generate_combination_bars(links, all_hosts, config):
     '''
-    How many of the transferred interactions carried over to which hosts: a bar per set of
-    hosts, over a matrix saying which hosts the set is.
-
-    A Venn diagram is the usual figure for this and does not survive a third host; the
-    bars do, and they also put the sets in an order -- shared first, one host only last --
-    that a Venn has no way of showing.
-
-    :param links: the link combinations of one parasite
-    :param list all_hosts: every host of the parasite, in the order of the matrix rows
+    How many of the transferred interactions carried over to which hosts: a bar per set
+    of hosts, over a matrix saying which hosts the set is.
     '''
     order = order_combinations(links)
     counts = links.groupby('combination').size().reindex(order)
@@ -313,8 +239,8 @@ def generate_combination_bars(links, all_hosts, config):
                             hovertemplate='%{x}<br>%{y} orthology-group links<extra></extra>'),
                      row=1, col=1)
 
-    # the matrix below the bars: a filled dot where the set includes the host, an empty
-    # one where it does not, and a line joining the hosts of a set that spans several
+    # the matrix below the bars: a filled dot where the set includes the host, a line
+    # joining the hosts of a set
     for i, combination in enumerate(order):
         included = [h for h in all_hosts if h in members[combination]]
         if len(included) > 1:
@@ -329,8 +255,7 @@ def generate_combination_bars(links, all_hosts, config):
                                                     else ABSENT_COLOR),
                                         hoverinfo='skip', showlegend=False), row=2, col=1)
 
-    # the left margin is explicit rather than left to plotly, which cuts off the host names
-    # labelling the rows of the matrix, and the top one leaves room for the count over the
+    # explicit margins: plotly cuts off the host names on the rows and the count over the
     # tallest bar
     figure.update_layout(height=460, plot_bgcolor='white', showlegend=False,
                          margin=dict(l=150, r=10, t=45, b=20), bargap=0.4)
@@ -339,8 +264,7 @@ def generate_combination_bars(links, all_hosts, config):
     figure.update_yaxes(title_text=None, categoryorder='array', categoryarray=all_hosts[::-1],
                         showgrid=False, row=2, col=1)
     figure.update_xaxes(showticklabels=False, row=1, col=1)
-    # the dots below name the set, and a name spelled out under them as well runs into its
-    # neighbour as soon as a parasite has three hosts
+    # the dots below name the set; names run into each other from three hosts on
     figure.update_xaxes(title_text=None, showticklabels=False, showgrid=False, row=2, col=1)
 
     return figure
@@ -351,24 +275,14 @@ def generate_link_matrix(links, all_hosts, config):
     '''
     A tile matrix of every transferred interaction: parasite proteins run across, host
     orthology groups run down, and a tile's colour says which hosts received that link.
-
-    Two networks side by side is the other way of drawing this and is the wrong one: the
-    reader has to hold one of them in their head to find what the other is missing, and
-    the host proteins have different names in each. Here the difference is the figure --
-    a row that changes colour across is a family one host reaches and another does not.
-
-    The rows are ordered by how many hosts reach them, then by host in configured order;
-    the block of shared interactions gathers in the top left corner and host-specific
-    rows stay together instead of mixing Rat and Mouse families.
     '''
     squares = links.copy()
     squares['family'] = [group_label(p, g) for p, g in
                          zip(squares['host_proteins'], squares['group2'])]
     squares['parasite family'] = [group_label(p, g) for p, g in
                                   zip(squares['parasite_proteins'], squares['group1'])]
-    # Gene symbols are only labels, and the same symbol can occur in separate orthology
-    # groups. Keep the group identifier as the categorical coordinate on both axes so
-    # those rows and columns do not collapse into a single Plotly category.
+    # the same gene symbol can occur in separate orthology groups, so the group id is the
+    # categorical coordinate on both axes
     squares['family_id'] = squares['group2']
     squares['parasite_id'] = squares['group1']
     squares['host proteins'] = squares['host_proteins'].map(', '.join)
@@ -403,7 +317,7 @@ def generate_link_matrix(links, all_hosts, config):
     figure = px.scatter(squares, x='parasite_id', y='family_id', color='combination',
                         color_discrete_map=palette,
                         # plotly express flips category_orders on a y axis, so the most
-                        # shared families first here puts them in the top rows
+                        # shared families come out on top
                         category_orders={'parasite_id': list(columns.index),
                                          'family_id': list(rows.index),
                                          'combination': order},
@@ -413,20 +327,17 @@ def generate_link_matrix(links, all_hosts, config):
                                     'orthology groups': True,
                                     'interactions': True, 'combination': False,
                                     'predicted in': True})
-    # White borders separate adjacent links into individually readable tiles while still
-    # keeping dense selections compact.
     figure.update_traces(marker=dict(symbol='square', size=14,
                                      line=dict(color='white', width=1.5)))
     figure.update_layout(height=max(420, 17 * len(rows) + 260), plot_bgcolor='white',
-                         # the names down the side and along the foot are long enough that
-                         # plotly cuts them off if the margins are left to it
+                         # the names are long enough that plotly cuts them off if the
+                         # margins are left to it
                          margin=dict(l=190, r=10, t=10, b=label_margin(columns['family'])),
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
                          xaxis_title='parasite protein family',
                          yaxis_title='host protein family',
                          legend_title_text='predicted in host(s)')
-    # tickmode='array' on both axes: left to itself plotly thins the labels of an axis
-    # this long, and a matrix whose columns are unnamed cannot be read at all
+    # tickmode='array': plotly thins the labels of an axis this long
     figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#eef1f4',
                          gridwidth=1, zeroline=False, tickfont_size=9,
                          tickmode='array',
@@ -441,23 +352,22 @@ def generate_link_matrix(links, all_hosts, config):
 @st.cache_data(show_spinner=False)
 def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     '''
-    How many host proteins the pipeline had to work with in each host, which is the
-    number the rest of this page has to be read against.
+    How many host proteins the pipeline had to work with for this parasite in each host,
+    which is the number the rest of this page has to be read against.
 
-    Two counts per host: the proteins that came through the secretome, tissue and DeepLoc
-    filters at all, and the ones among them annotated to a tissue this parasite is known
-    to infect. Both come from tissues_cell_types.parquet, which pipeline/main.py writes
-    for exactly the proteins that survived the filters.
-
-    :param dict hosts_taxids: {host label: tuple of taxids as str}
-    :return: {host label: (proteins after the filters, of those in an infected tissue)}
+    The pool is the half of each host the parasite's niche reaches, and not the whole of
+    what came through the filters. pipeline/main.py filters the hosts once for every
+    parasite, while homology.get_links hands each parasite only its niche's half at
+    transfer time, so the whole pool is not what an extracellular parasite was drawn
+    from -- for the extracellular parasites of this page it is around three times what
+    they were offered, and by a different factor in each host.
     '''
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     infected = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
+    niche = web_utils.parasite_niche(config, parasite_taxid)
 
     available = {}
     for host, taxids in hosts_taxids.items():
-        proteins = set(tissues.loc[tissues['Gene'].str.split('.').str[0].isin(taxids), 'Gene'])
+        proteins = web_utils.filtered_pool(data_dir, taxids, niche=niche)
         available[host] = (len(proteins), len(proteins & infected))
 
     return available
@@ -466,16 +376,8 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
 @st.cache_data(show_spinner=False)
 def get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids):
     '''
-    The size of what was predicted in each host, beside the size of what could have been.
-
-    The point of the table is that the first set of numbers is not a result on its own.
-    Human carries two to three times the interactions of pig for the same parasite, and
-    the last two columns are why: the human proteome is annotated far more deeply, so far
-    more human proteins reach the transfer step at all.
-
-    The two 'available' columns are the pool the pipeline drew from, and the second of them
-    is a superset of the proteins reached: both are restricted to the tissues this parasite
-    infects, so the two can be read against each other.
+    The size of what was predicted in each host, beside the size of what could have
+    been.
     '''
     edges = df_pred[df_pred['taxid1_label'] == parasite]
     parasite_taxid = edges['taxid1'].iloc[0]
@@ -486,9 +388,9 @@ def get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids):
         'parasite proteins': ('source', 'nunique'),
         'host proteins reached': ('target', 'nunique'),
         'host families reached': ('group2', 'nunique')}).reset_index()
-    coverage['host proteins available after the filters'] = coverage['host'].map(
+    coverage['host proteins this parasite could reach'] = coverage['host'].map(
         lambda h: available[h][0])
-    coverage['available in a tissue this parasite infects'] = coverage['host'].map(
+    coverage['of those, in a tissue it infects'] = coverage['host'].map(
         lambda h: available[h][1])
 
     return coverage.rename(columns={'host': 'Host'}).sort_values(
@@ -499,41 +401,29 @@ def get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids):
 def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, hosts_taxids):
     '''
     For every interaction predicted in some hosts but not others, why it is missing from
-    the others. There are three ways it can be, and they mean different things:
-
-    * the host has no protein in that orthology group at all -- the family is absent from
-      the host, and the parasite has nothing to interact with. This is the only one of the
-      three that is about the host's biology.
-    * the host has proteins in the group, but none of them came through the pipeline's
-      filters into a tissue the parasite infects, so the transfer was never attempted.
-    * the host has such a protein and the link was still not transferred. One run of the
-      pipeline cannot produce this -- the proteins that came through the filters are
-      exactly the ones the orthology groups were matched from, so one of them in the group
-      would have carried the link -- but a data directory whose parquet files were written
-      by different runs can.
-
-    On the data as it stands every host-specific link of every parasite is the second,
-    which is worth saying plainly: the differences between the hosts on this page are
-    differences in how deeply the hosts are annotated, not in what the parasite can reach.
-    The check is kept rather than hard-coded because that stops being true as soon as a
-    host or a parasite is added.
-
-    :return: (dataframe of one row per missing link, None if host_orthologs is not built)
+    the others.
     '''
     orthologs = load_host_orthologs(data_dir)
     if orthologs is None:
         return None
 
     expressed = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
+    # the niche half of the pool, which homology.get_links applies as it transfers and the
+    # pool the rest of the page counts against does not
+    in_reach = web_utils.filtered_pool(
+        data_dir, tuple(taxid for taxids in hosts_taxids.values() for taxid in taxids),
+        niche=web_utils.parasite_niche(config, parasite_taxid))
 
-    members, reachable = {}, {}
+    members, expressed_of, reachable = {}, {}, {}
     for host, taxids in hosts_taxids.items():
         rows = orthologs[orthologs['taxid'].isin(taxids)]
         proteins = rows.groupby('group')['proteins'].apply(
             lambda p: {protein for entry in p for protein in entry.split(',')})
         members[host] = proteins.to_dict()
-        reachable[host] = {group: proteins_of & expressed
-                           for group, proteins_of in members[host].items()}
+        expressed_of[host] = {group: proteins_of & expressed
+                              for group, proteins_of in members[host].items()}
+        reachable[host] = {group: proteins_of & in_reach
+                           for group, proteins_of in expressed_of[host].items()}
 
     missing = []
     for link in links[links['n_hosts'] < len(all_hosts)].itertuples():
@@ -542,11 +432,13 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
                 continue
             family = members[host].get(link.group2, set())
             if not family:
-                reason = 'no protein of the family in this host'
+                reason = ABSENT_FAMILY
+            elif not expressed_of[host].get(link.group2):
+                reason = NOT_EXPRESSED
             elif not reachable[host].get(link.group2):
-                reason = 'family present, but no protein of it reaches the infected tissues'
+                reason = OUT_OF_REACH
             else:
-                reason = 'protein available, link not transferred'
+                reason = NOT_TRANSFERRED
             missing.append([group_label(link.host_proteins, link.group2),
                             ', '.join(link.parasite_proteins), link.combination, host,
                             len(family), reason])
@@ -560,9 +452,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
 def get_overview(df_pred, config):
     '''
     Every parasite that has more than one host, and how much of it carried over between
-    them. Drawn before anything is selected, since which parasites are even comparable is
-    the first thing to know -- there are seven of them as species, four with rat and mouse
-    read as one host.
+    them.
     '''
     overview = []
     for parasite, edges in df_pred.groupby('taxid1_label'):
@@ -583,7 +473,6 @@ st.caption('One parasite across the hosts it is predicted against: which interac
            'predictions compare with the host proteins available in each.')
 st.markdown("---")
 
-# The confidence threshold decides which multi-host predictions there are to compare.
 settings, _ = st.columns([1, 1])
 with settings:
     score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
@@ -617,23 +506,20 @@ else:
                         for host, rows in edges.groupby('host')}
         links = get_link_combinations(df_pred, parasite)
 
-        # the comparison first, since it is what the rest of the parasite's section has to
-        # be read against: a host carrying more interactions than another may only have
-        # been annotated more deeply, and the last two columns are where that is read. The
-        # table is a few rows of long column names, so it is given the width of the page
+        # the comparison first, since a host carrying more interactions may only have been
+        # annotated more deeply
         st.subheader('Predicted interactions relative to the available host proteins')
         st.caption('Interactions predicted in each host beside the pool of host proteins '
-                   'available: those passing the secretome, tissue and DeepLoc filters, '
-                   'and those among them annotated to a tissue this parasite infects. The '
-                   'second pool is what the predictions were drawn from, so a host with '
-                   'more predicted interactions than another may simply have more of it.')
+                   'they were drawn from: those passing the tissue and DeepLoc filters and '
+                   'lying where this parasite\'s niche can reach them — the surface of the '
+                   'cell for a parasite that stays outside it, the cytosol and nucleus as '
+                   'well for one that gets in — and those among them annotated to a tissue '
+                   'this parasite infects. The second pool is what the predictions were '
+                   'drawn from, so a host with more predicted interactions than another may '
+                   'simply have more of it.')
         st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
                      width='stretch', hide_index=True)
 
-        # then where the interactions are and how they divide between the hosts, side by
-        # side: neither is wider than half the page -- the bodies are drawn one per host
-        # and the bars have a column per host set -- and they are the two summaries the
-        # matrix below is the detail of
         body_column, sets_column = st.columns([1, 1], gap='large')
         with body_column:
             body_figure.show_body_figure(
@@ -649,8 +535,6 @@ else:
             st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
 
-        # the matrix names every orthology group on both axes, which is what its labels
-        # need the width of the page for
         st.subheader('Interactions per parasite protein family and host protein family')
         st.caption('One tile per transferred interaction: families of parasite proteins on '
                    'the x axis, families of host proteins on the y axis, coloured by the '
@@ -664,13 +548,33 @@ else:
                                         edges['taxid1'].iloc[0], hosts_taxids)
         if reasons is not None and not reasons.empty:
             counts = reasons['Why'].value_counts()
-            absent = counts.get('no protein of the family in this host', 0)
-            st.markdown(f'**Of the {len(reasons)} host–link combinations missing from a host, '
-                        f'{absent} are missing because that host has no protein of the family '
-                        'at all.** Every other one is a family the host does have, whose '
-                        'proteins were filtered out before the transfer was attempted — so '
-                        'it is a gap in the host\'s annotation and not a protein the parasite '
-                        'cannot reach.')
+            # `none` rather than `0`: a nought in bold reads as a value the page failed to
+            # fill in
+            absent = counts.get(ABSENT_FAMILY, 0) or 'none'
+            said = [f'**Of the {len(reasons)} host–link combinations missing from a host, '
+                    f'{absent} are missing because that host has no protein of the family '
+                    'at all** — the only reason of the four that is about the host\'s own '
+                    'biology rather than about what is known of it.']
+            if counts.get(NOT_EXPRESSED):
+                said.append(f'{counts[NOT_EXPRESSED]} are a family the host does have, with no '
+                            'protein of it annotated to a tissue this parasite infects, so the '
+                            'transfer was never attempted. TISSUES cannot tell a protein that '
+                            'is not expressed there from one nobody has looked for, and it '
+                            'covers human far more deeply than pig, so these are the limit of '
+                            'the annotation at least as much as the reach of the parasite.')
+            if counts.get(OUT_OF_REACH):
+                said.append(f'{counts[OUT_OF_REACH]} are a family the host does express in an '
+                            'infected tissue, whose proteins DeepLoc puts where this parasite '
+                            'cannot reach them — inside the cell, for a parasite that stays '
+                            'outside it.')
+            if counts.get(NOT_TRANSFERRED):
+                said.append(f'{counts[NOT_TRANSFERRED]} are a family the host has, expresses '
+                            'and the parasite reaches, whose link is not recorded under this '
+                            'pair of groups. A host protein belonging to both groups of a link '
+                            'is the usual reason: the transfer is then written with the two '
+                            'groups the other way round, and the host has the interaction '
+                            'after all.')
+            st.markdown(' '.join(said))
             with st.expander(f'The {len(reasons)} missing links, one row each'):
                 st.dataframe(reasons, width='stretch', hide_index=True)
         elif reasons is None:

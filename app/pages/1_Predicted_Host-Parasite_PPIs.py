@@ -138,11 +138,6 @@ SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
                        web_utils.CYTOPLASM: 'net_surface_cytoplasm',
                        web_utils.NUCLEUS: 'net_surface_nucleus'}
 
-# the background the host proteins are tested against; the wider one is the same for every
-# parasite
-BACKGROUND_FILTERS = 'Proteins that passed the filters'
-BACKGROUND_TISSUES = 'Those in the tissues this parasite infects'
-
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
@@ -564,7 +559,7 @@ def generate_cell_type_matrix(marks, blocks):
 
 
 @st.cache_data(max_entries=3, ttl=1800)
-def get_enrichment(pred_df, data_dir, side, background, config_file):
+def get_enrichment(pred_df, data_dir, side, config_file):
     '''
     The processes over-represented among one side of the network, against the proteins
     of that side's species the network could have been drawn from.
@@ -582,10 +577,6 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
                   for taxid in pred_df['taxid1'].unique()}
         niche = niches.pop() if len(niches) == 1 else None
     pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species), niche=niche)
-    if side == HOST and background == BACKGROUND_TISSUES:
-        parasite = pred_df['taxid1'].iloc[0]
-        pool = pool & web_utils.infected_tissue_proteins(
-            data_dir, utils.read_config(config_file), parasite)
     # a directory carrying neither table is left on the proteome rather than emptied
     if pool:
         go_df = go_df[go_df['#string_protein_id'].isin(pool)]
@@ -1314,20 +1305,9 @@ with st.container():
                              'parasite proteins reaching them, or the two tested apart and '
                              'shown together.')
         sides = [HOST, PARASITE] if side == BOTH else [side]
-        background = BACKGROUND_FILTERS
-        if HOST in sides:
-            background = st.radio('Test them against', (BACKGROUND_FILTERS,
-                                                        BACKGROUND_TISSUES), horizontal=True,
-                                  help='Every host protein that came through the filters, '
-                                       'or only those expressed where this parasite is. '
-                                       'The narrower background asks whether the targets '
-                                       'are special among the proteins the parasite can '
-                                       'actually meet, and takes the tissues it infects '
-                                       'out of the answer; the wider one is the same for '
-                                       'every parasite, so two of them can be compared.')
         # the sides are tested one at a time and carried together with the side on each row
         enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
-                                               data_dir, s, background,
+                                               data_dir, s,
                                                web_utils.get_config_file()).assign(side=s)
                                 for s in sides], ignore_index=True)
         if not enrichment.empty:
@@ -1345,7 +1325,7 @@ with st.container():
             per_side = (' (' + ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}'
                                          for s in sides) + ')') if side == BOTH else ''
             st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}{per_side}. '
-                       'Select rows to pick them out of the figures below.')
+                       'Select rows to highlight GO terms in the network.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
             gb.configure_pagination(paginationAutoPageSize=False,
                                     paginationPageSize=TABLE_PAGE_SIZE)
@@ -1372,16 +1352,8 @@ with st.container():
 
 with st.container():
     if enrichment_view is not None and enrichment_view.empty:
-        # against the infected tissues, nothing passing is a result rather than a setting to
-        # loosen
-        narrowed = (HOST in sides and background == BACKGROUND_TISSUES)
-        st.info(f"No biological process passes an FDR of {fdr}. "
-                + ("Against the proteins of the tissues this parasite infects, its targets "
-                   "carry no process more often than the rest of them. Test against every "
-                   "protein that passed the filters to see what its tissues account for."
-                   if narrowed else
-                   "Loosen the correction above to see the processes that are enriched "
-                   "less strongly."))
+        st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
+                "to see the processes that are enriched less strongly.")
     elif enrichment_view is not None:
         enrichment_viz = enrichment_view
         if selected_rows is not None and len(selected_rows) > 0:

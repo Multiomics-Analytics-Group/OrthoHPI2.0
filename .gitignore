@@ -163,3 +163,5 @@ poster/assets/structures/
 poster/*.pdf
 poster/*-preview.png
 poster/*-inkscape-backup.svg
+
+docs/rodents.md

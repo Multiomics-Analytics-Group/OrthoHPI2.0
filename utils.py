@@ -41,50 +41,15 @@ def export_graph(G, filename, format='graphml', output_dir='tmp'):
 
 def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
                          min_in_set=2):
-    """
-    Fisher's exact test of every Gene Ontology term against one set of proteins.
-
-    `proteins` and `go_df` have to be of the same species. The background is every
-    annotated protein of `go_df`, so a set of one organism tested against the annotation of
-    two is tested against a null that is partly another organism's: the two differ in how
-    deeply they are annotated, and the difference is read as enrichment.
-
-    A term is tested when the background gives it between `min_term` and `max_term`
-    proteins -- the range that is neither nearly empty nor nearly everything -- and when at
-    least `min_in_set` of the tested proteins carry it. The ceiling is also held to
-    `max_share` of the background: nearly everything is a share of what is being tested
-    against, and a count tuned to a proteome lets a term covering half a smaller background
-    through. The floor stays a count, since a term of three proteins is too small to say
-    anything about however large the background is. The size range is read off the
-    background rather than off the tested set: selecting a term because many of the tested
-    proteins carry it and then testing whether they over-carry it is the same question
-    asked twice, and on a set of twenty proteins it leaves almost nothing to test.
-
-    The test is one-sided: only a term the set carries more often than the background is
-    a result here, and a two-sided test would let a term the set is depleted of pass under
-    a heading that reads as over-representation.
-
-    :param proteins: the protein ids to test, as STRING ids
-    :param go_df: GO annotations of their species, with columns #string_protein_id, term
-                  (the GO id, which identifies a term) and description (its name)
-    :param int min_term: smallest background term tested, exclusive
-    :param int max_term: largest background term tested, exclusive
-    :param float max_share: largest share of the background a term may cover
-    :param int min_in_set: proteins of the set a term needs before it is worth testing
-    :return: dataframe of go_id and go_term, the four cells of the table, p_value,
-             odds_ratio, the proteins behind it, and the Benjamini-Hochberg corrected fdr_bh
-    """
+    '''Fisher's exact test of every Gene Ontology term against one set of proteins.'''
     annotated = set(go_df['#string_protein_id'])
-    # the universe is what is annotated: a protein no term can be counted against belongs
-    # in neither margin of the table
+    # the universe is what is annotated
     tested = set(proteins) & annotated
     total_nodes = len(tested)
     total_prots = len(annotated)
 
     max_term = min(max_term, round(max_share * total_prots))
 
-    # a term is held by its GO id and named by its description, which is what the app
-    # writes on the figures
     names = dict(go_df[['term', 'description']].drop_duplicates().values)
     sizes = go_df.groupby('term')['#string_protein_id'].nunique()
     in_set = (go_df[go_df['#string_protein_id'].isin(tested)]
@@ -98,10 +63,8 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0
         members = set(ids)
         net_members = members & tested
 
-        # the 2x2 table the test is run on: the proteins of the set annotated to the term
-        # (A), the rest of the set (B), the proteins outside the set annotated to it (C)
-        # and everything else (D). The set's proteins annotated to the term are taken out
-        # of both margins of D, so they are added back once
+        # 2x2 table: set proteins annotated to the term (A), rest of the set (B), outside
+        # the set annotated (C), everything else (D)
         a = len(net_members)
         b = total_nodes - a
         c = len(members) - a
@@ -113,8 +76,7 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0
     enrichment = pd.DataFrame(enrichment, columns=['go_id', 'go_term', 'A', 'B', 'C', 'D',
                                                    'p_value', 'odds_ratio', 'nodes'])
     if not enrichment.empty:
-        # only the corrected p-values are used, and those do not depend on a threshold:
-        # the significance a term has to reach is chosen in the app, term by term
+        # only the corrected p-values are used; the threshold is chosen in the app
         enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(),
                                              method='fdr_bh')[1]
         enrichment = enrichment.sort_values(by='fdr_bh', ascending=True)
@@ -126,10 +88,7 @@ def save_to_parquet(df, output_file):
 
 
 def read_parquet_file(input_file, filters=None):
-    '''
-    Reads a parquet file. Optional filters (i.e. [('taxid', 'in', [9606])]) are
-    pushed down to the reader so only the matching row groups are loaded.
-    '''
+    '''Reads a parquet file.'''
     df = pd.read_parquet(input_file, filters=filters)
 
     return df
@@ -137,14 +96,8 @@ def read_parquet_file(input_file, filters=None):
 
 def annotate_alias_id(predictions_df, taxids, config_file, sources, new_col, mapping_col):
     '''
-    Adds an extra column to the provided dataframe with the String alias selected (e.g., UniProt id)
-
-    :param DataFrame predictions_df: predictions dataframe to be annotated (requires mapping_col in columns)
-    :param str config_file: path to config file (used to get the aliases for each species)
-    :param list sources: what source ids need to be annotated, in order of preference
-                (see parse_string_aliases)
-
-    :return DataFrame predictions_df: annotated dataframe with the String aliases of interest
+    Adds an extra column to the provided dataframe with the String alias selected (e.g.,
+    UniProt id)
     '''
     aliases = {}
     for taxid in taxids:
@@ -152,25 +105,14 @@ def annotate_alias_id(predictions_df, taxids, config_file, sources, new_col, map
                     sources=sources, taxid=str(taxid), reverse=True))
     
     predictions_df[new_col] = predictions_df[mapping_col].map(aliases)
-    #predictions_df['target_uniprot'] = predictions_df['target'].map(aliases)
     
     return predictions_df
 
 
 def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     '''
-    Parses the alias file from String database and generates a dictionary
-    that can be used to map to the right identifiers
-    :param str config_file: path to the config file where the url to the String alias file should be defined
-    :param list sources: sources to consider (i.e. Ensembl_gene), in order of preference:
-                the alias of the first source that has one for an identifier wins. STRING
-                alias files differ per species -- only human carries
-                Ensembl_HGNC_uniprot_ids -- so listing fallbacks maps the other species
-                without changing the ones that do have the preferred source.
-    :param str taxid: taxonomic identifier of the species for which to parse the aliases file
-    :param bool reverse: whether to store alias --> string_id dictionary (False), or string_id --> alias (True)
-    :return: dictionary with key --> alias, values --> string_id (reverse=False),
-                or key --> string_id, values --> alias
+    Parses the alias file from String database and generates a dictionary that can be
+    used to map to the right identifiers
     '''
     data_dict = {}
     urls = read_config(filepath=config_file, field='urls')
@@ -181,10 +123,8 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
     data = pd.read_csv(filename, sep='\t', header=0)
     if sources is not None:
         data = data[data['source'].isin(sources)]
-        # Rows are written into data_dict in order and later ones overwrite earlier
-        # ones, so sorting by descending preference leaves the most preferred source
-        # written last -- and therefore the one that wins. The sort is stable, so
-        # within a single source the file order still decides, as it did before.
+        # later rows overwrite earlier ones, so descending preference leaves the most
+        # preferred source written last; the sort is stable
         rank = {source: i for i, source in enumerate(sources)}
         data = data.sort_values('source', key=lambda s: s.map(rank), ascending=False, kind='stable')
 
@@ -198,11 +138,7 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
 
 
 def read_yaml(yaml_file):
-    """
-    Reads YAML file and stores it in a dictionary
-    :param str yaml_file: path to yaml file
-    :return: a dictionary with the content of the yaml file
-    """
+    '''Reads YAML file and stores it in a dictionary'''
     content = None
     with open(yaml_file, 'r') as stream:
         try:
@@ -212,14 +148,9 @@ def read_yaml(yaml_file):
     return content
 
 def read_config(filepath, field=None):
-    """
+    '''
     Read the configuration file and return either the full content or an specific field.
-    
-    :param str filepath: path to configuration file
-    :param str field: field to be obtained from the configuration
-    
-    :return: dictionary with the content of the configuration or the field specified
-    """
+    '''
     content = read_yaml(filepath)
     if content is not None:
         if field is not None:
@@ -229,12 +160,7 @@ def read_config(filepath, field=None):
     return content
 
 def download_file(url, data_dir='data'):
-    """
-    Download file from an url into an existing directory
-    :param str url: URL address where to download the data from
-    :param str data_dir: path to directory where to download the data
-    :return: filepath to the downloaded data
-    """
+    '''Download file from an url into an existing directory'''
     os.makedirs(data_dir, exist_ok=True)
     header = {'user-agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36'}
     filename = url.split('/')[-1]
@@ -247,21 +173,16 @@ def download_file(url, data_dir='data'):
     return filename
 
 def read_gzipped_file(filepath):
-    """
-    Opens an underlying process to access a gzip file through the creation of a new pipe to the child.
-    :param str filepath: path to gzip file.
-    :return: A bytes sequence that specifies the standard output.
-    """
+    '''
+    Opens an underlying process to access a gzip file through the creation of a new pipe
+    to the child.
+    '''
     handle = gzip.open(filepath, "rb")
 
     return handle
 
 def read_zipped_file(filepath):
-    '''
-    Opens a handler to access the content of zip file
-    :param str filepath: path to the zip file
-    :return: A bytes sequence that specifies the standard output
-    '''
+    '''Opens a handler to access the content of zip file'''
     file_name = filepath.split('/')[-1].split('.')[0]+'.tsv'
     archive = zipfile.ZipFile(filepath, 'r')
     handle = archive.open(file_name)
@@ -280,12 +201,10 @@ def merge_list_of_lists(list_of_lists):
 
 
 def convertOBOtoNet(ontologyFile):
-    """
-    Takes an .obo file and returns a NetworkX graph representation of the ontology, that holds multiple \
-    edges between two nodes.
-    :param str ontologyFile: path to ontology file.
-    :return: NetworkX graph.
-    """
+    '''
+    Takes an .obo file and returns a NetworkX graph representation of the ontology, that
+    holds multiple     edges between two nodes.
+    '''
     graph = obonet.read_obo(ontologyFile)
 
     return graph

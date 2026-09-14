@@ -1,38 +1,4 @@
-"""
-Generate LSF job scripts for running DeepLoc 2.1 on HPC, one per parasite.
-
-Usage:
-    python generate_hpc_jobs.py --work-dir /work3/idamei/orthohpi
-    python generate_hpc_jobs.py --work-dir /work3/idamei/orthohpi --model Accurate --taxids 9606,10116,9823
-
-This assumes:
-  - Protein sequence FASTAs are at {work_dir}/data/TAXID.fasta
-  - DeepLoc venv is at {work_dir}/deeploc_venv (or ~/deeploc_env, see TEMPLATE)
-  - Output goes to {work_dir}/data/deeploc_output/TAXID (Fast) or
-    {work_dir}/data/deeploc_output_accurate/TAXID (Accurate) -- kept separate so
-    re-running with the other model doesn't overwrite/mix with existing results.
-
-Job scripts and logs are kept in per-model subdirectories so Fast and Accurate
-runs never mix:
-    jobs/fast/5759_Entamoeba_histolytica.sh
-    jobs/accurate/5759_Entamoeba_histolytica.sh
-    {work_dir}/logs/fast/deeploc_5759_%J.out
-    {work_dir}/logs/accurate/deeploc_5759_%J.out
-
-Submit with:
-    for f in jobs/accurate/*.sh; do bsub < $f; done
-
-Accurate (ProtT5) model note:
-  ProtT5 is ~32GB and is downloaded from the internet the first time it's used.
-  HPC compute nodes are usually offline, so trigger the download once on a node
-  with internet access (e.g. a login/interactive node) before batch-submitting.
-  Point HF_HOME at shared scratch first -- both so the cache is visible to the
-  GPU nodes (unlike a login-node-local path) and so it doesn't blow your $HOME
-  quota -- then warm it up with a tiny fasta:
-      export HF_HOME={work_dir}/.cache/huggingface
-      deeploc2 -f test.fasta -o /tmp/warmup -m Accurate
-  The job template below sets the same HF_HOME so batch jobs hit that cache.
-"""
+'''Generate LSF job scripts for running DeepLoc 2.1 on HPC, one per parasite.'''
 
 import argparse
 import os
@@ -87,8 +53,7 @@ echo "End: $(date)"
 
 
 def select_species(config_file, taxids):
-    """Return {taxid: info} to run for. Defaults to config parasites; if taxids is
-    given, pick those from hosts+parasites (so host taxids can be targeted too)."""
+    '''Return {taxid: info} to run for.'''
     hosts = utils.read_config(filepath=config_file, field="hosts") or {}
     parasites = utils.read_config(filepath=config_file, field="parasites") or {}
     if taxids is None:

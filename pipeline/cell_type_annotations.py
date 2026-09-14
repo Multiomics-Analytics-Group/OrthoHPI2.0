@@ -1,4 +1,4 @@
-"""Load and combine cell-type annotations from host-specific atlas sources."""
+'''Load and combine cell-type annotations from host-specific atlas sources.'''
 
 import pandas as pd
 import utils
@@ -7,19 +7,9 @@ PIG_TAXID = '9823'
 MOUSE_TAXID = '10090'
 CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 
-# HPA names its own tissues; they have to be rewritten as the labels of config['tissues']
-# before the cell types can be merged onto the rows of the TISSUES annotation. One HPA
-# name can stand for more than one label: TISSUES annotates the gut both under `colon`,
-# `rectum` and `small intestine` and under the coarser `intestine`, and HPA is the only
-# source of cell types for any of the four, so those three are written out under their own
-# name as well as under `intestine`. Sending them to `intestine` alone, as this did, left
-# every colon, rectum and small intestine row of the annotation without a cell type.
-#
-# `pbmc` is HPA's blood: it is the only single cell data HPA has for blood, and a name
-# missing from this table is dropped by the tissue filter, so leaving it out left blood
-# without a human cell type at all. It is the mononuclear fraction alone -- no
-# erythrocytes, no granulocytes -- so a blood cell type a parasite meets can be missing
-# from it, the red cell Plasmodium invades most of all.
+# HPA tissue names -> config['tissues'] labels. The gut tissues are written under their own
+# label and `intestine`, since TISSUES annotates both; `pbmc` is HPA's only blood data (no
+# erythrocytes or granulocytes)
 HPA_TISSUE_LABELS = {
     'heart muscle': ['heart'],
     'bronchus': ['lung'],
@@ -31,12 +21,7 @@ HPA_TISSUE_LABELS = {
 
 
 def read_hpa(config_file):
-    '''
-    Reads the HPA file containing cell type protein expression profiles
-    per tissue.
-    :param str config_file: path to the configuration file
-    :return: pandas dataframe with the protein expression profiles for each tissue and cell type
-    '''
+    '''Reads the HPA file containing cell type protein expression profiles per tissue.'''
     urls = utils.read_config(filepath=config_file, field='urls')
     if 'hpa_single_cell_tissue_url' not in urls:
         raise KeyError("hpa_single_cell_tissue_url missing from config urls")
@@ -51,16 +36,10 @@ def read_hpa(config_file):
 
 
 def map_hpa_data(config_file, hpa_data):
-    '''
-    Map gene identifiers and filetering only tissues relevant in OrthoHPI 2.0
-    :param str config_file: path to the config file
-    :param dataframe hpa_data: pandas dataframe with the single cell type data from HPA
-    :return: mapped dataframe
-    '''
+    '''Map gene identifiers and filetering only tissues relevant in OrthoHPI 2.0'''
     aliases = utils.parse_string_aliases(config_file, sources=['Ensembl_gene'])
     tissues = {t.lower() for t in utils.read_config(filepath=config_file, field='tissues').values()}
-    # a tissue HPA reports keeps only the labels of config['tissues'] it stands for, so the
-    # rows of the tissues OrthoHPI does not use are dropped before they are duplicated
+    # a tissue HPA reports keeps only the labels of config['tissues'] it stands for
     labels = {tissue: [label for label in HPA_TISSUE_LABELS.get(tissue, [tissue]) if label in tissues]
               for tissue in hpa_data['Tissue'].unique()}
 
@@ -69,22 +48,15 @@ def map_hpa_data(config_file, hpa_data):
     hpa_data = hpa_data[hpa_data['Tissue'].str.len() > 0].explode('Tissue', ignore_index=True)
     hpa_data['Gene'] = hpa_data['Gene'].map(aliases)
 
-    # the rewrite brings several HPA tissues under one label (bronchus onto lung, the three
-    # gut tissues onto intestine) and several Ensembl genes onto one STRING protein, so a
-    # cell type can now stand twice for the same gene and tissue; keep the highest nTPM of
-    # each, as read_hpa does for the rows it reads
+    # several HPA tissues and Ensembl genes now fall under one label and protein; keep the
+    # highest nTPM of each
     hpa_data = hpa_data.sort_values(by='nTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
 
     return hpa_data
 
 
 def filter_valid_proteins(hpa_data, valid_proteins):
-    '''
-    Keep only the HPA rows whose mapped Gene is in the pipeline's valid proteins.
-    :param dataframe hpa_data: mapped HPA dataframe (Gene column holds STRING protein ids)
-    :param iterable valid_proteins: protein ids kept after the pipeline filters
-    :return: filtered dataframe
-    '''
+    '''Keep only the HPA rows whose mapped Gene is in the pipeline's valid proteins.'''
     hpa_data = hpa_data[hpa_data['Gene'].isin(valid_proteins)]
 
     return hpa_data
@@ -92,11 +64,8 @@ def filter_valid_proteins(hpa_data, valid_proteins):
 
 def parse_hpa(config_file, valid_proteins):
     '''
-    Load, map, and filter HPA single-cell data to (Gene, Tissue, Cell type, nTPM)
-    rows for the given valid proteins.
-    :param str config_file: path to the configuration file
-    :param iterable valid_proteins: protein ids kept after the pipeline filters
-    :return: filtered HPA dataframe
+    Load, map, and filter HPA single-cell data to (Gene, Tissue, Cell type, nTPM) rows
+    for the given valid proteins.
     '''
     data = read_hpa(config_file=config_file)
     data = map_hpa_data(config_file=config_file, hpa_data=data)
@@ -106,14 +75,7 @@ def parse_hpa(config_file, valid_proteins):
 
 
 def read_pig_atlas(data_dir, valid_proteins):
-    """
-    Load preprocessed pig cell-atlas expression, when it has been generated.
-
-    The raw atlas is a 14 GB Seurat object and is intentionally processed outside
-    the main pipeline by build_pig_atlas_cell_types.py. Keeping this optional
-    preserves pipeline runs for configurations and snapshots that do not include
-    the pig atlas.
-    """
+    '''Load preprocessed pig cell-atlas expression, when it has been generated.'''
     filename = f'{data_dir}/pig_atlas_cell_types.parquet'
     try:
         data = utils.read_parquet_file(input_file=filename)
@@ -130,7 +92,7 @@ def read_pig_atlas(data_dir, valid_proteins):
 
 
 def read_mouse_atlas(data_dir, valid_proteins):
-    """Load preprocessed Tabula Muris Senis expression, when it has been generated."""
+    '''Load preprocessed Tabula Muris Senis expression, when it has been generated.'''
     filename = f'{data_dir}/mouse_atlas_cell_types.parquet'
     try:
         data = utils.read_parquet_file(input_file=filename)
@@ -147,7 +109,7 @@ def read_mouse_atlas(data_dir, valid_proteins):
 
 
 def parse_cell_type_data(config_file, data_dir, valid_proteins):
-    """Return HPA and optional pig/mouse atlas cell-type annotations."""
+    '''Return HPA and optional pig/mouse atlas cell-type annotations.'''
     human = parse_hpa(config_file=config_file, valid_proteins=valid_proteins)
     pig = read_pig_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
     mouse = read_mouse_atlas(data_dir=data_dir, valid_proteins=valid_proteins)

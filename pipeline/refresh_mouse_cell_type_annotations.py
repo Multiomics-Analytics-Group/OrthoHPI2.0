@@ -1,4 +1,4 @@
-"""Add generated mouse atlas annotations to the existing app tissue artifact."""
+'''Add generated mouse atlas annotations to the existing app tissue artifact.'''
 import argparse
 import os
 
@@ -11,7 +11,9 @@ MOUSE_TAXID = f'{cell_type_annotations.MOUSE_TAXID}.'
 
 
 def refresh(data_dir):
-    """Replace mouse cell-type rows in tissues_cell_types.parquet from the atlas artifact."""
+    '''
+    Replace mouse cell-type rows in tissues_cell_types.parquet from the atlas artifact.
+    '''
     output_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
     tissues = utils.read_parquet_file(output_file)
     required = {'Gene', 'Tissue'}

@@ -12,14 +12,7 @@ web_url = 'https://alphafold.ebi.ac.uk/entry/query_protein'
 
 @lru_cache(maxsize=None)
 def get_alphafold_url(uniprot_id):
-    '''
-    Returns the url of the current AlphaFold model file for a UniProt id. The model
-    files are versioned and older versions are removed (model_v4 is gone), so the
-    url is resolved through the API instead of being built from a fixed version.
-
-    :param str uniprot_id: UniProt accession to look up
-    :return: url of the pdb file for the latest model of that protein
-    '''
+    '''Returns the url of the current AlphaFold model file for a UniProt id.'''
     request = urllib.request.Request(api_url.replace('query_protein', uniprot_id))
     with urllib.request.urlopen(request, timeout=30) as response:
         predictions = json.loads(response.read().decode('utf-8'))
@@ -31,11 +24,7 @@ def get_alphafold_url(uniprot_id):
 
 
 def download_structure(url, pdb_filename):
-    '''
-    Downloads a structure to pdb_filename. The file is written to a temporary path
-    first so a failed download does not leave an empty file behind, which would
-    later be mistaken for a cached structure.
-    '''
+    '''Downloads a structure to pdb_filename.'''
     request = urllib.request.Request(url)
     with urllib.request.urlopen(request, timeout=60) as response:
         content = response.read().decode('utf-8')
@@ -48,15 +37,7 @@ def download_structure(url, pdb_filename):
 
 
 def get_alphafold_structure(query_proteins={}, output_dir='data/tmp'):
-    '''
-    Downloads the AlphaFold structure of each query protein.
-
-    :param dict query_proteins: protein name --> UniProt id
-    :param str output_dir: directory where the downloaded structures are cached
-    :return: dict protein name --> (pdb file, pdb url, AlphaFold entry url, reason),
-             where the file and url are None when no structure could be retrieved and
-             reason says why, and reason is None when one was
-    '''
+    '''Downloads the AlphaFold structure of each query protein.'''
     structures = {}
     os.makedirs(output_dir, exist_ok=True)
     for query_protein in query_proteins:
@@ -74,9 +55,8 @@ def get_alphafold_structure(query_proteins={}, output_dir='data/tmp'):
                 if not os.path.isfile(pdb_filename) or os.path.getsize(pdb_filename) == 0:
                     download_structure(pdb_url, pdb_filename)
         except urllib.error.HTTPError as e:
-            # 404 is the database answering that it holds no model for this protein,
-            # which about one parasite protein in five hits and is not an error. Anything
-            # else went wrong on the way and should not be reported as a missing model.
+            # 404 means no model for this protein, which about one parasite protein in five
+            # hits
             if e.code == 404:
                 reason = 'The AlphaFold database holds no model for this protein'
             else:
@@ -94,12 +74,7 @@ def get_alphafold_structure(query_proteins={}, output_dir='data/tmp'):
 
     return structures
 
-# AlphaFold writes the per-residue confidence of its model (pLDDT) into the B-factor
-# column of the pdb file, so colouring the cartoon by that column shows which parts of
-# the model are to be trusted. The colours are the ones the AlphaFold database itself
-# uses, from very low to very high confidence, and the range is cut at the two outer
-# thresholds of its scale: 3Dmol blends between the four rather than banding them, so
-# the bands read as a gradient from orange through yellow and light blue to dark blue.
+# AlphaFold writes pLDDT into the B-factor column; colours are the AlphaFold database's own
 PLDDT_BANDS = [('#FF7D45', 'Very low (pLDDT < 50)'),
                ('#FFDB13', 'Low (50 - 70)'),
                ('#65CBF3', 'Confident (70 - 90)'),
@@ -113,8 +88,6 @@ def plddt_legend():
     '''
     The key to the colours generate_mol_structure paints the model with, which mean
     nothing without one.
-
-    :return: html of the legend, to be written with st.markdown(unsafe_allow_html=True)
     '''
     swatches = ''.join(
         f'<span style="display:inline-block;width:0.75em;height:0.75em;'
@@ -127,14 +100,7 @@ def plddt_legend():
 def generate_mol_structure(pdb_file, height=460):
     '''
     Builds the 3Dmol viewer of a structure, with the cartoon coloured by the per-residue
-    confidence of the model. The viewer is built to fill the width it is given rather
-    than the fixed 640px py3Dmol defaults to, so that it is not cut off when embedded in
-    a column narrower than that. The view is also zoomed out a little from the fit 3Dmol
-    computes, which otherwise leaves elongated proteins touching the edges of the canvas.
-
-    :param str pdb_file: path of the pdb file to show
-    :param int height: height of the viewer in pixels
-    :return: py3Dmol view of the structure
+    confidence of the model.
     '''
     with open(pdb_file) as ifile:
         content = ifile.read()
@@ -144,8 +110,7 @@ def generate_mol_structure(pdb_file, height=460):
     xyzview.setStyle({'cartoon': {'colorscheme': {'prop': 'b', 'gradient': 'linear',
                                                   'colors': PLDDT_COLORS,
                                                   'min': PLDDT_MIN, 'max': PLDDT_MAX}}})
-    # white rather than the black py3Dmol starts from: the confident parts of the model
-    # are the dark blue end of the scale, which does not stand out against black
+    # the confident parts of the model are dark blue, which does not stand out against black
     xyzview.setBackgroundColor('white')
     xyzview.zoomTo()
     xyzview.zoom(0.85)

@@ -1,18 +1,4 @@
-"""
-Write eligible_proteins.parquet for a data directory that predates it.
-
-The file holds the proteins the pipeline's filters passed, which is the background the
-app tests a network's enrichment against. A full pipeline run writes it, but rebuilding a
-data directory only for this file would repeat the orthology transfer, which takes hours
-and would rewrite predictions.parquet from today's sources. This runs the filter stage
-alone, off the same cached downloads, and writes nothing else.
-
-    .venv/bin/python scripts/build_eligible_proteins.py [--config config.yml] [--data-dir data]
-
-The filters read the secretome predictions and the DeepLoc output under the data
-directory, so a directory whose predictions were built with other cut-offs than the ones
-in pipeline/main.py will get a pool that does not match them.
-"""
+'''Write eligible_proteins.parquet for a data directory that predates it.'''
 import argparse
 import os
 import sys
@@ -23,14 +9,7 @@ from pipeline import main
 
 
 def check_inputs(data_dir):
-    """
-    Refuse a data directory that does not hold the filters' own inputs.
-
-    A missing secretome file raises on its own, but a missing DeepLoc directory only
-    warns and leaves the host proteins unfiltered, which would write a pool several times
-    too large -- and a pool too large is read as a background, not as an error. The
-    snapshot directories are the case that matters: they hold parquet outputs alone.
-    """
+    '''Refuse a data directory that does not hold the filters' own inputs.'''
     missing = [d for d in (os.path.join(data_dir, 'secretome'),
                            os.path.join(data_dir, main.DEEPLOC_ACCURATE_DIR))
                if not os.path.isdir(d)]

@@ -1,20 +1,8 @@
-"""
-Run DeepLoc 2.1 on parasite proteomes to predict secretome and membrane proteins,
-producing FASTA files in data/secretome_pred_input_data/input_data/{taxid}.fasta
-that are consumed by get_secretome_predictions() in filters.py.
-
-Usage:
-    python run_deeploc.py [--config config.yml] [--data-dir data]
-
-Requires deeploc2 installed:
-    pip install . (from the deeploc2_package directory)
-
-For each parasite in config:
-  - Downloads protein sequences from STRING (TAXID.protein.sequences.v12.0.fa.gz)
-  - Runs DeepLoc 2.1 (Fast model) on the full proteome
-  - Keeps Extracellular proteins for all parasites, plus Cell membrane for unicellular
-  - Writes filtered sequences to data/secretome_pred_input_data/input_data/{taxid}.fasta
-"""
+'''
+Run DeepLoc 2.1 on parasite proteomes to predict secretome and membrane proteins, producing
+FASTA files in data/secretome_pred_input_data/input_data/{taxid}.fasta that are consumed by
+get_secretome_predictions() in filters.py.
+'''
 
 import argparse
 import glob

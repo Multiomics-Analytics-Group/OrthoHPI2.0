@@ -1,29 +1,7 @@
-"""
-Which orthology groups each host proteome has a protein in, for the host groups that
-carry a predicted interaction.
-
-The cross-host page has to tell two different absences apart. A parasite predicted to
-interact with a human protein but not with its pig counterpart is either a parasite
-that cannot reach that protein in pig -- because pig has no protein in the group at
-all -- or the same interaction filtered out of the pig predictions, because no pig
-protein of the group is annotated to a tissue the parasite infects, or DeepLoc did not
-call one surface-exposed, or STRING has no pig entry for it. Only the first is about
-the host's biology; the second is about how deeply the host is annotated, and reading
-it as the first is the mistake this file exists to prevent.
-
-predictions.parquet cannot answer that: a group with no predicted interaction in pig is
-absent from it whichever of the two happened. The EggNOG members file can, since it
-lists every protein of every group.
-
-Only the host groups that appear in predictions.parquet are kept (193 of them at the
-time of writing), so the output is a few kilobytes rather than a scan of all of
-Eukaryota.
-
-    python scripts/build_host_orthologs.py
-
-Re-run it whenever predictions.parquet is rebuilt with new hosts or new parasites; the
-app treats a missing file as "not known" and simply leaves the section out.
-"""
+'''
+Which orthology groups each host proteome has a protein in, for the host groups that carry a
+predicted interaction.
+'''
 
 import argparse
 import os
@@ -39,31 +17,20 @@ GROUP_COLUMN, PROTEINS_COLUMN, SPECIES_COLUMN = 1, 4, 5
 
 
 def get_host_groups(predictions_file):
-    """
+    '''
     The orthology groups of the host side of the predictions, and the hosts to look for
-    in them. Both come from the predictions rather than from the config so that the
-    output covers exactly what the app can ask about.
-
-    :param str predictions_file: path to predictions.parquet
-    :return: (set of group ids, set of host taxids as str)
-    """
+    in them.
+    '''
     predictions = utils.read_parquet_file(input_file=predictions_file)
 
     return set(predictions['group2']), set(predictions['taxid2'].astype(str))
 
 
 def count_members(members_file, groups, taxids):
-    """
-    Streams the members file and counts, for each wanted group, how many proteins of each
-    host it holds. The proteins of a group are one comma-separated field, so the species
-    field is read first and the proteins are only split for a group that has a host in it.
-
-    :param str members_file: path to the gzipped EggNOG members file
-    :param set groups: group ids to keep
-    :param set taxids: host taxids to count, as strings
-    :return: list of [group, taxid, n_proteins, proteins] for every host present in a
-             wanted group, proteins comma-separated as they are in the members file
-    """
+    '''
+    Streams the members file and counts, for each wanted group, how many proteins of
+    each host it holds.
+    '''
     counts = []
     with utils.read_gzipped_file(members_file) as members:
         for i, line in enumerate(members, 1):
@@ -77,13 +44,11 @@ def count_members(members_file, groups, taxids):
                 continue
             proteins = data[PROTEINS_COLUMN].split(",")
             for taxid in sorted(present):
-                # the proteins are STRING-style taxid.identifier, so the host's are the
-                # ones under its own prefix
+                # the proteins are STRING-style taxid.identifier
                 prefix = f"{taxid}."
                 members_of_host = [p for p in proteins if p.startswith(prefix)]
-                # the ids are kept, and not only counted, so the app can ask the next
-                # question of them: whether any of the host's proteins of the group is
-                # annotated to a tissue the parasite infects
+                # the ids are kept so the app can ask which are annotated to an infected
+                # tissue
                 counts.append([data[GROUP_COLUMN], taxid, len(members_of_host),
                                ",".join(members_of_host)])
 
@@ -100,9 +65,7 @@ def main(data_dir):
 
     counts = count_members(members_file, groups, taxids)
     orthologs = pd.DataFrame(counts, columns=["group", "taxid", "n_proteins", "proteins"])
-    # a group whose only member of a host is in EggNOG but not in STRING is still a
-    # protein that host has, so the zero counts are kept out rather than kept as zeros:
-    # what the app asks is whether the host has one at all
+    # what the app asks is whether the host has a protein of the group at all
     orthologs = orthologs[orthologs["n_proteins"] > 0]
 
     utils.save_to_parquet(orthologs, output_file)

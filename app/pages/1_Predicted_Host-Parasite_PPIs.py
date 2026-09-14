@@ -21,11 +21,9 @@ from ppi_network import ppi_network
 style.load_css()
 web_utils.show_header('Host-parasite network')
 
-#Initialize variables
 df_select = None
 networks = []
-# the filters, named before the column that draws them so the sections further down the
-# page can say what they are showing even when a filter offered nothing to select
+# named before the column that draws them, so the sections below can say what they show
 selected_tissues = []
 selected_cell_types = []
 selected_surface = []
@@ -36,85 +34,59 @@ enrichment_table = None
 enrichment_view = None
 enrichment = None
 path = 'data/tmp'
-# where the network is written for the download buttons; not in the repository, so it
-# has to be created on a fresh checkout
+# where the network is written for the download buttons; not in the repository
 os.makedirs(path, exist_ok=True)
-# characters per line of a node label, so a long protein name wraps instead of
-# stretching its node across the network
+# characters per line of a node label
 LABEL_WRAP_WIDTH = 22
 LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
 LABEL_FONT_COLOR = '#2f3a46'
 LABEL_FONT_FACE = "'Source Sans Pro', -apple-system, 'Segoe UI', sans-serif"
-# the labels are drawn over the edges, so they are given a halo of the network
-# background to sit in rather than being read through the lines
+# halo behind the labels, so they are not read through the edges
 NETWORK_BACKGROUND = '#fbfcfd'
-# how far toward white a node's species colour is washed out to fill it. A saturated
-# fill of the colours the parasites are identified by leaves the label on top of it
-# unreadable; a wash of the same colour still says which organism the protein is from
+# how far toward white a node's species colour is washed out to fill it, so the label stays
+# readable
 NODE_FILL_TINT = 0.74
 NODE_HIGHLIGHT_TINT = 0.5
-# edges are the background of the picture until one is pointed at: neutral and light
-# enough to read the nodes through them, and the accent of the page when hovered
+# edges are neutral until hovered
 EDGE_COLOR = '#c7cfd9'
 EDGE_ACCENT_COLOR = '#2b8cbe'
-# the enrichment view below the table, where the proteins of the selected processes are
-# picked out of a network that is otherwise pushed into the background
+# the enrichment view, where selected processes are picked out of a dimmed network
 HIGHLIGHT_COLOR = '#e7298a'
 MUTED_COLOR = '#c8ced6'
-# the enrichment figures. Significance is a magnitude, so it is drawn on a single hue
-# running light to dark rather than on a set of unrelated colours
+# significance is a magnitude, so a single hue running light to dark
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
 GO_AXIS_COLOR = '#8d97a3'
-# the matrix of host proteins against the cell types they are concentrated in. Fewer
-# proteins than this and the rows say nothing a glance at the table would not
+# fewer proteins than this and the cell-type matrix says nothing the table does not
 MATRIX_MIN_PROTEINS = 3
 MATRIX_MARK_SIZE = 11
-# the bars are counted per cell type and do not grow with the host proteins, so the tab
-# holding them keeps one height whatever the parasite
+# the bars do not grow with the host proteins
 BARS_HEIGHT = 420
-# what a column joins the tissue and the cell type with, since a cell type name is only
-# unique inside its tissue. Not a character a name of either carries
+# joins tissue and cell type, a cell type name being unique only inside its tissue
 MATRIX_SEPARATOR = ' | '
 GO_GRID_COLOR = '#e6eaef'
-# how many processes the ranked plot shows. Beyond this the term names stop being
-# readable, and the table above is the place to see the rest
+# processes the ranked plot shows; beyond this the names stop being readable
 GO_TOP_N = 20
-# characters per line of a GO term name on the y axis of the ranked plot
+# characters per line of a GO term name on the ranked plot
 GO_LABEL_WRAP_WIDTH = 42
-# an FDR that underflows to 0 would be an infinite -log10. It is read as the smallest
-# FDR the rest of the table holds instead, so one term cannot stretch the colour scale
+# an FDR that underflows to 0 would be an infinite -log10
 GO_MIN_FDR = 1e-300
-# the block all the others are nested in. It is in the data rather than left to plotly,
-# which paints a sector it has no colour value for in a hard grey (see the treemap below)
+# the treemap root, in the data so plotly does not paint it grey
 GO_TREEMAP_ROOT_ID = '__all_enriched_processes__'
 GO_TREEMAP_ROOT_LABEL = 'All enriched processes'
-# height of the network. The layout spaces the proteins widely so that their names can be
-# read, and the view is zoomed to fit whatever it is given: a shorter canvas does not
-# remove the space between the proteins, it only shrinks the whole network, names and all.
-# The empty space around a small network is taken out by the zoom (see index.html), not
-# by making the canvas smaller.
+# the layout spaces the proteins widely; a shorter canvas only shrinks the whole network
 NETWORK_HEIGHT = 1000
-# height of each of the two structure viewers in the dialog an interaction opens
+# height of each structure viewer in the interaction dialog
 VIEWER_HEIGHT = 400
 
-# Columns of the interactions table. The colors and shapes only exist to draw the network,
-# the taxids repeat their labels, and the parasite and the edge type are the same on every
-# row. The optional Rodent view carries both rat and mouse proteins, so their species is
-# retained to distinguish them throughout the network, table, and tissue views.
-#
-# Both STRING ids are carried even though the parasite one is the taxid and the UniProt
-# accession joined and could be left to the reader to assemble: the host one cannot be --
-# 9606.ENSP00000312671 shares nothing with Q8N3D4 -- and a table whose two halves are
-# identified differently is a table that has to be explained before it can be used.
+# columns of the interactions table; both STRING ids are carried since the host one cannot
+# be assembled from the rest
 TABLE_COLUMNS = ['source_name', 'source_full_name', 'source', 'source_uniprot',
                  'target_name', 'target_full_name', 'target', 'target_uniprot',
                  'Tissues', 'experimental_evidence_score',
                  'databases_evidence_score', 'weight', 'group1', 'group2']
 
-# what those columns are called once they are read by someone rather than by the network:
-# `source` is the parasite and `target` the host throughout the pipeline, which is not
-# something the table should ask its reader to know. The names are the ones the rest of the
-# app uses, so a column here and a caption elsewhere say the same word for the same thing.
+# `source` is the parasite and `target` the host throughout the pipeline; the names here are
+# the ones the rest of the app uses
 TABLE_COLUMN_NAMES = {
     'source_name': 'Parasite protein',
     'source_full_name': 'Parasite protein description',
@@ -133,8 +105,7 @@ TABLE_COLUMN_NAMES = {
     'group1': 'Parasite orthology group',
     'group2': 'Host orthology group'}
 
-# and the columns of the enrichment table. GO_TERM_COLUMN is read back out of the grid
-# when rows are picked, so the figures below highlight what was selected.
+# GO_TERM_COLUMN is read back out of the grid when rows are picked
 ENRICHMENT_COLUMN_NAMES = {
     'go_term': 'Biological process',
     'n_proteins': 'Proteins of the network',
@@ -143,59 +114,46 @@ ENRICHMENT_COLUMN_NAMES = {
     'fdr_bh': 'FDR (BH)'}
 GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 
-# the filters are written as badges above each section below the fold, one colour per
-# kind, so a network read halfway down the page is not taken for the whole prediction set.
-# The confidence score is always one of them: it is never not filtering
+# filters written as badges above each section, one colour per kind; the score is always one
+# of them
 FILTER_BADGES = {'tissue': 'blue', 'cell type': 'green', 'localisation': 'violet'}
-# how many names of one kind are written into a download filename before they are counted
-# instead, since every selected cell type would otherwise end up in it
+# names of one kind in a download filename before they are counted instead
 FILENAME_MAX_NAMES = 2
 
-# rows to a page of either table. The grid is grown to the page rather than the page fitted
-# to a fixed height, so the last page of a short table is the only one drawn short
+# rows to a page of either table
 TABLE_PAGE_SIZE = 10
 
 # the two sides of the network, tested separately for enrichment
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
 
-# the tissue filter is named so that a click on the body figure can set it: the figure is
-# drawn after the filter is created, so a click only reaches it on the following run
+# named so a click on the body figure can set it on the following run
 TISSUE_FILTER_KEY = 'net_tissues'
 
-# the localisation tickboxes are drawn above the network they narrow rather than beside
-# the other filters, so they are named as well: their state has to be read where the
-# predictions are filtered, which is before they are drawn again
+# named so their state can be read where the predictions are filtered, before they are drawn
+# again
 SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
                        web_utils.EXTRACELLULAR: 'net_surface_extracellular',
                        web_utils.CYTOPLASM: 'net_surface_cytoplasm',
                        web_utils.NUCLEUS: 'net_surface_nucleus'}
 
-# what the host proteins of the network are tested against. The pipeline's filters are
-# the universe the network was drawn from, and the second option narrows that universe
-# the same way the predictions themselves are narrowed. The two answer different
-# questions -- whether the parasite's targets are special among everything it could have
-# reached anywhere, or among what it could have reached where it lives -- and the wider
-# one is offered first because it is the same background for every parasite, so two
-# parasites can be read against each other
+# the background the host proteins are tested against; the wider one is the same for every
+# parasite
 BACKGROUND_FILTERS = 'Proteins that passed the filters'
 BACKGROUND_TISSUES = 'Those in the tissues this parasite infects'
 
-# Read dataset
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-# the predictions themselves are loaded by web_utils, so the three pages share one
-# cached copy of them however the app is navigated
+# loaded by web_utils, so the pages share one cached copy
 load_predictions = web_utils.load_predictions
 
 
 @st.cache_data(show_spinner=False, max_entries=5)
 def get_parasite_tissues(data_dir, parasite, host_taxids):
     '''
-    Annotates the predictions of one parasite against the selected host with the
-    tissues and cell types its host targets are expressed in. Selecting the parasite
-    before merging keeps the full predictions x tissues table (~630 MB) out of the app.
+    Annotates the predictions of one parasite against the selected host with the tissues
+    and cell types its host targets are expressed in.
     '''
     predictions = load_predictions(data_dir)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
@@ -207,8 +165,10 @@ def get_parasite_tissues(data_dir, parasite, host_taxids):
 
 @st.cache_data(show_spinner=False)
 def get_parasite_list(data_dir, host_taxids):
-    '''Parasites with predictions against the selected host, so the parasite
-    selector never offers one that yields an empty network.'''
+    '''
+    Parasites with predictions against the selected host, so the parasite selector never
+    offers one that yields an empty network.
+    '''
     predictions = load_predictions(data_dir)
     predictions = predictions[predictions['taxid2'].isin(host_taxids)]
 
@@ -224,10 +184,6 @@ def tint(color, amount):
     '''
     Mixes a colour toward white, so the colour a species is identified by can also be
     used as a fill light enough to write on.
-
-    :param str color: '#rrggbb'
-    :param float amount: 0 leaves the colour alone, 1 turns it white
-    :return: the mixed colour, or the colour unchanged if it is not a hex triplet
     '''
     color = str(color)
     if not color.startswith('#') or len(color) != 7:
@@ -241,12 +197,7 @@ def node_color(color):
     '''
     The fill, border and hover colours of a node from the one colour its species is
     drawn in: a wash of the colour inside a border of the colour itself, which reads as
-    a group at a glance and keeps the protein name on top of it legible. Hovering and
-    selecting deepen the fill rather than change the colour, so a node stays
-    recognisable as its species while it is pointed at.
-
-    :param str color: the species colour
-    :return: a vis.js node colour dictionary
+    a group at a glance and keeps the protein name on top of it legible.
     '''
     return {'background': tint(color, NODE_FILL_TINT),
             'border': color,
@@ -257,39 +208,30 @@ def node_color(color):
 def style_network(net):
     '''
     Applies the look of the network: the label font, the node fills and the edge
-    colours. The font has to be set on the network rather than on each node, as pyvis
-    overwrites a node's font with the font_color the network was built with. The colours
-    are set on the nodes and edges pyvis built rather than on the networkx graph they
-    came from, because a colour dictionary is not something GraphML can hold and the
-    same graph is exported for download.
-
-    :param net: pyvis Network to style
+    colours.
     '''
     net.options.nodes = {
         'font': {'size': LABEL_FONT_SIZE, 'color': LABEL_FONT_COLOR,
                  'face': LABEL_FONT_FACE,
-                 # the halo that lifts the label off the edges running under it
+                 # the halo that lifts the label off the edges
                  'strokeWidth': 4, 'strokeColor': NETWORK_BACKGROUND},
         'borderWidth': 2, 'borderWidthSelected': 3}
     net.options.edges = {
-        # vis.js spreads the confidence scores over its default 1-15 px, which turns the
-        # best-supported interactions into bars. A narrower range still ranks them by
-        # confidence while leaving the network something to be read through
+        # vis.js spreads the scores over 1-15 px by default, which turns the best
+        # interactions into bars
         'scaling': {'min': 1, 'max': 6},
-        # pyvis asks for dynamic curves, which hang an invisible support node off every
-        # edge for the physics to solve: the same curve without the cost, and shallow
-        # enough that two proteins still read as joined by a line
+        # pyvis asks for dynamic curves, which hang a support node off every edge for the
+        # physics
         'smooth': {'enabled': True, 'type': 'continuous', 'roundness': 0.15},
-        # the edges are thin, which is close to unclickable, so pointing at one or
-        # picking it thickens it as well as colouring it
+        # the edges are thin, so hovering or picking one thickens it
         'hoverWidth': 2, 'selectionWidth': 3}
     net.options.interaction = {'hover': True, 'selectConnectedEdges': False,
                                'tooltipDelay': 120}
     for node in net.nodes:
         node['color'] = node_color(node.get('color', '#8899aa'))
     for edge in net.edges:
-        # as an object rather than pyvis' plain string: vis.js reads a string as "this
-        # colour whatever happens to the edge", which loses the hover and the selection
+        # as an object: vis.js reads a plain string as the colour whatever happens to the
+        # edge
         edge['color'] = {'color': EDGE_COLOR,
                          'highlight': EDGE_ACCENT_COLOR,
                          'hover': EDGE_ACCENT_COLOR}
@@ -298,14 +240,7 @@ def style_network(net):
 def generate_node_labels(df, annotations):
     '''
     Draws the descriptive protein name on the node instead of the short name STRING
-    prefers. Proteins STRING has no name for are left with their short name -- an
-    "Uncharacterized protein" label identifies nothing, and most parasite proteins
-    would end up sharing it. The name is wrapped so long ones do not stretch the node
-    across the network.
-
-    :param df: predictions dataframe of the selected parasite
-    :param dict annotations: STRING id --> descriptive protein name
-    :return: {STRING id: label}
+    prefers.
     '''
     labels = {}
     for prefix in ['source', 'target']:
@@ -323,20 +258,7 @@ def generate_node_labels(df, annotations):
 def get_surface_calls(data_dir, host_taxids):
     '''
     What DeepLoc 2 called each protein and how sure it was of that call, keyed by STRING
-    id. Both sides of the interactions are in it: every protein of the predictions went
-    through a localisation filter to get here, the host proteins for sitting somewhere a
-    parasite of theirs can reach and the parasite proteins for being secreted, and this is
-    what those filters read.
-
-    The two sides are called on their own classes, which is why the hosts are named: a host
-    protein is read on all four -- the cytosol and the nucleus being open to a parasite with
-    an intracellular stage -- and a parasite protein on the surface pair its secretome
-    filter selected on.
-
-    :param str data_dir: directory holding deeploc_localisations.parquet
-    :param tuple host_taxids: taxids of the hosts, as strings
-    :return: dataframe of surface calls and probabilities, indexed by STRING id; empty without
-             the file
+    id.
     '''
     localisations = web_utils.load_deeploc_localisations(data_dir)
     if localisations.empty:
@@ -359,18 +281,10 @@ def generate_node_titles(df, annotations, surface_calls=None):
     '''
     Builds the hover text of each node: the short name, the descriptive protein name,
     where DeepLoc puts the protein and the identifiers needed to look it up elsewhere.
-    The label only shows one of the two names, so the tooltip keeps both.
-
-    :param df: predictions dataframe of the selected parasite
-    :param dict annotations: STRING id --> descriptive protein name
-    :param surface_calls: DeepLoc calls, as get_surface_calls returns them, or None for a
-                          data directory with no localisations to show
-    :return: {STRING id: hover text}
     '''
     calls = {} if surface_calls is None or surface_calls.empty else surface_calls.to_dict('index')
     titles = {}
-    # each side is read on the classes its own filter was made of, the same pairing
-    # get_surface_calls classified them with
+    # each side is read on the classes its own filter was made of
     for prefix, taxid_col, classes in [('source', 'taxid1_label', web_utils.SURFACE_CLASSES),
                                        ('target', 'taxid2_label', web_utils.HOST_CLASSES)]:
         cols = [prefix, f'{prefix}_name', f'{prefix}_uniprot', taxid_col]
@@ -382,9 +296,7 @@ def generate_node_titles(df, annotations, surface_calls=None):
             lines.append(str(species))
             call = calls.get(protein)
             if call:
-                # every class the protein was called for, each at its own probability: the
-                # call of a protein in several places is not one number, and the class name
-                # alone would not say which places
+                # every class the protein was called for, each at its own probability
                 called = [(c, call[web_utils.DEEPLOC_SCORES[c]]) for c in classes
                           if web_utils.DEEPLOC_SCORES[c] in call
                           and call[web_utils.DEEPLOC_SCORES[c]] > web_utils.DEEPLOC_CUTOFFS[c]]
@@ -402,18 +314,7 @@ def generate_node_titles(df, annotations, surface_calls=None):
 
 
 def generate_interactions_table(df, score, annotations):
-    '''
-    Builds the table of predicted interactions above the chosen score. The predictions
-    are merged with the tissue and cell type annotation to filter them, which repeats
-    every interaction once per tissue and single-cell cluster the host protein was
-    found in -- 39 interactions come out as 820 rows. The tissues are gathered back
-    into one cell so the table holds one row per interaction.
-
-    :param df: predictions dataframe of the selected parasite
-    :param float score: minimum confidence score
-    :param dict annotations: STRING id --> descriptive protein name
-    :return: the table to show and download
-    '''
+    '''Builds the table of predicted interactions above the chosen score.'''
     table = df[df['weight'] >= score]
     if table.empty:
         return table[TABLE_COLUMNS[:1]].rename(columns=TABLE_COLUMN_NAMES)
@@ -430,11 +331,8 @@ def generate_interactions_table(df, score, annotations):
     columns = list(TABLE_COLUMNS)
     if table['taxid2_label'].nunique() > 1:
         columns.insert(columns.index('target_name'), 'taxid2_label')
-    # where DeepLoc puts each side. The host call is why the host protein is in the network
-    # at all; the parasite call is not a criterion -- the secretome filter is what selected
-    # those -- and is here to be read rather than to explain the selection, which is why a
-    # parasite protein can be called neither class and still be in the table. Only when the
-    # data directory has the localisations, since the snapshot ones do not
+    # where DeepLoc puts each side; only when the data directory has the localisations. The
+    # parasite call is not a criterion
     if 'source_surface' in table.columns:
         columns.insert(columns.index('target_name'), 'source_surface')
     if 'target_surface' in table.columns:
@@ -447,12 +345,7 @@ def generate_interactions_table(df, score, annotations):
 def search_table(table, search):
     '''
     Keeps the rows of the interactions table holding the searched text in any of their
-    columns, ignoring case. The rows shown and the rows handed out by the download
-    button are the same ones this way.
-
-    :param table: the interactions table
-    :param str search: text typed in the search box, empty for no filtering
-    :return: the rows that match
+    columns, ignoring case.
     '''
     search = search.strip()
     if not search or table.empty:
@@ -465,24 +358,11 @@ def search_table(table, search):
 
 
 def name_the_selection(table, parasite, host):
-    '''
-    The parasite and the host as two columns at the front of the table.
-
-    For the table on the page they would be the same value on every row -- one parasite and
-    one host group are selected before it is built -- and the host is only named there when
-    the group covers two species. The downloaded file is the other way round: it is read
-    away from the selectors that made it, and outlives the parasite name in its filename.
-
-    :param table: the interactions table, as generate_interactions_table returns it
-    :param str parasite: the selected parasite
-    :param str host: the selected host species
-    :return: the table with the two columns in front, or unchanged if it is empty
-    '''
+    '''The parasite and the host as two columns at the front of the table.'''
     if table.empty:
         return table
 
-    # The combined Rodent view already carries each row's host species; preserve that
-    # column and add the selected host label separately.
+    # the Rodent view already carries each row's host species
     host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
     named = table.assign(**{'Parasite species': parasite, host_column: host})
     front = ['Parasite species', host_column]
@@ -491,16 +371,7 @@ def name_the_selection(table, parasite, host):
 
 
 def active_filters(score, tissues, cell_types, surface):
-    """
-    The filters narrowing what the page shows, as (kind, name) pairs. The score comes
-    first and is always there; the rest appear only once something is selected.
-
-    :param float score: the confidence the network is drawn from
-    :param iterable tissues: selected tissues
-    :param iterable cell_types: selected cell types
-    :param iterable surface: selected DeepLoc classes
-    :return: list of (kind, name), the kinds being the keys of FILTER_BADGES
-    """
+    '''The filters narrowing what the page shows, as (kind, name) pairs.'''
     active = [('score', f'confidence \u2265 {score:g}')]
     for kind, selected in (('tissue', tissues), ('cell type', cell_types),
                            ('localisation', surface)):
@@ -510,26 +381,18 @@ def active_filters(score, tissues, cell_types, surface):
 
 
 def show_active_filters(filters):
-    """Writes the filters above a section, so it says what it is showing."""
+    '''Writes the filters above a section, so it says what it is showing.'''
     badges = ' '.join(f':{FILTER_BADGES.get(kind, "gray")}-badge[{name}]'
                       for kind, name in filters)
     st.markdown(f'Showing {badges}')
 
 
 def download_name(parasite, filters, suffix):
-    """
-    Names a download after the filters it was taken under, rather than after the parasite
-    alone: an exported table of one tissue is otherwise indistinguishable from the whole
-    network of that parasite once it is on disk.
-
-    Names of one kind are written out while there are few of them and counted once there
-    are more, so selecting a dozen cell types does not produce a filename to match.
-
-    :param str parasite: the selected parasite
-    :param list filters: the filters, as returned by active_filters
-    :param str suffix: what the file is, extension included
-    :return: the filename
-    """
+    '''
+    Names a download after the filters it was taken under, rather than after the
+    parasite alone: an exported table of one tissue is otherwise indistinguishable from
+    the whole network of that parasite once it is on disk.
+    '''
     parts = [parasite]
     for kind in ('score', 'tissue', 'cell type', 'localisation'):
         names = [name for active_kind, name in filters if active_kind == kind]
@@ -555,17 +418,7 @@ def generate_tissue_filters(df):
 def generate_cell_type_filters(df, score):
     '''
     The cell types on offer, the one holding the most host proteins first, and how many
-    each holds. The count is what makes one cell type worth picking over another, and it
-    is read off the interactions above the confidence slider so that an option never
-    promises proteins the network is not drawing.
-
-    A cell type holds the host proteins with expression above 1 nTPM
-    (web_utils.keep_expressed_cell_types), and the filter that reads these options keeps
-    the same rows.
-
-    :param dataframe df: the predictions of the parasite, annotated with tissues
-    :param float score: confidence the network is drawn from
-    :return: series of host proteins per cell type, its index the options themselves
+    each holds.
     '''
     annotated = df[(df['weight'] >= score) & df['Cell type'].notna()]
     if annotated.empty:
@@ -578,18 +431,9 @@ def generate_cell_type_filters(df, score):
 def generate_surface_filters(df, surface_calls, niche):
     '''
     The DeepLoc classes offered as tickboxes: the surface of the host cell and the space
-    around it, and for a parasite with an intracellular stage the cytosol and the nucleus
-    as well, those being the classes its niche let the filter keep a host protein for.
-
-    Read from the probabilities rather than from the class of each protein. A protein
-    called for several classes carries one name for all of them, and it belongs to each of
-    the boxes it is over the cut-off of. A class no host protein of this parasite is over
-    is left out, as an empty option filters to an empty network.
-
-    :param df: the predictions of the parasite
-    :param surface_calls: DeepLoc calls, as get_surface_calls returns them
-    :param str niche: niche of the parasite, as web_utils.get_niches names it
-    :return: the classes worth offering, in the order they are drawn in
+    around it, and for a parasite with an intracellular stage the cytosol and the
+    nucleus as well, those being the classes its niche let the filter keep a host
+    protein for.
     '''
     if surface_calls is None or surface_calls.empty or 'target' not in df.columns:
         return []
@@ -605,25 +449,14 @@ def cell_type_marks(df, score):
     The host proteins of the network against the cell types where they exceed 1 nTPM
     (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
     section are drawn from, and the tissues those cell types are grouped into.
-
-    A cell type name repeats across tissues -- smooth muscle cells are in the lung and in
-    the intestine -- so a column is a (tissue, cell type) pair and only the cell type is
-    written under it. The tissues come in blocks, the one holding the most host proteins
-    first and its cell types in the same order inside it, as the tissues of the other pages
-    are ordered.
-
-    :param dataframe df: the predictions of the parasite, annotated with tissues
-    :param float score: confidence the network is drawn from
-    :return: the rows and the blocks as (tissue, its columns), or (None, None) where there
-             is too little annotation to draw anything
     '''
     annotated = df[(df['weight'] >= score) & df['Cell type'].notna()]
     if annotated.empty:
         return None, None
 
     marks = web_utils.keep_expressed_cell_types(annotated).copy()
-    # the row a protein reaches its maximum in is always kept, so the share is read off
-    # the marks themselves and the darkest of a row is 100%
+    # the row a protein reaches its maximum in is always kept, so the darkest of a row is
+    # 100%
     marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
     marks['column'] = marks['Tissue'] + MATRIX_SEPARATOR + marks['Cell type']
     if (marks['target_name'].nunique() < MATRIX_MIN_PROTEINS
@@ -641,16 +474,7 @@ def cell_type_marks(df, score):
 def label_tissue_blocks(figure, blocks):
     '''
     Names each tissue above the columns of its cell types and parts one block from the
-    next with a rule, rather than repeating the tissue under every column of it. The two
-    figures carry the same columns in the same order, so the blocks land in the same place
-    on both and switching between them does not move the ground under the reader.
-
-    A line down every column would fence the marks in and leave these rules
-    indistinguishable from the rest, so the vertical grid goes as they arrive.
-
-    :param figure: a figure whose x axis holds the columns of the blocks, in their order
-    :param list blocks: the blocks as (tissue, its columns)
-    :return: the figure
+    next with a rule, rather than repeating the tissue under every column of it.
     '''
     columns = [column for _, block in blocks for column in block]
     start = 0
@@ -670,9 +494,11 @@ def label_tissue_blocks(figure, blocks):
 
 
 def style_cell_type_figure(figure, blocks):
-    '''The two cell type figures share their axes, their blocks and the room above the
-    plot the names of those blocks need, which style_go_axes leaves only the margin of a
-    plain figure for.'''
+    '''
+    The two cell type figures share their axes, their blocks and the room above the plot
+    the names of those blocks need, which style_go_axes leaves only the margin of a
+    plain figure for.
+    '''
     figure = style_go_axes(label_tissue_blocks(figure, blocks))
     figure.update_layout(margin=dict(l=10, r=10, t=34, b=40))
 
@@ -681,18 +507,9 @@ def style_cell_type_figure(figure, blocks):
 
 def generate_cell_type_bars(marks, blocks):
     '''
-    The predicted interactions of the network counted per cell type, in the blocks of the
-    tissue the cell types belong to: where the parasite is predicted to meet the host most
-    often, read in one glance.
-
-    An interaction is counted in every cell type where its host protein exceeds 1 nTPM,
-    so the bars overlap and do not partition the network. They are the columns of the
-    matrix beside them added up, which is the trade the two tabs offer: how many against
-    which.
-
-    :param dataframe marks: rows from cell_type_marks
-    :param list blocks: the blocks as (tissue, its columns)
-    :return: the figure
+    The predicted interactions of the network counted per cell type, in the blocks of
+    the tissue the cell types belong to: where the parasite is predicted to meet the
+    host most often, read in one glance.
     '''
     columns = [column for _, block in blocks for column in block]
     counted = (marks.drop_duplicates(['column', 'source', 'target_name'])
@@ -714,23 +531,9 @@ def generate_cell_type_bars(marks, blocks):
 
 def generate_cell_type_matrix(marks, blocks):
     '''
-    Where inside the tissue the host proteins of the network sit: a mark wherever a protein
-    exceeds 1 nTPM in a cell type, the cell types along the bottom in blocks of the tissue
-    they belong to and the host proteins up the side.
-
-    The network says which host proteins a parasite is predicted to reach and the body
-    figure says in which organs. Neither can say whether a protein is met in one cell type
-    of an organ or in all of them, which is what a row of this reads as: a row of a single
-    mark is a protein the parasite meets in one kind of cell, a full row one it meets
-    wherever it goes.
-
-    The mark is shaded by the share of the expression the protein reaches anywhere in that
-    tissue the cell type carries, so the darkest mark of a row is where the protein is most
-    abundant.
-
-    :param dataframe marks: rows from cell_type_marks
-    :param list blocks: the blocks as (tissue, its columns)
-    :return: the figure
+    Where inside the tissue the host proteins of the network sit: a mark wherever a
+    protein exceeds 1 nTPM in a cell type, the cell types along the bottom in blocks of
+    the tissue they belong to and the host proteins up the side.
     '''
     columns = [column for _, block in blocks for column in block]
     drawn = marks.drop_duplicates(['target_name', 'column'])
@@ -740,8 +543,7 @@ def generate_cell_type_matrix(marks, blocks):
     figure = px.scatter(drawn, x='column', y='target_name', color='share',
                         color_continuous_scale=GO_SEQUENTIAL,
                         range_color=(0, 1),
-                        # plotly express flips category_orders on a y axis, so the protein
-                        # in the most cell types first puts it in the top row
+                        # plotly express flips category_orders on a y axis
                         category_orders={'column': columns, 'target_name': proteins},
                         custom_data=['Tissue', 'Cell type', 'nTPM', 'share'])
     figure.update_traces(marker=dict(size=MATRIX_MARK_SIZE, symbol='square',
@@ -753,7 +555,7 @@ def generate_cell_type_matrix(marks, blocks):
     figure.update_yaxes(title=None, ticksuffix='  ')
     figure.update_coloraxes(colorbar=dict(title='Share of<br>tissue peak', tickformat='.0%',
                                           thickness=12, outlinewidth=0, len=0.6))
-    # one row is one host protein, as one row of the enrichment dot plot is one process
+    # one row per host protein
     figure.update_layout(height=max(320, 22 * len(proteins) + 200))
 
     return style_cell_type_figure(figure, blocks)
@@ -762,46 +564,16 @@ def generate_cell_type_matrix(marks, blocks):
 @st.cache_data(max_entries=3, ttl=1800)
 def get_enrichment(pred_df, data_dir, side, background, config_file):
     '''
-    The processes over-represented among one side of the network, against the proteins of
-    that side's species the network could have been drawn from.
-
-    The two sides are tested apart rather than pooled. They are annotated to a different
-    depth -- 17,265 human proteins carry a term against 11,025 of S. mansoni -- and they
-    were selected on different grounds, the host proteins for being surface or
-    extracellular and the parasite proteins for being secreted. Pooled, the test is run
-    against a null that is half the other organism, and whichever side has more proteins in
-    the network decides what the section says.
-
-    Either side is tested against the proteins of its species that came through the
-    pipeline's filters, not against the whole proteome. Those filters are why a network
-    holds the proteins it holds, so a proteome background reads them back as a result: at
-    the lowest confidence the page offers, the whole S. mansoni network returns 383
-    processes against the proteome, led by cell-substrate adhesion -- which is the surface
-    call that let those host proteins in -- and 104 against the pool. Its parasite side
-    goes from 49 processes to 28, tested against the 826 proteins the secretome filter
-    passed rather than the 11,025 annotated ones. The difference is smaller on the
-    networks a high confidence leaves, which run to a few proteins and can as easily gain
-    terms as lose them: what changes there is which terms, not how many.
-
-    :param pred_df: predictions of the network, above the chosen score
-    :param str data_dir: directory holding gos.parquet
-    :param str side: HOST or PARASITE
-    :param str background: BACKGROUND_FILTERS or BACKGROUND_TISSUES, for the host side
-    :param str config_file: configuration naming the tissues the parasite infects, part of
-                            the cache key so a snapshot entrypoint tests against its own
-    :return: enrichment dataframe, with A renamed to n_proteins
+    The processes over-represented among one side of the network, against the proteins
+    of that side's species the network could have been drawn from.
     '''
     column, taxid_column = (('target', 'taxid2') if side == HOST else ('source', 'taxid1'))
     species = [int(s) for s in pred_df[taxid_column].unique()]
-    # the filter is pushed down to the reader (fastparquet prunes row groups only,
-    # so the exact selection is still applied afterwards)
+    # fastparquet prunes row groups only, so the exact selection is still applied afterwards
     go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
-    # The background pool is read from exactly the species included in the selected view,
-    # and its host half from the niche of the parasite the view is of: an extracellular
-    # parasite could never have been given the cytosolic and nuclear host proteins an
-    # intracellular one was, so they are no part of the background it is read against. A
-    # view of several parasites at once is left on the union, having no single niche.
+    # the background pool is read from the species of the view and the niche of its
+    # parasite; several parasites at once are left on the union
     niche = None
     if side == HOST:
         niches = {web_utils.parasite_niche(utils.read_config(config_file), taxid)
@@ -812,13 +584,11 @@ def get_enrichment(pred_df, data_dir, side, background, config_file):
         parasite = pred_df['taxid1'].iloc[0]
         pool = pool & web_utils.infected_tissue_proteins(
             data_dir, utils.read_config(config_file), parasite)
-    # a data directory carrying neither table gives no pool, and is left on the proteome
-    # rather than emptied -- the same fallback the snapshot directories need elsewhere
+    # a directory carrying neither table is left on the proteome rather than emptied
     if pool:
         go_df = go_df[go_df['#string_protein_id'].isin(pool)]
     enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
-    # A is the number of proteins of the side annotated to the term, which is what every
-    # figure below sizes its marks by
+    # A is the number of proteins of the side annotated to the term
     enrichment = enrichment.rename(columns={'A': 'n_proteins'})
 
     return enrichment
@@ -834,8 +604,7 @@ def prepare_enrichment_view(enrichment_df):
     view = enrichment_df.copy()
     odds = pd.to_numeric(view['odds_ratio'], errors='coerce')
     finite = odds[np.isfinite(odds)]
-    # an infinite ratio is drawn at the largest one that can be drawn, and said so in
-    # the hover, rather than dropped: those terms are the strongest results
+    # an infinite ratio is drawn at the largest finite one and said so in the hover
     cap = finite.max() if not finite.empty else 1.0
     view['capped'] = ~np.isfinite(odds)
     view['odds_ratio_plot'] = odds.where(np.isfinite(odds), cap).clip(lower=np.nextafter(0, 1))
@@ -853,8 +622,10 @@ def wrap_term(term):
 
 
 def style_go_axes(fig):
-    '''The grid and axes of the enrichment figures are a background to read the marks
-    against, not lines to be read themselves.'''
+    '''
+    The grid and axes of the enrichment figures are a background to read the marks
+    against, not lines to be read themselves.
+    '''
     fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                       font_color=LABEL_FONT_COLOR,
                       margin=dict(l=10, r=10, t=10, b=40), hovermode='closest')
@@ -869,8 +640,8 @@ def style_go_axes(fig):
 def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
     '''
     The enriched processes as a ranked dot plot: the most significant terms, named on
-    the axis, placed by odds ratio, sized by how many proteins of the network carry
-    them and shaded by significance.
+    the axis, placed by odds ratio, sized by how many proteins of the network carry them
+    and shaded by significance.
     '''
     view = prepare_enrichment_view(enrichment_df)
     view = view.nsmallest(top_n, 'fdr_bh').sort_values('odds_ratio_plot')
@@ -891,8 +662,7 @@ def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
     fig.update_yaxes(title=None, showgrid=True, ticksuffix='  ')
     fig.update_coloraxes(colorbar=dict(title='-log<sub>10</sub> FDR', thickness=12,
                                        outlinewidth=0, len=0.6))
-    # one row of the plot is one process, so the canvas grows with the number of them
-    # instead of squeezing the names together
+    # one row per process
     fig.update_layout(height=max(260, 90 + 34 * len(view)))
 
     return style_go_axes(fig)
@@ -900,8 +670,8 @@ def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
 
 def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
     '''
-    Every tested process, significant or not: effect size against significance, with
-    the terms that pass the chosen FDR picked out of the ones that do not.
+    Every tested process, significant or not: effect size against significance, with the
+    terms that pass the chosen FDR picked out of the ones that do not.
     '''
     selected_terms = set(selected_terms or [])
     view = prepare_enrichment_view(enrichment_df)
@@ -911,8 +681,7 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
                                        view['odds_ratio_plot'].map('{:.1f}'.format))
 
     fig = pgo.Figure()
-    # the marks are scaled by area from a reference shared by the three groups, so a dot
-    # means the same number of proteins wherever it sits
+    # scaled by area from a reference shared by the three groups
     sizeref = 2.0 * view['n_proteins'].max() / (17.0 ** 2)
     groups = [('Not significant', view[~view['significant']], MUTED_COLOR),
               ('Significant', view[view['significant'] & ~view['go_term'].isin(selected_terms)],
@@ -933,13 +702,11 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
                           'Proteins in the network: %{customdata[2]}<br>'
                           'FDR: %{customdata[3]:.2e}<extra></extra>'))
 
-    # the few most significant terms are named on the plot, so the shape of the cloud
-    # can be read without pointing at it
+    # the most significant terms are named on the plot
     labelled = view[view['go_term'].isin(selected_terms)] if selected_terms else \
         view[view['significant']].nsmallest(label_n, 'fdr_bh')
     for i, (_, row) in enumerate(labelled.head(label_n).iterrows()):
-        # the labels are staggered left and right so that the names of two terms of
-        # nearly the same significance do not land on top of each other
+        # staggered left and right so neighbouring labels do not overlap
         side = 1 if i % 2 == 0 else -1
         fig.add_annotation(x=row['log2_odds'], y=row['significance'],
                            text=textwrap.shorten(row['go_term'], width=34, placeholder='…'),
@@ -970,13 +737,7 @@ def load_ontology_parents(data_dir):
 def nearest_enriched_ancestors(terms, parents_of):
     '''
     For each enriched term, the closest term above it in the ontology that is also
-    enriched, so the processes can be nested in each other. Terms with no enriched
-    ancestor sit at the top level. The ontology is a graph rather than a tree -- a term
-    can have several parents -- so it is walked breadth-first and the first enriched
-    level reached wins.
-
-    Terms are GO ids here rather than names: the ontology is keyed by id, and a name
-    that does not match a node in it would leave the term looking like a root.
+    enriched, so the processes can be nested in each other.
     '''
     enriched = set(terms)
     ancestors = {}
@@ -998,8 +759,8 @@ def nearest_enriched_ancestors(terms, parents_of):
             frontier = [n for n in next_frontier if n not in seen]
         ancestors[term] = found
 
-    # two terms can end up as each other's ancestor if the ontology holds a cycle;
-    # a treemap cannot be drawn from one, so the loop is cut at the top
+    # a cycle in the ontology would make the treemap undrawable, so the loop is cut at the
+    # top
     for term in terms:
         walked = {term}
         node = ancestors[term]
@@ -1027,25 +788,20 @@ def get_enrichment_summary(enrichment_df, parents_of):
                          view['odds_ratio_plot'].map('{:.1f}'.format))
     fdr_text = view['fdr_bh'].map('{:.2e}'.format)
     significance = view['significance']
-    # the darker half of the colour ramp is too dark to write the term name on in ink
+    # the darker half of the ramp is too dark to write on in ink
     span = significance.max() - significance.min()
     midpoint = significance.min() + span / 2 if span > 0 else np.inf
     text_colors = np.where(significance > midpoint, '#ffffff', LABEL_FONT_COLOR)
 
-    # the root is drawn behind every block, and plotly paints a sector it has no colour
-    # value for in a hard grey -- the frame that used to sit around the whole treemap.
-    # It is given the palest step of the ramp, and the scale is pinned to the terms so
-    # that the root cannot shift it
+    # the root gets the palest step of the ramp, and the scale is pinned to the terms
     fig = pgo.Figure(pgo.Treemap(
-        # a block is held by its GO id and named by its term, so two processes cannot
-        # collide and the nesting follows the ontology rather than the wording
+        # held by GO id and named by term, so two processes cannot collide
         ids=[GO_TREEMAP_ROOT_ID] + terms,
-        # unwrapped: a block draws its name on one line and drops it when it does not
-        # fit, which keeps the header of a group readable instead of hiding it
+        # unwrapped: a block drops its name when it does not fit
         labels=[GO_TREEMAP_ROOT_LABEL] + labels,
         parents=[''] + [ancestors[t] or GO_TREEMAP_ROOT_ID for t in terms],
         values=[0] + view['n_proteins'].tolist(),
-        # a parent term keeps its own proteins on top of those of the terms nested in it
+        # a parent term keeps its own proteins on top of those nested in it
         branchvalues='remainder',
         marker=dict(colors=[significance.min()] + significance.tolist(),
                     colorscale=GO_SEQUENTIAL,
@@ -1061,16 +817,14 @@ def get_enrichment_summary(enrichment_df, parents_of):
                       'Proteins in the network: %{customdata[2]}<br>'
                       'FDR: %{customdata[3]}<extra></extra>',
         insidetextfont=dict(color=[LABEL_FONT_COLOR] + text_colors.tolist()),
-        # a network can be enriched for several hundred terms, which at full depth are
-        # slivers too small to read. Three levels of processes are drawn at a time (the
-        # root is the fourth) and the rest is reached by clicking into a block
+        # three levels of processes at a time (the root is the fourth); the rest by clicking
+        # in
         maxdepth=4,
         pathbar=dict(visible=True, side='top', thickness=22),
         tiling=dict(pad=2)))
     fig.update_layout(height=700, margin=dict(l=0, r=0, t=10, b=10),
                       font_color=LABEL_FONT_COLOR, paper_bgcolor='rgba(0,0,0,0)',
-                      # a name that does not fit its block is left out rather than
-                      # shrunk to an unreadable size
+                      # a name that does not fit is left out rather than shrunk
                       uniformtext=dict(minsize=9, mode='hide'))
 
     return fig
@@ -1104,7 +858,6 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
     
 
     rm_edges = [(n1, n2) for n1,n2,w in G.edges.data('weight') if w < score]
-    # remove filtered edges from graph G
     G.remove_edges_from(rm_edges)
     G.remove_nodes_from(list(nx.isolates(G)))
 
@@ -1124,24 +877,9 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
 def annotate_edges(edges, df, annotations):
     '''
     Writes the two proteins of an interaction onto the edge that draws it, so that a
-    click on the edge carries everything needed to show their structures. The graph is
-    undirected, which leaves the orientation of an edge up to networkx -- some come out
-    host to parasite -- so the pair is looked up unordered and written back with the
-    parasite protein always first.
-
-    What the prediction was transferred from travels with the edge too: the two orthology
-    groups and the two evidence scores STRING gives their link. The edge is drawn between
-    two proteins, but nothing about those two proteins was measured -- the pair exists
-    because their groups interact -- so the groups are what a reader has to see to know
-    what the edge stands on.
-
-    :param list edges: vis.js edge dictionaries, as pyvis built them
-    :param df: predictions dataframe of the selected parasite
-    :param dict annotations: STRING id --> descriptive protein name
-    :return: the same edges, each with the proteins of its interaction added
+    click on the edge carries everything needed to show their structures.
     '''
-    # the species travels with the edge as well, so the dialog can name it beside each
-    # protein and say which of the two models is the parasite's and which the host's
+    # the species travels with the edge, so the dialog can name it beside each protein
     cols = ['source', 'source_name', 'source_uniprot', 'taxid1_label',
             'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight',
             'group1', 'group2', 'experimental_evidence_score', 'databases_evidence_score']
@@ -1149,8 +887,7 @@ def annotate_edges(edges, df, annotations):
     for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
         pairs[frozenset((row.source, row.target))] = {
             'parasite': str(row.source_name),
-            # a protein UniProt has no accession for has no AlphaFold model either,
-            # and NaN does not survive the trip to the browser
+            # NaN does not survive the trip to the browser
             'parasite_uniprot': None if pd.isna(row.source_uniprot) else str(row.source_uniprot),
             'parasite_full': annotations.get(row.source, ''),
             'parasite_species': str(row.taxid1_label),
@@ -1161,9 +898,7 @@ def annotate_edges(edges, df, annotations):
             'weight': float(row.weight),
             'parasite_group': str(row.group1),
             'host_group': str(row.group2),
-            # the two scores the weight is the mean of, kept apart: a link carried by
-            # experiments and one carried by a database curation average out the same and
-            # are not the same evidence
+            # the two scores the weight is the mean of, kept apart
             'experimental': float(row.experimental_evidence_score),
             'databases': float(row.databases_evidence_score)}
 
@@ -1183,33 +918,19 @@ def annotate_edges(edges, df, annotations):
 
 
 def network_options(net):
-    '''
-    The vis.js options pyvis built, which style_network has already filled in. The
-    downloaded HTML is drawn from the same options, so the network that is saved looks
-    like the one on the page.
-
-    :param net: pyvis Network the options come from
-    :return: options dictionary to hand to the network component
-    '''
+    '''The vis.js options pyvis built, which style_network has already filled in.'''
     return json.loads(net.get_network_data()[5])
 
 
 @st.cache_data(show_spinner=False)
 def get_structures(query_proteins):
-    '''
-    The AlphaFold model of each of the two proteins. Cached so that reopening a pair is
-    immediate and a rerun of the page never downloads anything again.
-
-    :param dict query_proteins: protein name --> UniProt accession
-    :return: dict protein name --> (pdb file, pdb url, AlphaFold entry url)
-    '''
+    '''The AlphaFold model of each of the two proteins.'''
     return strv.get_alphafold_structure(query_proteins=query_proteins)
 
 
 def show_structure(pdb_file):
     xyzview = strv.generate_mol_structure(pdb_file=pdb_file, height=VIEWER_HEIGHT)
-    # same as stmol.showmol, which still embeds through the deprecated st.components.v1.html.
-    # the width is left to stretch so the viewer follows the column it sits in
+    # same as stmol.showmol, which embeds through the deprecated st.components.v1.html
     st.iframe(xyzview._make_html(), height=VIEWER_HEIGHT + 20)
 
 
@@ -1217,17 +938,8 @@ def show_structure(pdb_file):
 def show_structures_dialog(edge):
     '''
     Shows the AlphaFold model of each of the two proteins of the interaction that was
-    clicked in the network, over the orthology groups the interaction was transferred from.
-    Opened over the network rather than placed under it so that the table and the
-    enrichment plots below do not move on every click.
-
-    The provenance is named as a pair of groups and not as a pair of proteins, which is
-    what it is: the link comes from STRING's COG links, one row per pair of orthology
-    groups, and no interaction between these two proteins was ever measured. Writing it
-    the other way round -- an interaction between two named proteins somewhere in STRING
-    -- would be inventing a record the transfer never had.
-
-    :param dict edge: the clicked edge, as annotated by annotate_edges
+    clicked in the network, over the orthology groups the interaction was transferred
+    from.
     '''
     st.markdown(f"**{edge['parasite']}** ({edge['parasite_species']}) &ndash; "
                 f"**{edge['host']}** ({edge['host_species']}) &nbsp;·&nbsp; "
@@ -1238,8 +950,8 @@ def show_structures_dialog(edge):
                f"database evidence {edge['databases']:.2f}.")
     st.markdown(strv.plddt_legend(), unsafe_allow_html=True)
 
-    # one entry per protein rather than a dict keyed by protein name, so the species stays
-    # attached to the right panel even if the two proteins happen to share a name
+    # one entry per protein, so the species stays attached even if the two proteins share a
+    # name
     proteins = [(edge['parasite'], edge['parasite_uniprot'],
                  edge['parasite_full'], edge['parasite_species']),
                 (edge['host'], edge['host_uniprot'],
@@ -1273,7 +985,6 @@ st.caption('The predicted interactions of one host and one parasite as a network
            'processes over-represented among the host proteins of the network.')
 
 
-# the body figure beside the selectors rather than a third of the row left empty
 col1, col2 = st.columns([1, 1], gap='large')
 
 with col2:
@@ -1296,8 +1007,8 @@ with col2:
     if selected_parasite != "<select>":
         df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
-        # where DeepLoc puts each host protein, carried on the predictions so the filter
-        # below, the table and the network all read the same call
+        # carried on the predictions so the filter, the table and the network read the same
+        # call
         surface_calls = get_surface_calls(data_dir, tuple(str(t) for t in selected_taxids))
         if not surface_calls.empty:
             df_select = df_select.assign(
@@ -1307,10 +1018,8 @@ with col2:
 
         tissues_options = generate_tissue_filters(df_select)
         if len(tissues_options) > 0:
-            # an organ clicked on the body figure drawn below selects the lifecycle tissues
-            # it stands for. The figure is drawn after this column, so the click is read on
-            # the run that follows it -- and it has to be read here, before the filter is
-            # created, since that is the last point its value can still be set
+            # a click on the body figure drawn below is read here, on the run after it,
+            # before the filter is created
             body_figure.apply_organ_click(config, selected_taxids, tissues_options,
                                           TISSUE_FILTER_KEY)
             selected_tissues = st.multiselect('Select tissues to filter the predicted PPI',
@@ -1318,11 +1027,7 @@ with col2:
             if len(selected_tissues) > 0:
                 df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
-        # the cell types are offered on their own rather than only after a tissue has been
-        # picked: a cell type belongs to one tissue anyway, so choosing one is choosing its
-        # tissue as well, and someone after a cell type had to find its tissue first to be
-        # allowed to ask for it. Picking tissues first narrows what is offered here, since
-        # the options are read off whatever is left of the predictions
+        # cell types are offered on their own; picking tissues first narrows what is offered
         cell_type_counts = generate_cell_type_filters(df_select, score)
         if len(cell_type_counts) > 0:
             def cell_type_label(cell_type):
@@ -1342,23 +1047,17 @@ with col2:
                     df_select[df_select['Cell type'].notna()])
                 df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
-        # localisation is independent of the tissue, so it filters beside the tissues
-        # rather than inside them: a host protein is on the cell surface or in the space
-        # around it wherever it is expressed. The tickboxes are drawn above the network,
-        # which is what they narrow, so what is read here is the state they were left in
-        # -- Streamlit hands that over before the boxes are drawn again, which is what
-        # makes a tick reach the predictions on the run it is made
+        # the tickboxes are drawn above the network; Streamlit hands their state over before
+        # they are drawn again
         surface_options = generate_surface_filters(
             df_select, surface_calls,
             web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE))
         ticked = [c for c in surface_options
                   if st.session_state.get(SURFACE_FILTER_KEYS[c])]
-        # ticking every class offered leaves every host protein in, exactly as ticking none
-        # does, so a filter is anything in between
+        # ticking every class leaves every host protein in, as ticking none does
         selected_surface = ticked if 0 < len(ticked) < len(surface_options) else []
         if selected_surface:
-            # the host proteins over the cut-off of any ticked class, read from the
-            # probabilities so that a protein called for several answers to each of them
+            # read from the probabilities so a protein called for several answers to each
             over = pd.concat([surface_calls[web_utils.DEEPLOC_SCORES[c]]
                               > web_utils.DEEPLOC_CUTOFFS[c]
                               for c in selected_surface], axis=1).any(axis=1)
@@ -1380,15 +1079,13 @@ with col2:
             networks.append((host_taxid, config['hosts'][int(host_taxid)]['label'],
                              host_df, G, net))
         
-        #net.show_buttons(filter_=['nodes'])
         
         
-# resolved after the column that draws the filters, and read by every section below
+# resolved after the column that draws the filters, read by every section below
 page_filters = active_filters(score, selected_tissues, selected_cell_types,
                               selected_surface) if df_select is not None else []
 
-# drawn after the column that holds the selectors, which is where the predictions the
-# figure counts are read and filtered
+# drawn after the column that holds the selectors, where the predictions are filtered
 with col1:
     if df_select is not None:
         body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
@@ -1399,15 +1096,7 @@ def network_legend(parasite_label, parasite_color, host_label, host_color):
     '''
     The key to the network: a node is read by its shape, which says whether the protein
     is the parasite's or the host's, and by its colour, which says which species it
-    belongs to. Neither is written anywhere on the network itself, and the shapes are
-    drawn here the way vis.js draws the nodes -- a wash of the species colour inside a
-    border of the colour itself -- so the legend and the network cannot drift apart.
-
-    :param str parasite_label: species name of the parasite
-    :param str parasite_color: the colour its proteins are drawn in
-    :param str host_label: species name of the host
-    :param str host_color: the colour its proteins are drawn in
-    :return: the legend as an HTML string
+    belongs to.
     '''
     def entry(shape, color, label):
         fill = tint(color, NODE_FILL_TINT)
@@ -1427,8 +1116,7 @@ def network_legend(parasite_label, parasite_color, host_label, host_color):
 
 def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
-        # the species name only distinguishes the panels when there is more than one,
-        # as on the rodent page; a single host already says which one it is
+        # the species name only distinguishes the panels on the rodent page
         if len(networks) > 1:
             st.subheader(host_label)
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
@@ -1441,9 +1129,8 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                     unsafe_allow_html=True)
         filename = f'{selected_parasite}_{host_taxid}_network'
         html_data = ""
-        # Save and read graph as HTML file, which is what the download button hands out.
-        # The network on the page is drawn by the component instead: an embedded HTML
-        # file has no way of telling Python which interaction was clicked.
+        # saved for the download button; the page draws the network through the component so
+        # clicks reach Python
         net.save_graph(f'{path}/{filename}.html')
         utils.export_graph(G, filename=f'{filename}.graphml',
                            format='graphml', output_dir=path)
@@ -1460,10 +1147,8 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             key=f'network_{selected_parasite}_{host_taxid}')
         net = None
 
-        # Closing the dialog reruns the page with the component still holding the edge
-        # that opened it, so the click is remembered to keep it from opening again. The
-        # nonce changes on every click, which is what makes clicking the same edge twice
-        # open the dialog again.
+        # closing the dialog reruns the page with the component still holding the edge, so
+        # the click is remembered; the nonce lets the same edge open again
         shown_edge_key = f'shown_edge_{host_taxid}'
         if selected_edge is not None and selected_edge['nonce'] != st.session_state.get(shown_edge_key):
             st.session_state[shown_edge_key] = selected_edge['nonce']
@@ -1517,8 +1202,7 @@ if networks:
                    'Ticking a class leaves the interactions that can take place there, and '
                    'drops any parasite protein left with nothing to bind; a protein DeepLoc '
                    'places in several classes stays whichever of them is ticked.')
-        # narrow columns beside each other rather than one box a row, and one column more
-        # than there are boxes so the boxes are not spread across the page
+        # one column more than there are boxes so they are not spread across the page
         boxes = st.columns(len(surface_options) + 2)
         for box, surface in zip(boxes, surface_options):
             with box:
@@ -1541,8 +1225,7 @@ with st.container():
                        'under its block alone, since the same kind of cell is annotated '
                        'separately in each tissue. Cell-type annotation is available for '
                        'human (HPA) and pig (Pig Cell Atlas).')
-            # the same columns twice, counted and then opened up: how many interactions a
-            # cell type holds, and which host proteins they are
+            # the same columns counted, then opened up per protein
             per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
             with per_cell_type_tab:
                 st.caption('Predicted interactions per cell type. An interaction is counted '
@@ -1574,12 +1257,11 @@ with st.container():
         if search.strip() and table.empty:
             st.info(f"No interaction holds '{search}'.")
         gb = GridOptionsBuilder.from_dataframe(table)
-        # a page of a known size with the grid grown to fit it. Sizing the page to a fixed
-        # height instead fits as many whole rows as it can and draws the remainder of the
-        # height as blank rows under the last one
+        # a page of a known size with the grid grown to fit it, rather than blank rows under
+        # a short page
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=TABLE_PAGE_SIZE)
         gb.configure_grid_options(domLayout='autoHeight')
-        gb.configure_side_bar() #Add a sidebar
+        gb.configure_side_bar()
         gridOptions = gb.build()
         grid_response = AgGrid(
                             table,
@@ -1632,8 +1314,7 @@ with st.container():
                            horizontal=True,
                            help='The Benjamini-Hochberg corrected significance a process '
                                 'has to reach to be counted as enriched.')
-            # the figures read the columns the enrichment is built with; only the grid and
-            # the file it hands out are renamed for reading
+            # only the grid and the file it hands out are renamed for reading
             enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
             enrichment_table = enrichment_view[list(ENRICHMENT_COLUMN_NAMES)].rename(
                 columns=ENRICHMENT_COLUMN_NAMES)
@@ -1643,8 +1324,8 @@ with st.container():
             gb.configure_pagination(paginationAutoPageSize=False,
                                     paginationPageSize=TABLE_PAGE_SIZE)
             gb.configure_grid_options(domLayout='autoHeight')
-            gb.configure_side_bar() #Add a sidebar
-            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children") #Enable multi-row selection
+            gb.configure_side_bar()
+            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children")
             gridOptions = gb.build()
             grid_response = AgGrid(
                                 enrichment_table,
@@ -1665,9 +1346,8 @@ with st.container():
 
 with st.container():
     if enrichment_view is not None and enrichment_view.empty:
-        # against the tissues the parasite infects, nothing passing is a result rather than
-        # a setting to loosen: the targets are then no more specialised than the proteins
-        # the parasite meets anyway, and it is the background that is worth changing
+        # against the infected tissues, nothing passing is a result rather than a setting to
+        # loosen
         narrowed = (side == HOST and background == BACKGROUND_TISSUES)
         st.info(f"No biological process passes an FDR of {fdr}. "
                 + ("Against the proteins of the tissues this parasite infects, its targets "
@@ -1709,10 +1389,8 @@ with st.container():
                                        surface_calls)
                     nx.set_node_attributes(G, MUTED_COLOR, 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
-                    # Initiate PyVis network object
                     net = Network(height="450px", width="100%",
                                   bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
-                    # Take Networkx graph and translate it to a PyVis graph format
                     net.from_nx(G)
                     G = None
                     style_network(net)

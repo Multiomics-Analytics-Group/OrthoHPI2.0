@@ -1,21 +1,4 @@
-"""
-Convert cell-type means extracted from the pig atlas into the app's Parquet format.
-
-The raw ``pig_atlas_20221014.rds`` Seurat object is too large to load as part of
-the prediction pipeline. First aggregate its normalized sparse expression matrix:
-
-    Rscript scripts/extract_pig_atlas_expression.R data/pig_atlas_20221014.rds \
-        /tmp/pig_atlas_expression.csv
-
-Then run this script from the repository root:
-
-    .venv/bin/python -m pipeline.build_pig_atlas_cell_types \
-        --input /tmp/pig_atlas_expression.csv
-
-The result is ``data/pig_atlas_cell_types.parquet``. On the next pipeline run,
-``pipeline.main`` merges it with human HPA annotation when writing
-``tissues_cell_types.parquet``.
-"""
+'''Convert cell-type means extracted from the pig atlas into the app's Parquet format.'''
 import argparse
 import os
 
@@ -38,7 +21,7 @@ TISSUE_MAPPING = {
 
 
 def map_expression(input_file, config_file):
-    """Map pig-atlas genes and tissues to STRING IDs and OrthoHPI tissue names."""
+    '''Map pig-atlas genes and tissues to STRING IDs and OrthoHPI tissue names.'''
     data = pd.read_csv(input_file)
     missing = REQUIRED_COLUMNS.difference(data.columns)
     if missing:
@@ -63,7 +46,7 @@ def map_expression(input_file, config_file):
 
 
 def build(input_file, config_file, output_file):
-    """Write mapped pig cell-type expression in the shared annotation schema."""
+    '''Write mapped pig cell-type expression in the shared annotation schema.'''
     data = map_expression(input_file=input_file, config_file=config_file)
     os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
     utils.save_to_parquet(data, output_file)

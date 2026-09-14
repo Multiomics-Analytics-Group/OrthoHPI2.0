@@ -1,14 +1,8 @@
-"""
-Draws the hosts and parasites of the study on the home page: a card per host with the
-number of parasites it has predictions for, and a panel per parasite group listing its
-species, each marked with a dot per host it infects.
-
-Everything is read from the configuration, so the overview follows the study whenever a
-host or a parasite is added. It is the same picture as docs/hosts_parasites.svg, drawn in
-HTML rather than as a fixed 1600 x 900 frame so that it wraps to the page and sits among
-the other figures; the group order, the plain-language names of the groups and their icons
-are imported from the script that writes the slide, so the two cannot drift apart.
-"""
+'''
+Draws the hosts and parasites of the study on the home page: a card per host with the number
+of parasites it has predictions for, and a panel per parasite group listing its species,
+each marked with a dot per host it infects.
+'''
 import html
 import re
 
@@ -16,11 +10,11 @@ import streamlit as st
 
 from scripts.build_hosts_parasites_figure import GROUP_ICON, GROUP_ORDER, GROUP_SUB, ICONS
 
-# `Homo sapiens (human)`: the latin name and, in parentheses, the one the cards are headed with
+# `Homo sapiens (human)`: the latin name and, in parentheses, the one the cards are headed
+# with
 LABEL = re.compile(r'^(?P<latin>[^(]+?)\s*\((?P<common>[^)]+)\)\s*$')
 
-# the panel Nematoda takes up: twice the width and height of the others, with its names in
-# two columns, since it holds more species than the next three groups together
+# Nematoda takes twice the width and height, with its names in two columns
 WIDE_GROUP = 'Nematoda'
 
 STYLE = '''
@@ -75,9 +69,6 @@ STYLE = '''
 def split_label(label):
     '''
     The common and the latin name of a host, from the label the configuration gives it.
-
-    :param str label: e.g. `Homo sapiens (human)`
-    :return: (`Human`, `Homo sapiens`); a label without parentheses is both
     '''
     found = LABEL.match(label)
     if not found:
@@ -89,12 +80,8 @@ def split_label(label):
 def dots(host_ids, hosts, infected):
     '''
     One slot per host, in the order of the configuration, so that the dots of every
-    species line up and the position of a dot says which host it is before its colour does.
-
-    :param list host_ids: the hosts of the study
-    :param dict hosts: their configuration
-    :param set infected: the hosts of the species
-    :return: the html of the slots
+    species line up and the position of a dot says which host it is before its colour
+    does.
     '''
     return ''.join(
         f'<span class="hp-dot" style="--c: {hosts[h]["color"]}" title="{split_label(hosts[h]["label"])[0]}"></span>'
@@ -121,12 +108,8 @@ def group_panel(group, color, members, host_ids, hosts):
 
 def show(config, interactions=None):
     '''
-    Draws the overview: the hosts across the top, the parasites grouped below them, and a
-    legend for the dots.
-
-    :param dict config: the configuration of the study
-    :param int interactions: number of predicted interactions, counted once per host a
-                             parasite infects, to state in the caption with the species
+    Draws the overview: the hosts across the top, the parasites grouped below them, and
+    a legend for the dots.
     '''
     hosts = config['hosts']
     parasites = config['parasites']

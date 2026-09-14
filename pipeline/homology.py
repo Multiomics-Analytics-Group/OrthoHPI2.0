@@ -3,7 +3,7 @@ import pandas as pd
 import utils
 from . import filters
 
-# STRING evidence scores are stored as integers 0-1000; divide to get a 0-1 score.
+# STRING evidence scores are integers 0-1000
 STRING_SCORE_SCALE = 1000
 # keep an inter-group link only if its experimental or database evidence is at least this
 EVIDENCE_CUTOFF = 0.7
@@ -16,12 +16,7 @@ LINK_COLUMNS = ["taxid1", "taxid1_label", "source_color", "source_shape", "sourc
 
 
 def get_eggnog_groups(filepath, proteins):
-    """
-    Obtains all the EggNOG groups which contains a list of given proteins
-    :param str filepath: path to the EggNOG groups file
-    :param list proteins: list of Ensembl protein identifiers
-    :return: dictionary with all the valid EggNOG groups. Key -> group, value -> list proteins in the group
-    """
+    '''Obtains all the EggNOG groups which contains a list of given proteins'''
     print("  Scanning EggNOG groups...")
     valid_groups = {}
     protein_set = set(proteins)
@@ -33,11 +28,8 @@ def get_eggnog_groups(filepath, proteins):
             group, gproteins = data[1], data[4].split(',')
             matched = protein_set.intersection(gproteins)
             if matched:
-                # sorted rather than in set order, which python varies from run to run.
-                # A protein pair that two linked groups both hold is reached twice by
-                # get_links, once from each side, and the first one seen is the one kept
-                # -- so set order decided which group was recorded as the parasite's and
-                # which as the host's, and two runs over the same input disagreed
+                # sorted, not set order: a pair held by both linked groups is reached twice
+                # by get_links and the first seen is kept, so set order made runs disagree
                 valid_groups[group] = sorted(matched)
 
     return valid_groups
@@ -45,27 +37,10 @@ def get_eggnog_groups(filepath, proteins):
 
 def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
               default_niche=None):
-    """
-    Obtain the transferred interactions at the EggNOG group level from STRING and
-    return them as a DataFrame (columns: LINK_COLUMNS). Each link is a parasite-host
-    protein pair whose orthology groups interact in STRING, restricted to hosts the
-    parasite infects and to the host proteins its niche puts it in reach of. The caller
-    is responsible for writing the result.
-
-    The niche restriction is made here and not in the pool, because the pool is per host
-    and the niche is a property of the parasite: a host infected by both an intracellular
-    and an extracellular parasite carries the cytosolic and nuclear proteins of the first,
-    which the second must not be handed.
-
-    :param str filepath: path to STRING file with the groups links
-    :param dict valid_groups: dictionary with all the valid groups
-    :param dict proteins: mapping from ENSP to protein name
-    :param str config_file: path to the configuration file
-    :param dict reachable: {niche: set of host proteins}, from filters.apply_deeploc_filter;
-                           None leaves every host protein open to every parasite
-    :param str default_niche: niche for a parasite the config records none for
-    :return: DataFrame of predicted links (columns: LINK_COLUMNS)
-    """
+    '''
+    Obtain the transferred interactions at the EggNOG group level from STRING and return
+    them as a DataFrame (columns: LINK_COLUMNS).
+    '''
     links = []
     seen = set()
     hosts = utils.read_config(filepath=config_file, field='hosts')
@@ -93,7 +68,7 @@ def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
                     taxid2 = protein2.split('.')[0]
                     taxid1_is_host = int(taxid1) in hosts
                     taxid2_is_host = int(taxid2) in hosts
-                    # keep only host-parasite pairs; skip host-host and parasite-parasite
+                    # keep only host-parasite pairs
                     if taxid1_is_host == taxid2_is_host or taxid1 == taxid2:
                         continue
                     if (protein1, protein2) in seen:

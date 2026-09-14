@@ -1,14 +1,7 @@
-"""
-Build a slide figure of the four OrthoHPI 2.0 hosts and all their parasites,
-with the parasites grouped by taxonomy.
-
-Everything is read from config.yml, so the figure follows the study whenever
-hosts or parasites are added.  The organism drawings are simple hand-drawn
-vector icons (no external assets), so the output is a single self-contained
-SVG that PowerPoint / Keynote / Illustrator can open and recolour.
-
-    .venv/bin/python scripts/build_hosts_parasites_figure.py [-o docs/hosts_parasites.svg]
-"""
+'''
+Build a slide figure of the four OrthoHPI 2.0 hosts and all their parasites, with the
+parasites grouped by taxonomy.
+'''
 import argparse
 import functools
 import math
@@ -48,7 +41,7 @@ GROUP_SUB = {
 
 # --- little vector helpers ---------------------------------------------------
 def ribbon(centreline, width, n=64):
-    """Closed path for a tapered body: centreline(t) -> (x, y), width(t) -> half-width."""
+    '''Closed path for a tapered body: centreline(t) -> (x, y), width(t) -> half-width.'''
     left, right = [], []
     for i in range(n + 1):
         t = i / n
@@ -69,7 +62,7 @@ def ribbon(centreline, width, n=64):
 
 
 def taper(peak=1.0, head=0.35, tail=0.08):
-    """Half-width profile: thickest around the middle, blunt head, fine tail."""
+    '''Half-width profile: thickest around the middle, blunt head, fine tail.'''
     def f(t):
         base = math.sin(math.pi * (0.15 + 0.85 * t)) ** 0.7
         ends = head + (1 - head) * min(1.0, t / 0.18) if t < 0.18 else 1.0
@@ -78,8 +71,7 @@ def taper(peak=1.0, head=0.35, tail=0.08):
     return f
 
 
-# --- organism icons ----------------------------------------------------------
-# Every icon draws inside a 100 x 100 box and is placed with a transform.
+# --- organism icons: each draws inside a 100 x 100 box and is placed with a transform
 def icon_nematode(c):
     body = ribbon(lambda t: (8 + 84 * t, 50 + 22 * math.sin(2 * math.pi * 1.1 * t + 0.5)),
                   taper(peak=10.5, head=0.75, tail=0.06))
@@ -187,13 +179,9 @@ ICONS = {"nematode": icon_nematode, "fluke": icon_fluke, "tapeworm": icon_tapewo
          "amoeba": icon_amoeba, "spore": icon_spore, "tick": icon_tick}
 
 
-# --- host silhouettes (off by default; --host-icons brings them back) --------
-# Real silhouettes from PhyloPic (https://www.phylopic.org), all released under
-# CC0, cached in images/silhouettes/ so the script needs no network.
-#   human  f36c3c31-8b66-4413-a39f-a2b2b422e7ff  T. Michael Keesey
-#   rat    6b8ecf3f-a5c2-4ca4-adbc-1c7280c380d4  Arcadia Science
-#   mouse  36dc0476-ae7d-49ed-85c4-220139930bfc  Cagri Cevrim
-#   pig    216ee85d-1696-49ae-a62c-d1da6fef06fc  anonymous
+# --- host silhouettes (off by default; --host-icons brings them back). PhyloPic CC0
+# silhouettes cached in images/silhouettes/: human f36c3c31 (T. Michael Keesey), rat
+# 6b8ecf3f (Arcadia Science), mouse 36dc0476 (Cagri Cevrim), pig 216ee85d (anonymous)
 SILHOUETTE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "silhouettes")
 SILHOUETTE_CREDIT = ("Host silhouettes: PhyloPic (CC0) — T. M. Keesey, "
@@ -209,7 +197,7 @@ HOST_SILHOUETTE = {
 
 @functools.lru_cache(maxsize=None)
 def load_silhouette(filename):
-    """Return (viewBox, drawing) for a cached PhyloPic SVG, with fills stripped."""
+    '''Return (viewBox, drawing) for a cached PhyloPic SVG, with fills stripped.'''
     with open(os.path.join(SILHOUETTE_DIR, filename)) as fh:
         svg = fh.read()
     vb = [float(v) for v in re.search(r'viewBox="([^"]+)"', svg).group(1).replace(",", " ").split()]
@@ -220,7 +208,7 @@ def load_silhouette(filename):
 
 
 def place_silhouette(taxid, color, x, y, box_w, box_h):
-    """Fit a host silhouette into (x, y, box_w, box_h), bottom-aligned."""
+    '''Fit a host silhouette into (x, y, box_w, box_h), bottom-aligned.'''
     spec = HOST_SILHOUETTE[taxid]
     (vx, vy, vw, vh), body = load_silhouette(spec["file"])
     k = min(box_w / vw, box_h / vh) * spec["rel"]
@@ -246,7 +234,7 @@ def text(x, y, s, size=16, color=INK, weight="normal", style="normal",
 
 
 def place_icon(draw, color, x, y, size):
-    """Place a 100x100 icon with its top-left corner at (x, y)."""
+    '''Place a 100x100 icon with its top-left corner at (x, y).'''
     k = size / 100.0
     return (f'<g transform="translate({x:.1f},{y:.1f}) scale({k:.4f})">'
             f'{draw(color)}</g>')

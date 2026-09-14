@@ -1,22 +1,4 @@
-"""
-Build secretome FASTA files from DeepLoc 2 output.
-
-Reads DeepLoc CSV results (Accurate model) and filters proteins on the per-class
-probability, against DeepLoc's own thresholds for that model:
-  - P(Extracellular) > 0.61728516 (all parasites)
-  - P(Cell membrane) > 0.56464844 (unicellular parasites only)
-
-The same thresholds the host proteins are filtered on (pipeline/main.py). See
-docs/deeploc.md for where the numbers come from and why they are not the
-assigned Localizations column.
-
-Writes filtered FASTAs to data/secretome_pred_input_data/input_data/{taxid}.fasta
-
-Usage:
-    python build_secretome_fastas.py [--config config.yml] [--data-dir data]
-        [--deeploc-dir data/deeploc/output_accurate/deeploc_output_accurate]
-        [--extracellular-cutoff 0.61728516] [--membrane-cutoff 0.56464844]
-"""
+'''Build secretome FASTA files from DeepLoc 2 output.'''
 
 import argparse
 import glob
@@ -25,12 +7,8 @@ import os
 
 import pandas as pd
 
-# DeepLoc 2's own per-class thresholds for the Accurate (ProtT5) model, taken from
-# DeepLoc2/deeploc2.py label_threshold. That array carries one entry more than there are
-# classes and convert_label2string reads it at i+1, so the threshold of labels[i] is
-# label_threshold[i+1]: Extracellular is labels[2] -> 0.61728516 and Cell membrane is
-# labels[3] -> 0.56464844. Reading the array straight gives the wrong pair, and taking it
-# from the Fast model gives another wrong pair (0.64638672 / 0.52368164).
+# DeepLoc 2 Accurate-model thresholds from DeepLoc2/deeploc2.py label_threshold, which is
+# read at i+1: Extracellular is labels[2], Cell membrane labels[3]. See docs/deeploc.md
 EXTRACELLULAR_CUTOFF = 0.61728516
 MEMBRANE_CUTOFF = 0.56464844
 from Bio import SeqIO
@@ -49,18 +27,7 @@ def load_deeploc_csv(deeploc_dir, taxid):
 
 
 def filter_by_score(df, multicellular, extracellular_cutoff, membrane_cutoff):
-    """Keep proteins whose per-class probability clears DeepLoc's threshold.
-
-    Extracellular is kept for every parasite; cell membrane is additionally kept
-    for unicellular parasites, a multicellular one reaching its host with
-    secreted proteins alone.
-
-    Strictly greater than, which is how DeepLoc itself calls a class
-    (DeepLoc2/utils.py convert_label2string). Read the probability rather than
-    the Localizations column: DeepLoc writes a class into Localizations even
-    when nothing crosses a threshold, falling back to whichever class came
-    closest, and those proteins are not surface-exposed in any useful sense.
-    """
+    '''Keep proteins whose per-class probability clears DeepLoc's threshold.'''
     keep = df["Extracellular"] > extracellular_cutoff
     if not multicellular:
         keep = keep | (df["Cell membrane"] > membrane_cutoff)
@@ -77,7 +44,7 @@ def write_filtered_fasta(source_fasta, valid_ids, output_path):
 
 
 def source_fasta_path(config_file, data_dir, taxid):
-    """Path to the STRING sequence FASTA for a species, named after string_sequences_url."""
+    '''Path to the STRING sequence FASTA for a species, named after string_sequences_url.'''
     urls = utils.read_config(filepath=config_file, field="urls")
     filename = urls["string_sequences_url"].split("/")[-1].replace("TAXID", str(taxid))
     species_dir = os.path.join(data_dir, "downloads", "species", str(taxid))

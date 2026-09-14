@@ -1,14 +1,4 @@
-"""
-Prepare input FASTA files for DeepLoc 2 on HPC.
-Downloads protein sequences from STRING for each parasite and writes the full
-proteome to data/secretome_pred_input_data/input_data/{taxid}.fasta.
-
-These files can then be copied to the HPC and used as input for DeepLoc 2.
-After DeepLoc runs, use build_secretome_fastas.py to filter by localization.
-
-Usage:
-    python prepare_deeploc_input.py [--config config.yml] [--data-dir data]
-"""
+'''Prepare input FASTA files for DeepLoc 2 on HPC.'''
 
 import argparse
 import gzip
@@ -21,8 +11,7 @@ import utils
 
 
 def select_species(config_file, taxids):
-    """Return {taxid: info} to run for. Defaults to config parasites; if taxids is
-    given, pick those from hosts+parasites (so host taxids can be targeted too)."""
+    '''Return {taxid: info} to run for.'''
     hosts = utils.read_config(filepath=config_file, field="hosts") or {}
     parasites = utils.read_config(filepath=config_file, field="parasites") or {}
     if taxids is None:

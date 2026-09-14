@@ -161,19 +161,43 @@ def get_link_combinations(df_pred, parasite):
     hosts: the orthology group of the parasite protein against the orthology group of
     the host protein.
     '''
-    edges = df_pred[df_pred['taxid1_label'] == parasite]
-    links = edges.groupby(['group1', 'group2']).agg(
+    edges = df_pred[df_pred['taxid1_label'] == parasite].copy()
+    # The pair is unordered. A protein belonging to both groups of a COG link is drawn
+    # from either of them by homology.get_links, so the same transfer can be written with
+    # group1 and group2 the other way round; keyed on the ordered pair, those are two
+    # links and a host carrying one of them reads as missing the other. Every parasite
+    # here has eight to eleven pairs written both ways round.
+    edges['pair'] = [tuple(sorted(pair)) for pair in zip(edges['group1'], edges['group2'])]
+    links = edges.groupby('pair').agg(
         hosts=('host', lambda h: frozenset(h)),
         interactions=('target', 'size'),
         # tuples, not lists: streamlit hashes a dataframe through pandas, which cannot
         # factorize unhashable values
         parasite_proteins=('source_name', lambda n: tuple(sorted(set(n)))),
         host_proteins=('target_name', lambda n: tuple(sorted(set(str(x).upper() for x in n)))),
+        parasite_group=('group1', dominant_group),
         weight=('weight', 'max')).reset_index()
+    # the orientation the merged link is drawn and looked up under: the one most of its
+    # rows were written in. group2 is the other half of the pair, and both halves of a
+    # link between a group and itself are that group
+    links['group1'] = links['parasite_group']
+    links['group2'] = [next((g for g in pair if g != group1), group1)
+                       for pair, group1 in zip(links['pair'], links['group1'])]
+    links = links.drop(columns=['parasite_group'])
     links['n_hosts'] = links['hosts'].map(len)
     links['combination'] = links['hosts'].map(combination_label)
 
     return links
+
+
+def dominant_group(groups):
+    '''
+    Which group of an unordered pair the parasite side is drawn from: the one most of the
+    link's rows name, ties broken by sort order so the choice does not follow row order.
+    '''
+    counts = groups.value_counts()
+
+    return sorted(counts[counts == counts.max()].index)[0]
 
 
 def group_label(proteins, group):

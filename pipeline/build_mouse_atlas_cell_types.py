@@ -1,16 +1,4 @@
-"""
-Build mouse cell-type expression from the Tabula Muris Senis droplet H5AD.
-
-By default this downloads the official raw droplet dataset from Figshare, filters
-to 3-month mice, normalizes each cell to 10,000 counts, applies log1p, averages
-expression by tissue and Cell Ontology label, and maps mouse genes to STRING IDs:
-
-    .venv/bin/python -m pipeline.build_mouse_atlas_cell_types
-
-Supply --input to process a previously downloaded H5AD. The default droplet
-dataset is used deliberately: its UMI counts must not be pooled directly with
-the Smart-seq2/FACS dataset's read counts.
-"""
+'''Build mouse cell-type expression from the Tabula Muris Senis droplet H5AD.'''
 import argparse
 import os
 
@@ -50,21 +38,16 @@ TISSUE_MAPPING = {
     'Spleen': 'spleen',
 }
 
-# TISSUES records the large intestine both under `colon` and under the coarser
-# `intestine`, and `Large_Intestine` is the atlas's only source of mouse cell types for
-# either, so its rows are written out under both labels; the droplet cells it holds are
-# largely colonic epithelium. `small intestine` and `rectum` have no atlas tissue of
-# their own and stay without cell types rather than borrowing these.
+# TISSUES records the large intestine under both `colon` and `intestine`, and
+# `Large_Intestine` is the only atlas source for either
 SHARED_TISSUE_LABELS = {'intestine': ['colon']}
 
 
 def normalized_tissues(obs):
-    """Map source tissue labels to the OrthoHPI vocabulary without inventing matches."""
+    '''Map source tissue labels to the OrthoHPI vocabulary without inventing matches.'''
     source = obs['tissue'].astype(object).copy()
     if 'tissue_free_annotation' in obs:
-        # Only this pooled source category needs its free annotation to distinguish
-        # heart from aorta. Other free annotations are finer tissue names that are
-        # not part of the OrthoHPI tissue vocabulary.
+        # only this pooled source needs its free annotation to distinguish heart from aorta
         heart_or_aorta = source == 'Heart_and_Aorta'
         source.loc[heart_or_aorta] = (
             obs.loc[heart_or_aorta, 'tissue_free_annotation'].replace('', pd.NA)
@@ -74,12 +57,12 @@ def normalized_tissues(obs):
 
 
 def add_shared_labels(data):
-    """Write the rows of a tissue out under the other labels TISSUES also gives it."""
+    '''Write the rows of a tissue out under the other labels TISSUES also gives it.'''
     extra = []
     for tissue, labels in SHARED_TISSUE_LABELS.items():
         sources = [source for source, mapped in TISSUE_MAPPING.items() if mapped == tissue]
-        # the labels are shared with one atlas tissue, not with whatever else may later be
-        # mapped onto the same OrthoHPI tissue, so a second source has to be looked at
+        # the labels are shared with one atlas tissue, so a second source has to be looked
+        # at
         if len(sources) != 1:
             raise ValueError(f'{tissue} is mapped from {sorted(sources)}, so it cannot be '
                              f'labelled {labels} as well')
@@ -90,7 +73,7 @@ def add_shared_labels(data):
 
 
 def is_hdf5(filename):
-    """Return whether filename starts with the HDF5 file signature."""
+    '''Return whether filename starts with the HDF5 file signature.'''
     try:
         with open(filename, 'rb') as handle:
             return handle.read(len(HDF5_SIGNATURE)) == HDF5_SIGNATURE
@@ -99,7 +82,7 @@ def is_hdf5(filename):
 
 
 def download_atlas(url, output_file):
-    """Stream the large atlas download into a complete, validated H5AD file."""
+    '''Stream the large atlas download into a complete, validated H5AD file.'''
     if is_hdf5(output_file):
         return output_file
 
@@ -131,7 +114,7 @@ def download_atlas(url, output_file):
 
 
 def mean_normalized_expression(matrix):
-    """Return log1p(CP10K)-normalized mean expression for every gene."""
+    '''Return log1p(CP10K)-normalized mean expression for every gene.'''
     matrix = matrix.tocsr().astype(np.float64)
     totals = np.asarray(matrix.sum(axis=1)).ravel()
     nonzero = totals > 0
@@ -145,7 +128,7 @@ def mean_normalized_expression(matrix):
 
 
 def read_csr_chunk(matrix, start, stop, n_genes):
-    """Read consecutive rows from an H5AD CSR matrix into an in-memory CSR matrix."""
+    '''Read consecutive rows from an H5AD CSR matrix into an in-memory CSR matrix.'''
     offsets = matrix['indptr'][start:stop + 1]
     data_start, data_stop = offsets[0], offsets[-1]
     return sparse.csr_matrix(
@@ -156,7 +139,7 @@ def read_csr_chunk(matrix, start, stop, n_genes):
 
 
 def normalized_expression_sum(matrix):
-    """Return summed log1p(CP10K) expression and the number of nonempty cells."""
+    '''Return summed log1p(CP10K) expression and the number of nonempty cells.'''
     matrix = matrix.tocsr().astype(np.float64)
     totals = np.asarray(matrix.sum(axis=1)).ravel()
     nonzero = totals > 0
@@ -170,7 +153,7 @@ def normalized_expression_sum(matrix):
 
 
 def aggregate_expression(input_file, config_file, age):
-    """Aggregate the selected Tabula Muris Senis H5AD into the shared schema."""
+    '''Aggregate the selected Tabula Muris Senis H5AD into the shared schema.'''
     atlas = anndata.read_h5ad(input_file, backed='r')
     required = {'age', 'tissue', 'cell_ontology_class'}
     missing = required.difference(atlas.obs.columns)
@@ -242,7 +225,7 @@ def aggregate_expression(input_file, config_file, age):
 
 
 def build(input_file, config_file, output_file, age):
-    """Write Tabula Muris Senis cell-type expression as a shared Parquet artifact."""
+    '''Write Tabula Muris Senis cell-type expression as a shared Parquet artifact.'''
     data = aggregate_expression(input_file=input_file, config_file=config_file, age=age)
     os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
     utils.save_to_parquet(data, output_file)
@@ -251,7 +234,7 @@ def build(input_file, config_file, output_file, age):
 
 
 def combine_atlases(droplet, facs):
-    """Use FACS only for tissues absent from droplet data; never pool technologies."""
+    '''Use FACS only for tissues absent from droplet data; never pool technologies.'''
     if facs is None:
         return droplet
     return pd.concat([droplet, facs[~facs['Tissue'].isin(droplet['Tissue'])]],

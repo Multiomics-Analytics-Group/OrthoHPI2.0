@@ -1,16 +1,9 @@
-"""
-Compare how much the jensenlab TISSUES filter and an HPA-expression filter each
-narrow the host protein pool, and how much they agree.
-
-Standalone analysis -- it reuses the pipeline's own functions but writes nothing
-the pipeline reads.
-
-The jensenlab channel can be swapped: `experiments` is what the pipeline uses,
-`integrated` folds in text-mining and curated knowledge on top of it. The two files
-have the same layout apart from where the confidence score sits.
+'''
+Compare how much the jensenlab TISSUES filter and an HPA-expression filter each narrow the
+host protein pool, and how much they agree.
 
 Usage: .venv/bin/python scripts/compare_tissue_filters.py [experiments|integrated]
-"""
+'''
 import os
 import sys
 
@@ -24,13 +17,13 @@ from pipeline import cell_type_annotations, filters, main
 CONFIG = 'config.yml'
 HPA_NTPM_CUTOFFS = [0.0, 1.0]
 
-# Column holding the confidence score in each jensenlab channel's TSV.
+# column holding the confidence score in each jensenlab channel's TSV
 SCORE_COL = {'experiments': 6, 'integrated': 4}
 SCORE_SWEEP = [0.0, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0]
 
 
 def host_pools(config_file):
-    """{taxid: {protein: name}} straight out of STRING, hosts only."""
+    '''{taxid: {protein: name}} straight out of STRING, hosts only.'''
     hosts = utils.read_config(filepath=config_file, field='hosts')
     urls = utils.read_config(filepath=config_file, field='urls')
     return {taxid: main.get_species_proteins(urls['string_protein_url'], taxid)
@@ -38,14 +31,14 @@ def host_pools(config_file):
 
 
 def tissue_file(config_file, taxid, channel):
-    """Download the host's jensenlab TSV for the requested channel."""
+    '''Download the host's jensenlab TSV for the requested channel.'''
     hosts = utils.read_config(filepath=config_file, field='hosts')
     url = hosts[taxid]['tissues_url'].replace('experiments', channel)
     return utils.download_file(url=url, data_dir='data/downloads')
 
 
 def parasite_tissues(config_file):
-    """The BTO tissues some parasite of the config infects -- what the filter scans for."""
+    '''The BTO tissues some parasite of the config infects -- what the filter scans for.'''
     parasites = utils.read_config(filepath=config_file, field='parasites')
     valid_tissues = set()
     for parasite in parasites.values():
@@ -54,7 +47,7 @@ def parasite_tissues(config_file):
 
 
 def best_scores(config_file, pool, taxid, channel):
-    """{protein: best confidence score} over the tissues the config's parasites infect."""
+    '''{protein: best confidence score} over the tissues the config's parasites infect.'''
     valid_tissues = parasite_tissues(config_file)
     score_col = SCORE_COL[channel]
     best = {}
@@ -70,7 +63,7 @@ def best_scores(config_file, pool, taxid, channel):
 
 
 def tissues_pass(config_file, pool, cutoff, channel):
-    """Proteins kept by the jensenlab TISSUES filter, per host."""
+    '''Proteins kept by the jensenlab TISSUES filter, per host.'''
     hosts = utils.read_config(filepath=config_file, field='hosts')
     mapping = utils.read_config(filepath=config_file, field='tissues')
     kept = {}
@@ -84,8 +77,10 @@ def tissues_pass(config_file, pool, cutoff, channel):
 
 
 def deeploc_pass(config_file, pool):
-    """Proteins kept by the DeepLoc localisation filter, per host: the union over
-    the niches of the parasites that infect it."""
+    '''
+    Proteins kept by the DeepLoc localisation filter, per host: the union over the
+    niches of the parasites that infect it.
+    '''
     proteins = {taxid: dict(p) for taxid, p in pool.items()}
     filters.apply_deeploc_filter(
         config_file=config_file, valid_proteins=proteins,
@@ -96,14 +91,16 @@ def deeploc_pass(config_file, pool):
 
 
 def hpa_pass(config_file, cutoffs):
-    """Human proteins with HPA single-cell expression in a config tissue, per nTPM cutoff."""
+    '''
+    Human proteins with HPA single-cell expression in a config tissue, per nTPM cutoff.
+    '''
     data = cell_type_annotations.read_hpa(config_file=config_file)
     mapped = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
     return {c: set(mapped.loc[mapped['nTPM'] > c, 'Gene'].dropna()) for c in cutoffs}
 
 
 def hpa_any_tissue_universe(config_file):
-    """Human STRING proteins HPA has a row for in ANY tissue (not just config tissues)."""
+    '''Human STRING proteins HPA has a row for in ANY tissue (not just config tissues).'''
     data = cell_type_annotations.read_hpa(config_file=config_file)
     aliases = utils.parse_string_aliases(config_file, sources=['Ensembl_gene'])
     return set(data['Gene'].map(aliases).dropna())

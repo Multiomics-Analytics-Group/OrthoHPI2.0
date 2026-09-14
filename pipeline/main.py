@@ -6,16 +6,12 @@ import pandas as pd
 import utils
 from . import cell_type_annotations, homology, filters, go
 
-# Default jensenlab confidence score below which a host protein's tissue evidence is
-# ignored. A host can override it with hosts.<taxid>.tissue_cutoff in config.yml.
+# jensenlab confidence score below which tissue evidence is ignored;
+# hosts.<taxid>.tissue_cutoff overrides it
 TISSUE_CUTOFF = 2.5
 
-# DeepLoc 2 (Accurate) probability cut-offs for the localisation classes a parasite can
-# reach in its host. Values are DeepLoc's own per-class thresholds for the Accurate
-# (ProtT5) model (DeepLoc2/deeploc2.py label_threshold, offset by one: labels[i] ->
-# threshold[i+1], which convert_label2string reads at i+1). The parasite secretome filter
-# applies the two surface numbers in deeploc/build_secretome_fastas.py; docs/deeploc.md
-# has the derivation.
+# DeepLoc 2 Accurate-model per-class thresholds (DeepLoc2/deeploc2.py label_threshold, read
+# at i+1); see docs/deeploc.md
 DEEPLOC_ACCURATE_DIR = os.path.join('deeploc', 'output_accurate', 'deeploc_output_accurate')
 DEEPLOC_CUTOFFS = {
     'Extracellular': 0.61728516,
@@ -24,36 +20,21 @@ DEEPLOC_CUTOFFS = {
     'Nucleus': 0.50136719,
 }
 
-# Which of those classes each niche of config.yml reaches, and so which host proteins are
-# open to a parasite that lives there. Both niches keep the host surface: an intracellular
-# parasite has an invasive extracellular stage that has to engage it, and the config
-# records the wider of a parasite's stages. What the intracellular niche adds is the
-# cytosol and the nucleus, which its effectors reach whether the parasite lies free in the
-# cytoplasm (T. cruzi, Trichinella) or exports them across a parasitophorous vacuole
-# membrane (Plasmodium, Toxoplasma, Leishmania, Cryptosporidium, microsporidia).
-#
-# The other DeepLoc classes are deliberately left out. Mitochondrion, Endoplasmic
-# reticulum, Golgi apparatus, Lysosome/Vacuole and Peroxisome are lumen- and matrix-facing
-# proteomes behind a membrane the parasite does not cross; a vacuole recruiting host ER or
-# mitochondria touches their cytosolic face, and those proteins already carry Cytoplasm.
-# Adding them would keep 93% of the human proteome, which is no filter at all.
+# which classes each niche reaches. Both keep the host surface; intracellular adds cytosol
+# and nucleus. The organelle classes are left out: adding them keeps 93% of the human
+# proteome
 DEEPLOC_NICHE_CLASSES = {
     'extracellular': ('Extracellular', 'Cell membrane'),
     'intracellular': ('Extracellular', 'Cell membrane', 'Cytoplasm', 'Nucleus'),
 }
-# the niche a parasite is filtered on when config.yml records none for it: the narrower of
-# the two, so a missing value cannot widen a host pool by accident
+# the narrower niche, so a missing value cannot widen a host pool by accident
 DEEPLOC_DEFAULT_NICHE = 'extracellular'
 DEEPLOC_NICHE_CUTOFFS = {niche: {c: DEEPLOC_CUTOFFS[c] for c in classes}
                          for niche, classes in DEEPLOC_NICHE_CLASSES.items()}
 
 
 def get_proteins(config_file):
-    """
-    Retrieve all proteins for all species
-    :param str config_file: path to config file
-    
-    :return: dictionary with all proteins for all species. Key -> tax id, value -> dictionary: key -> protein id, value -> protein name"""
+    '''Retrieve all proteins for all species'''
     proteins = {}
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
@@ -69,13 +50,7 @@ def get_proteins(config_file):
 
 
 def get_species_proteins(string_url, taxid):
-    """
-    Download and parse the STRING protein.info file for a single species.
-    :param str string_url: url template to the STRING protein.info file (contains TAXID)
-    :param int taxid: taxonomic id of the species of interest
-
-    :return: dictionary with all proteins. Key -> Ensembl protein id, value -> protein name
-    """
+    '''Download and parse the STRING protein.info file for a single species.'''
     proteins = {}
     if string_url is None:
         return proteins
@@ -91,28 +66,18 @@ def get_species_proteins(string_url, taxid):
 
 
 def filter_proteins(config_file, data_dir, proteins):
-    """
+    '''
     Narrow every species to the proteins an interaction could be predicted between: the
     parasite proteins the secretome predictions call secreted or membrane-bound, and the
     host proteins expressed in a tissue some parasite of the config infects and put by
     DeepLoc in a localisation a parasite infecting that host can reach.
-
-    Kept apart from run() so that the pool can be rebuilt for a data directory without
-    repeating the orthology transfer, which is the expensive half of the pipeline.
-
-    :param str config_file: path to the configuration file
-    :param str data_dir: directory holding the secretome and DeepLoc inputs
-    :param dict proteins: {taxid: {protein: name}} before filtering; filtered in place
-    :return: ({protein: name} over every species, {protein: [tissue, ...]} for the hosts,
-             {niche: set of host proteins it reaches})
-    """
-    # proteins stays a {taxid: {protein: name}} dict through all three filters,
-    # then is flattened to one {protein: name} dict for the homology transfer
+    '''
+    # proteins stays {taxid: {protein: name}} through the filters, then is flattened for the
+    # homology transfer
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
-    # host proteins kept if DeepLoc puts them in a class the parasites infecting that host
-    # reach; the per-niche halves of that pool go on to get_links, which applies them
-    # parasite by parasite
+    # the per-niche halves of the pool go on to get_links, which applies them parasite by
+    # parasite
     reachable = filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
                                              deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
                                              niche_cutoffs=DEEPLOC_NICHE_CUTOFFS,
@@ -122,32 +87,12 @@ def filter_proteins(config_file, data_dir, proteins):
 
 
 def save_eligible_proteins(proteins, output_file, reachable=None):
-    """
-    Write the proteins the filters passed, over every species of the config.
-
-    This is what the app tests a network's enrichment against. A network holds the
-    proteins it holds because these are the ones it could have been built from, so the
-    whole proteome is the wrong background: tested against it, a network returns the
-    filters that made it -- surface processes for the hosts, secretion for the parasites
-    -- whichever parasite is being asked about. The parasites need this file, having no
-    tissue table to be read out of.
-
-    The pool is not the same for every parasite once the hosts are filtered by niche, so
-    a reachable_<niche> column says which half of it each protein belongs to: a network of
-    an extracellular parasite has to be read against the surface proteins alone, while the
-    cytosolic and nuclear ones were only ever available to the intracellular parasites.
-    Parasite proteins are true in every column -- the niche constrains the host side.
-
-    :param dict proteins: {protein: name} after the filters, over every species
-    :param str output_file: parquet path to write
-    :param dict reachable: {niche: set of host proteins}, as filter_proteins returns it;
-                           None writes the pool without the per-niche columns
-    """
+    '''Write the proteins the filters passed, over every species of the config.'''
     eligible = pd.DataFrame(sorted(proteins.items()), columns=['protein', 'name'])
     eligible['taxid'] = eligible['protein'].str.split('.').str[0]
     if reachable:
-        # every host protein of the pool is in some niche's set -- the filter dropped the
-        # ones no niche reaches -- so what is in none of them is a parasite protein
+        # every host protein of the pool is in some niche's set, so what is in none is a
+        # parasite protein
         parasite_side = ~eligible['protein'].isin(set().union(*reachable.values()))
         for niche, host_proteins in sorted(reachable.items()):
             eligible[f'reachable_{niche}'] = (eligible['protein'].isin(host_proteins)
@@ -157,19 +102,13 @@ def save_eligible_proteins(proteins, output_file, reachable=None):
 
 
 def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file):
-    """
-    Build the (Gene, Tissue, cell-type) annotation table and write it to parquet.
-    :param dict tissues: {protein_id: [tissue, ...]} from the tissue filter
-    :param dict proteins: valid {protein_id: name} after all filters
-    :param str config_file: path to the configuration file
-    :param str output_file: parquet path to write
-    """
+    '''Build the (Gene, Tissue, cell-type) annotation table and write it to parquet.'''
     tissues_df = pd.DataFrame(
         [(gene, tissue) for gene, ts in tissues.items() for tissue in ts],
         columns=['Gene', 'Tissue'],
     )
     tissues_df = tissues_df[tissues_df['Gene'].isin(proteins.keys())]
-    # HPA annotates human; an optional preprocessed pig atlas adds pig cell types.
+    # HPA annotates human; an optional preprocessed pig atlas adds pig cell types
     cell_type_data = cell_type_annotations.parse_cell_type_data(
         config_file, data_dir=os.path.dirname(output_file), valid_proteins=proteins.keys())
     tissues_df = pd.merge(tissues_df, cell_type_data, on=['Gene', 'Tissue'], how='left')
@@ -179,20 +118,18 @@ def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file)
 
 PER_SPECIES_URLS = {"string_protein_url", "string_ppi_url", "string_go_url", "string_alias_url", "string_sequences_url"}
 
-# The EggNOG 6 source file is ~10 GB and covers every tax level; it is streamed and
-# filtered down to level 2759 by pipeline/prepare_eggnog_members.py instead.
+# the EggNOG 6 source file is ~10 GB; pipeline/prepare_eggnog_members.py filters it to level
+# 2759
 PREPROCESSED_URLS = {"eggNOG_members_url"}
 
 
 def setup(config_file, output_file_path):
-    """
-    Downloads all necessary files according to the urls specified in the configuration file
-    except the ones templated per species (contain a TAXID placeholder), which are
+    '''
+    Downloads all necessary files according to the urls specified in the configuration
+    file except the ones templated per species (contain a TAXID placeholder), which are
     downloaded elsewhere once a taxid is known, and the ones prepared by a separate
-    script. The go terms will also be downloaded and formatted.
-
-    :param str config_file: path to the configuration file
-    """
+    script.
+    '''
     urls = utils.read_config(filepath=config_file, field='urls')
     for url_name in urls:
         url = urls[url_name]
@@ -203,7 +140,7 @@ def setup(config_file, output_file_path):
 
 
 def print_group_counts(valid_groups):
-    """Print how many proteins each species contributes to the matched EggNOG groups."""
+    '''Print how many proteins each species contributes to the matched EggNOG groups.'''
     taxid_counts = Counter()
     for prots in valid_groups.values():
         for p in prots:
@@ -213,18 +150,7 @@ def print_group_counts(valid_groups):
 
 
 def annotate_predictions(predictions, hosts, parasites, config_file):
-    """
-    Add source_uniprot / target_uniprot columns by mapping STRING ids to UniProt.
-
-    Parasites and hosts use different STRING alias source names in v12 (the v11.5
-    names BLAST_UniProt_AC / Ensembl_HGNC_UniProt_ID(supplied_by_UniProt) no longer
-    exist).
-
-    Host sources are a preference list, because the alias files are not uniform:
-    Ensembl_HGNC_uniprot_ids holds one canonical accession per protein but exists
-    only for human, so rat, mouse and pig fall back to UniProt_AC. Ensembl_UniProt
-    is deliberately not used -- it mixes gene names in with the accessions.
-    """
+    '''Add source_uniprot / target_uniprot columns by mapping STRING ids to UniProt.'''
     predictions = utils.annotate_alias_id(predictions_df=predictions,
                             taxids=list(parasites.keys()), config_file=config_file,
                             sources=['Uniprot'], new_col="source_uniprot",
@@ -237,13 +163,7 @@ def annotate_predictions(predictions, hosts, parasites, config_file):
 
 
 def run(config_file, data_dir, verbose=False):
-    """
-    Run the full prediction pipeline and write the parquet outputs into data_dir.
-
-    :param str config_file: path to the configuration file
-    :param str data_dir: directory for downloads and output parquet files
-    :param bool verbose: print the per-taxid EggNOG protein counts
-    """
+    '''Run the full prediction pipeline and write the parquet outputs into data_dir.'''
     downloads_dir = os.path.join(data_dir, 'downloads')
 
     print("Setup: downloading reference files...")
@@ -271,7 +191,7 @@ def run(config_file, data_dir, verbose=False):
     get_tissue_cell_type_annotation(tissues=tissues, proteins=proteins, config_file=config_file, output_file=os.path.join(data_dir, 'tissues_cell_types.parquet'))
 
     print("Getting EggNOG groups and transferring PPIs...")
-    # setup() saved the COG links file under its URL basename; rebuild that name to find it
+    # setup() saved the COG links file under its URL basename
     cog_filename = urls['string_COG_url'].split('/')[-1]
     members_file = os.path.join(downloads_dir, '2759_members.tsv.gz')
     if not os.path.isfile(members_file):
@@ -286,7 +206,6 @@ def run(config_file, data_dir, verbose=False):
 
     print("Annotating predictions with UniProt accessions...")
     predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)
-    # single output: predictions plus source_uniprot / target_uniprot columns
     utils.save_to_parquet(df=predictions, output_file=os.path.join(data_dir, 'predictions.parquet'))
 
 

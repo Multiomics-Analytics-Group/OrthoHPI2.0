@@ -1,12 +1,4 @@
-"""Print the structure of an .rds file without R.
-
-Streams the gzipped R serialization and reports the object tree — slots,
-classes, dimensions, factor levels — while discarding the bulk numeric
-payloads instead of holding them in memory.
-
-Usage:
-    python rds_peek.py FILE.rds [--depth N] [--max-items N] [--values N]
-"""
+'''Print the structure of an .rds file without R.'''
 
 import argparse
 import gzip
@@ -35,7 +27,7 @@ TYPENAME = {
 
 
 class Node:
-    """A parsed object: its R type, a short summary, and named children."""
+    '''A parsed object: its R type, a short summary, and named children.'''
 
     def __init__(self, rtype, summary="", children=None, tags=None):
         self.rtype = rtype
@@ -46,7 +38,7 @@ class Node:
 
 
 class CountingStream:
-    """Wraps the decompressed stream so errors can report a byte offset."""
+    '''Wraps the decompressed stream so errors can report a byte offset.'''
 
     def __init__(self, inner):
         self.inner = inner
@@ -120,8 +112,8 @@ class Reader:
             idx = flags >> 8
             if idx == 0:
                 idx = self.int32()
-            # Resolve to the referenced symbol's own name: these back-references
-            # carry attribute and slot names, so a placeholder loses them.
+            # resolve to the referenced symbol's own name: these carry attribute and slot
+            # names
             target = self.refs[idx - 1] if 0 < idx <= len(self.refs) else "?"
             return Node(SYMSXP, target)
         if rtype in (GLOBALENV_SXP, BASEENV_SXP, EMPTYENV_SXP, BASENAMESPACE_SXP):
@@ -172,8 +164,7 @@ class Reader:
             state = self.read()
             self.read()  # attributes
             cls = info.children[0].summary if info.children else "?"
-            # wrap_* ALTREPs hold the real vector as the car of their state
-            # pairlist; unwrap it so callers see the data, not the wrapper.
+            # wrap_* ALTREPs hold the real vector as the car of their state pairlist
             if state.rtype == LISTSXP and state.children:
                 state = state.children[0]
             node = Node(state.rtype, f"{state.summary} [ALTREP {cls}]")
@@ -207,10 +198,8 @@ class Reader:
 
         raise ValueError(f"unhandled SEXP type {rtype} (flags {flags:#x})")
 
-    # --- byte code -------------------------------------------------------
-    # Mirrors ReadBC/ReadBC1/ReadBCConsts/ReadBCLang in R's serialize.c. The
-    # values are discarded, but the traversal must be exact or the stream
-    # desynchronises for everything that follows.
+    # --- byte code: mirrors ReadBC* in R's serialize.c. Values are discarded, but the
+    # traversal must be exact or the stream desynchronises
     def read_bytecode(self):
         nreps = self.int32()
         self.bc_reps = [None] * (nreps + 1)
@@ -270,7 +259,7 @@ class Reader:
         return node
 
     def read_attributes(self):
-        """The ATTRIB field is just another item: a tagged pairlist or NULL."""
+        '''The ATTRIB field is just another item: a tagged pairlist or NULL.'''
         node = self.read()
         if node.rtype != LISTSXP:
             return {}
@@ -323,7 +312,7 @@ class Reader:
 
 
 def describe(node, values_shown):
-    """One-line description, enriched with class/dim attributes."""
+    '''One-line description, enriched with class/dim attributes.'''
     bits = []
     cls = node.attrs.get("class")
     if cls is not None and getattr(cls, "values", None):
@@ -380,7 +369,7 @@ def walk(node, name, depth, out, max_depth, max_items, values_shown):
 
 
 def as_column(node):
-    """Materialise a parsed vector as a plain Python list, decoding factors."""
+    '''Materialise a parsed vector as a plain Python list, decoding factors.'''
     vals = getattr(node, "values", None)
     if vals is None:
         return None
@@ -392,7 +381,7 @@ def as_column(node):
 
 
 def dump_tables(root, outdir):
-    """Write the small, useful tables — cell annotations, genes, embeddings."""
+    '''Write the small, useful tables — cell annotations, genes, embeddings.'''
     import csv
     import os
 

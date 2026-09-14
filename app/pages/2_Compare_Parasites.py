@@ -73,6 +73,8 @@ DOT_CHROME = 240
 # session key the shared-interactor matrix counts its remounts under, which is what lets
 # the same cell be opened twice running
 CELL_NONCE_KEY = 'shared_cell_nonce'
+# the tissue selector of the shared-protein dots, meaning no tissue filter
+ALL_TISSUES = 'All tissues'
 
 
 # The localization of a host protein is a band beside its row of the shared-interactors
@@ -304,7 +306,8 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
     return figure
 
 @st.cache_data(show_spinner=False)
-def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SCORE):
+def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SCORE,
+                                     tissue=None):
     '''
     Predictions restricted to the host proteins that are expressed in a tissue the
     parasite is known to infect (config['parasites'][taxid]['tissues']), which is the
@@ -316,6 +319,10 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     `score` drops the interactions predicted below that confidence, the same cut the
     network page offers. It is applied here rather than per figure so the shared-interactor
     heatmap and the shared-protein dots keep counting the same interactions.
+
+    `tissue` narrows the restriction to that one tissue: the host proteins expressed there,
+    for the parasites known to infect it. Parasites that do not infect the tissue drop out
+    along with their interactions.
 
     One row is one predicted interaction, parasite protein (`source`) included: the heatmap
     only ever looks at which host proteins are reached, but the dot matrix sizes its dots by
@@ -336,6 +343,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     aux = predictions.drop_duplicates().astype({'taxid1': str})
     aux = pd.merge(aux, expressed, on='target')
     aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
+    if tissue is not None:
+        aux = aux[aux['Tissue'] == tissue]
 
     return aux[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
 
@@ -1249,7 +1258,8 @@ if selected_host != web_utils.NO_HOST:
     # one slider for the three figures below it, which are the same interactions read three
     # ways -- filtering them apart would put different numbers in figures whose captions
     # say they match. The tissue dots at the foot of the page are a different count and
-    # keep every prediction.
+    # keep every prediction. The shared-protein dots alone can be narrowed further to one
+    # tissue, and their caption says so when they are.
     # It sits in the middle of three columns, as the host selector above it does: left to
     # itself a slider takes the whole width of the page, which is a metre of track for a
     # range of half a point
@@ -1272,10 +1282,17 @@ if selected_host != web_utils.NO_HOST:
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
     shared_similarity = get_shared_interactor_similarity(counted, parasite_groups,
                                                         group_order, niches, order_by)
-    top_shared = get_top_shared_proteins(counted, parasite_groups, group_order, niches,
-                                         order_by,
-                                         web_utils.load_protein_annotations(data_dir),
-                                         web_utils.load_deeploc_localisations(data_dir))
+
+    per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
+                                                              selected_taxids, score)
+    ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
+                                                                           kind='stable')
+    annotated = set(per_cell_type['Tissue'])
+    # every tissue the parasites reach is offered, and not only the ones the HPA gives cell
+    # types for: a reader looking for pig muscle should find it and be told the single cell
+    # data is missing, rather than be left to guess whether the tissue or its annotation is
+    # what is absent
+    choices = list(ranked.index)
 
     matrix, shared = st.columns(2)
 
@@ -1329,20 +1346,37 @@ if selected_host != web_utils.NO_HOST:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
     with shared:
+        st.subheader("Host interactors common to several parasites")
+        # the selector is offered whatever the tissue chosen leaves, so a tissue that empties
+        # the figure can be changed back rather than taking the control away with the plot
+        shared_tissue = st.selectbox(
+            'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue',
+            help='Keep only the host proteins expressed in this tissue, for the parasites '
+                 'known to infect it. Tissues the parasites infect, most interactions first.')
+        # the same interactions the heatmap reads, narrowed to one tissue where one is
+        # chosen; the heatmap beside it keeps every tissue, which is what its caption says
+        shared_predictions = (counted if shared_tissue == ALL_TISSUES else
+                              get_tissue_expressed_predictions(data_dir, config,
+                                                               selected_taxids, score,
+                                                               shared_tissue))
+        top_shared = get_top_shared_proteins(shared_predictions, parasite_groups, group_order,
+                                             niches, order_by,
+                                             web_utils.load_protein_annotations(data_dir),
+                                             web_utils.load_deeploc_localisations(data_dir))
+        where = '' if shared_tissue == ALL_TISSUES else f' in {shared_tissue}'
         if top_shared is not None:
             # the figure draws the rows it is given; the count of what they were taken from
             # belongs to the caption, which is the only place saying what is on screen and
             # what is not
             *figure_arguments, shareable = top_shared
             shown = len(figure_arguments[1])
-            st.subheader("Host interactors common to several parasites")
             # a truncated figure says what it is a top of: with hundreds of proteins tied
             # a few parasites apart, a reader who is not told 40 of 810 reads the last row
             # as the last protein several parasites reach
-            selection = (f'The {shown} host proteins reached by the most parasites, of the '
-                         f'{shareable} reached by more than one.' if shareable > shown else
-                         f'The {shown} host proteins reached by more than one parasite, '
-                         'most first.')
+            selection = (f'The {shown} host proteins{where} reached by the most parasites, of '
+                         f'the {shareable} reached by more than one.' if shareable > shown else
+                         f'The {shown} host proteins{where} reached by more than one '
+                         'parasite, most first.')
             st.caption(selection + ' A dot wherever a parasite is predicted to interact with '
                        "one, sized by the number of that parasite's proteins reaching it. "
                        'The band beside each row gives the DeepLoc 2 localization '
@@ -1354,17 +1388,10 @@ if selected_host != web_utils.NO_HOST:
                 generate_shared_protein_dots(*figure_arguments,
                                              config.get('parasite_groups', {}), column),
                 width='stretch')
+        else:
+            st.info(f'No host protein{where} is reached by more than one parasite at this '
+                    'confidence.')
 
-    per_tissue, per_cell_type = count_interactions_per_tissue(data_dir, config,
-                                                              selected_taxids, score)
-    ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
-                                                                           kind='stable')
-    annotated = set(per_cell_type['Tissue'])
-    # every tissue the parasites reach is offered, and not only the ones the HPA gives cell
-    # types for: a reader looking for pig muscle should find it and be told the single cell
-    # data is missing, rather than be left to guess whether the tissue or its annotation is
-    # what is absent
-    choices = list(ranked.index)
     tissues, cell_types = st.columns(2)
     with tissues:
         st.subheader("Tissues in which the predicted interactions can take place")

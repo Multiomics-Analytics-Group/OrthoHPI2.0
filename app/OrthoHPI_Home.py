@@ -69,6 +69,8 @@ SPLIT_SIDES = {'Host proteins': ('target', HOST_SPLIT_CLASSES),
 # the counts run from 39 to two and a half thousand, so the split of the small parasites is
 # only legible in shares
 BAR_SCALES = ('Counts', 'Share')
+# the whole proteome is drawn this faint behind the solid bar of its eligible subset
+PROTEOME_OPACITY = 0.3
 # how far under the lowest cut-off or point a probability scale starts
 SCALE_MARGIN = 0.05
 # rows of the shared-family dot plot, pixels a row takes, and what the strip, the names
@@ -553,6 +555,60 @@ def generate_interactions_by_group(df, palette, width, score):
 
 
 @st.cache_data(show_spinner=False)
+def generate_proteome_sizes(config, sizes, eligible, palette):
+    '''
+    One bar per parasite: the whole proteome STRING holds for it, faint, with the
+    proteins the secretome filter let through solid in front. The ratio is what the
+    counts above stand on -- a small proteome, or a multicellular parasite kept to its
+    secreted proteins, has few interactions to offer before any prediction is made.
+    '''
+    order = {g: i for i, g in enumerate(palette)}
+    pool = eligible['taxid'].astype(str).value_counts()
+    sizes = sizes.set_index('taxid')['proteins']
+    rows = []
+    for taxid, parasite in config['parasites'].items():
+        group = parasite.get('group', UNKNOWN_GROUP)
+        rows.append({'name': short_name(parasite['label']), 'group': group,
+                     'group_rank': order.get(group, len(order)),
+                     'label': parasite['label'],
+                     # what the secretome filter admits of each: a multicellular parasite
+                     # reaches its host with secreted proteins alone
+                     'kept': 'secreted' if parasite.get('multicellular')
+                             else 'secreted or membrane',
+                     'proteome': sizes.get(str(taxid)), 'eligible': pool.get(str(taxid), 0)})
+    df = pd.DataFrame(rows).dropna(subset=['proteome'])
+    df = df.sort_values(by=['group_rank', 'label'], kind='stable')
+    df['share'] = df['eligible'] / df['proteome']
+
+    figure = go.Figure()
+    for group, group_df in df.groupby('group', sort=False):
+        color = palette.get(group, UNKNOWN_COLOR)
+        custom = group_df[['proteome', 'eligible', 'share', 'kept']]
+        hover = ('%{x}<br>%{customdata[0]:,} proteins in STRING<br>%{customdata[1]:,} '
+                 '%{customdata[3]} (%{customdata[2]:.0%})' f'<extra>{group}</extra>')
+        figure.add_trace(
+            go.Bar(x=group_df['name'], y=group_df['proteome'], name=group,
+                   marker_color=color, opacity=PROTEOME_OPACITY, customdata=custom,
+                   legendgroup=group, showlegend=False, hovertemplate=hover))
+        figure.add_trace(
+            go.Bar(x=group_df['name'], y=group_df['eligible'], name=group,
+                   marker_color=color, customdata=custom,
+                   legendgroup=group, hovertemplate=hover))
+
+    figure.update_layout(barmode='overlay', bargap=0.2, height=420, plot_bgcolor='white',
+                         margin=dict(l=0, r=0, t=40, b=10),
+                         legend=dict(orientation='h', yanchor='bottom', y=1.02, x=0,
+                                     title_text='', font=dict(size=11)))
+    figure.update_xaxes(categoryorder='array', categoryarray=df['name'].tolist(),
+                        tickangle=-60, showgrid=False, tickfont=dict(size=11),
+                        automargin=True)
+    figure.update_yaxes(title_text='proteins', showgrid=True, gridcolor='#f0f0f0',
+                        zerolinecolor='#e0e0e0', automargin=True)
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
 def generate_confidence_per_parasite(df, palette, width, score):
     '''
     The spread of the confidence score of each parasite's predicted interactions, in the
@@ -793,6 +849,18 @@ st.plotly_chart(
                                        share=bar_scale == BAR_SCALES[1]),
     width='stretch')
 
+proteome_sizes = web_utils.load_proteome_sizes(data_dir)
+eligible_proteins = web_utils.load_eligible_proteins(data_dir)
+if proteome_sizes is not None and eligible_proteins is not None:
+    with st.expander('Parasite proteome sizes'):
+        st.caption('The whole proteome of each parasite as STRING holds it, faint, and in '
+                   'front of it the proteins the secretome filter let through — the '
+                   'membrane and secreted proteins of a unicellular parasite, the secreted '
+                   'proteins alone of a multicellular one.')
+        st.plotly_chart(generate_proteome_sizes(config, proteome_sizes, eligible_proteins,
+                                                parasite_palette),
+                        width='stretch')
+
 st.subheader("Host protein families common to several parasites")
 shared_families = get_top_shared_families(overview, score)
 if shared_families is None:
@@ -804,12 +872,9 @@ else:
                  f'{shareable} reached by more than one, ' if shareable > shown else
                  f'The {shown} host protein families reached by more than one parasite, ')
     st.caption(selection + 'at or above the confidence set above. A family is the '
-               'orthology group of the host protein, which is what the same protein of two '
-               'hosts has in common, and is named by the gene symbols of its proteins; a '
-               'parasite reaching it in two hosts is one parasite in two columns. A dot '
+               'orthology group of the host protein, and is named by the gene symbols of its proteins. A dot '
                'wherever a parasite is predicted to interact with a protein of the family, '
-               "sized by the number of that parasite's proteins reaching it and coloured by "
-               'its taxonomic group; hover a dot for the host proteins behind it. '
+               "sized by the number of that parasite's proteins reaching it; hover a dot for the host proteins behind it. "
                + NICHE_STRIP)
     st.plotly_chart(generate_shared_family_dots(overview, family_dots, families,
                                                 parasite_palette, page),

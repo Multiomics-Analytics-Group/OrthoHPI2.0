@@ -684,7 +684,7 @@ def generate_shared_family_dots(df, dots, families, palette, width):
                                          '%{customdata[2]} host-parasite pairs<br>'
                                          'proteins of %{x} reaching it: %{customdata[3]}<br>'
                                          'host proteins reached: %{customdata[4]}'
-                                         f'<extra>{host}</extra>'),
+                                         '<extra></extra>'),
                 row=1, col=column)
             labelled.add(group)
         # the range is set rather than left to the markers, which plotly pads at either

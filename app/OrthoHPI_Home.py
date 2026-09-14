@@ -87,6 +87,11 @@ LABEL_CHAR = 6.2
 LABEL_PADDING = 40
 # height of one horizontal legend row, in pixels
 LEGEND_ROW = 46
+# pixels a tissue row of the tissue matrix takes, and what the axis names and the
+# legend take besides; a tile is this much narrower than its column
+TISSUE_ROW = 19
+TISSUE_CHROME = 150
+TILE_SHARE = 0.72
 
 
 def score_floor(*values):
@@ -609,6 +614,102 @@ def generate_proteome_sizes(config, sizes, eligible, palette):
 
 
 @st.cache_data(show_spinner=False)
+def generate_tissue_matrix(config, palette, width):
+    '''
+    A tile wherever a parasite's lifecycle touches a tissue of the host, the parasites in
+    the columns and colours of the figures above, the tissues ordered by how many
+    parasites infect them so the most shared is the top row. The tissue filter keeps a
+    parasite to the host proteins expressed in its tissues, so a row of one tile is a
+    parasite predicted against a narrow slice of the host, a row of seven the whole
+    host near enough. The strips under the columns carry the taxonomic group and the
+    niche, as under the other figures.
+    '''
+    order = {g: i for i, g in enumerate(palette)}
+    niches = web_utils.get_niches(config)
+    names = config['tissues']
+    rows = []
+    for parasite in config['parasites'].values():
+        group = parasite.get('group', UNKNOWN_GROUP)
+        tissues = [names[code] for code in parasite.get('tissues', [])]
+        for tissue in tissues:
+            rows.append({'name': short_name(parasite['label']), 'label': parasite['label'],
+                         'group': group, 'group_rank': order.get(group, len(order)),
+                         'niche': niches.get(parasite['label'], web_utils.UNKNOWN_NICHE),
+                         'tissue': tissue, 'tissues': len(tissues)})
+    df = pd.DataFrame(rows)
+    df = df.sort_values(by=['group_rank', 'label'], kind='stable')
+    parasites = df['name'].unique().tolist()
+    # how many parasites infect each tissue, most first; ties in alphabetical order
+    counts = df.groupby('tissue').size().sort_index()
+    counts = counts.sort_values(ascending=False, kind='stable')
+    rows_of = {t: i for i, t in enumerate(counts.index)}
+    df = df.assign(y=df['tissue'].map(rows_of),
+                   parasites=df['tissue'].map(counts))
+
+    # the strips keep the height they have under the other figures
+    band = BAND_HEIGHT * 470
+    height = TISSUE_ROW * len(counts) + TISSUE_CHROME + 2 * band
+    band_height = band / height
+    figure = make_subplots(rows=3, cols=1,
+                           row_heights=[1 - 2 * band_height, band_height, band_height],
+                           vertical_spacing=BAND_GAP)
+    room = width - (LABEL_CHAR * max(len(t) for t in counts.index) + LABEL_PADDING)
+    size = min(TISSUE_ROW * TILE_SHARE, max(4, room / len(parasites) * TILE_SHARE))
+
+    for group, group_df in df.groupby('group', sort=False):
+        figure.add_trace(
+            go.Scatter(x=group_df['name'], y=group_df['y'], mode='markers', name=group,
+                       marker=dict(color=palette.get(group, UNKNOWN_COLOR), size=size,
+                                   symbol='square', line=dict(width=0)),
+                       legendgroup=group,
+                       customdata=group_df[['label', 'tissue', 'tissues',
+                                            'parasites']].to_numpy(),
+                       hovertemplate='%{customdata[0]}<br>%{customdata[1]}, one of '
+                                     '%{customdata[2]} tissues it infects<br>'
+                                     '%{customdata[3]} parasites infect it'
+                                     f'<extra>{group}</extra>'),
+            row=1, col=1)
+
+    # the tiles are the legend of the groups already, so the group strip adds no entry;
+    # the two share a legendgroup, and toggle together
+    columns = [(None, df.drop_duplicates('name'), parasites)]
+    add_band(figure, columns, 'group', palette, set(palette) | {UNKNOWN_GROUP},
+             row=2, legend='legend2')
+    add_band(figure, columns, 'niche', web_utils.NICHE_COLORS, set(), row=3,
+             legend='legend3', unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+    stack_bands(figure)
+
+    # the legends are placed from the top of the figure rather than the plot
+    figure.update_layout(height=height, plot_bgcolor='white',
+                         margin=dict(l=0, r=0, t=2 * LEGEND_ROW, b=10),
+                         legend=dict(orientation='h', x=0, yref='container',
+                                     yanchor='top', y=1, title_text='taxonomic group',
+                                     title_font=dict(size=11), font=dict(size=11)),
+                         legend3=dict(orientation='h', x=0, yref='container',
+                                      yanchor='top', y=1 - LEGEND_ROW / height,
+                                      title_text=web_utils.NICHE_TITLE,
+                                      title_font=dict(size=11), font=dict(size=11)))
+    # the range is set rather than left to the markers, which plotly pads at either end,
+    # so the columns stand over the segments of the strips below them
+    figure.update_xaxes(categoryorder='array', categoryarray=parasites,
+                        range=[-0.5, len(parasites) - 0.5], showgrid=False,
+                        zeroline=False, showticklabels=False)
+    # the names belong under the strips
+    figure.update_xaxes(showticklabels=True, tickangle=-60, tickfont=dict(size=11),
+                        automargin=True, row=3)
+    figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0', row=1)
+    # reversed, so the most-infected tissue is the top row; each tissue is named with the
+    # number of parasites infecting it
+    figure.update_yaxes(range=[len(counts) - 0.5, -0.5], tickmode='array',
+                        tickvals=list(range(len(counts))),
+                        ticktext=[f'{t} ({n})' for t, n in counts.items()],
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False,
+                        tickfont=dict(size=11), automargin=True, row=1)
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
 def generate_confidence_per_parasite(df, palette, width, score):
     '''
     The spread of the confidence score of each parasite's predicted interactions, in the
@@ -860,6 +961,15 @@ if proteome_sizes is not None and eligible_proteins is not None:
         st.plotly_chart(generate_proteome_sizes(config, proteome_sizes, eligible_proteins,
                                                 parasite_palette),
                         width='stretch')
+
+st.subheader("Tissues infected by each parasite")
+st.caption('A tile wherever a parasite is known to infect a tissue of its host, from the '
+           'lifecycle of the parasite; the tissues are ordered by how many parasites '
+           'infect them, the number in brackets. The tissue filter keeps a parasite to the host proteins expressed '
+           'in these tissues, so a parasite with one tile is predicted against a narrow '
+           'slice of the host and one with seven against most of it. Tissue names follow '
+           'the BRENDA Tissue Ontology. ' + BANDS_STRIP)
+st.plotly_chart(generate_tissue_matrix(config, parasite_palette, page), width='stretch')
 
 st.subheader("Host protein families common to several parasites")
 shared_families = get_top_shared_families(overview, score)

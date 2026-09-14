@@ -36,11 +36,11 @@ SPECIES_TINT = 0.45
 # a host the combination does not include; no host is drawn in a grey
 ABSENT_COLOR = '#e0e0e0'
 # why a host missed a link, in the order explain_host_specific tests them; the paragraph
-# under the table counts the rows of each
-ABSENT_FAMILY = 'no protein of the family in this host'
-NOT_EXPRESSED = 'family present, but no protein of it reaches the infected tissues'
-OUT_OF_REACH = 'family expressed, but not where this parasite can reach it'
-NOT_TRANSFERRED = 'protein available, link not transferred'
+# under the bars counts the rows of each
+ABSENT_FAMILY = 'family absent from this host'
+NOT_EXPRESSED = 'not expressed in an infected tissue'
+OUT_OF_REACH = 'not in a reachable subcellular location'
+NOT_TRANSFERRED = 'available, but not transferred'
 # most gene symbols in an orthology group label before the rest are left to the hover
 SYMBOLS_IN_LABEL = 3
 # the label is cut here whatever the count, since parasite proteins without a symbol are
@@ -464,12 +464,11 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
             else:
                 reason = NOT_TRANSFERRED
             missing.append([group_label(link.host_proteins, link.group2),
-                            ', '.join(link.parasite_proteins), link.combination, host,
-                            len(family), reason])
+                            ', '.join(link.parasite_proteins), link.combination,
+                            short_name(host), reason])
 
     return pd.DataFrame(missing, columns=['Host protein family', 'Parasite proteins',
-                                          'Predicted in', 'Missing from',
-                                          'Proteins of the family in that host', 'Why'])
+                                          'Predicted in', 'Missing from', 'Why'])
 
 
 @st.cache_data(show_spinner=False)
@@ -559,6 +558,38 @@ else:
             st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
 
+            reasons = explain_host_specific(links, all_hosts, data_dir, config,
+                                            edges['taxid1'].iloc[0], hosts_taxids)
+            if reasons is not None and not reasons.empty:
+                counts = reasons['Why'].value_counts()
+                # `none` rather than `0`: a nought in bold reads as a value the page failed
+                # to fill in
+                absent = counts.get(ABSENT_FAMILY, 0) or 'none'
+                lead = (f'**Of the {len(reasons)} host–link combinations missing from a '
+                        f'host, {absent} are missing because the host lacks the family.**')
+                clauses = []
+                if counts.get(NOT_EXPRESSED):
+                    clauses.append(f'in {counts[NOT_EXPRESSED]} the family is not annotated '
+                                   'to a tissue the parasite infects')
+                if counts.get(OUT_OF_REACH):
+                    clauses.append(f'in {counts[OUT_OF_REACH]} it is expressed there, but '
+                                   'DeepLoc places it in compartments the parasite cannot '
+                                   'reach')
+                if counts.get(NOT_TRANSFERRED):
+                    clauses.append(f'{counts[NOT_TRANSFERRED]} have a member that passes '
+                                   'every filter, yet no interaction is recorded — a '
+                                   'mismatch between the predictions and the data directory')
+                if clauses:
+                    rest = '; '.join(clauses)
+                    lead += ' ' + rest[0].upper() + rest[1:] + '.'
+                st.markdown(lead)
+                with st.expander(f'The {len(reasons)} missing links, one row each'):
+                    st.dataframe(reasons, width='stretch', hide_index=True)
+            elif reasons is None:
+                st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
+                           'of whether a host missing an interaction has a protein of the '
+                           'family at all.')
+
         st.subheader('Interactions per parasite protein family and host protein family')
         st.caption('One tile per transferred interaction: families of parasite proteins on '
                    'the x axis, families of host proteins on the y axis, coloured by the '
@@ -567,38 +598,6 @@ else:
                    'group ID and the full membership on hover, ordered so shared '
                    'interactions gather in the upper left.')
         st.plotly_chart(generate_link_matrix(links, all_hosts, config), width='stretch')
-
-        reasons = explain_host_specific(links, all_hosts, data_dir, config,
-                                        edges['taxid1'].iloc[0], hosts_taxids)
-        if reasons is not None and not reasons.empty:
-            counts = reasons['Why'].value_counts()
-            # `none` rather than `0`: a nought in bold reads as a value the page failed to
-            # fill in
-            absent = counts.get(ABSENT_FAMILY, 0) or 'none'
-            said = [f'**Of the {len(reasons)} host–link combinations missing from a host, '
-                    f'{absent} are missing because the host lacks the family entirely.**']
-            if counts.get(NOT_EXPRESSED):
-                said.append(f'In {counts[NOT_EXPRESSED]} cases the host has the family, but '
-                            'none of its members is annotated to a tissue the parasite '
-                            'infects.')
-            if counts.get(OUT_OF_REACH):
-                said.append(f'In {counts[OUT_OF_REACH]} cases the family is expressed in an '
-                            'infected tissue, but DeepLoc places its members in compartments '
-                            'the parasite cannot reach.')
-            if counts.get(NOT_TRANSFERRED):
-                said.append(f'{counts[NOT_TRANSFERRED]} are a family the host has, expresses '
-                            'and the parasite reaches, whose link is not recorded under this '
-                            'pair of groups. A host protein belonging to both groups of a link '
-                            'is the usual reason: the transfer is then written with the two '
-                            'groups the other way round, and the host has the interaction '
-                            'after all.')
-            st.markdown(' '.join(said))
-            with st.expander(f'The {len(reasons)} missing links, one row each'):
-                st.dataframe(reasons, width='stretch', hide_index=True)
-        elif reasons is None:
-            st.caption('Run `python scripts/build_host_orthologs.py` to add the check of '
-                       'whether a host missing an interaction has a protein of the family '
-                       'at all.')
 
 st.markdown("---")
 

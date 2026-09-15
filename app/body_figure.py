@@ -52,7 +52,7 @@ CROP_MARGIN = 10
 # height of the anatomy row when several hosts are compared
 COMPARISON_FIGURE_HEIGHT = 200
 # the human SVG holds frontal and side views on one canvas; comparisons use the frontal one
-HUMAN_FRONT_VIEW = (220, 220)
+HUMAN_FRONT_VIEW = (190, 220)
 HUMAN_SIDE_VIEW = (600, 125)
 HUMAN_VIEW_GAP = 10
 COMPACT_HUMAN_FIGURE_HEIGHT = 360

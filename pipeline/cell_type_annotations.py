@@ -12,6 +12,7 @@ CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
 # erythrocytes or granulocytes)
 HPA_TISSUE_LABELS = {
     'heart muscle': ['heart'],
+    'skeletal muscle': ['muscle'],
     'bronchus': ['lung'],
     'pbmc': ['blood'],
     'colon': ['colon', 'intestine'],

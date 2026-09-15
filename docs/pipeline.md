@@ -133,6 +133,19 @@ then left-joins it with human Human Protein Atlas and optional Pig Cell Atlas
 or Tabula Muris Senis mouse single-cell RNA data
 (`cell_type_annotations.parse_cell_type_data`) to add cell-type resolution on
 top of tissue resolution.
+
+HPA names its single-cell tissues differently from the BTO-derived labels in
+`config['tissues']`, so `cell_type_annotations.HPA_TISSUE_LABELS` renames them
+before the join: `heart muscle` → `heart`, `skeletal muscle` → `muscle`,
+`bronchus` → `lung`, `pbmc` → `blood` (HPA's only blood data; no erythrocytes
+or granulocytes). `colon`, `rectum` and `small intestine` are written under
+both their own label and `intestine`, since TISSUES annotates host proteins
+under both. Where several HPA tissues or Ensembl genes land on the same
+`(protein, tissue, cell type)`, the highest nTPM is kept. Config tissues HPA
+has no single-cell data for (e.g. `mouth`, `nose`, `spinal cord`,
+`urinary bladder`, `vagina`, `macrophage`) stay without cell types rather than
+borrowing rows from a neighbouring tissue.
+
 Written to `data/tissues_cell_types.parquet` — this is annotation data
 consumed by the Streamlit app, not a filter.
 

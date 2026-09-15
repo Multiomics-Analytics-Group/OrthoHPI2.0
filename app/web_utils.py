@@ -84,47 +84,13 @@ def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
 
 
-def load_predictions(data_dir, config_file=None):
-    '''
-    Every predicted interaction that could take place: the ones whose host protein is
-    expressed in a tissue the parasite is known to infect.
-    '''
-    return _load_predictions(data_dir, config_file or get_config_file())
-
-
 @st.cache_data(show_spinner=False)
-def _load_predictions(data_dir, config_file):
+def load_predictions(data_dir):
+    '''Every predicted interaction, as pipeline/main.py writes them.'''
     predictions = utils.read_parquet_file(input_file=f'{data_dir}/predictions.parquet')
     predictions['weight'] = predictions['weight'].astype(float)
 
-    return keep_infected_tissues(predictions, data_dir, config_file)
-
-
-def keep_infected_tissues(predictions, data_dir, config_file):
-    '''
-    Drops the interactions whose host protein is not expressed anywhere the parasite is.
-    '''
-    tissue_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
-    if not os.path.exists(tissue_file):
-        return predictions
-
-    config = utils.read_config(config_file)
-    tissues = utils.read_parquet_file(input_file=tissue_file)
-    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']]
-    expressed = tissues.drop_duplicates().groupby('Tissue')['target'].apply(frozenset)
-
-    names = config['tissues']
-    reachable = {}
-    for taxid, parasite in config['parasites'].items():
-        proteins = set()
-        for tissue in parasite['tissues']:
-            proteins |= expressed.get(names[tissue].lower(), frozenset())
-        reachable[str(taxid)] = proteins
-
-    keep = [target in reachable.get(str(taxid), ())
-            for taxid, target in zip(predictions['taxid1'], predictions['target'])]
-
-    return predictions[keep]
+    return predictions
 
 
 @st.cache_data(show_spinner=False)

@@ -36,7 +36,7 @@ def get_eggnog_groups(filepath, proteins):
 
 
 def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
-              default_niche=None):
+              default_niche=None, infected=None):
     '''
     Obtain the transferred interactions at the EggNOG group level from STRING and return
     them as a DataFrame (columns: LINK_COLUMNS).
@@ -85,6 +85,9 @@ def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
                         continue
                     # and to the host proteins its niche reaches
                     if reachable and target_protein not in reachable[niches[int(source_taxid)]]:
+                        continue
+                    # and to the ones expressed in a tissue it infects
+                    if infected and target_protein not in infected[int(source_taxid)]:
                         continue
                     links.append([source_taxid, parasites[int(source_taxid)]['label'],
                                 parasites[int(source_taxid)]['color'], 'diamond', source_protein,

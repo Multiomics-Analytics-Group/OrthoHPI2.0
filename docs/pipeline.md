@@ -88,6 +88,13 @@ BTO tissue exists in every host's jensenlab data (e.g. rat lacks skin and
 blood), so a parasite whose tissues are all absent for its host yields no
 predictions.
 
+The pool this leaves is per host: a protein expressed in a tissue *any*
+parasite infects. `filters.parasite_tissue_proteins` narrows it per parasite
+(`{parasite taxid: host proteins in a tissue it infects}`), and
+`homology.get_links` applies that as it transfers, the way it applies the niche
+halves of step 5. Proteins of a host without a `tissues_url` pass for every
+parasite.
+
 ### 5. DeepLoc host filter (`filters.apply_deeploc_filter`)
 
 Keeps only the host proteins a parasite is in a position to reach, using

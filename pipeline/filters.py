@@ -71,6 +71,28 @@ def get_tissues(config_file, tissues_file, valid_proteins, cutoff, mapping, taxi
                                  valid_tissues, score_col=6, transform=lambda t: mapping[t])
 
 
+def parasite_tissue_proteins(config_file, tissues, valid_proteins):
+    '''
+    {parasite taxid: host proteins expressed in a tissue it infects}. Hosts without
+    tissue data pass unfiltered.
+    '''
+    hosts = utils.read_config(filepath=config_file, field='hosts')
+    parasites = utils.read_config(filepath=config_file, field='parasites')
+    mapping = utils.read_config(filepath=config_file, field='tissues')
+    unfiltered = set()
+    for taxid, host in hosts.items():
+        if 'tissues_url' not in host:
+            unfiltered.update(valid_proteins[taxid])
+
+    infected = {}
+    for taxid, parasite in parasites.items():
+        labels = {mapping[t] for t in parasite['tissues']}
+        infected[int(taxid)] = unfiltered | {protein for protein, expressed in tissues.items()
+                                             if labels.intersection(expressed)}
+
+    return infected
+
+
 def get_parasite_niches(config_file, known_niches, default_niche):
     '''
     Where each parasite of the configuration sits relative to the host cell, which

@@ -82,8 +82,10 @@ def filter_proteins(config_file, data_dir, proteins):
                                              deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
                                              niche_cutoffs=DEEPLOC_NICHE_CUTOFFS,
                                              default_niche=DEEPLOC_DEFAULT_NICHE)
+    infected = filters.parasite_tissue_proteins(config_file=config_file, tissues=tissues,
+                                                valid_proteins=proteins)
 
-    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues, reachable
+    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues, reachable, infected
 
 
 def save_eligible_proteins(proteins, output_file, reachable=None):
@@ -179,8 +181,8 @@ def run(config_file, data_dir, verbose=False):
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/DeepLoc filters...")
-    proteins, tissues, reachable = filter_proteins(config_file=config_file,
-                                                  data_dir=data_dir, proteins=proteins)
+    proteins, tissues, reachable, infected = filter_proteins(config_file=config_file,
+                                                            data_dir=data_dir, proteins=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 
     print("Writing the proteins the filters passed...")
@@ -202,7 +204,7 @@ def run(config_file, data_dir, verbose=False):
         print_group_counts(valid_groups)
     predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups,
               proteins=proteins, config_file=config_file, reachable=reachable,
-              default_niche=DEEPLOC_DEFAULT_NICHE)
+              default_niche=DEEPLOC_DEFAULT_NICHE, infected=infected)
 
     print("Annotating predictions with UniProt accessions...")
     predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)

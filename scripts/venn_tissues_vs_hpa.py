@@ -57,14 +57,14 @@ def tissues_tissue_proteins(data_dir):
     return tissues.drop_duplicates(['Gene', 'Tissue']).groupby('Tissue')['Gene'].apply(set).to_dict()
 
 
-def raw_tissues_tissue_proteins(config_file, pool, taxid=HUMAN):
+def raw_tissues_tissue_proteins(config_file, pool, taxid=HUMAN, cutoff=None):
     '''{config tissue label: pool proteins TISSUES annotates to it}, from the raw file.'''
     hosts = utils.read_config(filepath=config_file, field='hosts')
     mapping = utils.read_config(filepath=config_file, field='tissues')
     filename = utils.download_file(url=hosts[taxid]['tissues_url'], data_dir='data/downloads')
-    annotations, _ = filters.get_tissues(
-        config_file, filename, dict(pool), filters.tissue_cutoff(hosts[taxid], pipeline_main.TISSUE_CUTOFF),
-        mapping, taxid)
+    if cutoff is None:
+        cutoff = filters.tissue_cutoff(hosts[taxid], pipeline_main.TISSUE_CUTOFF)
+    annotations, _ = filters.get_tissues(config_file, filename, dict(pool), cutoff, mapping, taxid)
     by_tissue = {}
     for protein, tissues in annotations.items():
         for tissue in tissues:

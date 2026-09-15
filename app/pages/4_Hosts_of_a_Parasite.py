@@ -366,13 +366,16 @@ def generate_link_matrix(links, all_hosts, config):
                          xaxis_title='parasite protein family',
                          yaxis_title='host protein family',
                          legend_title_text='predicted in host(s)')
-    # tickmode='array': plotly thins the labels of an axis this long
+    # tickmode='array': plotly thins the labels of an axis this long. The ranges are
+    # explicit because autorange pads a scatter by more than a marker on every side,
+    # which leaves a band of empty grid around the matrix.
     figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#eef1f4',
                          gridwidth=1, zeroline=False, tickfont_size=9,
-                         tickmode='array',
+                         tickmode='array', range=[-0.5, len(columns) - 0.5],
                          tickvals=list(columns.index), ticktext=list(columns['family']))
     figure.update_yaxes(showgrid=True, gridcolor='#eef1f4', gridwidth=1, zeroline=False,
                          tickfont_size=9, tickmode='array',
+                         range=[-0.5, len(rows) - 0.5],
                          tickvals=list(rows.index), ticktext=list(rows['family']))
 
     return figure

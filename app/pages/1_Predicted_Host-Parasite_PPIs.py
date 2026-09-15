@@ -443,7 +443,7 @@ def generate_surface_filters(df, surface_calls, niche):
 
 def cell_type_marks(df, score):
     '''
-    The host proteins of the network against the cell types where they exceed 1 nTPM
+    The host proteins of the network against the cell types they are expressed in
     (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
     section are drawn from, and the tissues those cell types are grouped into.
     '''
@@ -529,8 +529,8 @@ def generate_cell_type_bars(marks, blocks):
 def generate_cell_type_matrix(marks, blocks):
     '''
     Where inside the tissue the host proteins of the network sit: a mark wherever a
-    protein exceeds 1 nTPM in a cell type, the cell types along the bottom in blocks of
-    the tissue they belong to and the host proteins up the side.
+    protein is expressed in a cell type, the cell types along the bottom in blocks of the
+    tissue they belong to and the host proteins up the side.
     '''
     columns = [column for _, block in blocks for column in block]
     drawn = marks.drop_duplicates(['target_name', 'column'])
@@ -1045,9 +1045,9 @@ with col2:
                 'Select cell types to filter the predicted PPI', list(cell_type_counts.index),
                 format_func=cell_type_label,
                 help='A cell type is offered with the number of host proteins expressed '
-                     'above 1 nTPM in it. Cell-type annotation is available for human (HPA) '
-                     'and pig (Pig Cell Atlas); a host protein with no cell type is left out '
-                     'once a cell type is chosen.')
+                     'in it. Cell-type annotation is available for human (HPA), mouse '
+                     '(Tabula Muris Senis) and pig (Pig Cell Atlas); a host protein with no '
+                     'cell type is left out once a cell type is chosen.')
             if len(selected_cell_types) > 0:
                 expressed = web_utils.keep_expressed_cell_types(
                     df_select[df_select['Cell type'].notna()])
@@ -1225,21 +1225,22 @@ with st.container():
         if marks is not None:
             st.header('Cell types expressing the host proteins')
             show_active_filters(page_filters)
-            st.caption('A host protein counts towards a cell type when its expression is '
-                       'above 1 nTPM. The columns of both tabs are those cell types, grouped '
-                       'into the tissues the parasite infects, and a cell type is written '
-                       'under its block alone, since the same kind of cell is annotated '
-                       'separately in each tissue. Cell-type annotation is available for '
-                       'human (HPA) and pig (Pig Cell Atlas).')
+            st.caption('A host protein counts towards a cell type when it is expressed there: '
+                       'above 1 nTPM in HPA, detected in the mouse and pig atlases. The '
+                       'columns of both tabs are those cell types, grouped into the tissues '
+                       'the parasite infects, and a cell type is written under its block '
+                       'alone, since the same kind of cell is annotated separately in each '
+                       'tissue. Cell-type annotation is available for human (HPA), mouse '
+                       '(Tabula Muris Senis) and pig (Pig Cell Atlas).')
             # the same columns counted, then opened up per protein
             per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
             with per_cell_type_tab:
                 st.caption('Predicted interactions per cell type. An interaction is counted '
-                           'in every cell type where its host protein exceeds 1 nTPM, so the '
+                           'in every cell type where its host protein is expressed, so the '
                            'bars overlap and are not a partition of the network.')
                 st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
             with per_protein_tab:
-                st.caption('A mark wherever a host protein exceeds 1 nTPM in a cell type, '
+                st.caption('A mark wherever a host protein is expressed in a cell type, '
                            'shaded by the share of its expression in that tissue the cell '
                            'type carries. A row of one mark is a protein the parasite meets '
                            'in a single kind of cell; a full row one it meets throughout the '

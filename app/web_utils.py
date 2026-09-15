@@ -360,15 +360,15 @@ def filter_tissues(config, df):
     return df
 
 
-# minimum atlas expression for a host protein to count in a cell type
-CELL_TYPE_NTPM_CUTOFF = 1.0
+# minimum expression for a host protein to count in a cell type: HPA reports nTPM, the
+# mouse and pig atlases mean log1p(counts per 10k), where 1 TPM is about 0.01
+CELL_TYPE_CUTOFFS = {'9606': 1.0}
+CELL_TYPE_ATLAS_CUTOFF = 0.01
 
 
-def keep_expressed_cell_types(df, cutoff=CELL_TYPE_NTPM_CUTOFF):
-    '''
-    The rows of a tissue-annotated frame where a host protein has expression above the
-    absolute cell-type cutoff.
-    '''
+def keep_expressed_cell_types(df):
+    '''The rows of a tissue-annotated frame where a host protein counts as expressed.'''
+    cutoff = df['target'].str.split('.').str[0].map(CELL_TYPE_CUTOFFS).fillna(CELL_TYPE_ATLAS_CUTOFF)
     return df[df['nTPM'] > cutoff]
 
 

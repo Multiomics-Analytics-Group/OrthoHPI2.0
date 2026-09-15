@@ -936,10 +936,10 @@ if selected_host != web_utils.NO_HOST:
         if choices:
             st.subheader("Cell types of a tissue")
             st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
-                       'taxonomic group. A host protein counts towards a cell type where its '
-                       'expression exceeds 1 nTPM. A protein expressed above that threshold '
-                       'in several cell types counts in each, so the bars are not a partition '
-                       'of the tissue.')
+                       'taxonomic group. A host protein counts towards a cell type where it '
+                       'is expressed (above 1 nTPM in HPA, detected in the mouse and pig '
+                       'atlases). A protein expressed in several cell types counts in each, '
+                       'so the bars are not a partition of the tissue.')
             tissue = st.selectbox('Tissue', choices, index=0,
                                   help='Tissues the parasites infect, most interactions first')
             if tissue in annotated:

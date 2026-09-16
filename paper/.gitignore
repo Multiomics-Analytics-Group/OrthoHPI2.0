@@ -1,6 +1,9 @@
 # Generated figures -- rebuilt from the data, so not worth committing. Follows
 # the same rule as poster/figures/ in the top-level .gitignore.
-figures/
+figures/*
+# Except the hand-drawn workflow diagram, which cannot be regenerated. The PNG
+# the paper includes is exported from it by `make figures`.
+!figures/workflow.svg
 
 # LaTeX build products.
 *.aux

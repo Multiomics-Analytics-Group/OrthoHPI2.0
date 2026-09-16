@@ -18,16 +18,22 @@
 # BibLaTeX with "keep updated" ticked makes the file rewrite itself on every
 # edit and `make refs` redundant. The citation keys match either way.
 #
-# There are no figure rules yet. When the figure list is settled they go here
-# as one rule per figure, depending on ../data/predictions.parquet and run
-# under ~/.venvs/streamlit/bin/python (which has plotly and kaleido; the repo's
-# .venv has neither).
+# The workflow figure is a hand-drawn SVG exported to PNG with Inkscape. Data
+# figures, when the list is settled, go here as one rule per figure, depending
+# on ../data/predictions.parquet and run under ~/.venvs/streamlit/bin/python
+# (which has plotly and kaleido; the repo's .venv has neither).
 
 ZOTERO := ../scripts/zotero_to_bib.py
 PYTHON := ../.venv/bin/python
+INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
-paper.pdf: paper.tex refs.bib tables/parasites.tex
+paper.pdf: paper.tex refs.bib tables/parasites.tex figures/workflow.png
 	tectonic --synctex --keep-logs paper.tex
+
+figures/workflow.png: figures/workflow.svg
+	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+figures: figures/workflow.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.
@@ -46,4 +52,4 @@ clean:
 	rm -f paper.pdf paper.aux paper.bbl paper.bcf paper.blg paper.log \
 	      paper.out paper.run.xml paper.synctex.gz
 
-.PHONY: clean refs tables
+.PHONY: clean refs tables figures

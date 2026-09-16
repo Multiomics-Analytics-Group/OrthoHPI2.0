@@ -83,6 +83,26 @@ predicted by DeepLoc~\cite{dum2024deeploc}.
 % The stages below mirror docs/pipeline.md, which is the running description
 % of what `python -m pipeline.main` actually does. Keep the two in step.
 
+Figure~\ref{fig:workflow} gives an overview of the prediction workflow: the
+host and parasite proteomes are filtered by tissue expression and predicted
+subcellular localisation, and interactions are then transferred between the
+remaining proteins through shared orthologous groups.
+
+% paper/figures/workflow.png is exported from workflow.svg: `make figures`.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/workflow}
+  \caption{Overview of the OrthoHPI 2.0 prediction workflow. For each
+  host--parasite pair, the host proteome is restricted to proteins expressed in
+  the tissues the parasite infects (TISSUES) and to localisations the parasite
+  can reach (DeepLoc), and the parasite proteome to extracellular and, for
+  unicellular parasites, cell-membrane proteins. STRING interactions between
+  EggNOG orthologous groups are transferred to the remaining host and parasite
+  proteins, each predicted pair scored by the mean of the experimental and
+  database evidence scores.}
+  \label{fig:workflow}
+\end{figure}
+
 \subsection{Data sources}
 \todo{STRING v12.0, EggNOG 6, JensenLab TISSUES, Human Protein Atlas, Gene
 Ontology. Canonical URLs and versions are in config.yml lines 1--32.}

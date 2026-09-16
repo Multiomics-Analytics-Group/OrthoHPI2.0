@@ -14,10 +14,17 @@
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{pdflscape}
+\usepackage{array}
+% Left-aligned, ragged paragraph column for the generated tables.
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \usepackage{siunitx}
 \usepackage{authblk}
 \usepackage[hidelinks]{hyperref}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
+% Every second row of the generated tables.
+\definecolor{rowblue}{HTML}{E8F1FB}
 
 % natbib + classic bibtex rather than biblatex + biber: tectonic runs bibtex
 % internally, but has to shell out to biber, and its bundled biblatex (3.17)
@@ -81,8 +88,12 @@ predicted by DeepLoc~\cite{dum2024deeploc}.
 Ontology. Canonical URLs and versions are in config.yml lines 1--32.}
 
 \subsection{Proteomes and orthologous groups}
-\todo{EggNOG Eukaryota (2759) groups; hosts human, rat, mouse, pig; 40 parasite
-species.}
+\todo{EggNOG Eukaryota (2759) groups; hosts human, rat, mouse, pig.}
+The 45 parasite species, their hosts and the tissues they occupy are listed in
+Table~\ref{tab:parasites}.
+
+% paper/tables/parasites.tex is generated: `make tables` (see Makefile).
+\input{tables/parasites}
 
 \subsection{Filtering the parasite proteome}
 \todo{Secretome filter via DeepLoc.}

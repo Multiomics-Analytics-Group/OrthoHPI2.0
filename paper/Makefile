@@ -8,6 +8,7 @@
 # runs the multi-pass and biber loop itself, so there is nothing else to call.
 #
 #   make refs     re-export refs.bib from Zotero
+#   make tables   regenerate paper/tables/ from config.yml and the data
 #
 # refs.bib is generated from the "postdoc" collection of the Zotero library.
 # Add or correct a reference in Zotero, then `make refs` -- never edit the .bib.
@@ -23,9 +24,17 @@
 # .venv has neither).
 
 ZOTERO := ../scripts/zotero_to_bib.py
+PYTHON := ../.venv/bin/python
 
-paper.pdf: paper.tex refs.bib
+paper.pdf: paper.tex refs.bib tables/parasites.tex
 	tectonic --synctex --keep-logs paper.tex
+
+# The parasite table, in three renderings: .tex for the paper, .csv and .html
+# for pasting into Google Sheets / Docs.
+tables/parasites.tex: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_table.py
+	cd .. && $(PYTHON) scripts/build_parasite_table.py
+
+tables: tables/parasites.tex
 
 # Not a dependency of paper.pdf: the Zotero library changes under the Makefile's
 # feet, and a build that silently rewrote the bibliography would be worse than
@@ -37,4 +46,4 @@ clean:
 	rm -f paper.pdf paper.aux paper.bbl paper.bcf paper.blg paper.log \
 	      paper.out paper.run.xml paper.synctex.gz
 
-.PHONY: clean refs
+.PHONY: clean refs tables

@@ -809,8 +809,8 @@ def generate_shared_family_dots(df, dots, families, palette, width):
     parasites reach them so the most widely reached is the top row.
     '''
     height = DOT_ROW * len(families) + DOT_CHROME
-    # the strip keeps the height it has under the other figures
-    figure, hosts = host_columns(df, width, bands=1,
+    # the strips keep the height they have under the other figures
+    figure, hosts = host_columns(df, width, bands=2,
                                  band_height=BAND_HEIGHT * 470 / height)
     rows_of = {f: i for i, f in enumerate(families)}
     dots = dots.assign(y=dots['family'].map(rows_of))
@@ -850,7 +850,13 @@ def generate_shared_family_dots(df, dots, families, palette, width):
                             range=[-0.5, len(names) - 0.5], row=1, col=column)
 
     figure = style_host_columns(figure, 'host protein family')
-    add_niche_band(figure, hosts, labelled)
+    # the dots are the legend of the groups already, so the group strip adds no entry;
+    # the two share a legendgroup, and toggle together
+    add_band(figure, hosts, 'group', palette, set(palette) | {UNKNOWN_GROUP},
+             row=2, legend='legend2')
+    add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=3,
+             legend='legend3', unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+    stack_bands(figure)
     # reversed, so the most-shared family is the top row; the ticks are set on every
     # column so the grids line up
     figure.update_yaxes(range=[len(families) - 0.5, -0.5], tickmode='array',
@@ -859,12 +865,20 @@ def generate_shared_family_dots(df, dots, families, palette, width):
     # the names are longer than the counts the margin was set for
     figure.update_yaxes(automargin=True, row=1, col=1)
     figure.update_xaxes(showgrid=True, gridcolor='#f0f0f0', row=1)
+    # the names belong under the strips
+    figure.update_xaxes(showticklabels=False, row=1)
+    figure.update_xaxes(showticklabels=False, row=2)
+    figure.update_xaxes(automargin=True, row=3)
     # the legends are placed from the top of the figure rather than the plot, which the
     # rows have made tall
-    figure.update_layout(height=height,
-                         legend=dict(yref='container', yanchor='top', y=1),
-                         legend2=dict(yref='container', yanchor='top',
-                                      y=1 - LEGEND_ROW / height))
+    figure.update_layout(height=height, margin=dict(t=2 * LEGEND_ROW),
+                         legend=dict(yref='container', yanchor='top', y=1,
+                                     title_text='taxonomic group',
+                                     title_font=dict(size=11)),
+                         legend3=dict(orientation='h', x=0, yref='container',
+                                      yanchor='top', y=1 - LEGEND_ROW / height,
+                                      title_text=web_utils.NICHE_TITLE,
+                                      title_font=dict(size=11), font=dict(size=11)))
 
     return figure
 
@@ -985,7 +999,7 @@ else:
                'orthology group of the host protein, and is named by the gene symbols of its proteins. A dot '
                'wherever a parasite is predicted to interact with a protein of the family, '
                "sized by the number of that parasite's proteins reaching it; hover a dot for the host proteins behind it. "
-               + NICHE_STRIP)
+               + BANDS_STRIP)
     st.plotly_chart(generate_shared_family_dots(overview, family_dots, families,
                                                 parasite_palette, page),
                     width='stretch')

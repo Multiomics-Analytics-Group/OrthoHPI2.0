@@ -1,46 +1,46 @@
-Species,Group,Niche,Hosts,Tissues,Predicted PPIs
-Ancylostoma ceylanicum,Nematoda,extracellular,human,"skin, lung, small intestine, intestine",334
-Angiostrongylus cantonensis,Nematoda,extracellular,"rat, mouse","lung, brain",888
-Angiostrongylus costaricensis,Nematoda,extracellular,"rat, mouse","mesenteric artery, intestine, blood",452
-Brugia malayi,Nematoda,extracellular,human,"lymph vessel, lymph node, blood",44
-Brugia timori,Nematoda,extracellular,human,"lymph vessel, lymph node, blood",89
-Dracunculus medinensis,Nematoda,extracellular,human,"small intestine, intestine, skin",178
-Enterobius vermicularis,Nematoda,extracellular,human,"colon, intestine, skin",189
-Loa loa,Nematoda,extracellular,human,"skin, blood, eye",171
-Necator americanus,Nematoda,extracellular,human,"skin, lung, small intestine, intestine",466
-Onchocerca volvulus,Nematoda,extracellular,human,"skin, eye",126
-Strongyloides stercoralis,Nematoda,extracellular,human,"skin, lung, small intestine, intestine",116
-Toxocara canis,Nematoda,extracellular,human,"liver, heart, lung, brain, muscle, eye",580
-Trichinella britovi,Nematoda,intracellular,human,"intestine, muscle, brain, heart, lung",1751
-Trichinella nativa,Nematoda,intracellular,human,"intestine, muscle, brain, heart, lung",1367
-Trichinella nelsoni,Nematoda,intracellular,human,"intestine, muscle, brain, heart, lung",907
-Trichinella pseudospiralis,Nematoda,intracellular,"human, pig","intestine, muscle, brain, heart, lung",1706
-Trichinella spiralis,Nematoda,intracellular,"human, pig","intestine, brain, heart, muscle, lung",1708
-Trichuris trichiura,Nematoda,extracellular,human,"colon, intestine",75
-Wuchereria bancrofti,Nematoda,extracellular,human,"blood, lymph node, lymph vessel",64
-Clonorchis sinensis,Trematoda,extracellular,human,"liver, bile duct",67
-Opisthorchis felineus,Trematoda,extracellular,human,"liver, bile duct, small intestine, intestine",142
-Opisthorchis viverrini,Trematoda,extracellular,human,"liver, bile duct",59
-Schistosoma haematobium,Trematoda,extracellular,human,"skin, urinary bladder, rectum, intestine, liver, blood, lung",123
-Schistosoma japonicum,Trematoda,extracellular,human,"skin, liver, small intestine, intestine, lung, blood",159
-Schistosoma mansoni,Trematoda,extracellular,human,"skin, liver, intestine, spleen, lung, blood",439
-Echinococcus granulosus,Cestoda,extracellular,human,"liver, lung",69
-Echinococcus multilocularis,Cestoda,extracellular,human,"liver, lung",61
-Hymenolepis diminuta,Cestoda,extracellular,"human, rat, mouse","small intestine, intestine",181
-Taenia asiatica,Cestoda,extracellular,human,"small intestine, intestine",46
-Cryptosporidium muris,Apicomplexa,intracellular,"human, rat, mouse","stomach, intestine",305
-Cryptosporidium parvum,Apicomplexa,intracellular,human,"small intestine, intestine",32
-Plasmodium falciparum,Apicomplexa,intracellular,human,"skin, liver, blood, brain, spleen",1706
-Plasmodium knowlesi,Apicomplexa,intracellular,human,"skin, liver, blood",380
-Plasmodium vivax,Apicomplexa,intracellular,human,"skin, liver, blood",536
-Toxoplasma gondii,Apicomplexa,intracellular,human,"blood, brain, eye, heart, muscle, placenta, lymph node",276
-Leishmania braziliensis,Kinetoplastida,intracellular,"rat, mouse","skin, nose, mouth, macrophage, blood",352
-Leishmania infantum,Kinetoplastida,intracellular,human,"liver, spleen, bone marrow, lymph node, skin, blood, macrophage",49
-Leishmania major,Kinetoplastida,intracellular,human,"skin, blood, macrophage",52
-Trypanosoma brucei,Kinetoplastida,extracellular,human,"skin, blood, brain, lymph node, spinal cord",34
-Trypanosoma cruzi,Kinetoplastida,intracellular,human,"skin, heart, colon, intestine, muscle, blood, eye",509
-Entamoeba histolytica,Other protozoa,extracellular,human,"colon, intestine, liver, brain, lung",334
-Giardia lamblia,Other protozoa,extracellular,human,"small intestine, intestine",67
-Trichomonas vaginalis,Other protozoa,extracellular,human,"vagina, urethra",0
-Trachipleistophora hominis,Microsporidia,intracellular,human,"muscle, eye",0
-Vittaforma corneae,Microsporidia,intracellular,human,eye,8
+Species,U/M,I/E,Hosts,Tissues,Proteins,Predicted PPIs
+Ancylostoma ceylanicum,M,E,human,"skin, lung, small intestine, intestine",36519,334
+Angiostrongylus cantonensis,M,E,"rat, mouse","lung, brain",14486,888
+Angiostrongylus costaricensis,M,E,"rat, mouse","mesenteric artery, intestine, blood",13350,452
+Brugia malayi,M,E,human,"lymph vessel, lymph node, blood",8202,44
+Brugia timori,M,E,human,"lymph vessel, lymph node, blood",16199,89
+Dracunculus medinensis,M,E,human,"small intestine, intestine, skin",10868,178
+Enterobius vermicularis,M,E,human,"colon, intestine, skin",12840,189
+Loa loa,M,E,human,"skin, blood, eye",12152,171
+Necator americanus,M,E,human,"skin, lung, small intestine, intestine",19125,466
+Onchocerca volvulus,M,E,human,"skin, eye",12118,126
+Strongyloides stercoralis,M,E,human,"skin, lung, small intestine, intestine",12819,116
+Toxocara canis,M,E,human,"liver, heart, lung, brain, muscle, eye",18499,580
+Trichinella britovi,M,I,human,"intestine, muscle, brain, heart, lung",15466,1751
+Trichinella nativa,M,I,human,"intestine, muscle, brain, heart, lung",13202,1367
+Trichinella nelsoni,M,I,human,"intestine, muscle, brain, heart, lung",13005,907
+Trichinella pseudospiralis,M,I,"human, pig","intestine, muscle, brain, heart, lung",10629,1706
+Trichinella spiralis,M,I,"human, pig","intestine, brain, heart, muscle, lung",14258,1708
+Trichuris trichiura,M,E,human,"colon, intestine",9625,75
+Wuchereria bancrofti,M,E,human,"blood, lymph node, lymph vessel",9343,64
+Clonorchis sinensis,M,E,human,"liver, bile duct",14505,67
+Opisthorchis felineus,M,E,human,"liver, bile duct, small intestine, intestine",11402,142
+Opisthorchis viverrini,M,E,human,"liver, bile duct",16307,59
+Schistosoma haematobium,M,E,human,"skin, urinary bladder, rectum, intestine, liver, blood, lung",11119,123
+Schistosoma japonicum,M,E,human,"skin, liver, small intestine, intestine, lung, blood",10042,159
+Schistosoma mansoni,M,E,human,"skin, liver, intestine, spleen, lung, blood",14110,439
+Echinococcus granulosus,M,E,human,"liver, lung",11279,69
+Echinococcus multilocularis,M,E,human,"liver, lung",10469,61
+Hymenolepis diminuta,M,E,"human, rat, mouse","small intestine, intestine",11264,181
+Taenia asiatica,M,E,human,"small intestine, intestine",10327,46
+Cryptosporidium muris,U,I,"human, rat, mouse","stomach, intestine",3930,305
+Cryptosporidium parvum,U,I,human,"small intestine, intestine",3805,32
+Plasmodium falciparum,U,I,human,"skin, liver, blood, brain, spleen",5376,1706
+Plasmodium knowlesi,U,I,human,"skin, liver, blood",5100,380
+Plasmodium vivax,U,I,human,"skin, liver, blood",5389,536
+Toxoplasma gondii,U,I,human,"blood, brain, eye, heart, muscle, placenta, lymph node",8404,276
+Leishmania braziliensis,U,I,"rat, mouse","skin, nose, mouth, macrophage, blood",8084,352
+Leishmania infantum,U,I,human,"liver, spleen, bone marrow, lymph node, skin, blood, macrophage",8045,49
+Leishmania major,U,I,human,"skin, blood, macrophage",8038,52
+Trypanosoma brucei,U,E,human,"skin, blood, brain, lymph node, spinal cord",8561,34
+Trypanosoma cruzi,U,I,human,"skin, heart, colon, intestine, muscle, blood, eye",19242,509
+Entamoeba histolytica,U,E,human,"colon, intestine, liver, brain, lung",7959,334
+Giardia lamblia,U,E,human,"small intestine, intestine",7154,67
+Trichomonas vaginalis,U,E,human,"vagina, urethra",50190,0
+Trachipleistophora hominis,U,I,human,"muscle, eye",3212,0
+Vittaforma corneae,U,I,human,eye,2236,8

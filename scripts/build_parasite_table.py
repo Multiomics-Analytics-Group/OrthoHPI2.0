@@ -1,9 +1,8 @@
 '''
 Write the parasite table of the paper from config.yml: every parasite with its
-taxonomic group, niche, hosts and lifecycle tissues, next to how many
-interactions the pipeline predicts for it. Organisation is left out: the
-helminth groups are multicellular and the rest unicellular, which the caption
-says. Three renderings of the same rows go to paper/tables/:
+organisation (U/M), niche (I/E), hosts and lifecycle tissues, next to how many
+of its proteins STRING holds and how many interactions the pipeline predicts
+for it. Rows follow the taxonomic group order of config.yml. Three renderings of the same rows go to paper/tables/:
 parasites.tex is \input by paper.tex, parasites.csv opens in Google Sheets, and
 parasites.html pastes into Google Docs as a table when opened in a browser and
 copied.
@@ -19,7 +18,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 
-COLUMNS = ['Species', 'Group', 'Niche', 'Hosts', 'Tissues', 'Predicted PPIs']
+COLUMNS = ['Species', 'U/M', 'I/E', 'Hosts', 'Tissues', 'Proteins', 'Predicted PPIs']
+TEXT_COLUMNS = COLUMNS[1:5]
+NUMBER_COLUMNS = COLUMNS[5:]
 
 
 def build_rows(config_file, data_dir):
@@ -28,6 +29,8 @@ def build_rows(config_file, data_dir):
     tissues = utils.read_config(filepath=config_file, field='tissues')
     # config.yml lists the groups helminths first, then protozoa: rows follow it.
     group_order = list(utils.read_config(filepath=config_file, field='parasite_groups'))
+    sizes = pd.read_parquet(os.path.join(data_dir, 'proteome_sizes.parquet'))
+    sizes = sizes.set_index(sizes['taxid'].astype(int))['proteins']
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
     counts = predictions.groupby(predictions['taxid1'].astype(int)).size()
 
@@ -42,10 +45,11 @@ def build_rows(config_file, data_dir):
     for taxid, parasite in sorted(parasites.items(), key=order):
         rows.append({
             'Species': parasite['label'],
-            'Group': parasite['group'],
-            'Niche': parasite['niche'],
+            'U/M': 'M' if parasite.get('multicellular') else 'U',
+            'I/E': parasite['niche'][0].upper(),
             'Hosts': ', '.join(host_names[host] for host in parasite['hosts']),
             'Tissues': ', '.join(tissues[bto] for bto in parasite['tissues']),
+            'Proteins': int(sizes.get(taxid, 0)),
             'Predicted PPIs': int(counts.get(taxid, 0)),
         })
     return pd.DataFrame(rows, columns=COLUMNS)
@@ -65,31 +69,33 @@ def write_tex(table, path):
         r'\singlespacing\scriptsize',
         r'\setlength{\LTcapwidth}{\textwidth}',
         r'\rowcolors{2}{rowblue}{white}',
-        r'\begin{longtable}{@{}L{4.2cm}L{2.4cm}L{2.1cm}L{3cm}L{8.4cm}r@{}}',
-        r'\caption{Parasites included in OrthoHPI 2.0. Nematoda, Trematoda and'
-        r' Cestoda are multicellular, the other groups unicellular; tissues are'
-        r' those the parasite occupies in the host during its lifecycle.'
-        r' Predicted PPIs are the interactions of the final network.}'
+        r'\begin{longtable}{@{}L{4.2cm}cc L{3cm}L{8.4cm}rr@{}}',
+        r'\caption{Parasites included in OrthoHPI 2.0, ordered by taxonomic'
+        r' group. U/M: unicellular or multicellular; I/E: intracellular or'
+        r' extracellular niche in the host; tissues are those the parasite'
+        r' occupies in the host during its lifecycle. Proteins is the STRING'
+        r' v12.0 proteome size before any filter, and predicted PPIs the'
+        r' interactions of the final network, summed over the hosts.}'
         r'\label{tab:parasites}\\',
         r'\toprule',
         ' & '.join(COLUMNS) + r'\\',
         r'\midrule',
         r'\endfirsthead',
-        r'\multicolumn{6}{@{}l}{\textit{Table~\ref{tab:parasites} continued}}\\',
+        r'\multicolumn{7}{@{}l}{\textit{Table~\ref{tab:parasites} continued}}\\',
         r'\toprule',
         ' & '.join(COLUMNS) + r'\\',
         r'\midrule',
         r'\endhead',
         r'\midrule',
-        r'\multicolumn{6}{r@{}}{\textit{continued on next page}}\\',
+        r'\multicolumn{7}{r@{}}{\textit{continued on next page}}\\',
         r'\endfoot',
         r'\bottomrule',
         r'\endlastfoot',
     ]
     for _, row in table.iterrows():
         values = [r'\textit{' + cell(row['Species']) + '}']
-        values += [cell(row[column]) for column in COLUMNS[1:5]]
-        values += [r'\num{' + str(row[column]) + '}' for column in COLUMNS[5:]]
+        values += [cell(row[column]) for column in TEXT_COLUMNS]
+        values += [r'\num{' + str(row[column]) + '}' for column in NUMBER_COLUMNS]
         lines.append(' & '.join(values) + r'\\')
     lines += [r'\end{longtable}', r'\end{landscape}', r'\restoregeometry', '']
     with open(path, 'w') as handle:
@@ -101,8 +107,8 @@ def write_html(table, path):
              '<tr>' + ''.join(f'<th>{c}</th>' for c in COLUMNS) + '</tr>']
     for i, (_, row) in enumerate(table.iterrows()):
         cells = [f'<td><i>{html.escape(row["Species"])}</i></td>']
-        cells += [f'<td>{html.escape(str(row[c]))}</td>' for c in COLUMNS[1:5]]
-        cells += [f'<td style="text-align:right">{row[c]:,}</td>' for c in COLUMNS[5:]]
+        cells += [f'<td>{html.escape(str(row[c]))}</td>' for c in TEXT_COLUMNS]
+        cells += [f'<td style="text-align:right">{row[c]:,}</td>' for c in NUMBER_COLUMNS]
         style = ' style="background:#e8f1fb"' if i % 2 == 0 else ''
         lines.append(f'<tr{style}>' + ''.join(cells) + '</tr>')
     lines += ['</table>', '']

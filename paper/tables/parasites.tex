@@ -4,67 +4,67 @@
 \singlespacing\scriptsize
 \setlength{\LTcapwidth}{\textwidth}
 \rowcolors{2}{rowblue}{white}
-\begin{longtable}{@{}L{4.2cm}L{2.4cm}L{2.1cm}L{3cm}L{8.4cm}r@{}}
-\caption{Parasites included in OrthoHPI 2.0. Nematoda, Trematoda and Cestoda are multicellular, the other groups unicellular; tissues are those the parasite occupies in the host during its lifecycle. Predicted PPIs are the interactions of the final network.}\label{tab:parasites}\\
+\begin{longtable}{@{}L{4.2cm}cc L{3cm}L{8.4cm}rr@{}}
+\caption{Parasites included in OrthoHPI 2.0, ordered by taxonomic group. U/M: unicellular or multicellular; I/E: intracellular or extracellular niche in the host; tissues are those the parasite occupies in the host during its lifecycle. Proteins is the STRING v12.0 proteome size before any filter, and predicted PPIs the interactions of the final network, summed over the hosts.}\label{tab:parasites}\\
 \toprule
-Species & Group & Niche & Hosts & Tissues & Predicted PPIs\\
+Species & U/M & I/E & Hosts & Tissues & Proteins & Predicted PPIs\\
 \midrule
 \endfirsthead
-\multicolumn{6}{@{}l}{\textit{Table~\ref{tab:parasites} continued}}\\
+\multicolumn{7}{@{}l}{\textit{Table~\ref{tab:parasites} continued}}\\
 \toprule
-Species & Group & Niche & Hosts & Tissues & Predicted PPIs\\
+Species & U/M & I/E & Hosts & Tissues & Proteins & Predicted PPIs\\
 \midrule
 \endhead
 \midrule
-\multicolumn{6}{r@{}}{\textit{continued on next page}}\\
+\multicolumn{7}{r@{}}{\textit{continued on next page}}\\
 \endfoot
 \bottomrule
 \endlastfoot
-\textit{Ancylostoma ceylanicum} & Nematoda & extracellular & human & skin, lung, small intestine, intestine & \num{334}\\
-\textit{Angiostrongylus cantonensis} & Nematoda & extracellular & rat, mouse & lung, brain & \num{888}\\
-\textit{Angiostrongylus costaricensis} & Nematoda & extracellular & rat, mouse & mesenteric artery, intestine, blood & \num{452}\\
-\textit{Brugia malayi} & Nematoda & extracellular & human & lymph vessel, lymph node, blood & \num{44}\\
-\textit{Brugia timori} & Nematoda & extracellular & human & lymph vessel, lymph node, blood & \num{89}\\
-\textit{Dracunculus medinensis} & Nematoda & extracellular & human & small intestine, intestine, skin & \num{178}\\
-\textit{Enterobius vermicularis} & Nematoda & extracellular & human & colon, intestine, skin & \num{189}\\
-\textit{Loa loa} & Nematoda & extracellular & human & skin, blood, eye & \num{171}\\
-\textit{Necator americanus} & Nematoda & extracellular & human & skin, lung, small intestine, intestine & \num{466}\\
-\textit{Onchocerca volvulus} & Nematoda & extracellular & human & skin, eye & \num{126}\\
-\textit{Strongyloides stercoralis} & Nematoda & extracellular & human & skin, lung, small intestine, intestine & \num{116}\\
-\textit{Toxocara canis} & Nematoda & extracellular & human & liver, heart, lung, brain, muscle, eye & \num{580}\\
-\textit{Trichinella britovi} & Nematoda & intracellular & human & intestine, muscle, brain, heart, lung & \num{1751}\\
-\textit{Trichinella nativa} & Nematoda & intracellular & human & intestine, muscle, brain, heart, lung & \num{1367}\\
-\textit{Trichinella nelsoni} & Nematoda & intracellular & human & intestine, muscle, brain, heart, lung & \num{907}\\
-\textit{Trichinella pseudospiralis} & Nematoda & intracellular & human, pig & intestine, muscle, brain, heart, lung & \num{1706}\\
-\textit{Trichinella spiralis} & Nematoda & intracellular & human, pig & intestine, brain, heart, muscle, lung & \num{1708}\\
-\textit{Trichuris trichiura} & Nematoda & extracellular & human & colon, intestine & \num{75}\\
-\textit{Wuchereria bancrofti} & Nematoda & extracellular & human & blood, lymph node, lymph vessel & \num{64}\\
-\textit{Clonorchis sinensis} & Trematoda & extracellular & human & liver, bile duct & \num{67}\\
-\textit{Opisthorchis felineus} & Trematoda & extracellular & human & liver, bile duct, small intestine, intestine & \num{142}\\
-\textit{Opisthorchis viverrini} & Trematoda & extracellular & human & liver, bile duct & \num{59}\\
-\textit{Schistosoma haematobium} & Trematoda & extracellular & human & skin, urinary bladder, rectum, intestine, liver, blood, lung & \num{123}\\
-\textit{Schistosoma japonicum} & Trematoda & extracellular & human & skin, liver, small intestine, intestine, lung, blood & \num{159}\\
-\textit{Schistosoma mansoni} & Trematoda & extracellular & human & skin, liver, intestine, spleen, lung, blood & \num{439}\\
-\textit{Echinococcus granulosus} & Cestoda & extracellular & human & liver, lung & \num{69}\\
-\textit{Echinococcus multilocularis} & Cestoda & extracellular & human & liver, lung & \num{61}\\
-\textit{Hymenolepis diminuta} & Cestoda & extracellular & human, rat, mouse & small intestine, intestine & \num{181}\\
-\textit{Taenia asiatica} & Cestoda & extracellular & human & small intestine, intestine & \num{46}\\
-\textit{Cryptosporidium muris} & Apicomplexa & intracellular & human, rat, mouse & stomach, intestine & \num{305}\\
-\textit{Cryptosporidium parvum} & Apicomplexa & intracellular & human & small intestine, intestine & \num{32}\\
-\textit{Plasmodium falciparum} & Apicomplexa & intracellular & human & skin, liver, blood, brain, spleen & \num{1706}\\
-\textit{Plasmodium knowlesi} & Apicomplexa & intracellular & human & skin, liver, blood & \num{380}\\
-\textit{Plasmodium vivax} & Apicomplexa & intracellular & human & skin, liver, blood & \num{536}\\
-\textit{Toxoplasma gondii} & Apicomplexa & intracellular & human & blood, brain, eye, heart, muscle, placenta, lymph node & \num{276}\\
-\textit{Leishmania braziliensis} & Kinetoplastida & intracellular & rat, mouse & skin, nose, mouth, macrophage, blood & \num{352}\\
-\textit{Leishmania infantum} & Kinetoplastida & intracellular & human & liver, spleen, bone marrow, lymph node, skin, blood, macrophage & \num{49}\\
-\textit{Leishmania major} & Kinetoplastida & intracellular & human & skin, blood, macrophage & \num{52}\\
-\textit{Trypanosoma brucei} & Kinetoplastida & extracellular & human & skin, blood, brain, lymph node, spinal cord & \num{34}\\
-\textit{Trypanosoma cruzi} & Kinetoplastida & intracellular & human & skin, heart, colon, intestine, muscle, blood, eye & \num{509}\\
-\textit{Entamoeba histolytica} & Other protozoa & extracellular & human & colon, intestine, liver, brain, lung & \num{334}\\
-\textit{Giardia lamblia} & Other protozoa & extracellular & human & small intestine, intestine & \num{67}\\
-\textit{Trichomonas vaginalis} & Other protozoa & extracellular & human & vagina, urethra & \num{0}\\
-\textit{Trachipleistophora hominis} & Microsporidia & intracellular & human & muscle, eye & \num{0}\\
-\textit{Vittaforma corneae} & Microsporidia & intracellular & human & eye & \num{8}\\
+\textit{Ancylostoma ceylanicum} & M & E & human & skin, lung, small intestine, intestine & \num{36519} & \num{334}\\
+\textit{Angiostrongylus cantonensis} & M & E & rat, mouse & lung, brain & \num{14486} & \num{888}\\
+\textit{Angiostrongylus costaricensis} & M & E & rat, mouse & mesenteric artery, intestine, blood & \num{13350} & \num{452}\\
+\textit{Brugia malayi} & M & E & human & lymph vessel, lymph node, blood & \num{8202} & \num{44}\\
+\textit{Brugia timori} & M & E & human & lymph vessel, lymph node, blood & \num{16199} & \num{89}\\
+\textit{Dracunculus medinensis} & M & E & human & small intestine, intestine, skin & \num{10868} & \num{178}\\
+\textit{Enterobius vermicularis} & M & E & human & colon, intestine, skin & \num{12840} & \num{189}\\
+\textit{Loa loa} & M & E & human & skin, blood, eye & \num{12152} & \num{171}\\
+\textit{Necator americanus} & M & E & human & skin, lung, small intestine, intestine & \num{19125} & \num{466}\\
+\textit{Onchocerca volvulus} & M & E & human & skin, eye & \num{12118} & \num{126}\\
+\textit{Strongyloides stercoralis} & M & E & human & skin, lung, small intestine, intestine & \num{12819} & \num{116}\\
+\textit{Toxocara canis} & M & E & human & liver, heart, lung, brain, muscle, eye & \num{18499} & \num{580}\\
+\textit{Trichinella britovi} & M & I & human & intestine, muscle, brain, heart, lung & \num{15466} & \num{1751}\\
+\textit{Trichinella nativa} & M & I & human & intestine, muscle, brain, heart, lung & \num{13202} & \num{1367}\\
+\textit{Trichinella nelsoni} & M & I & human & intestine, muscle, brain, heart, lung & \num{13005} & \num{907}\\
+\textit{Trichinella pseudospiralis} & M & I & human, pig & intestine, muscle, brain, heart, lung & \num{10629} & \num{1706}\\
+\textit{Trichinella spiralis} & M & I & human, pig & intestine, brain, heart, muscle, lung & \num{14258} & \num{1708}\\
+\textit{Trichuris trichiura} & M & E & human & colon, intestine & \num{9625} & \num{75}\\
+\textit{Wuchereria bancrofti} & M & E & human & blood, lymph node, lymph vessel & \num{9343} & \num{64}\\
+\textit{Clonorchis sinensis} & M & E & human & liver, bile duct & \num{14505} & \num{67}\\
+\textit{Opisthorchis felineus} & M & E & human & liver, bile duct, small intestine, intestine & \num{11402} & \num{142}\\
+\textit{Opisthorchis viverrini} & M & E & human & liver, bile duct & \num{16307} & \num{59}\\
+\textit{Schistosoma haematobium} & M & E & human & skin, urinary bladder, rectum, intestine, liver, blood, lung & \num{11119} & \num{123}\\
+\textit{Schistosoma japonicum} & M & E & human & skin, liver, small intestine, intestine, lung, blood & \num{10042} & \num{159}\\
+\textit{Schistosoma mansoni} & M & E & human & skin, liver, intestine, spleen, lung, blood & \num{14110} & \num{439}\\
+\textit{Echinococcus granulosus} & M & E & human & liver, lung & \num{11279} & \num{69}\\
+\textit{Echinococcus multilocularis} & M & E & human & liver, lung & \num{10469} & \num{61}\\
+\textit{Hymenolepis diminuta} & M & E & human, rat, mouse & small intestine, intestine & \num{11264} & \num{181}\\
+\textit{Taenia asiatica} & M & E & human & small intestine, intestine & \num{10327} & \num{46}\\
+\textit{Cryptosporidium muris} & U & I & human, rat, mouse & stomach, intestine & \num{3930} & \num{305}\\
+\textit{Cryptosporidium parvum} & U & I & human & small intestine, intestine & \num{3805} & \num{32}\\
+\textit{Plasmodium falciparum} & U & I & human & skin, liver, blood, brain, spleen & \num{5376} & \num{1706}\\
+\textit{Plasmodium knowlesi} & U & I & human & skin, liver, blood & \num{5100} & \num{380}\\
+\textit{Plasmodium vivax} & U & I & human & skin, liver, blood & \num{5389} & \num{536}\\
+\textit{Toxoplasma gondii} & U & I & human & blood, brain, eye, heart, muscle, placenta, lymph node & \num{8404} & \num{276}\\
+\textit{Leishmania braziliensis} & U & I & rat, mouse & skin, nose, mouth, macrophage, blood & \num{8084} & \num{352}\\
+\textit{Leishmania infantum} & U & I & human & liver, spleen, bone marrow, lymph node, skin, blood, macrophage & \num{8045} & \num{49}\\
+\textit{Leishmania major} & U & I & human & skin, blood, macrophage & \num{8038} & \num{52}\\
+\textit{Trypanosoma brucei} & U & E & human & skin, blood, brain, lymph node, spinal cord & \num{8561} & \num{34}\\
+\textit{Trypanosoma cruzi} & U & I & human & skin, heart, colon, intestine, muscle, blood, eye & \num{19242} & \num{509}\\
+\textit{Entamoeba histolytica} & U & E & human & colon, intestine, liver, brain, lung & \num{7959} & \num{334}\\
+\textit{Giardia lamblia} & U & E & human & small intestine, intestine & \num{7154} & \num{67}\\
+\textit{Trichomonas vaginalis} & U & E & human & vagina, urethra & \num{50190} & \num{0}\\
+\textit{Trachipleistophora hominis} & U & I & human & muscle, eye & \num{3212} & \num{0}\\
+\textit{Vittaforma corneae} & U & I & human & eye & \num{2236} & \num{8}\\
 \end{longtable}
 \end{landscape}
 \restoregeometry

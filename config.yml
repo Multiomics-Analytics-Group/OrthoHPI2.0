@@ -64,6 +64,9 @@ tissues:
     "BTO:0001158": rectum
     "BTO:0000243": vagina
     "BTO:0001426": urethra
+    "BTO:0001421": uterine cervix
+    "BTO:0001129": prostate
+    "BTO:0001244": urinary tract
     "BTO:0000269": colon
     "BTO:0000778": pulmonary artery
     "BTO:0000779": mesenteric artery
@@ -473,6 +476,9 @@ parasites:
         tissues:
             - "BTO:0000243"
             - "BTO:0001426"
+            - "BTO:0001421"
+            - "BTO:0001129"
+            - "BTO:0001244"
         hosts:
             - 9606
     36087:

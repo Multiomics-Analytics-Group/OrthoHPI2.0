@@ -58,8 +58,8 @@ HUMAN_VIEW_GAP = 10
 COMPACT_HUMAN_FIGURE_HEIGHT = 360
 
 # coarser organs for the config['tissues'] terms FIGURE_ORGANS does not draw. `macrophage`,
-# `mouth`, `nose`, `placenta` and `vagina` have no organ and shade nothing (Trichomonas
-# vaginalis is the only parasite whose figure stays blank)
+# `mouth`, `nose`, `placenta`, `vagina`, `uterine cervix` and `prostate` have no organ and
+# shade nothing
 ORGAN_PARENTS = {
     'BTO:0000142': 'nervous system',      # brain
     'BTO:0001279': 'nervous system',      # spinal cord
@@ -71,6 +71,7 @@ ORGAN_PARENTS = {
     'BTO:0000752': 'lymph nodes',         # lymph vessel
     'BTO:0000779': 'intestine',           # mesenteric artery
     'BTO:0001426': 'urinary bladder',     # urethra
+    'BTO:0001244': 'urinary bladder',     # urinary tract
 }
 
 

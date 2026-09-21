@@ -49,7 +49,14 @@ figures/multi_host.svg figures/multi_host.pdf tables/multi_host.csv: ../config.y
 figures/multi_host.png: figures/multi_host.svg
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png
+# The host families the most parasites converge on, over the parasites of human.
+figures/shared_families.svg figures/shared_families.pdf tables/shared_families.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_families.py
+	cd .. && $(PYTHON) scripts/build_shared_families.py
+
+figures/shared_families.png: figures/shared_families.svg
+	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png figures/shared_families.pdf figures/shared_families.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

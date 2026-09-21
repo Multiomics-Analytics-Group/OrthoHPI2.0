@@ -1,0 +1,19 @@
+parasite,host,predicted PPIs,links,links in all hosts,links in some hosts,links only here,missing: absent,missing: not expressed,missing: out of reach,missing: not transferred
+Cryptosporidium muris,human,60,36,28,7,1,0,72,0,0
+Cryptosporidium muris,rat,155,100,28,24,48,0,8,0,0
+Cryptosporidium muris,mouse,90,54,28,21,5,0,54,0,0
+Hymenolepis diminuta,human,45,16,13,2,1,0,22,3,0
+Hymenolepis diminuta,rat,74,35,13,17,5,0,3,3,0
+Hymenolepis diminuta,mouse,62,34,13,17,4,0,6,1,0
+Angiostrongylus cantonensis,rat,554,105,68,0,37,0,0,4,0
+Angiostrongylus cantonensis,mouse,334,72,68,0,4,0,23,14,0
+Angiostrongylus costaricensis,rat,208,64,53,0,11,0,7,4,0
+Angiostrongylus costaricensis,mouse,244,64,53,0,11,0,7,4,0
+Leishmania braziliensis,rat,0,0,0,0,0,0,136,0,0
+Leishmania braziliensis,mouse,352,136,0,0,136,0,0,0,0
+Trichinella spiralis,human,966,377,245,0,132,1,40,0,0
+Trichinella spiralis,pig,742,286,245,0,41,7,116,9,0
+Trichinella pseudospiralis,human,964,449,287,0,162,0,52,0,0
+Trichinella pseudospiralis,pig,742,339,287,0,52,10,141,11,0
+Nippostrongylus brasiliensis,rat,901,157,100,0,57,0,4,7,0
+Nippostrongylus brasiliensis,mouse,722,111,100,0,11,0,29,28,0

@@ -1,0 +1,51 @@
+taxid,species,side,group,proteome,tissue,localization,eggnog,linked,interactor
+9606,Homo sapiens,host,Host,19699,8346,6919,6917,2191,1253
+10116,Rattus norvegicus,host,Host,22237,11853,9741,9708,2865,334
+10090,Mus musculus,host,Host,21840,8604,6959,6950,1942,348
+9823,Sus scrofa,host,Host,21278,9612,7820,7816,2368,469
+53326,Ancylostoma ceylanicum,parasite,Nematoda,36519,,5004,3606,238,126
+6313,Angiostrongylus cantonensis,parasite,Nematoda,14486,,1547,1286,135,102
+334426,Angiostrongylus costaricensis,parasite,Nematoda,13350,,1392,1173,132,93
+6279,Brugia malayi,parasite,Nematoda,8202,,745,682,61,28
+42155,Brugia timori,parasite,Nematoda,16199,,1578,1278,149,70
+318479,Dracunculus medinensis,parasite,Nematoda,10868,,1323,895,103,63
+51028,Enterobius vermicularis,parasite,Nematoda,12840,,1714,1114,117,73
+7209,Loa loa,parasite,Nematoda,12152,,1163,987,86,49
+51031,Necator americanus,parasite,Nematoda,19125,,2768,2301,235,135
+27835,Nippostrongylus brasiliensis,parasite,Nematoda,22636,,3269,2453,272,195
+6282,Onchocerca volvulus,parasite,Nematoda,12118,,1114,1006,82,44
+6248,Strongyloides stercoralis,parasite,Nematoda,12819,,2066,1809,113,46
+6265,Toxocara canis,parasite,Nematoda,18499,,2038,1427,143,107
+45882,Trichinella britovi,parasite,Nematoda,15466,,1202,1051,84,82
+6335,Trichinella nativa,parasite,Nematoda,13202,,1048,943,75,73
+6336,Trichinella nelsoni,parasite,Nematoda,13005,,989,867,66,63
+6337,Trichinella pseudospiralis,parasite,Nematoda,10629,,921,792,71,68
+6334,Trichinella spiralis,parasite,Nematoda,14258,,1048,874,66,64
+36087,Trichuris trichiura,parasite,Nematoda,9625,,835,725,81,40
+6293,Wuchereria bancrofti,parasite,Nematoda,9343,,858,832,85,43
+79923,Clonorchis sinensis,parasite,Trematoda,14505,,816,606,88,50
+147828,Opisthorchis felineus,parasite,Trematoda,11402,,886,686,108,82
+6198,Opisthorchis viverrini,parasite,Trematoda,16307,,896,640,130,40
+6185,Schistosoma haematobium,parasite,Trematoda,11119,,541,489,55,31
+6182,Schistosoma japonicum,parasite,Trematoda,10042,,611,463,65,39
+6183,Schistosoma mansoni,parasite,Trematoda,14110,,826,696,101,76
+6210,Echinococcus granulosus,parasite,Cestoda,11279,,466,335,31,16
+6211,Echinococcus multilocularis,parasite,Cestoda,10469,,450,340,35,19
+6216,Hymenolepis diminuta,parasite,Cestoda,11264,,545,349,39,27
+60517,Taenia asiatica,parasite,Cestoda,10327,,440,353,38,16
+441375,Cryptosporidium muris,parasite,Apicomplexa,3930,,303,126,23,22
+353152,Cryptosporidium parvum,parasite,Apicomplexa,3805,,309,116,19,7
+36329,Plasmodium falciparum,parasite,Apicomplexa,5376,,983,733,105,100
+5851,Plasmodium knowlesi,parasite,Apicomplexa,5100,,885,738,92,70
+126793,Plasmodium vivax,parasite,Apicomplexa,5389,,1089,707,111,93
+432359,Toxoplasma gondii,parasite,Apicomplexa,8404,,751,562,32,28
+5660,Leishmania braziliensis,parasite,Kinetoplastida,8084,,366,341,40,37
+5671,Leishmania infantum,parasite,Kinetoplastida,8045,,346,337,22,15
+5664,Leishmania major,parasite,Kinetoplastida,8038,,383,371,26,20
+185431,Trypanosoma brucei,parasite,Kinetoplastida,8561,,662,334,21,14
+353153,Trypanosoma cruzi,parasite,Kinetoplastida,19242,,3292,1283,162,142
+5759,Entamoeba histolytica,parasite,Other protozoa,7959,,899,393,59,43
+184922,Giardia lamblia,parasite,Other protozoa,7154,,746,283,41,34
+5722,Trichomonas vaginalis,parasite,Other protozoa,50190,,4443,1088,169,112
+72359,Trachipleistophora hominis,parasite,Microsporidia,3212,,235,133,1,0
+993615,Vittaforma corneae,parasite,Microsporidia,2236,,106,35,4,3

@@ -6,7 +6,7 @@ host-parasite PPI predictions in `data/annotated_predictions.parquet` get
 built. 
 
 Everything is driven by `config.yml`: `urls` (data sources), `hosts` (human
-9606, rat 10116, mouse 10090, pig 9823), and `parasites` (40 species, each with
+9606, rat 10116, mouse 10090, pig 9823), and `parasites` (46 species, each with
 a STRING taxid, a display label/color, the list of BTO tissue codes relevant to
 that parasite's life cycle, and a `hosts` list of the host taxids it infects).
 

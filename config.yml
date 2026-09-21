@@ -667,3 +667,18 @@ parasites:
             - "BTO:0000648"
         hosts:
             - 9606
+    27835:
+        label: Nippostrongylus brasiliensis
+        group: Nematoda
+        multicellular: true
+        niche: extracellular
+        color: "#a6cee3"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000089"
+            - "BTO:0000763"
+            - "BTO:0000651"
+            - "BTO:0000648"
+        hosts:
+            - 10116
+            - 10090

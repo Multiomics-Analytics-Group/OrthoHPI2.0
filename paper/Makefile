@@ -56,7 +56,14 @@ figures/shared_families.svg figures/shared_families.pdf tables/shared_families.c
 figures/shared_families.png: figures/shared_families.svg
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png figures/shared_families.pdf figures/shared_families.png
+# How alike the interactomes of the parasites of human are, pair by pair.
+figures/parasite_similarity.svg figures/parasite_similarity.pdf tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
+	cd .. && $(PYTHON) scripts/build_parasite_similarity.py
+
+figures/parasite_similarity.png: figures/parasite_similarity.svg
+	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png figures/shared_families.pdf figures/shared_families.png figures/parasite_similarity.pdf figures/parasite_similarity.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

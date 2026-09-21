@@ -250,6 +250,53 @@ def order_combinations(links):
 
 
 @st.cache_data(show_spinner=False)
+def generate_overview_bars(df_pred, config):
+    '''
+    Every multi-host parasite on one figure: its orthology-group links stacked by how far
+    they carried over, from shared by every host to found in one host only, in the
+    colours the rest of the page reads them in.
+    '''
+    parasites = sorted(df_pred['taxid1_label'].unique())
+    all_hosts = sorted(df_pred['host'].unique())
+    stacks = {'in every host': {}, 'in some hosts': {}}
+    stacks.update({f'only in {common_name(host)}': {} for host in all_hosts})
+    for parasite in parasites:
+        links = get_link_combinations(df_pred, parasite)
+        n_hosts = len(links['hosts'].iloc[0].union(*links['hosts']))
+        stacks['in every host'][parasite] = int((links['n_hosts'] == n_hosts).sum())
+        stacks['in some hosts'][parasite] = int(((links['n_hosts'] > 1) & (links['n_hosts'] < n_hosts)).sum())
+        for host in all_hosts:
+            stacks[f'only in {common_name(host)}'][parasite] = int(
+                (links['hosts'] == frozenset([host])).sum())
+
+    colors = {'in every host': SHARED_COLOR, 'in some hosts': PARTIAL_COLORS[0]}
+    colors.update({f'only in {common_name(host)}': host_color(host, config) for host in all_hosts})
+    figure = go.Figure()
+    for name, counts in stacks.items():
+        values = [counts[p] for p in parasites]
+        if not any(values):
+            continue
+        figure.add_trace(go.Bar(y=parasites, x=values, name=name, orientation='h',
+                                marker_color=colors[name],
+                                hovertemplate='%{y}<br>%{x} orthology-group links ' + name
+                                              + '<extra></extra>'))
+    totals = [sum(counts[p] for counts in stacks.values()) for p in parasites]
+    figure.add_trace(go.Scatter(y=parasites, x=totals, mode='text', text=totals,
+                                textposition='middle right', textfont=dict(size=11, color='#555555'),
+                                hoverinfo='skip', showlegend=False))
+    # explicit margins, as below: plotly cuts off the species names and the axis title
+    figure.update_layout(barmode='stack', height=90 + 32 * len(parasites), plot_bgcolor='white',
+                         margin=dict(l=210, r=40, t=40, b=45), bargap=0.35,
+                         legend=dict(orientation='h', yanchor='bottom', y=1.0, x=0,
+                                     traceorder='normal'))
+    web_utils.count_ticks(figure, max(totals), axis='x', title_text='orthology-group links',
+                          showgrid=True, gridcolor='#f0f0f0')
+    figure.update_yaxes(autorange='reversed', tickfont=dict(style='italic'))
+
+    return figure
+
+
+@st.cache_data(show_spinner=False)
 def generate_combination_bars(links, all_hosts, config):
     '''
     How many of the transferred interactions carried over to which hosts: a bar per set
@@ -501,6 +548,16 @@ else:
     hosts_of = df_pred.groupby('taxid1_label')['host'].agg(
         lambda h: ', '.join(common_name(host) for host in sorted(set(h))))
     parasites = sorted(hosts_of.index)
+
+    # the overview first, so the page has something to read before a parasite is chosen
+    st.subheader('Parasites with more than one host')
+    st.caption('The interactions of every parasite predicted against several hosts, '
+               'counted as orthology-group links so that a host with more paralogues does '
+               'not count for more: how many carried over to every host, and how many '
+               'are found in one host only. Choose a parasite below to see which links '
+               'they are and why a host lacks them.')
+    st.plotly_chart(generate_overview_bars(df_pred, config), width='stretch')
+
     with st.columns(3)[1]:
         parasite = st.selectbox('Select a parasite to compare its hosts', parasites,
                                 format_func=lambda p: f'{p} ({hosts_of[p]})',

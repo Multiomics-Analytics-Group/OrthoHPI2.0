@@ -24,10 +24,17 @@
 # (which has plotly and kaleido; the repo's .venv has neither).
 
 ZOTERO := ../scripts/zotero_to_bib.py
-PYTHON := ../.venv/bin/python
+# the recipes below run from the repo root (`cd ..`), so this is relative to it
+PYTHON := .venv/bin/python
 INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
-paper.pdf: paper.tex refs.bib tables/parasites.tex figures/workflow.png
+# The figures the manuscript includes: workflow as a PNG export, the rest as the
+# vector PDFs the build scripts write.
+FIGURES := figures/workflow.png figures/funnel.pdf figures/networks.pdf \
+	figures/parasite_similarity.pdf figures/shared_families.pdf \
+	figures/multi_host.pdf figures/case_study.pdf
+
+paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
 
 figures/workflow.png: figures/workflow.svg

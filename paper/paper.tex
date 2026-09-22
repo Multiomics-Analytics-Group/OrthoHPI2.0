@@ -11,7 +11,9 @@
 \usepackage{lmodern}
 \usepackage{microtype}
 
-\usepackage[margin=2.5cm]{geometry}
+% 15 mm side margins make the text block 180 mm, the two-column width the
+% figures are built at (scripts/figure_style.py), so they render at full size.
+\usepackage[a4paper,left=1.5cm,right=1.5cm,top=2cm,bottom=2cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}
@@ -41,6 +43,10 @@
 \linenumbers
 \usepackage{setspace}
 \onehalfspacing
+% Captions stay single-spaced and small, so that a full-page figure and its
+% caption still fit on one page at 1.5 spacing.
+\usepackage{caption}
+\captionsetup{font={small,stretch=1.0}}
 
 % A note to self that survives into the PDF but is obviously not prose.
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
@@ -125,6 +131,30 @@ surface-exposed localisations.}
 \subsection{Homology transfer}
 \todo{Transfer of STRING interactions through shared orthologous groups.}
 
+Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
+stage by stage and separately for each host--parasite pair.
+
+% paper/figures/funnel.pdf is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel}
+  \caption{Proteins surviving each stage of the pipeline, for every
+  host--parasite pair. Bars are nested on a logarithmic axis, one row per pair,
+  in blocks by host. The host side (left) runs from the STRING proteome through
+  the TISSUES and DeepLoc filters to the proteins in a predicted interaction
+  with that parasite; the parasite side (right) from the STRING proteome
+  through the DeepLoc secretome filter and assignment to an EggNOG orthologous
+  group to the proteins in a predicted interaction with that host. Both filters
+  keep what Figure~\ref{fig:workflow} specifies. The orthologous-group stage is
+  omitted on the host side, where every protein reaching it is already in a
+  group. Rows are ordered by the parasite's niche in the host, then taxonomic
+  group, then name; the strips left of each block give the niche (outer) and
+  the taxonomic group (inner). The DeepLoc filter leaves an intracellular
+  parasite roughly five times as many host proteins as an extracellular one.
+  \todo{per-pair counts in Supplementary Table SX}}
+  \label{fig:funnel}
+\end{figure}
+
 \subsection{Tissue and cell-type annotation}
 \todo{TISSUES confidence scores and HPA single-cell expression.}
 
@@ -132,7 +162,107 @@ surface-exposed localisations.}
 \todo{Streamlit application, repository URL, data snapshot.}
 
 \section{Results}
-\todo{results}
+
+\subsection{The predicted networks}
+\todo{Size of the networks; what drives the spread between parasites.}
+Figure~\ref{fig:networks} shows the size of each predicted network and where in
+the host cell its interactions land.
+
+% paper/figures/networks.pdf is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/networks}
+  \caption{Predicted interactions of every host--parasite pair, one block per
+  host, the blocks sharing an axis so that a bar is comparable across hosts.
+  Each bar is split by where DeepLoc places the host protein: on the surface
+  (extracellular or cell membrane), in the interior (cytoplasm or nucleus), or
+  called for both. The interior fraction is what the parasite's niche opens to
+  it, so it is substantial only for the intracellular parasites. The strips
+  beside the names give the niche (outer) and the taxonomic group (inner).}
+  \label{fig:networks}
+\end{figure}
+
+\subsection{Parasites of the same host reach overlapping host proteins}
+\todo{Interpretation: similarity within genera and within niches.}
+Figure~\ref{fig:similarity} compares the interactomes of the parasites of human
+pair by pair, and Figure~\ref{fig:shared_families} the host families that the
+most of them converge on.
+
+% paper/figures/parasite_similarity.pdf is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_similarity}
+  \caption{Jaccard similarity of the sets of human proteins reached by each
+  pair of parasites predicted against human. Parasites are ordered by niche in
+  the host, then taxonomic group, then name, so that the two niches read as
+  blocks; the strips along both axes give the niche (outer) and the taxonomic
+  group (inner), and the diagonal is left grey. Similarity is highest within a
+  genus and falls away sharply between the niches, which draw on different host
+  localisations.}
+  \label{fig:similarity}
+\end{figure}
+
+% paper/figures/shared_families.pdf is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_families}
+  \caption{Host protein families of human reached by at least twelve
+  parasites, as a dot matrix over the parasites predicted against human. A
+  family is the orthologous group of the host protein, labelled by the gene
+  symbols of its members, and is reached by a parasite when any parasite
+  protein is predicted to interact with any member. The area of a dot is the
+  number of parasite proteins reaching that family. The three columns on the
+  right count the parasites reaching the family, the distinct parasite
+  orthologous groups they do so through --- one group means a single conserved
+  parasite protein transferred many times, rather than independent convergence
+  --- and the split between helminths and protozoa. The strips above the matrix
+  give the niche (outer) and the taxonomic group (inner).}
+  \label{fig:shared_families}
+\end{figure}
+
+\subsection{Comparing the hosts of one parasite}
+\todo{Interpretation: how much of a parasite's interactome is host specific.}
+Figure~\ref{fig:multi_host} compares, for each parasite predicted against more
+than one host, which interactions are shared and why the others are missing.
+
+% paper/figures/multi_host.pdf is generated: `make figures`.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/multi_host}
+  \caption{Hosts compared for every parasite predicted against more than one.
+  An interaction is compared between hosts as the pair of orthologous groups it
+  was transferred from, so a link counts as shared when both hosts carry a
+  protein of the host group interacting with the parasite's. \textbf{(A)} The
+  links of each parasite, split by the hosts carrying them. \textbf{(B)} For
+  each host, the links it lacks that another host of the same parasite carries,
+  attributed to the first filter the host family fails there: the family is
+  absent from the host proteome, no member is expressed in a tissue the
+  parasite infects, no expressed member is in a location the parasite reaches,
+  or the family is available and STRING transferred nothing.}
+  \label{fig:multi_host}
+\end{figure}
+
+\subsection{From parasite protein to host cell type}
+\todo{Interpretation of the \textit{Necator americanus} case study.}
+Figure~\ref{fig:case_study} follows one pair from the parasite protein family
+to the host cell types expressing its targets.
+
+% paper/figures/case_study.pdf is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/case_study}
+  \caption{\textit{Necator americanus} in \textit{Homo sapiens}.
+  \textbf{(A)} Predicted interactions between parasite orthologous groups
+  (rows, named by the commonest description of their members, with the number
+  of parasite proteins in parentheses) and human proteins (columns), coloured
+  by the confidence score of the prediction. Families reaching fewer than three
+  host proteins are left out. \textbf{(B)} Expression of the same host
+  proteins, sharing the columns of (A), across the cell types of the tissues
+  the parasite infects, from the Human Protein Atlas. The eight cell types of
+  each tissue expressing the most of these host proteins are kept, and the
+  strip beside the names gives the tissue.}
+  \label{fig:case_study}
+\end{figure}
 
 \section{Discussion}
 \todo{discussion}

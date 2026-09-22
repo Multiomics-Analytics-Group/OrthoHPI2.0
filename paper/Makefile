@@ -63,7 +63,22 @@ figures/parasite_similarity.svg figures/parasite_similarity.pdf tables/parasite_
 figures/parasite_similarity.png: figures/parasite_similarity.svg
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png figures/shared_families.pdf figures/shared_families.png figures/parasite_similarity.pdf figures/parasite_similarity.png
+# The case study: one host-parasite pair from parasite family to host cell type.
+figures/case_study.svg figures/case_study.pdf tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
+	cd .. && $(PYTHON) scripts/build_case_study.py
+
+figures/case_study.png: figures/case_study.svg
+	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+# The predicted networks at a glance: interactions per parasite by host and by
+# host-protein location.
+figures/networks.svg figures/networks.pdf tables/networks.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_networks_figure.py
+	cd .. && $(PYTHON) scripts/build_networks_figure.py
+
+figures/networks.png: figures/networks.svg
+	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/multi_host.pdf figures/multi_host.png figures/shared_families.pdf figures/shared_families.png figures/parasite_similarity.pdf figures/parasite_similarity.png figures/case_study.pdf figures/case_study.png figures/networks.pdf figures/networks.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

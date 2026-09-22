@@ -132,7 +132,9 @@ surface-exposed localisations.}
 \todo{Transfer of STRING interactions through shared orthologous groups.}
 
 Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
-stage by stage and separately for each host--parasite pair.
+stage by stage and separately for each host--parasite pair. The DeepLoc filter
+leaves an intracellular parasite roughly five times as many host proteins as an
+extracellular one.
 
 % paper/figures/funnel.pdf is generated: `make figures` (see Makefile).
 \begin{figure}[p]
@@ -149,9 +151,8 @@ stage by stage and separately for each host--parasite pair.
   omitted on the host side, where every protein reaching it is already in a
   group. Rows are ordered by the parasite's niche in the host, then taxonomic
   group, then name; the strips left of each block give the niche (outer) and
-  the taxonomic group (inner). The DeepLoc filter leaves an intracellular
-  parasite roughly five times as many host proteins as an extracellular one.
-  \todo{per-pair counts in Supplementary Table SX}}
+  the taxonomic group (inner). The counts behind every row, and the number of
+  predicted interactions of each pair, are in Supplementary Table~S1.}
   \label{fig:funnel}
 \end{figure}
 
@@ -266,6 +267,13 @@ to the host cell types expressing its targets.
 
 \section{Discussion}
 \todo{discussion}
+
+\section*{Supplementary material}
+\textbf{Supplementary Table S1} (\texttt{funnel\_supplementary.csv}). One row
+per host--parasite pair, in the order Figure~\ref{fig:funnel} draws them: the
+host and parasite proteins surviving each stage of the pipeline, and the number
+of predicted interactions of the pair. Supplied as a comma-separated file
+rather than typeset, since the 56 rows are meant to be sorted and filtered.
 
 \section*{Data and code availability}
 \todo{Repository: \url{https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0}}

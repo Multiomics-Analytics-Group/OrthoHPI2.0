@@ -53,6 +53,25 @@ NICHE_COLORS = {'intracellular': '#555555', 'extracellular': '#bdbdbd'}
 # the colour strips left of a block, as (column, colours, offset in axes fractions)
 STRIPS = [('niche', NICHE_COLORS, -0.10), ('group', None, -0.05)]
 STRIP_WIDTH = 0.025
+# the supplementary table: the columns of the counts under the names a reader needs,
+# in the order the figure draws the rows
+SUPPLEMENTARY_COLUMNS = {
+    'host': 'Host',
+    'species': 'Parasite',
+    'taxid': 'Parasite taxid',
+    'group': 'Taxonomic group',
+    'niche': 'Niche in the host',
+    'host_proteome': 'Host proteins: STRING proteome',
+    'host_tissue': 'Host proteins: expressed in an infected tissue',
+    'host_localization': 'Host proteins: in a reachable localisation',
+    'host_eggnog': 'Host proteins: in an orthologous group',
+    'host_interactor': 'Host proteins: in a predicted PPI',
+    'parasite_proteome': 'Parasite proteins: STRING proteome',
+    'parasite_localization': 'Parasite proteins: secreted or on the surface',
+    'parasite_eggnog': 'Parasite proteins: in an orthologous group',
+    'parasite_interactor': 'Parasite proteins: in a predicted PPI',
+    'edges': 'Predicted interactions',
+}
 # a host with fewer pairs still gets a block this many rows tall
 MIN_BLOCK = 3
 # the layout in inches: margins, the gap between the two columns, and the gap between a
@@ -122,7 +141,8 @@ def count_pairs(config, data):
                          'host_interactor': edges['target'].nunique(),
                          'parasite_proteome': len(proteins[taxid]), 'parasite_localization': len(pool),
                          'parasite_eggnog': len(pool & in_group),
-                         'parasite_interactor': edges['source'].nunique()})
+                         'parasite_interactor': edges['source'].nunique(),
+                         'edges': len(edges)})
 
     return pd.DataFrame(rows)
 
@@ -258,6 +278,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--table', default='paper/tables/funnel.csv')
+    parser.add_argument('--supplementary-table', default='paper/tables/funnel_supplementary.csv',
+                        help='the same rows under readable headers')
     parser.add_argument('--figure', default='paper/figures/funnel', help='output path without extension')
     parser.add_argument('--linear', action='store_true', help='linear axes instead of the log ones')
     args = parser.parse_args()
@@ -265,6 +287,8 @@ if __name__ == '__main__':
     config = utils.read_config(filepath=args.config)
     pairs = count_pairs(config, load(args.config, args.data_dir))
     pairs.to_csv(args.table, index=False)
-    print(f"Wrote {args.table}")
+    supplementary = pairs[list(SUPPLEMENTARY_COLUMNS)].rename(columns=SUPPLEMENTARY_COLUMNS)
+    supplementary.to_csv(args.supplementary_table, index=False)
+    print(f"Wrote {args.table} and {args.supplementary_table} ({len(pairs)} pairs)")
     draw(pairs, config['parasite_groups'], args.figure, linear=args.linear)
     print(f"Wrote {args.figure} (.pdf and .svg)")

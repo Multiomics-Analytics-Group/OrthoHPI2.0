@@ -33,8 +33,9 @@ paper.pdf: paper.tex refs.bib tables/parasites.tex figures/workflow.png
 figures/workflow.png: figures/workflow.svg
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-# The filter funnel: proteins left after each stage of the pipeline, per species.
-# Rereads the TISSUES downloads and the EggNOG/COG files, so it takes a minute.
+# The filter funnel: proteins left after each stage of the pipeline on the host and
+# parasite side of each host-parasite pair. Rereads the TISSUES downloads and the
+# EggNOG members file, so it takes a minute.
 figures/funnel.svg figures/funnel.pdf tables/funnel.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_filter_funnel.py
 

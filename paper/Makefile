@@ -82,7 +82,7 @@ figures: figures/workflow.png figures/funnel.pdf figures/funnel.png figures/mult
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.
-tables/parasites.tex: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_table.py
+tables/parasites.tex: ../config.yml ../scripts/build_parasite_table.py
 	cd .. && $(PYTHON) scripts/build_parasite_table.py
 
 tables: tables/parasites.tex

@@ -6,7 +6,7 @@ of parasites, the two figures that say whether the convergence is real: how many
 distinct parasite orthology groups reach the family (one means a single conserved
 parasite protein transferred many times), and how many helminths and protozoa do.
 Writes paper/tables/shared_families.csv (every family reached by two or more parasites)
-and paper/figures/shared_families.pdf/.svg (the families reached by at least
+and paper/figures/shared_families.pdf/.svg/.png (the families reached by at least
 --min-parasites, as a dot matrix over the parasites).
 '''
 import argparse
@@ -132,8 +132,8 @@ def draw(config, families, edges, output_stem):
     # room above the dots for the strips and the parasite names standing on them
     fig.subplots_adjust(left=0.18, right=0.875, top=1 - 1.45 / fig.get_figheight(),
                         bottom=(legends + 0.1) / fig.get_figheight())
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -157,4 +157,4 @@ if __name__ == '__main__':
     print(f"Wrote {args.table}: {len(families)} families reached by two or more parasites, "
           f"{(families['parasites'] >= args.min_parasites).sum()} by {args.min_parasites} or more")
     draw(config, families[families['parasites'] >= args.min_parasites], edges, args.figure)
-    print(f"Wrote {args.figure}.pdf and .svg")
+    print(f"Wrote {args.figure}.pdf, .svg and .png")

@@ -4,7 +4,7 @@ a parasite with a host as a matrix of parasite protein families against host pro
 and under it, sharing the columns, the cell types of the infected tissues expressing
 each host protein. A parasite family is the orthology group of the parasite proteins,
 which the predictions are made at the level of, named by the most common description
-of its members. Writes paper/figures/case_study.pdf/.svg and the two matrices to
+of its members. Writes paper/figures/case_study.pdf/.svg/.png and the two matrices to
 paper/tables/case_study_links.csv and paper/tables/case_study_cell_types.csv.
 '''
 import argparse
@@ -163,8 +163,8 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
     figure_style.stack_legends(fig, left=0.36, blocks=[('Tissue', handles)], ncol=len(handles))
     fig.suptitle(title, x=0.02, ha='left', y=0.995, style='italic')
     fig.subplots_adjust(left=0.36, right=0.92, top=1 - 0.45 / fig_height, bottom=1.1 / fig_height)
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -197,4 +197,4 @@ if __name__ == '__main__':
     title = (f"{config['parasites'][args.parasite]['label']} in "
              f"{config['hosts'][args.host]['label'].split(' (')[0]}")
     draw(links, families, symbols, expression, tissues, title, args.figure)
-    print(f"Wrote {args.figure}.pdf and .svg")
+    print(f"Wrote {args.figure}.pdf, .svg and .png")

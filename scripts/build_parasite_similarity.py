@@ -4,7 +4,7 @@ similarity of the host proteins each pair of parasites reaches, drawn as the hea
 the "Parasites of a host" page, with the taxonomic group and niche strips along both
 axes and the parasites ordered by niche, then group, then name (or group first, with
 --order-by group), so the two niches read as blocks. Writes
-paper/figures/parasite_similarity.pdf/.svg, the matrix to
+paper/figures/parasite_similarity.pdf/.svg/.png, the matrix to
 paper/tables/parasite_similarity.csv and, for the text, the median similarity within
 and between genera, taxonomic groups, niches and organisations to
 paper/tables/parasite_similarity_medians.csv.
@@ -139,8 +139,8 @@ def draw(config, similarity, output_stem):
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
     legends = figure_style.stack_legends(fig, left=0.2, blocks=[('Taxonomic group', groups), ('Niche', niches)])
     fig.subplots_adjust(left=0.2, right=0.9, top=0.82, bottom=(legends + 0.1) / fig.get_figheight())
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -169,4 +169,4 @@ if __name__ == '__main__':
     print(table.to_string(index=False))
     print(f"Wrote {args.table} and {args.medians}")
     draw(config, similarity, args.figure)
-    print(f"Wrote {args.figure}.pdf and .svg")
+    print(f"Wrote {args.figure}.pdf, .svg and .png")

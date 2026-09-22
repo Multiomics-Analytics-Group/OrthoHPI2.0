@@ -5,7 +5,7 @@ expressed in a tissue this parasite infects (TISSUES) -> put by DeepLoc where it
 reaches -> in a predicted interaction with this parasite. On the
 parasite side: proteome -> secreted or on the surface (DeepLoc) -> in an EggNOG group
 -> in a predicted interaction with this host. Writes paper/tables/funnel.csv (the counts)
-and paper/figures/funnel.pdf/.svg, a butterfly chart: one row per pair, the host stages
+and paper/figures/funnel.pdf/.svg/.png, a butterfly chart: one row per pair, the host stages
 nested leftwards and the parasite stages rightwards of the parasite's name, on log axes
 unless --linear, which gives each side a linear axis up to its own largest proteome.
 '''
@@ -267,8 +267,8 @@ def draw(table, group_colors, output_stem, linear=False):
         ('Parasite niche in the host',
          [Patch(color=NICHE_COLORS[niche], label=niche) for niche in NICHE_ORDER]),
         ('Taxonomic group', [Patch(color=color, label=group) for group, color in group_colors.items()])])
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -291,4 +291,4 @@ if __name__ == '__main__':
     supplementary.to_csv(args.supplementary_table, index=False)
     print(f"Wrote {args.table} and {args.supplementary_table} ({len(pairs)} pairs)")
     draw(pairs, config['parasite_groups'], args.figure, linear=args.linear)
-    print(f"Wrote {args.figure} (.pdf and .svg)")
+    print(f"Wrote {args.figure} (.pdf, .svg and .png)")

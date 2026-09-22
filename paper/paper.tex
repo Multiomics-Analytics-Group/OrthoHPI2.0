@@ -237,9 +237,13 @@ than one host, which interactions are shared and why the others are missing.
   links of each parasite, split by the hosts carrying them. \textbf{(B)} For
   each host, the links it lacks that another host of the same parasite carries,
   attributed to the first filter the host family fails there: the family is
-  absent from the host proteome, no member is expressed in a tissue the
-  parasite infects, no expressed member is in a location the parasite reaches,
-  or the family is available and STRING transferred nothing.}
+  absent from the host proteome, the TISSUES filter keeps no member in a tissue
+  the parasite infects, or the DeepLoc filter keeps no remaining member in a
+  location the parasite reaches. Every missing link falls into one of these
+  three; none is a family that passes every filter and carries no transferred
+  link, since a link is transferred at the level of the orthologous group. The
+  last two causes reflect the coverage of TISSUES and the accuracy of DeepLoc
+  for that host as much as the biology of the host family.}
   \label{fig:multi_host}
 \end{figure}
 

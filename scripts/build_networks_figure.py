@@ -5,7 +5,7 @@ comparable across hosts. Each bar is split by where DeepLoc puts the host protei
 the surface (extracellular or cell membrane), inside the cell (cytoplasm or nucleus) or
 called for both -- which is what the parasite's niche opened to it; the taxonomic group
 and niche are the strips beside the names. Writes paper/tables/networks.csv (one row per
-host-parasite pair) and paper/figures/networks.pdf/.svg.
+host-parasite pair) and paper/figures/networks.pdf/.svg/.png.
 '''
 import argparse
 import os
@@ -134,8 +134,8 @@ def draw(config, table, output_stem):
         ('Taxonomic group', [Patch(color=c, label=g) for g, c in taxon_colors.items()
                              if g in set(table['group'])]),
         ('Niche', [Patch(color=c, label=niche) for niche, c in NICHE_COLORS.items()])])
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -154,4 +154,4 @@ if __name__ == '__main__':
     print(f"{table['interactions'].sum():,} interactions over {len(table)} host-parasite pairs; "
           f"wrote {args.table}")
     draw(config, table, args.figure)
-    print(f"Wrote {args.figure}.pdf and .svg")
+    print(f"Wrote {args.figure}.pdf, .svg and .png")

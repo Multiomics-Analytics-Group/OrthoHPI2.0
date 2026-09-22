@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 from pipeline import filters, main
+from scripts import figure_style
 
 REASONS = ['absent', 'not expressed', 'out of reach', 'not transferred']
 REASON_LABELS = {
@@ -121,11 +122,11 @@ def compare(config_file, data_dir):
 
 
 def draw(table, config, output_stem):
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     host_colors = {h['label'].split('(')[1].rstrip(')'): h['color'] for h in config['hosts'].values()}
     parasites = list(dict.fromkeys(table['parasite']))
-    fig, (left, right) = plt.subplots(1, 2, figsize=(7.5, 0.42 * len(parasites) + 1.6),
-                                      gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    fig, (left, right) = plt.subplots(1, 2, figsize=(figure_style.WIDTH, 0.5 * len(parasites) + 1.9),
+                                      gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.22})
 
     # A: the group-pair links of each parasite, by the hosts carrying them
     for i, parasite in enumerate(parasites):
@@ -141,7 +142,7 @@ def draw(table, config, output_stem):
             value = row['links only here']
             left.barh(i, value, left=x, color=host_colors[row['host']], height=0.7)
             x += value
-        left.text(x + 3, i, f'{x:,}', fontsize=6, va='center', color='#555555')
+        left.text(x + 3, i, f'{x:,}', va='center', color='#555555')
 
     # B: the links each host lacks while another host of the parasite has them, by cause,
     # one thin bar per host on the parasite's row
@@ -156,39 +157,39 @@ def draw(table, config, output_stem):
                 value = row[f'missing: {reason}']
                 right.barh(y, value, left=x, color=REASON_COLORS[reason], height=height * 0.9)
                 x += value
-            right.text(x + 3, y, f'{x:,}', fontsize=5.5, va='center', color='#555555')
+            right.text(x + 3, y, f'{x:,}', va='center', color='#555555')
             ticks.append(y)
             labels.append(row['host'])
 
     left.set_yticks(range(len(parasites)))
-    left.set_yticklabels(parasites, fontsize=7, style='italic')
+    left.set_yticklabels([figure_style.short_name(p) for p in parasites], style='italic')
     right.set_yticks(ticks)
-    right.set_yticklabels(labels, fontsize=5.5)
+    right.set_yticklabels(labels)
     for ax in (left, right):
         ax.set_ylim(len(parasites) - 0.4, -0.6)
-    left.set_title('A  Links of each parasite, by host', loc='left', fontsize=8, fontweight='bold')
-    right.set_title('B  Missing from a host, by cause', loc='left', fontsize=8, fontweight='bold')
+    left.set_title('A  Links of each parasite, by host', loc='left', fontweight='bold')
+    right.set_title('B  Missing from a host, by cause', loc='left', fontweight='bold')
     for ax in (left, right):
         ax.tick_params(axis='y', length=0)
-        ax.tick_params(axis='x', labelsize=6)
         ax.grid(axis='x', color='#e6e6e6', linewidth=0.6)
         ax.set_axisbelow(True)
         for side in ('top', 'right', 'left'):
             ax.spines[side].set_visible(False)
         ax.spines['bottom'].set_color('#999999')
-        ax.set_xlabel('Group-pair links', fontsize=7)
+        ax.set_xlabel('Group-pair links')
         ax.margins(x=0.2)
 
     host_handles = [Patch(color=ALL_HOSTS_COLOR, label='in every host'),
                     Patch(color=SOME_HOSTS_COLOR, label='in two of three hosts')]
     host_handles += [Patch(color=color, label=f'only in {host}') for host, color in host_colors.items()
                      if host in set(table['host'])]
-    left.legend(handles=host_handles, loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=3,
-                fontsize=6, frameon=False, handlelength=0.9)
+    left.legend(handles=host_handles, loc='upper center', bbox_to_anchor=(0.5, -0.14), ncol=2,
+                frameon=False, handlelength=0.9)
     right.legend(handles=[Patch(color=REASON_COLORS[r], label=REASON_LABELS[r]) for r in REASONS],
-                 loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=6,
+                 loc='upper center', bbox_to_anchor=(0.5, -0.14), ncol=1,
                  frameon=False, handlelength=0.9)
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.9, bottom=0.24)
+    fig.subplots_adjust(left=0.15, right=0.95, top=1 - 0.35 / fig.get_figheight(),
+                        bottom=1.35 / fig.get_figheight())
     for extension in ('pdf', 'svg'):
         fig.savefig(f'{output_stem}.{extension}')
     plt.close(fig)

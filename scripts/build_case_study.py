@@ -23,12 +23,17 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
+from scripts import figure_style
 
 DOT_SCALE = ['#deebf7', '#9ecae1', '#6baed6', '#3182bd', '#08519c']
 HEAT_SCALE = ['#ffffff', '#fee6ce', '#fdae6b', '#e6550d', '#a63603']
 TISSUE_COLORS = ['#0072B2', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#D55E00']
 # what STRING's descriptions say when they say nothing
 UNNAMED = {'uncharacterized protein', 'hypothetical protein', ''}
+# most characters of a family name before it is cut to an ellipsis
+NAME_CHARS = 36
+# a cell type expressing a smaller share of the host proteins is an empty row
+MIN_EXPRESSED = 0.1
 
 
 def family_name(descriptions):
@@ -40,15 +45,16 @@ def family_name(descriptions):
     name = named[0][1]
     name = re.sub(r'\s*(domain[- ]containing protein|domain protein|family protein|protein)$',
                   '', name, flags=re.IGNORECASE)
+    name = name[0].upper() + name[1:]
 
-    return name[0].upper() + name[1:]
+    return name if len(name) <= NAME_CHARS else name[:NAME_CHARS - 1].rstrip() + '\u2026'
 
 
-def build(config, data_dir, parasite, host, min_targets, min_expressed):
+def build(config, data_dir, parasite, host, min_targets, cells_per_tissue):
     '''The link matrix (families x host proteins) and the cell-type matrix (cell types x
     host proteins) of one pair, both keyed by host protein id. Families reaching fewer
-    than min_targets host proteins and cell types expressing less than min_expressed of
-    the host proteins are left out.'''
+    than min_targets host proteins are left out, and each tissue keeps the
+    cells_per_tissue cell types expressing the most of the host proteins.'''
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
     predictions['weight'] = predictions['weight'].astype(float)
     annotations = pd.read_parquet(os.path.join(data_dir, 'protein_annotations.parquet'))
@@ -83,32 +89,33 @@ def build(config, data_dir, parasite, host, min_targets, min_expressed):
                   .reindex(columns=links.columns))
     # tissues in the parasite's order; cell types by how many of the targets they express
     expressed = (expression > 0).sum(axis=1)
-    expression = expression[expressed >= min_expressed * len(links.columns)]
+    expression = expression[expressed >= MIN_EXPRESSED * len(links.columns)]
     expression = expression.loc[sorted(expression.index,
                                        key=lambda i: (tissue_labels.index(i[0]), -expressed[i], i[1]))]
+    expression = expression.groupby(level=0, sort=False).head(cells_per_tissue)
 
     return links, families, symbols, expression, tissue_labels
 
 
 def draw(links, families, symbols, expression, tissue_labels, title, output_stem):
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     n_fam, n_cols, n_cells = len(links), links.shape[1], len(expression)
-    fig_height = 0.14 * (n_fam + n_cells) + 2.2
+    fig_height = 0.15 * (n_fam + n_cells) + 2.3
     fig, (top, bottom) = plt.subplots(
-        2, 1, figsize=(7.5, fig_height), sharex=True,
+        2, 1, figsize=(figure_style.WIDTH, fig_height), sharex=True,
         gridspec_kw={'height_ratios': [n_fam, n_cells], 'hspace': 0.04})
 
     # A: a dot per predicted link, shaded by confidence
     rows, cols = np.where(links.notna().to_numpy())
     scores = links.to_numpy()[rows, cols]
     cmap = LinearSegmentedColormap.from_list('score', DOT_SCALE)
-    dots = top.scatter(cols, rows, c=scores, cmap=cmap, vmin=0.35, vmax=1.0, s=14,
+    dots = top.scatter(cols, rows, c=scores, cmap=cmap, vmin=0.35, vmax=1.0, s=22,
                        linewidths=0, zorder=3)
     top.set_yticks(range(n_fam))
-    top.set_yticklabels(families['label'], fontsize=5.5)
+    top.set_yticklabels(families['label'])
     top.set_ylim(n_fam - 0.5, -0.5)
-    top.set_title('A  Parasite protein families and the host proteins they are predicted to bind',
-                  fontsize=7, loc='left', pad=3)
+    top.set_title('A  Parasite families and the host proteins they are predicted to bind',
+                  loc='left', pad=3)
 
     # B: the cell types of the infected tissues expressing each host protein
     values = expression.to_numpy(dtype=float)
@@ -119,16 +126,15 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
     heat = bottom.imshow(np.ma.masked_invalid(values), cmap=heat_cmap, aspect='auto',
                          norm=LogNorm(vmin=floor, vmax=np.nanmax(values)), interpolation='nearest')
     bottom.set_yticks(range(n_cells))
-    bottom.set_yticklabels([cell for _, cell in expression.index], fontsize=5.5)
+    bottom.set_yticklabels([cell for _, cell in expression.index])
     bottom.set_ylim(n_cells - 0.5, -0.5)
     bottom.set_xticks(range(n_cols))
-    bottom.set_xticklabels([symbols[t] for t in links.columns], fontsize=5.5, rotation=90)
-    bottom.set_title('B  Cell types of the infected tissues expressing them', fontsize=7,
-                     loc='left', pad=3)
+    bottom.set_xticklabels([symbols[t] for t in links.columns], rotation=90)
+    bottom.set_title('B  Cell types of the infected tissues expressing them', loc='left', pad=3)
     # a tissue strip down the side of B, one colour per tissue of the parasite
     tissue_color = dict(zip(tissue_labels, TISSUE_COLORS))
     for i, (tissue, _) in enumerate(expression.index):
-        bottom.add_patch(Rectangle((-1.6, i - 0.5), 0.6, 1, color=tissue_color[tissue],
+        bottom.add_patch(Rectangle((-1.5, i - 0.5), 0.7, 1, color=tissue_color[tissue],
                                    linewidth=0, clip_on=False))
     bottom.set_xlim(-0.5, n_cols - 0.5)
 
@@ -138,24 +144,25 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
             side.set_visible(False)
         ax.set_xticks(np.arange(-0.5, n_cols), minor=True)
         ax.tick_params(which='minor', length=0)
+    # the cell-type names sit left of the tissue strip
+    bottom.tick_params(axis='y', pad=11)
     top.grid(color='#eeeeee', linewidth=0.5)
     top.set_axisbelow(True)
     bottom.grid(which='minor', axis='x', color='#ffffff', linewidth=0.4)
 
     # scales beside the panels, the tissue legend under them
     score_bar = fig.colorbar(dots, ax=top, fraction=0.02, pad=0.01)
-    score_bar.set_label('confidence score', fontsize=6)
-    score_bar.ax.tick_params(labelsize=5.5, length=2)
+    score_bar.set_label('confidence score')
+    score_bar.ax.tick_params(length=2)
     score_bar.outline.set_visible(False)
     heat_bar = fig.colorbar(heat, ax=bottom, fraction=0.02, pad=0.01)
-    heat_bar.set_label('nTPM', fontsize=6)
-    heat_bar.ax.tick_params(labelsize=5.5, length=2)
+    heat_bar.set_label('nTPM')
+    heat_bar.ax.tick_params(length=2)
     heat_bar.outline.set_visible(False)
     handles = [Patch(color=tissue_color[t], label=t) for t in tissue_labels if t in {i[0] for i in expression.index}]
-    fig.legend(handles=handles, loc='lower center', ncol=len(handles), fontsize=6, frameon=False,
-               handlelength=0.9, bbox_to_anchor=(0.5, 0.0))
-    fig.suptitle(title, fontsize=8, x=0.02, ha='left', y=0.995, style='italic')
-    fig.subplots_adjust(left=0.3, right=0.93, top=1 - 0.4 / fig_height, bottom=1.0 / fig_height)
+    figure_style.stack_legends(fig, left=0.36, blocks=[('Tissue', handles)], ncol=len(handles))
+    fig.suptitle(title, x=0.02, ha='left', y=0.995, style='italic')
+    fig.subplots_adjust(left=0.36, right=0.92, top=1 - 0.45 / fig_height, bottom=1.1 / fig_height)
     for extension in ('pdf', 'svg'):
         fig.savefig(f'{output_stem}.{extension}')
     plt.close(fig)
@@ -169,10 +176,10 @@ if __name__ == '__main__':
     parser.add_argument('--parasite', type=int, default=51031,
                         help='parasite taxid (default: Necator americanus)')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
-    parser.add_argument('--min-targets', type=int, default=2,
+    parser.add_argument('--min-targets', type=int, default=3,
                         help='families reaching fewer host proteins are left out')
-    parser.add_argument('--min-expressed', type=float, default=0.1,
-                        help='cell types expressing a smaller share of the host proteins are left out')
+    parser.add_argument('--cells-per-tissue', type=int, default=8,
+                        help='the cell types of each tissue kept: those expressing the most host proteins')
     parser.add_argument('--links', default='paper/tables/case_study_links.csv')
     parser.add_argument('--cell-types', default='paper/tables/case_study_cell_types.csv')
     parser.add_argument('--figure', default='paper/figures/case_study',
@@ -181,7 +188,7 @@ if __name__ == '__main__':
 
     config = utils.read_config(filepath=args.config)
     links, families, symbols, expression, tissues = build(
-        config, args.data_dir, args.parasite, args.host, args.min_targets, args.min_expressed)
+        config, args.data_dir, args.parasite, args.host, args.min_targets, args.cells_per_tissue)
     (links.set_axis(families['label'], axis=0).set_axis([symbols[t] for t in links.columns], axis=1)
      .to_csv(args.links))
     expression.set_axis([symbols[t] for t in expression.columns], axis=1).to_csv(args.cell_types)

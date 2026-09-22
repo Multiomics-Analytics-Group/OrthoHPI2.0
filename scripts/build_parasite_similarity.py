@@ -24,6 +24,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
+from scripts import figure_style
 
 NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
 NICHE_ORDER = ['extracellular', 'intracellular']
@@ -85,14 +86,14 @@ def medians(config, similarity):
 
 
 def draw(config, similarity, output_stem):
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     parasites = config['parasites']
     taxon_colors = config['parasite_groups']
     taxids = list(similarity.index)
     n = len(taxids)
-    labels = [parasites[t]['label'] for t in taxids]
+    labels = [figure_style.short_name(parasites[t]['label']) for t in taxids]
 
-    fig, ax = plt.subplots(figsize=(7.0, 7.0))
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.WIDTH * 1.05))
     cmap = LinearSegmentedColormap.from_list('app', SCALE)
     # the diagonal compares nothing and is grey, not the white of a zero
     cmap.set_bad(DIAGONAL_COLOR)
@@ -100,8 +101,8 @@ def draw(config, similarity, output_stem):
                       vmax=np.nanmax(similarity.to_numpy()), interpolation='nearest')
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
-    ax.set_xticklabels(labels, fontsize=5.5, rotation=90, style='italic')
-    ax.set_yticklabels(labels, fontsize=5.5, style='italic')
+    ax.set_xticklabels(labels, rotation=90, style='italic')
+    ax.set_yticklabels(labels, style='italic')
     ax.tick_params(length=0, pad=2)
     for side in ax.spines.values():
         side.set_visible(False)
@@ -122,23 +123,22 @@ def draw(config, similarity, output_stem):
                                    linewidth=0, clip_on=False))
             ax.add_patch(Rectangle((i - 0.5, start), 1, strip * 0.9, color=color,
                                    linewidth=0, clip_on=False))
-    pad = 2 + (1 + 2.2 * strip) * (7.0 * 0.62 / n) * 72
+    pad = 2 + (1 + 2.2 * strip) * (figure_style.WIDTH * 0.66 / n) * 72
     ax.tick_params(axis='x', pad=pad, top=True, labeltop=True, bottom=False, labelbottom=False)
     ax.tick_params(axis='y', pad=pad)
     ax.set_xlim(-0.5, n - 0.5)
     ax.set_ylim(n - 0.5, -0.5)
 
     bar = fig.colorbar(image, ax=ax, fraction=0.03, pad=0.02)
-    bar.ax.tick_params(labelsize=6, length=2)
-    bar.set_label('Jaccard similarity of the host proteins reached', fontsize=6.5)
+    bar.ax.tick_params(length=2)
+    bar.set_label('Jaccard similarity of the host proteins reached')
     bar.outline.set_visible(False)
 
-    handles = [Patch(color=color, label=group) for group, color in taxon_colors.items()
-               if any(parasites[t]['group'] == group for t in taxids)]
-    handles += [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
-    fig.legend(handles=handles, loc='lower center', ncol=5, fontsize=6, frameon=False,
-               handlelength=0.9, bbox_to_anchor=(0.5, 0.0))
-    fig.subplots_adjust(left=0.26, right=0.9, top=0.78, bottom=0.07)
+    groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
+              if any(parasites[t]['group'] == group for t in taxids)]
+    niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
+    legends = figure_style.stack_legends(fig, left=0.2, blocks=[('Taxonomic group', groups), ('Niche', niches)])
+    fig.subplots_adjust(left=0.2, right=0.9, top=0.82, bottom=(legends + 0.1) / fig.get_figheight())
     for extension in ('pdf', 'svg'):
         fig.savefig(f'{output_stem}.{extension}')
     plt.close(fig)

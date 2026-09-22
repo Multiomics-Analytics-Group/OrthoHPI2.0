@@ -21,13 +21,14 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
+from scripts import figure_style
 
 HELMINTHS = {'Nematoda', 'Trematoda', 'Cestoda'}
 NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
 DOT_COLOR = '#2a62ab'
 # most gene symbols in a family label before the rest are left as an ellipsis
-SYMBOLS_IN_LABEL = 3
-LABEL_CHARS = 26
+SYMBOLS_IN_LABEL = 2
+LABEL_CHARS = 16
 
 
 def family_label(names):
@@ -67,7 +68,7 @@ def count_families(config, predictions, host):
 
 
 def draw(config, families, edges, output_stem):
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     parasites = config['parasites']
     taxon_order = list(config['parasite_groups'])
     taxon_colors = config['parasite_groups']
@@ -81,16 +82,15 @@ def draw(config, families, edges, output_stem):
     dots = (edges[edges['group2'].isin(row_of)]
             .groupby(['group2', 'taxid1'])['source'].nunique().reset_index())
     n_rows, n_cols = len(row_of), len(columns)
-    fig_width = 7.5
-    fig, ax = plt.subplots(figsize=(fig_width, 0.165 * n_rows + 2.1))
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.ROW * n_rows + 2.6))
     ax.scatter([col_of[t] for t in dots['taxid1']], [row_of[f] for f in dots['group2']],
-               s=4 + 2.2 * dots['source'].clip(upper=20), color=DOT_COLOR, linewidths=0, zorder=3)
+               s=6 + 3 * dots['source'].clip(upper=20), color=DOT_COLOR, linewidths=0, zorder=3)
     ax.set_xlim(-0.6, n_cols - 0.4)
     ax.set_ylim(n_rows - 0.4, -0.6)
     ax.set_yticks(range(n_rows))
-    ax.set_yticklabels(families['label'], fontsize=6)
+    ax.set_yticklabels(families['label'])
     ax.set_xticks(range(n_cols))
-    ax.set_xticklabels([parasites[int(t)]['label'] for t in columns], fontsize=5.5,
+    ax.set_xticklabels([figure_style.short_name(parasites[int(t)]['label']) for t in columns],
                        rotation=90, style='italic')
     ax.tick_params(length=0, pad=2)
     ax.grid(color='#eeeeee', linewidth=0.5)
@@ -108,32 +108,30 @@ def draw(config, families, edges, output_stem):
                                color=taxon_colors[p['group']], linewidth=0, clip_on=False))
         ax.add_patch(Rectangle((i - 0.5, -0.6 - 2 * strip), 1, strip * 0.8,
                                color=NICHE_COLORS[p['niche']], linewidth=0, clip_on=False))
-    ax.tick_params(axis='x', pad=2 + 2 * strip * 0.165 * 72)
+    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.ROW * 72)
 
     # the margin columns: parasites, parasite groups, helminths / protozoa
     margin_x = n_cols + 0.6
     headers = [('parasites', 'parasites'), ('parasite_groups', 'parasite groups'),
                (None, 'helminths / protozoa')]
     for j, (column, header) in enumerate(headers):
-        x = margin_x + 2.8 * j
+        x = margin_x + 2.5 * j
         # the headers stand like the parasite names, from the top of the strips up
-        ax.text(x, -0.6 - 2 * strip - 0.3, header, fontsize=5.5, ha='center', va='bottom',
+        ax.text(x, -0.6 - 2 * strip - 0.3, header, ha='center', va='bottom',
                 rotation=90, color='#555555', clip_on=False)
         for row in families.itertuples():
             y = row_of[row.family]
             text = (f'{row.helminths} / {row.protozoa}' if column is None
                     else f'{getattr(row, column)}')
-            ax.text(x, y, text, fontsize=5.5, ha='center', va='center', color='#555555',
-                    clip_on=False)
+            ax.text(x, y, text, ha='center', va='center', color='#555555', clip_on=False)
 
-    handles = [Patch(color=color, label=group) for group, color in taxon_colors.items()
-               if any(parasites[int(t)]['group'] == group for t in columns)]
-    handles += [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
-    fig.legend(handles=handles, loc='lower center', ncol=5, fontsize=6, frameon=False,
-               handlelength=0.9, bbox_to_anchor=(0.5, 0.0))
+    groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
+              if any(parasites[int(t)]['group'] == group for t in columns)]
+    niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
+    legends = figure_style.stack_legends(fig, left=0.18, blocks=[('Taxonomic group', groups), ('Niche', niches)])
     # room above the dots for the strips and the parasite names standing on them
-    fig.subplots_adjust(left=0.2, right=0.85, top=1 - 1.5 / fig.get_figheight(),
-                        bottom=0.4 / fig.get_figheight())
+    fig.subplots_adjust(left=0.18, right=0.875, top=1 - 1.45 / fig.get_figheight(),
+                        bottom=(legends + 0.1) / fig.get_figheight())
     for extension in ('pdf', 'svg'):
         fig.savefig(f'{output_stem}.{extension}')
     plt.close(fig)
@@ -145,7 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
-    parser.add_argument('--min-parasites', type=int, default=10,
+    parser.add_argument('--min-parasites', type=int, default=12,
                         help='families reached by fewer parasites stay out of the figure')
     parser.add_argument('--table', default='paper/tables/shared_families.csv')
     parser.add_argument('--figure', default='paper/figures/shared_families',

@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 from pipeline import filters, homology, main
+from scripts import figure_style
 
 HOST_STAGES = ['proteome', 'tissue', 'localization', 'eggnog', 'linked', 'interactor']
 PARASITE_STAGES = ['proteome', 'localization', 'eggnog', 'linked', 'interactor']
@@ -128,12 +129,12 @@ def draw_side(ax, rows, stages):
         ax.barh(y, rows[stage].astype(float).clip(lower=1) - 1, left=1,
                 color=STAGE_COLORS[stage], height=0.72, label=STAGE_LABELS[stage])
     ax.set_yticks(list(y))
-    ax.set_yticklabels(rows['species'], fontsize=6, style='italic')
+    ax.set_yticklabels([figure_style.short_name(s) for s in rows['species']], style='italic')
     ax.set_ylim(len(rows) - 0.4, -0.6)
     ax.set_xscale('log')
     ax.set_xlim(1, 1e5)
     ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
-    ax.set_xticklabels(['1', '', '100', '', '10,000', ''], fontsize=6)
+    ax.set_xticklabels(['1', '', '100', '', '10,000', ''])
     ax.minorticks_off()
     ax.tick_params(axis='y', length=0)
     ax.grid(axis='x', color='#e6e6e6', linewidth=0.6)
@@ -142,14 +143,13 @@ def draw_side(ax, rows, stages):
         ax.spines[side].set_visible(False)
     ax.spines['bottom'].set_color('#999999')
     for i, (proteome, interactors) in enumerate(zip(rows['proteome'], rows['interactor'])):
-        ax.text(1.3e5, i, f'{interactors:,} / {proteome:,}', fontsize=5.5, va='center',
-                color='#555555')
+        ax.text(1.3e5, i, f'{interactors:,} / {proteome:,}', va='center', color='#555555')
 
 
 def draw(table, group_colors, output_stem):
     """Two columns: the hosts and the largest parasite group on the left, the rest on the
     right, on a shared grid so every row is the same height."""
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     hosts = table[table['side'] == 'host'].reset_index(drop=True)
     parasites = table[table['side'] == 'parasite']
     largest = parasites['group'].value_counts().idxmax()
@@ -159,11 +159,11 @@ def draw(table, group_colors, output_stem):
     # one grid row per species; two rows of gap between the panels of the left column
     gap = 2
     n_rows = max(len(hosts) + gap + len(left), len(right))
-    fig = plt.figure(figsize=(7.5, 0.2 * n_rows + 1.5))
+    fig = plt.figure(figsize=(figure_style.WIDTH, figure_style.ROW * n_rows + 1.9))
     # the gap between the columns holds the left column's counts and the right one's names
-    grid = fig.add_gridspec(n_rows, 2, wspace=1.4,
-                            top=1 - 0.75 / fig.get_figheight(), bottom=0.85 / fig.get_figheight(),
-                            left=0.23, right=0.93)
+    grid = fig.add_gridspec(n_rows, 2, wspace=1.5,
+                            top=1 - 0.95 / fig.get_figheight(), bottom=1.05 / fig.get_figheight(),
+                            left=0.175, right=0.87)
     top = fig.add_subplot(grid[:len(hosts), 0])
     bottom_left = fig.add_subplot(grid[len(hosts) + gap:len(hosts) + gap + len(left), 0])
     bottom_right = fig.add_subplot(grid[:len(right), 1])
@@ -171,26 +171,26 @@ def draw(table, group_colors, output_stem):
     draw_side(top, hosts, HOST_STAGES)
     draw_side(bottom_left, left, PARASITE_STAGES)
     draw_side(bottom_right, right, PARASITE_STAGES)
-    top.set_title('Hosts', loc='left', fontsize=9, fontweight='bold')
-    bottom_left.set_title('Parasites', loc='left', fontsize=9, fontweight='bold')
-    bottom_right.set_title('Parasites (continued)', loc='left', fontsize=9, fontweight='bold')
+    top.set_title('Hosts', loc='left', fontweight='bold')
+    bottom_left.set_title('Parasites', loc='left', fontweight='bold')
+    bottom_right.set_title('Parasites (continued)', loc='left', fontweight='bold')
     for ax in (bottom_left, bottom_right):
-        ax.set_xlabel('Proteins left after each stage', fontsize=7)
+        ax.set_xlabel('Proteins left after each stage')
 
     # a strip of the taxonomic group colour down the left of its rows, as in the app
     for ax, rows in ((bottom_left, left), (bottom_right, right)):
         for group, members in rows.groupby('group', sort=False):
             first, last = members.index[0], members.index[-1]
-            ax.add_patch(Rectangle((-0.86, first - 0.4), 0.02, last - first + 0.8,
+            ax.add_patch(Rectangle((-0.82, first - 0.4), 0.025, last - first + 0.8,
                                    color=group_colors[group], linewidth=0,
                                    transform=ax.get_yaxis_transform(), clip_on=False))
 
     handles, labels = top.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', ncol=3, fontsize=7, frameon=False,
-               bbox_to_anchor=(0.5, 0.995))
-    fig.legend([Patch(color=color) for color in group_colors.values()], list(group_colors),
-               loc='lower center', ncol=7, fontsize=7, frameon=False,
-               bbox_to_anchor=(0.5, 0.0), handlelength=0.8, columnspacing=1.2)
+    fig.legend(handles, labels, title='Stage', loc='upper center', ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, 0.995), handlelength=1.2, columnspacing=1.5,
+               alignment='left', title_fontsize=figure_style.FONT)
+    figure_style.stack_legends(fig, left=0.175, blocks=[('Taxonomic group', [Patch(color=color, label=group)
+                                                          for group, color in group_colors.items()])])
     for extension in ('pdf', 'svg'):
         fig.savefig(f'{output_stem}.{extension}')
     plt.close(fig)

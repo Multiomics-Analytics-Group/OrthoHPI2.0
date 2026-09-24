@@ -8,7 +8,7 @@ all passed TISSUES already) or the human STRING proteome (--universe proteome, w
 --after-deeploc for the part the DeepLoc filter lets through).
 
 Usage: .venv/bin/python scripts/venn_tissues_vs_hpa.py [--universe predictions|proteome]
-           [--after-deeploc] [--ntpm 1.0] [--output FILE]
+           [--after-deeploc] [--ntpm 1.0] [--tissues-cutoff 2.5] [--output FILE]
 '''
 import argparse
 import math
@@ -87,7 +87,8 @@ def proteome_universe(config_file, after_deeploc):
     return set(pool[HUMAN]), pool[HUMAN]
 
 
-def compare(config_file, data_dir, ntpm_cutoff, universe='predictions', after_deeploc=False):
+def compare(config_file, data_dir, ntpm_cutoff, universe='predictions', after_deeploc=False,
+            tissues_cutoff=None):
     '''One row per parasite with the four Venn regions, plus the tissues HPA lacks.'''
     config = utils.read_config(config_file)
     labels = {bto: name.lower() for bto, name in config['tissues'].items()}
@@ -95,7 +96,7 @@ def compare(config_file, data_dir, ntpm_cutoff, universe='predictions', after_de
 
     if universe == 'proteome':
         proteome, pool = proteome_universe(config_file, after_deeploc)
-        tis = raw_tissues_tissue_proteins(config_file, pool)
+        tis = raw_tissues_tissue_proteins(config_file, pool, cutoff=tissues_cutoff)
         targets = {int(taxid): proteome for taxid, parasite in config['parasites'].items()
                    if parasite.get('hosts') is None or HUMAN in parasite['hosts']}
     else:
@@ -177,7 +178,7 @@ def circle_distance(r1, r2, shared):
     return (lo + hi) / 2
 
 
-def draw_venn(totals, ntpm_cutoff, output, universe_label):
+def draw_venn(totals, ntpm_cutoff, output, universe_label, tissues_cutoff):
     '''Area-proportional Venn: the two filters inside a circle that is the whole pool.'''
     left, both, right = totals['TISSUES only'], totals['both'], totals['HPA only']
     r1 = math.sqrt((left + both) / math.pi)
@@ -227,7 +228,7 @@ def draw_venn(totals, ntpm_cutoff, output, universe_label):
     handles = [Patch(facecolor=NEITHER_COLOR, alpha=0.45, edgecolor=INK_SECONDARY,
                      label=f'neither: whole pool, {universe_label}'),
                Patch(facecolor=TISSUES_COLOR, alpha=0.5, edgecolor=TISSUES_COLOR,
-                     label='TISSUES keeps: ≥ 2.5 in an infected tissue'),
+                     label=f'TISSUES keeps: ≥ {tissues_cutoff:g} in an infected tissue'),
                Patch(facecolor=HPA_COLOR, alpha=0.5, edgecolor=HPA_COLOR,
                      label=f'HPA keeps: nTPM > {ntpm_cutoff:g} in a cell type of an infected tissue')]
     ax.legend(handles=handles, loc='lower center', bbox_to_anchor=(0.5, -0.02), ncol=1,
@@ -242,7 +243,7 @@ def draw_venn(totals, ntpm_cutoff, output, universe_label):
     return output
 
 
-def draw_barplot(table, ntpm_cutoff, output, universe_label):
+def draw_barplot(table, ntpm_cutoff, output, universe_label, tissues_cutoff):
     '''One 100%-stacked bar per parasite over the four regions, sorted by HPA only.'''
     table = table.sort_values('HPA only', ascending=True)
     segments = [('both', 'kept by both', BOTH_COLOR), ('HPA only', 'HPA only (TISSUES drops)', HPA_COLOR),
@@ -269,7 +270,7 @@ def draw_barplot(table, ntpm_cutoff, output, universe_label):
     ax.spines['bottom'].set_color('#c9c8c2')
     ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=8.5)
     ax.set_title(f'Human proteins each parasite-specific tissue filter keeps '
-                 f'(TISSUES ≥ 2.5, HPA nTPM > {ntpm_cutoff:g}; HPA-covered tissues only)',
+                 f'(TISSUES ≥ {tissues_cutoff:g}, HPA nTPM > {ntpm_cutoff:g}; HPA-covered tissues only)',
                  fontsize=10, color=INK, pad=28)
 
     fig.savefig(output, dpi=200, bbox_inches='tight', facecolor='white')
@@ -285,23 +286,34 @@ def main():
     parser.add_argument('--after-deeploc', action='store_true',
                         help='with --universe proteome: only the proteins the DeepLoc filter keeps')
     parser.add_argument('--ntpm', type=float, default=NTPM_CUTOFF, help='HPA nTPM cutoff (default: the app\'s cell-type cutoff)')
+    parser.add_argument('--tissues-cutoff', type=float,
+                        help='TISSUES confidence cutoff (default: the host\'s config value); '
+                             'only applies to --universe proteome')
     parser.add_argument('--barplot', action='store_true', help='one stacked bar per parasite instead of the Venn')
     parser.add_argument('--proteins', action='store_true',
                         help='count unique human proteins (kept for any parasite) instead of (parasite, protein) pairs')
     parser.add_argument('--output', help='PNG to write (default: snapshots/tissues_vs_hpa_<venn|bars>_<universe>.png)')
     args = parser.parse_args()
+    if args.tissues_cutoff is not None and args.universe != 'proteome':
+        parser.error('--tissues-cutoff only applies to --universe proteome '
+                     '(tissues_cell_types.parquet is built with the pipeline cutoff)')
     if args.after_deeploc and args.universe != 'proteome':
         parser.error('--after-deeploc only applies to --universe proteome '
                      '(predictions.parquet is already DeepLoc-filtered)')
 
+    hosts = utils.read_config(filepath=args.config, field='hosts')
+    tissues_cutoff = (args.tissues_cutoff if args.tissues_cutoff is not None
+                      else filters.tissue_cutoff(hosts[HUMAN], pipeline_main.TISSUE_CUTOFF))
     universe_label = {'predictions': 'predictions.parquet',
                       'proteome': 'the DeepLoc-passing human proteome' if args.after_deeploc
                       else 'the human STRING proteome'}[args.universe]
     output = args.output or os.path.join(
         'snapshots', f"tissues_vs_hpa_{'bars' if args.barplot else 'venn'}_{args.universe}"
-                     f"{'_deeploc' if args.after_deeploc else ''}{'_proteins' if args.proteins else ''}.png")
+                     f"{'_deeploc' if args.after_deeploc else ''}{'_proteins' if args.proteins else ''}"
+                     f"{'' if args.tissues_cutoff is None else f'_tissues{args.tissues_cutoff:g}'}.png")
 
-    table, skipped = compare(args.config, args.data_dir, args.ntpm, args.universe, args.after_deeploc)
+    table, skipped = compare(args.config, args.data_dir, args.ntpm, args.universe, args.after_deeploc,
+                             args.tissues_cutoff)
     regions = ['interactors', 'both', 'TISSUES only', 'HPA only', 'neither']
     totals = pool_proteins(table) if args.proteins else pool_pairs(table)
     totals['parasites'] = table['parasite'].tolist()
@@ -322,7 +334,7 @@ def main():
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
     draw = draw_barplot if args.barplot else draw_venn
     data = table if args.barplot else totals
-    print('\nwrote', draw(data, args.ntpm, output, universe_label))
+    print('\nwrote', draw(data, args.ntpm, output, universe_label, tissues_cutoff))
 
 
 if __name__ == '__main__':

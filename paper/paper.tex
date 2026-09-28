@@ -279,6 +279,25 @@ host and parasite proteins surviving each stage of the pipeline, and the number
 of predicted interactions of the pair. Supplied as a comma-separated file
 rather than typeset, since the 56 rows are meant to be sorted and filtered.
 
+\textbf{Supplementary Figure~\ref{fig:tissues_coverage}}. TISSUES coverage of
+the infected tissues in each host.
+
+% paper/figures/tissues_coverage.png is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S1}
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/tissues_coverage}
+  \caption{STRING proteins annotated to each tissue by TISSUES at a confidence
+  score of at least 1, the cutoff the tissue filter applies, for
+  \textbf{(A)}~human, \textbf{(B)}~rat, \textbf{(C)}~mouse and
+  \textbf{(D)}~pig. Only the tissues the configuration maps parasites to are
+  shown, sorted by the number of proteins; the subtitle of each panel gives how
+  many of them TISSUES annotates for that host and the size of its STRING
+  proteome. All panels share one axis.}
+  \label{fig:tissues_coverage}
+\end{figure}
+
 \section*{Data and code availability}
 \todo{Repository: \url{https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0}}
 

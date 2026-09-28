@@ -30,7 +30,7 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
 	figures/parasite_similarity.png figures/shared_families.png \
-	figures/multi_host.png figures/case_study.png
+	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex

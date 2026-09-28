@@ -60,7 +60,9 @@ def count(config, data_dir):
     rows = []
     for host, host_name in hosts.items():
         for taxid, parasite in sorted(parasites.items(),
-                                      key=lambda item: (order.index(item[1]['group']), item[1]['label'])):
+                                      key=lambda item: (order.index(item[1]['group']),
+                                                        list(NICHE_COLORS).index(item[1]['niche']),
+                                                        item[1]['label'])):
             if int(host) not in parasite['hosts']:
                 continue
             edges = predictions[(predictions['taxid1'] == str(taxid)) & (predictions['taxid2'] == host)]

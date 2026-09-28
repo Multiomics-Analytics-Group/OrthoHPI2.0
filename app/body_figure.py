@@ -450,9 +450,9 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     infected = infected_organs(config, df['taxid1'].unique()[0])
     if not infected:
         if title_as_subheader:
-            st.subheader('Where the predicted interactions can take place')
+            st.subheader('Predicted interactions per infected organ')
         else:
-            st.markdown('##### Where the predicted interactions can take place')
+            st.markdown('##### Predicted interactions per infected organ')
         st.caption('The figure draws none of the tissues this parasite is recorded as '
                    'infecting, so there is nothing to shade.')
         return
@@ -463,9 +463,9 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     shown_organs = infected & (filtered_organs or infected)
 
     if title_as_subheader:
-        st.subheader('Where the predicted interactions can take place')
+        st.subheader('Predicted interactions per infected organ')
     else:
-        st.markdown('##### Where the predicted interactions can take place')
+        st.markdown('##### Predicted interactions per infected organ')
     st.caption('Predicted interactions whose host protein is expressed in each organ, '
                'after the confidence score and the tissue filters, and only in the organs '
                'this parasite is recorded as infecting. TISSUES annotates a host protein '

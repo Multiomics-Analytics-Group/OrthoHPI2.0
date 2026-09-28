@@ -8,7 +8,7 @@ from . import cell_type_annotations, homology, filters, go
 
 # jensenlab confidence score below which tissue evidence is ignored;
 # hosts.<taxid>.tissue_cutoff overrides it
-TISSUE_CUTOFF = 2.5
+TISSUE_CUTOFF = 1.0
 
 # DeepLoc 2 Accurate-model per-class thresholds (DeepLoc2/deeploc2.py label_threshold, read
 # at i+1); see docs/deeploc.md

@@ -133,8 +133,8 @@ def generate_tissue_dots(per_tissue, groups, group_order, niches, palette, colum
     dots['group'] = dots['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
     dots['niche'] = dots['taxid1_label'].map(niches).fillna(web_utils.UNKNOWN_NICHE)
-    order = sorted(dots['taxid1_label'].unique(),
-                   key=lambda p: (group_order.get(groups.get(p), len(group_order)), p))
+    order = parasite_order(dots['taxid1_label'].unique(), groups, group_order, niches,
+                           ORDER_BY_GROUP)
     parasites = [f'{p[0]}. {p.split(" ")[1]}' for p in order]
     reach = dots.groupby('Tissue').agg(parasites=('taxid1_label', 'nunique'),
                                        total=('interactions', 'sum'))

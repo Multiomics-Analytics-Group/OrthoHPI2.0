@@ -74,6 +74,7 @@ def draw(config, families, edges, output_stem):
     taxon_colors = config['parasite_groups']
     columns = sorted(set(edges['taxid1']),
                      key=lambda t: (taxon_order.index(parasites[int(t)]['group']),
+                                    list(NICHE_COLORS).index(parasites[int(t)]['niche']),
                                     parasites[int(t)]['label']))
     col_of = {t: i for i, t in enumerate(columns)}
     row_of = {f: i for i, f in enumerate(families['family'])}
@@ -130,7 +131,7 @@ def draw(config, families, edges, output_stem):
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
     legends = figure_style.stack_legends(fig, left=0.18, blocks=[('Taxonomic group', groups), ('Niche', niches)])
     # room above the dots for the strips and the parasite names standing on them
-    fig.subplots_adjust(left=0.18, right=0.875, top=1 - 1.45 / fig.get_figheight(),
+    fig.subplots_adjust(left=0.18, right=0.85, top=1 - 1.45 / fig.get_figheight(),
                         bottom=(legends + 0.1) / fig.get_figheight())
     for extension in ('pdf', 'svg', 'png'):
         fig.savefig(f'{output_stem}.{extension}', dpi=300)
@@ -143,7 +144,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
-    parser.add_argument('--min-parasites', type=int, default=12,
+    parser.add_argument('--min-parasites', type=int, default=24,
                         help='families reached by fewer parasites stay out of the figure')
     parser.add_argument('--table', default='paper/tables/shared_families.csv')
     parser.add_argument('--figure', default='paper/figures/shared_families',

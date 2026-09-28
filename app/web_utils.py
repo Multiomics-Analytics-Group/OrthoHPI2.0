@@ -120,16 +120,16 @@ def load_eligible_proteins(data_dir):
     return utils.read_parquet_file(input_file=eligible_file)
 
 
-def load_proteome_sizes(data_dir):
+def load_filter_stages(data_dir):
     '''
-    How many proteins STRING holds for every species, before any filter, as
-    scripts/build_proteome_sizes.py writes them; None where the file was not built.
+    Per host-parasite pair, the proteins of either side left after each filter, as
+    scripts/build_filter_stages.py writes them; None where the file was not built.
     '''
-    sizes_file = os.path.join(data_dir, 'proteome_sizes.parquet')
-    if not os.path.exists(sizes_file):
+    stages_file = os.path.join(data_dir, 'filter_stages.parquet')
+    if not os.path.exists(stages_file):
         return None
 
-    return utils.read_parquet_file(input_file=sizes_file)
+    return utils.read_parquet_file(input_file=stages_file)
 
 
 def filtered_pool(data_dir, taxids, niche=None):
@@ -270,6 +270,11 @@ NICHE_ORDER = ['Extracellular', 'Intracellular']
 NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Intracellular': '#3d3d3d',
                 UNKNOWN_NICHE: '#f0f0f0'}
 NICHE_TITLE = 'intracellular / extracellular'
+
+
+def niche_rank(niche):
+    '''Where a niche sorts among the parasites of a group: NICHE_ORDER, then unknown.'''
+    return NICHE_ORDER.index(niche) if niche in NICHE_ORDER else len(NICHE_ORDER)
 
 
 def parasite_niche(config, taxid):

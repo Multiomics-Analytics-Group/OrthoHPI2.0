@@ -21,7 +21,7 @@ label, taxid and colour. Rat and mouse share `group: Rodent` — `Parasites_db.x
 only curates rat as a host, and we assume the same parasites infect mouse, so
 every parasite with 10116 in its `hosts` list also lists 10090. Mouse is worth
 having alongside rat because rat's jensenlab tissue data is sparse (no blood,
-skin, macrophage, nose or mouth above the 2.5 cutoff) where mouse's is not.
+skin, macrophage, nose or mouth data at all) where mouse's is not.
 
 Data sources are STRING v12.0 and EggNOG 6.
 
@@ -73,9 +73,11 @@ untouched at this stage.
 Runs once per host: downloads that host's tissue expression scores from its
 `tissues_url` (jensenlab tissues.jensenlab.org) and keeps a host protein only
 if:
-- its expression score in some tissue is at least its host-specific `tissue_cutoff`
-  (`2.5` for human, `1.0` rat, `2.0` mouse, `1.5` pig; `2.5` is the default in
-  `main.py`), and
+- its expression score in some tissue is at least `tissue_cutoff` (`1.0` for
+  every host; the default in `main.py`, which a host's `tissue_cutoff` in
+  `config.yml` overrides). Higher scores rank tissue enrichment rather than
+  detection, and in human they are dominated by UniGene EST counts, which
+  over-sample brain, and
 - that tissue is one of the BTO codes listed under the relevant parasite(s)
   in `config.yml` (i.e. a tissue the parasite actually encounters during its
   life cycle — gut, skin, blood, etc.).

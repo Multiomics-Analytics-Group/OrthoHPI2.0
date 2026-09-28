@@ -1,0 +1,57 @@
+host,parasite,group,niche,interactions,parasite proteins,host proteins,surface,both,interior
+human,Ancylostoma ceylanicum,Nematoda,extracellular,334,126,64,313,21,0
+human,Brugia malayi,Nematoda,extracellular,44,28,10,43,1,0
+human,Brugia timori,Nematoda,extracellular,89,70,14,80,9,0
+human,Dracunculus medinensis,Nematoda,extracellular,178,63,40,166,12,0
+human,Enterobius vermicularis,Nematoda,extracellular,189,73,42,170,19,0
+human,Loa loa,Nematoda,extracellular,171,49,38,167,4,0
+human,Necator americanus,Nematoda,extracellular,466,135,61,449,17,0
+human,Onchocerca volvulus,Nematoda,extracellular,126,44,27,125,1,0
+human,Strongyloides stercoralis,Nematoda,extracellular,116,46,40,113,3,0
+human,Toxocara canis,Nematoda,extracellular,580,107,134,503,77,0
+human,Trichinella britovi,Nematoda,intracellular,1751,82,480,168,15,1568
+human,Trichinella nativa,Nematoda,intracellular,1367,73,454,179,19,1169
+human,Trichinella nelsoni,Nematoda,intracellular,907,63,465,150,29,728
+human,Trichinella pseudospiralis,Nematoda,intracellular,964,68,502,184,18,762
+human,Trichinella spiralis,Nematoda,intracellular,966,64,455,147,18,801
+human,Trichuris trichiura,Nematoda,extracellular,75,40,27,71,4,0
+human,Wuchereria bancrofti,Nematoda,extracellular,64,43,11,61,3,0
+human,Clonorchis sinensis,Trematoda,extracellular,67,50,17,65,2,0
+human,Opisthorchis felineus,Trematoda,extracellular,142,82,31,138,4,0
+human,Opisthorchis viverrini,Trematoda,extracellular,59,40,19,53,6,0
+human,Schistosoma haematobium,Trematoda,extracellular,123,31,42,114,9,0
+human,Schistosoma japonicum,Trematoda,extracellular,159,39,51,136,23,0
+human,Schistosoma mansoni,Trematoda,extracellular,439,76,36,435,4,0
+human,Echinococcus granulosus,Cestoda,extracellular,69,16,30,63,6,0
+human,Echinococcus multilocularis,Cestoda,extracellular,61,19,33,58,3,0
+human,Hymenolepis diminuta,Cestoda,extracellular,45,17,19,43,2,0
+human,Taenia asiatica,Cestoda,extracellular,46,16,25,40,6,0
+human,Cryptosporidium muris,Apicomplexa,intracellular,60,12,38,17,1,42
+human,Cryptosporidium parvum,Apicomplexa,intracellular,32,7,23,15,0,17
+human,Plasmodium falciparum,Apicomplexa,intracellular,1706,100,738,117,69,1520
+human,Plasmodium knowlesi,Apicomplexa,intracellular,380,70,177,33,27,320
+human,Plasmodium vivax,Apicomplexa,intracellular,536,93,183,49,20,467
+human,Toxoplasma gondii,Apicomplexa,intracellular,276,28,139,82,12,182
+human,Leishmania infantum,Kinetoplastida,intracellular,49,15,28,13,0,36
+human,Leishmania major,Kinetoplastida,intracellular,52,20,38,15,1,36
+human,Trypanosoma brucei,Kinetoplastida,extracellular,34,14,27,24,10,0
+human,Trypanosoma cruzi,Kinetoplastida,intracellular,509,142,143,112,25,372
+human,Entamoeba histolytica,Other protozoa,extracellular,334,43,79,270,64,0
+human,Giardia lamblia,Other protozoa,extracellular,67,34,9,67,0,0
+human,Trichomonas vaginalis,Other protozoa,extracellular,216,112,15,118,98,0
+human,Trachipleistophora hominis,Microsporidia,intracellular,0,0,0,0,0,0
+human,Vittaforma corneae,Microsporidia,intracellular,8,3,8,1,1,6
+rat,Angiostrongylus cantonensis,Nematoda,extracellular,554,99,158,500,54,0
+rat,Angiostrongylus costaricensis,Nematoda,extracellular,208,83,55,178,30,0
+rat,Nippostrongylus brasiliensis,Nematoda,extracellular,901,191,165,787,114,0
+rat,Hymenolepis diminuta,Cestoda,extracellular,74,21,33,61,13,0
+rat,Cryptosporidium muris,Apicomplexa,intracellular,155,15,125,32,4,119
+rat,Leishmania braziliensis,Kinetoplastida,intracellular,0,0,0,0,0,0
+mouse,Angiostrongylus cantonensis,Nematoda,extracellular,334,81,96,321,13,0
+mouse,Angiostrongylus costaricensis,Nematoda,extracellular,244,83,55,220,24,0
+mouse,Nippostrongylus brasiliensis,Nematoda,extracellular,722,160,116,659,63,0
+mouse,Hymenolepis diminuta,Cestoda,extracellular,62,24,34,54,8,0
+mouse,Cryptosporidium muris,Apicomplexa,intracellular,90,21,63,26,2,62
+mouse,Leishmania braziliensis,Kinetoplastida,intracellular,352,37,166,48,39,265
+pig,Trichinella pseudospiralis,Nematoda,intracellular,742,63,390,166,8,568
+pig,Trichinella spiralis,Nematoda,intracellular,742,62,361,135,12,595

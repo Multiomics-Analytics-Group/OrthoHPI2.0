@@ -3,10 +3,11 @@ Compare the hosts of every parasite predicted against more than one. An interact
 compared between hosts as the pair of orthologous groups it was transferred from, so a
 link counts as shared when both hosts carry a protein of the host group interacting with
 the parasite's. A link missing from a host is explained with the first filter its host
-family fails there: the family is absent from the host proteome, no member is expressed
-in a tissue the parasite infects, no expressed member is in a location the parasite
-reaches, or it is available and STRING transferred nothing. Writes
-paper/tables/multi_host.csv and paper/figures/multi_host.pdf/.svg.
+family fails there: the family is absent from the host proteome, the TISSUES filter
+keeps no member in a tissue the parasite infects, the DeepLoc filter keeps no remaining
+member in a location the parasite reaches, or it is available and STRING transferred
+nothing -- a fourth case the comparison counts but which no link has fallen into. Writes
+paper/tables/multi_host.csv and paper/figures/multi_host.pdf/.svg/.png.
 '''
 import argparse
 import copy
@@ -22,16 +23,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 from pipeline import filters, main
+from scripts import figure_style
 
 REASONS = ['absent', 'not expressed', 'out of reach', 'not transferred']
 REASON_LABELS = {
     'absent': 'family absent from the host',
-    'not expressed': 'not expressed in an infected tissue',
-    'out of reach': 'not in a reachable location',
+    'not expressed': 'removed by the TISSUES filter',
+    'out of reach': 'removed by the DeepLoc filter',
     'not transferred': 'available, not transferred',
 }
-REASON_COLORS = {'absent': '#3b3b3b', 'not expressed': '#7a7a7a',
-                 'out of reach': '#b4b4b4', 'not transferred': '#e0e0e0'}
+# three well-separated greys for the causes that occur, outlined so the palest still
+# reads on white; the fourth is classified and counted but has never had a link to draw
+REASON_COLORS = {'absent': '#2b2b2b', 'not expressed': '#7a7a7a',
+                 'out of reach': '#c4c4c4', 'not transferred': '#ececec'}
+REASON_EDGE = '#4d4d4d'
 ALL_HOSTS_COLOR = '#3b3b3b'
 SOME_HOSTS_COLOR = '#b4b4b4'
 
@@ -121,11 +126,11 @@ def compare(config_file, data_dir):
 
 
 def draw(table, config, output_stem):
-    matplotlib.rcParams['font.family'] = 'sans-serif'
+    figure_style.apply()
     host_colors = {h['label'].split('(')[1].rstrip(')'): h['color'] for h in config['hosts'].values()}
     parasites = list(dict.fromkeys(table['parasite']))
-    fig, (left, right) = plt.subplots(1, 2, figsize=(7.5, 0.42 * len(parasites) + 1.6),
-                                      gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.2})
+    fig, (left, right) = plt.subplots(1, 2, figsize=(figure_style.WIDTH, 0.5 * len(parasites) + 1.9),
+                                      gridspec_kw={'width_ratios': [1, 1], 'wspace': 0.22})
 
     # A: the group-pair links of each parasite, by the hosts carrying them
     for i, parasite in enumerate(parasites):
@@ -141,7 +146,7 @@ def draw(table, config, output_stem):
             value = row['links only here']
             left.barh(i, value, left=x, color=host_colors[row['host']], height=0.7)
             x += value
-        left.text(x + 3, i, f'{x:,}', fontsize=6, va='center', color='#555555')
+        left.text(x + 3, i, f'{x:,}', va='center', color='#555555')
 
     # B: the links each host lacks while another host of the parasite has them, by cause,
     # one thin bar per host on the parasite's row
@@ -154,43 +159,46 @@ def draw(table, config, output_stem):
             x = 0
             for reason in REASONS:
                 value = row[f'missing: {reason}']
-                right.barh(y, value, left=x, color=REASON_COLORS[reason], height=height * 0.9)
+                right.barh(y, value, left=x, color=REASON_COLORS[reason], height=height * 0.9,
+                           edgecolor=REASON_EDGE, linewidth=0.4)
                 x += value
-            right.text(x + 3, y, f'{x:,}', fontsize=5.5, va='center', color='#555555')
+            right.text(x + 3, y, f'{x:,}', va='center', color='#555555')
             ticks.append(y)
             labels.append(row['host'])
 
     left.set_yticks(range(len(parasites)))
-    left.set_yticklabels(parasites, fontsize=7, style='italic')
+    left.set_yticklabels([figure_style.short_name(p) for p in parasites], style='italic')
     right.set_yticks(ticks)
-    right.set_yticklabels(labels, fontsize=5.5)
+    right.set_yticklabels(labels)
     for ax in (left, right):
         ax.set_ylim(len(parasites) - 0.4, -0.6)
-    left.set_title('A  Links of each parasite, by host', loc='left', fontsize=8, fontweight='bold')
-    right.set_title('B  Missing from a host, by cause', loc='left', fontsize=8, fontweight='bold')
+    left.set_title('A  Links of each parasite, by host', loc='left', fontweight='bold')
+    right.set_title('B  Missing from a host, by cause', loc='left', fontweight='bold')
     for ax in (left, right):
         ax.tick_params(axis='y', length=0)
-        ax.tick_params(axis='x', labelsize=6)
         ax.grid(axis='x', color='#e6e6e6', linewidth=0.6)
         ax.set_axisbelow(True)
         for side in ('top', 'right', 'left'):
             ax.spines[side].set_visible(False)
         ax.spines['bottom'].set_color('#999999')
-        ax.set_xlabel('Group-pair links', fontsize=7)
+        ax.set_xlabel('Group-pair links')
         ax.margins(x=0.2)
 
     host_handles = [Patch(color=ALL_HOSTS_COLOR, label='in every host'),
                     Patch(color=SOME_HOSTS_COLOR, label='in two of three hosts')]
     host_handles += [Patch(color=color, label=f'only in {host}') for host, color in host_colors.items()
                      if host in set(table['host'])]
-    left.legend(handles=host_handles, loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=3,
-                fontsize=6, frameon=False, handlelength=0.9)
-    right.legend(handles=[Patch(color=REASON_COLORS[r], label=REASON_LABELS[r]) for r in REASONS],
-                 loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=6,
+    left.legend(handles=host_handles, loc='upper center', bbox_to_anchor=(0.5, -0.14), ncol=2,
+                frameon=False, handlelength=0.9)
+    drawn = [r for r in REASONS if table[f'missing: {r}'].sum()]
+    right.legend(handles=[Patch(facecolor=REASON_COLORS[r], label=REASON_LABELS[r],
+                                edgecolor=REASON_EDGE, linewidth=0.4) for r in drawn],
+                 loc='upper center', bbox_to_anchor=(0.5, -0.14), ncol=1,
                  frameon=False, handlelength=0.9)
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.9, bottom=0.24)
-    for extension in ('pdf', 'svg'):
-        fig.savefig(f'{output_stem}.{extension}')
+    fig.subplots_adjust(left=0.15, right=0.95, top=1 - 0.35 / fig.get_figheight(),
+                        bottom=1.35 / fig.get_figheight())
+    for extension in ('pdf', 'svg', 'png'):
+        fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
 
@@ -207,4 +215,4 @@ if __name__ == '__main__':
     table.to_csv(args.table, index=False)
     print(f"Wrote {args.table}")
     draw(table, utils.read_config(filepath=args.config), args.figure)
-    print(f"Wrote {args.figure}.pdf and .svg")
+    print(f"Wrote {args.figure}.pdf, .svg and .png")

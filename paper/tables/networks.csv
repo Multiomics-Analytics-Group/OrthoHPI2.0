@@ -33,6 +33,7 @@ human,Plasmodium knowlesi,Apicomplexa,intracellular,1917,90,909,160,92,1665
 human,Plasmodium vivax,Apicomplexa,intracellular,2500,108,972,197,77,2226
 human,Toxoplasma gondii,Apicomplexa,intracellular,444,32,220,120,19,305
 human,Trypanosoma brucei,Kinetoplastida,extracellular,60,15,48,47,13,0
+human,Leishmania braziliensis,Kinetoplastida,intracellular,769,39,314,78,40,646
 human,Leishmania infantum,Kinetoplastida,intracellular,376,22,215,74,9,293
 human,Leishmania major,Kinetoplastida,intracellular,334,26,194,42,16,276
 human,Trypanosoma cruzi,Kinetoplastida,intracellular,3509,158,731,293,238,2978
@@ -46,7 +47,6 @@ rat,Angiostrongylus costaricensis,Nematoda,extracellular,208,83,55,178,30,0
 rat,Nippostrongylus brasiliensis,Nematoda,extracellular,901,191,165,787,114,0
 rat,Hymenolepis diminuta,Cestoda,extracellular,74,21,33,61,13,0
 rat,Cryptosporidium muris,Apicomplexa,intracellular,155,15,125,32,4,119
-rat,Leishmania braziliensis,Kinetoplastida,intracellular,0,0,0,0,0,0
 mouse,Angiostrongylus cantonensis,Nematoda,extracellular,615,104,191,553,62,0
 mouse,Angiostrongylus costaricensis,Nematoda,extracellular,520,107,148,451,69,0
 mouse,Nippostrongylus brasiliensis,Nematoda,extracellular,1443,206,252,1265,178,0

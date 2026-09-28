@@ -10,6 +10,7 @@ human,Plasmodium falciparum,36329,Apicomplexa,intracellular,19699,14712,12361,12
 human,Plasmodium knowlesi,5851,Apicomplexa,intracellular,19699,10737,8830,8828,909,5100,885,738,90,1917
 human,Plasmodium vivax,126793,Apicomplexa,intracellular,19699,10737,8830,8828,972,5389,1089,707,108,2500
 human,Toxoplasma gondii,432359,Apicomplexa,intracellular,19699,14902,12563,12563,220,8404,751,562,32,444
+human,Leishmania braziliensis,5660,Kinetoplastida,intracellular,19699,10411,8683,8680,314,8084,366,341,39,769
 human,Leishmania infantum,5671,Kinetoplastida,intracellular,19699,12434,10360,10358,215,8045,346,337,22,376
 human,Leishmania major,5664,Kinetoplastida,intracellular,19699,8516,7089,7087,194,8038,383,371,26,334
 human,Trypanosoma cruzi,353153,Kinetoplastida,intracellular,19699,13988,11739,11736,731,19242,3292,1283,158,3509
@@ -42,7 +43,6 @@ human,Entamoeba histolytica,5759,Other protozoa,extracellular,19699,15324,3973,3
 human,Giardia lamblia,184922,Other protozoa,extracellular,19699,11598,2767,2767,56,7154,746,283,38,265
 human,Trichomonas vaginalis,5722,Other protozoa,extracellular,19699,11970,2786,2786,104,50190,4443,1088,145,859
 rat,Cryptosporidium muris,441375,Apicomplexa,intracellular,22237,4456,3453,3447,125,3930,303,126,15,155
-rat,Leishmania braziliensis,5660,Kinetoplastida,intracellular,22237,0,0,0,0,8084,366,341,0,0
 rat,Angiostrongylus cantonensis,6313,Nematoda,extracellular,22237,9408,2091,2089,158,14486,1547,1286,99,554
 rat,Angiostrongylus costaricensis,334426,Nematoda,extracellular,22237,4456,808,807,55,13350,1392,1173,83,208
 rat,Nippostrongylus brasiliensis,27835,Nematoda,extracellular,22237,8287,1617,1615,165,22636,3269,2453,191,901

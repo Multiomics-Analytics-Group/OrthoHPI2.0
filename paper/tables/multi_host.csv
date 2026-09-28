@@ -9,8 +9,8 @@ Angiostrongylus cantonensis,rat,554,105,101,0,4,0,3,12,0
 Angiostrongylus cantonensis,mouse,615,116,101,0,15,0,1,3,0
 Angiostrongylus costaricensis,rat,208,64,62,0,2,0,32,18,0
 Angiostrongylus costaricensis,mouse,520,112,62,0,50,0,0,2,0
-Leishmania braziliensis,rat,0,0,0,0,0,0,234,0,0
-Leishmania braziliensis,mouse,895,234,0,0,234,0,0,0,0
+Leishmania braziliensis,human,769,218,207,0,11,0,24,3,0
+Leishmania braziliensis,mouse,895,234,207,0,27,0,4,7,0
 Trichinella spiralis,human,1643,495,403,0,92,1,2,2,0
 Trichinella spiralis,pig,1209,408,403,0,5,8,75,9,0
 Trichinella pseudospiralis,human,1592,595,483,0,112,0,3,1,0

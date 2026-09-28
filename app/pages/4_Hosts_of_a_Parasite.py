@@ -637,8 +637,16 @@ else:
                    'host or host set that received the interaction. Both axes are distinct '
                    'orthology groups, labelled with the proteins they hold and with the '
                    'group ID and the full membership on hover, ordered so shared '
-                   'interactions gather in the upper left.')
-        st.plotly_chart(generate_link_matrix(links, all_hosts, config), width='stretch')
+                   'interactions gather in the upper left. The links found in every host '
+                   'are left out unless switched on below, since they are most of the '
+                   'links and are counted in the bars above.')
+        # the shared links are most of the matrix, several hundred rows for Trichinella
+        show_shared = st.toggle('Include links found in every host', value=False)
+        shown = links if show_shared else links[links['n_hosts'] < len(all_hosts)]
+        if shown.empty:
+            st.text(f'Every link of {parasite} is found in every host')
+        else:
+            st.plotly_chart(generate_link_matrix(shown, all_hosts, config), width='stretch')
 
 st.markdown("---")
 

@@ -172,8 +172,23 @@ don't pool them.
 
 ## Using it for pig cell-type resolution
 
-The app reads cell-type annotation from `data/tissues_cell_types.parquet`. Build
-the pig contribution once before rebuilding that pipeline artifact:
+The app reads cell-type annotation from `data/tissues_cell_types.parquet`. The
+pipeline's own input is `data/pig_atlas_cell_types.parquet`, which is committed;
+the 2.1 GB `.rds` is needed only to regenerate it, and `pipeline.main` never
+reads or downloads it. The atlas is a fixed 2022 snapshot, so a regeneration is
+only called for when its tissue mapping changes or a newer atlas is adopted.
+
+The `.rds` is not in the repository. Fetch it from the URL under
+`urls.pig_atlas_url` in `config.yml` with a resumable transfer — the download is
+long enough that an interrupted one is worth continuing rather than restarting:
+
+```
+curl -C - -o data/pig_atlas_20221014.rds \
+    https://dreamapp.biomed.au.dk/pigatlas/pig_atlas_20221014.rds
+```
+
+Extracting from it needs R with Seurat and Matrix, which the `.venv` does not
+provide. Build the pig contribution before rebuilding the pipeline artifact:
 
 ```
 Rscript scripts/extract_pig_atlas_expression.R data/pig_atlas_20221014.rds \

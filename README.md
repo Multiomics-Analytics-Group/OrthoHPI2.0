@@ -5,7 +5,9 @@ OrthoHPI 2.0 is a resource that provides homology-derived predictions of host-pa
 This resource provides tissue and cell type resolution interactions as well as annotation of Biological Processes that allows a comprehensive analysis and comparison of all the parasitic species studied.
 
 
-<img width="1760" alt="Screenshot 2022-10-08 at 20 25 11" src="https://user-images.githubusercontent.com/1425851/194722121-b6f01c52-57d7-4676-aefe-239a2be3e78a.png">
+The app is available at **https://orthohpi.streamlit.app/**.
+
+<a href="https://orthohpi.streamlit.app/"><img alt="OrthoHPI 2.0 homepage" src="images/homepage.png"></a>
 
 
 ## Development

@@ -41,7 +41,7 @@ FIGURE_ORGANS = {
 }
 
 # the pipeline's default TISSUES cutoff; --cutoff overrides it
-DEFAULT_CUTOFF = 2.5
+DEFAULT_CUTOFF = 1.0
 
 # columns of the Jensen Lab experiments file: protein, name, BTO code, label, source, source
 # score, confidence

@@ -16,7 +16,7 @@ hosts:
     9606:
         label: Homo sapiens (human)
         color: "#0072B2"
-        tissue_cutoff: 2.5
+        tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/human_tissue_experiments_full.tsv
     10116:
         label: Rattus norvegicus (rat)
@@ -26,12 +26,12 @@ hosts:
     10090:
         label: Mus musculus (mouse)
         color: "#009E73"
-        tissue_cutoff: 2.0
+        tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/mouse_tissue_experiments_full.tsv
     9823:
         label: Sus scrofa (pig)
         color: "#CC79A7"
-        tissue_cutoff: 1.5
+        tissue_cutoff: 1.0
         tissues_url: https://download.jensenlab.org/pig_tissue_experiments_full.tsv
 
 tissues:

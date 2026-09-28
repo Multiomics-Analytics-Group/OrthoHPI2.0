@@ -167,7 +167,8 @@ def get_overview_predictions(data_dir, config):
     df = pd.concat(frames, ignore_index=True)
 
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
-    # the order of the circos: taxonomic group as configured, then name, unclassified last
+    # the order of the circos: taxonomic group as configured, then niche, then name,
+    # unclassified last
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
     df['name'] = df['taxid1_label'].map(short_name)
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
@@ -186,8 +187,11 @@ def host_columns(df, width, bands=0, band_height=BAND_HEIGHT):
     hosts = []
     for host in df['host'].unique():
         host_df = df[df['host'] == host]
-        parasites = host_df[['taxid1_label', 'name', 'group_rank']].drop_duplicates()
-        parasites = parasites.sort_values(by=['group_rank', 'taxid1_label'], kind='stable')
+        parasites = host_df[['taxid1_label', 'name', 'group_rank']].drop_duplicates(
+            'taxid1_label')
+        parasites['niche_rank'] = parasites.index.map(host_df['niche']).map(web_utils.niche_rank)
+        parasites = parasites.sort_values(by=['group_rank', 'niche_rank', 'taxid1_label'],
+                                          kind='stable')
         hosts.append((host, host_df, parasites['name'].tolist()))
 
     widths = [max(len(names), MIN_COLUMN) for _, _, names in hosts]
@@ -568,6 +572,7 @@ def generate_proteome_sizes(config, sizes, eligible, palette):
     secreted proteins, has few interactions to offer before any prediction is made.
     '''
     order = {g: i for i, g in enumerate(palette)}
+    niches = web_utils.get_niches(config)
     pool = eligible['taxid'].astype(str).value_counts()
     sizes = sizes.set_index('taxid')['proteins']
     rows = []
@@ -575,6 +580,7 @@ def generate_proteome_sizes(config, sizes, eligible, palette):
         group = parasite.get('group', UNKNOWN_GROUP)
         rows.append({'name': short_name(parasite['label']), 'group': group,
                      'group_rank': order.get(group, len(order)),
+                     'niche_rank': web_utils.niche_rank(niches.get(parasite['label'])),
                      'label': parasite['label'],
                      # what the secretome filter admits of each: a multicellular parasite
                      # reaches its host with secreted proteins alone
@@ -582,7 +588,7 @@ def generate_proteome_sizes(config, sizes, eligible, palette):
                              else 'secreted or membrane',
                      'proteome': sizes.get(str(taxid)), 'eligible': pool.get(str(taxid), 0)})
     df = pd.DataFrame(rows).dropna(subset=['proteome'])
-    df = df.sort_values(by=['group_rank', 'label'], kind='stable')
+    df = df.sort_values(by=['group_rank', 'niche_rank', 'label'], kind='stable')
     df['share'] = df['eligible'] / df['proteome']
 
     figure = go.Figure()
@@ -637,7 +643,8 @@ def generate_tissue_matrix(config, palette, width):
                          'niche': niches.get(parasite['label'], web_utils.UNKNOWN_NICHE),
                          'tissue': tissue, 'tissues': len(tissues)})
     df = pd.DataFrame(rows)
-    df = df.sort_values(by=['group_rank', 'label'], kind='stable')
+    df['niche_rank'] = df['niche'].map(web_utils.niche_rank)
+    df = df.sort_values(by=['group_rank', 'niche_rank', 'label'], kind='stable')
     parasites = df['name'].unique().tolist()
     # how many parasites infect each tissue, most first; ties in alphabetical order
     counts = df.groupby('tissue').size().sort_index()

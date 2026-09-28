@@ -272,6 +272,11 @@ NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Intracellular': '#3d3d3d',
 NICHE_TITLE = 'intracellular / extracellular'
 
 
+def niche_rank(niche):
+    '''Where a niche sorts among the parasites of a group: NICHE_ORDER, then unknown.'''
+    return NICHE_ORDER.index(niche) if niche in NICHE_ORDER else len(NICHE_ORDER)
+
+
 def parasite_niche(config, taxid):
     '''
     The niche config.yml records for one parasite, keyed by taxid rather than by label,

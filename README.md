@@ -1,6 +1,6 @@
 # OrthoHPI2.0
 
-OrthoHPI 2.0 is a resource that provides homology-derived predictions of host-parasite protein-protein interactions (PPI). This work renews and extends OrthoHPI by integrating new versions of databases, predictors and proteomes of 24 eukaryotic parasites such as apicomplexa and trypanosomatids.
+OrthoHPI 2.0 is a resource that provides homology-derived predictions of host-parasite protein-protein interactions (PPI). This work renews and extends OrthoHPI by integrating new versions of databases, predictors and proteomes of 46 eukaryotic parasites such as apicomplexa and trypanosomatids across four hosts (human, pig, mouse, and rat).
 
 This resource provides tissue and cell type resolution interactions as well as annotation of Biological Processes that allows a comprehensive analysis and comparison of all the parasitic species studied.
 

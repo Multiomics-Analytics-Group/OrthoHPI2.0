@@ -1,3 +1,4 @@
+import math
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
@@ -69,8 +70,21 @@ SPLIT_SIDES = {'Host proteins': ('target', HOST_SPLIT_CLASSES),
 # the counts run from 39 to two and a half thousand, so the split of the small parasites is
 # only legible in shares
 BAR_SCALES = ('Counts', 'Share')
-# the whole proteome is drawn this faint behind the solid bar of its eligible subset
-PROTEOME_OPACITY = 0.3
+# the stages of the filter funnel on either side, in the order the pipeline applies them,
+# named after the boxes of the workflow figure and coloured as in the paper's funnel, a
+# later stage darker
+FUNNEL_SIDES = {'parasite': ['proteome', 'localization', 'eggnog', 'interactor'],
+                'host': ['proteome', 'tissue', 'localization', 'interactor']}
+FUNNEL_LABELS = {'proteome': 'STRING proteome',
+                 'tissue': 'TISSUES: expressed in an infected tissue (host)',
+                 'localization': 'DeepLoc: in a relevant subcellular location',
+                 'eggnog': 'in an EggNOG orthologous group (parasite)',
+                 'interactor': 'in a predicted interaction'}
+FUNNEL_COLORS = {'proteome': '#e4ecf7', 'tissue': '#b9d0ec', 'localization': '#87b0de',
+                 'eggnog': '#4a7fc1', 'interactor': '#10315e'}
+FUNNEL_SCALES = ('Logarithmic', 'Linear')
+# share of the figure height between the parasite and the host bars of the funnel
+FUNNEL_GAP = 0.03
 # how far under the lowest cut-off or point a probability scale starts
 SCALE_MARGIN = 0.05
 # rows of the shared-family dot plot, pixels a row takes, and what the strip, the names
@@ -563,58 +577,109 @@ def generate_interactions_by_group(df, palette, width, score):
     return figure
 
 
+def count_filter_stages(stages, df, score):
+    '''
+    The stage counts of every pair, the last stage on either side counted here: the
+    proteins in an interaction predicted at or above the confidence, which the pipeline
+    cannot know in advance.
+    '''
+    kept = df[df['weight'] >= score]
+    interactors = (kept.groupby(['host', 'taxid1_label'])
+                   .agg(host_interactor=('target', 'nunique'),
+                        parasite_interactor=('source', 'nunique'),
+                        edges=('weight', 'size'))
+                   .reset_index().rename(columns={'taxid1_label': 'species'}))
+    pairs = stages.merge(interactors, on=['host', 'species'], how='left')
+    counts = ['host_interactor', 'parasite_interactor', 'edges']
+    pairs[counts] = pairs[counts].fillna(0).astype(int)
+
+    return pairs
+
+
 @st.cache_data(show_spinner=False)
-def generate_proteome_sizes(config, sizes, eligible, palette):
+def generate_filter_funnel(config, stages, df, palette, width, score, log=True):
     '''
-    One bar per parasite: the whole proteome STRING holds for it, faint, with the
-    proteins the secretome filter let through solid in front. The ratio is what the
-    counts above stand on -- a small proteome, or a multicellular parasite kept to its
-    secreted proteins, has few interactions to offer before any prediction is made.
+    What each filter leaves of either proteome, one column per host as in the figures
+    above: the parasite's stages rising above the line and the host's hanging below it,
+    each stage a bar drawn in front of the one before, so the bar a filter leaves reads
+    against the one it was given.
     '''
+    pairs = count_filter_stages(stages, df, score)
     order = {g: i for i, g in enumerate(palette)}
     niches = web_utils.get_niches(config)
-    pool = eligible['taxid'].astype(str).value_counts()
-    sizes = sizes.set_index('taxid')['proteins']
-    rows = []
-    for taxid, parasite in config['parasites'].items():
-        group = parasite.get('group', UNKNOWN_GROUP)
-        rows.append({'name': short_name(parasite['label']), 'group': group,
-                     'group_rank': order.get(group, len(order)),
-                     'niche_rank': web_utils.niche_rank(niches.get(parasite['label'])),
-                     'label': parasite['label'],
-                     # what the secretome filter admits of each: a multicellular parasite
-                     # reaches its host with secreted proteins alone
-                     'kept': 'secreted' if parasite.get('multicellular')
-                             else 'secreted or membrane',
-                     'proteome': sizes.get(str(taxid)), 'eligible': pool.get(str(taxid), 0)})
-    df = pd.DataFrame(rows).dropna(subset=['proteome'])
-    df = df.sort_values(by=['group_rank', 'niche_rank', 'label'], kind='stable')
-    df['share'] = df['eligible'] / df['proteome']
+    pairs = pairs.assign(taxid1_label=pairs['species'], name=pairs['species'].map(short_name),
+                         group_rank=pairs['group'].map(lambda g: order.get(g, len(order))),
+                         niche=pairs['species'].map(niches).fillna(web_utils.UNKNOWN_NICHE))
+    # the rows of the skeleton are the parasite side, the host side and the two strips;
+    # their heights are set below
+    figure, hosts = host_columns(pairs, width, bands=3)
 
-    figure = go.Figure()
-    for group, group_df in df.groupby('group', sort=False):
-        color = palette.get(group, UNKNOWN_COLOR)
-        custom = group_df[['proteome', 'eligible', 'share', 'kept']]
-        hover = ('%{x}<br>%{customdata[0]:,} proteins in STRING<br>%{customdata[1]:,} '
-                 '%{customdata[3]} (%{customdata[2]:.0%})' f'<extra>{group}</extra>')
-        figure.add_trace(
-            go.Bar(x=group_df['name'], y=group_df['proteome'], name=group,
-                   marker_color=color, opacity=PROTEOME_OPACITY, customdata=custom,
-                   legendgroup=group, showlegend=False, hovertemplate=hover))
-        figure.add_trace(
-            go.Bar(x=group_df['name'], y=group_df['eligible'], name=group,
-                   marker_color=color, customdata=custom,
-                   legendgroup=group, hovertemplate=hover))
+    labelled = set()
+    for column, (host, host_df, names) in enumerate(hosts, start=1):
+        host_df = host_df.set_index('name').reindex(names)
+        for row, (side, stages_of) in enumerate(FUNNEL_SIDES.items(), start=1):
+            proteome = host_df[f'{side}_proteome']
+            for stage in stages_of:
+                counts = host_df[f'{side}_{stage}']
+                figure.add_trace(
+                    go.Bar(x=names, y=counts, name=FUNNEL_LABELS[stage],
+                           marker=dict(color=FUNNEL_COLORS[stage],
+                                       line=dict(color='white', width=0.5)),
+                           customdata=pd.DataFrame({'share': counts / proteome,
+                                                    'edges': host_df['edges']}),
+                           legendgroup=stage, showlegend=stage not in labelled,
+                           # in the order of the pipeline, not the order drawn
+                           legendrank=list(FUNNEL_COLORS).index(stage),
+                           hovertemplate=f'%{{x}}<br>{side} proteins: %{{y:,}} '
+                                         '(%{customdata[0]:.1%} of the proteome)<br>'
+                                         '%{customdata[1]:,} predicted interactions'
+                                         f'<extra>{FUNNEL_LABELS[stage]}</extra>'),
+                    row=row, col=column)
+                labelled.add(stage)
+            figure.update_xaxes(categoryorder='array', categoryarray=names, row=row,
+                                col=column)
 
-    figure.update_layout(barmode='overlay', bargap=0.2, height=420, plot_bgcolor='white',
-                         margin=dict(l=0, r=0, t=40, b=10),
-                         legend=dict(orientation='h', yanchor='bottom', y=1.02, x=0,
-                                     title_text='', font=dict(size=11)))
-    figure.update_xaxes(categoryorder='array', categoryarray=df['name'].tolist(),
-                        tickangle=-60, showgrid=False, tickfont=dict(size=11),
-                        automargin=True)
-    figure.update_yaxes(title_text='proteins', showgrid=True, gridcolor='#f0f0f0',
-                        zerolinecolor='#e0e0e0', automargin=True)
+    figure = style_host_columns(figure, 'parasite proteins')
+    figure.update_yaxes(title_text='host proteins', row=2, col=1)
+    add_band(figure, hosts, 'group', palette, set(), row=3, legend='legend2')
+    add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=4, legend='legend3',
+             unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
+
+    # the two sides face each other across a narrow gap, the host side hanging from it,
+    # and the strips sit on one another under both
+    top = figure.get_subplot(1, 1).yaxis.domain[1]
+    strip = (top - 3 * BAND_GAP) * BAND_HEIGHT
+    middle = (top + 2 * strip + BAND_GAP) / 2
+    figure.update_yaxes(domain=[0, strip], row=4)
+    figure.update_yaxes(domain=[strip, 2 * strip], row=3)
+    figure.update_yaxes(domain=[2 * strip + BAND_GAP, middle - FUNNEL_GAP / 2], row=2)
+    figure.update_yaxes(domain=[middle + FUNNEL_GAP / 2, top], row=1)
+    # each side on its own axis, as the host proteomes are several times the parasites';
+    # a log axis starts at one protein
+    for row, side in enumerate(FUNNEL_SIDES, start=1):
+        largest = pairs[f'{side}_proteome'].max()
+        if log:
+            limits = [0, math.log10(largest) + 0.1]
+            figure.update_yaxes(type='log', dtick=1, row=row)
+        else:
+            limits = [0, largest * 1.05]
+        figure.update_yaxes(range=limits[::-1] if side == 'host' else limits, row=row)
+
+    figure.update_layout(barmode='overlay', bargap=0.2, height=720, margin=dict(t=175),
+                         legend=dict(y=1.26, title_text='proteins left after',
+                                     title_font=dict(size=11)),
+                         legend2=dict(orientation='h', yanchor='bottom', y=1.16, x=0,
+                                      title_text='taxonomic group',
+                                      title_font=dict(size=11), font=dict(size=11)),
+                         legend3=dict(orientation='h', yanchor='bottom', y=1.08, x=0,
+                                      title_text=web_utils.NICHE_TITLE,
+                                      title_font=dict(size=11), font=dict(size=11)))
+    # the names belong under the strips
+    for row in (1, 2, 3):
+        figure.update_xaxes(showticklabels=False, row=row)
+    figure.update_xaxes(automargin=True, row=4)
+    figure.update_yaxes(automargin=True, row=1, col=1)
+    figure.update_yaxes(automargin=True, row=2, col=1)
 
     return figure
 
@@ -971,17 +1036,27 @@ st.plotly_chart(
                                        share=bar_scale == BAR_SCALES[1]),
     width='stretch')
 
-proteome_sizes = web_utils.load_proteome_sizes(data_dir)
-eligible_proteins = web_utils.load_eligible_proteins(data_dir)
-if proteome_sizes is not None and eligible_proteins is not None:
-    with st.expander('Parasite proteome sizes'):
-        st.caption('The whole proteome of each parasite as STRING holds it, faint, and in '
-                   'front of it the proteins the secretome filter let through — the '
-                   'membrane and secreted proteins of a unicellular parasite, the secreted '
-                   'proteins alone of a multicellular one.')
-        st.plotly_chart(generate_proteome_sizes(config, proteome_sizes, eligible_proteins,
-                                                parasite_palette),
-                        width='stretch')
+filter_stages = web_utils.load_filter_stages(data_dir)
+if filter_stages is not None:
+    st.subheader("Proteins left after each filter")
+    with st.columns([1.4, 1, 1.6])[0]:
+        funnel_scale = st.segmented_control(
+            'Axis', FUNNEL_SCALES, default=FUNNEL_SCALES[0], key='funnel_scale',
+            help='The proteomes run to tens of thousands of proteins and the interactors '
+                 'to a few dozen, so the later stages are only legible on a logarithmic '
+                 'axis; a linear one shows how much of each proteome is left.')
+    st.caption('For every host-parasite pair, how many proteins of the parasite (above the '
+               'line) and of the host (below it) are left after each filter of the pipeline, '
+               'each stage drawn in front of the one before it. The parasite is kept to its '
+               'secreted and membrane proteins — its secreted ones alone if multicellular — '
+               'and to those in an EggNOG orthologous group; the host to the proteins '
+               'expressed in a tissue the parasite infects and localized where its niche '
+               'reaches. The last stage counts the proteins in an interaction predicted at '
+               'or above the confidence set above. ' + BANDS_STRIP)
+    st.plotly_chart(generate_filter_funnel(config, filter_stages, overview, parasite_palette,
+                                           page, score,
+                                           log=funnel_scale != FUNNEL_SCALES[1]),
+                    width='stretch')
 
 st.subheader("Tissues infected by each parasite")
 st.caption('A tile wherever a parasite is known to infect a tissue of its host, from the '

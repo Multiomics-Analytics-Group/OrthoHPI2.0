@@ -120,16 +120,16 @@ def load_eligible_proteins(data_dir):
     return utils.read_parquet_file(input_file=eligible_file)
 
 
-def load_proteome_sizes(data_dir):
+def load_filter_stages(data_dir):
     '''
-    How many proteins STRING holds for every species, before any filter, as
-    scripts/build_proteome_sizes.py writes them; None where the file was not built.
+    Per host-parasite pair, the proteins of either side left after each filter, as
+    scripts/build_filter_stages.py writes them; None where the file was not built.
     '''
-    sizes_file = os.path.join(data_dir, 'proteome_sizes.parquet')
-    if not os.path.exists(sizes_file):
+    stages_file = os.path.join(data_dir, 'filter_stages.parquet')
+    if not os.path.exists(stages_file):
         return None
 
-    return utils.read_parquet_file(input_file=sizes_file)
+    return utils.read_parquet_file(input_file=stages_file)
 
 
 def filtered_pool(data_dir, taxids, niche=None):

@@ -566,7 +566,7 @@ parasites:
             - "BTO:0000801"
             - "BTO:0000089"
         hosts:
-            - 10116
+            - 9606
             - 10090
     6334:
         label: Trichinella spiralis

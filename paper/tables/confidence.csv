@@ -1,0 +1,57 @@
+host,parasite,group,niche,interactions,min,q1,median,q3,max
+human,Ancylostoma ceylanicum,Nematoda,extracellular,1143,0.351,0.374,0.450,0.584,0.949
+human,Brugia malayi,Nematoda,extracellular,129,0.359,0.364,0.441,0.450,0.941
+human,Brugia timori,Nematoda,extracellular,398,0.356,0.403,0.450,0.595,0.941
+human,Dracunculus medinensis,Nematoda,extracellular,628,0.357,0.397,0.449,0.535,0.941
+human,Enterobius vermicularis,Nematoda,extracellular,684,0.351,0.374,0.450,0.648,0.941
+human,Loa loa,Nematoda,extracellular,349,0.357,0.374,0.449,0.593,0.938
+human,Necator americanus,Nematoda,extracellular,1597,0.356,0.374,0.450,0.648,0.941
+human,Onchocerca volvulus,Nematoda,extracellular,266,0.353,0.359,0.445,0.505,0.938
+human,Strongyloides stercoralis,Nematoda,extracellular,423,0.352,0.374,0.450,0.593,0.946
+human,Toxocara canis,Nematoda,extracellular,1010,0.357,0.400,0.450,0.640,0.943
+human,Trichuris trichiura,Nematoda,extracellular,312,0.357,0.372,0.449,0.505,0.941
+human,Wuchereria bancrofti,Nematoda,extracellular,240,0.357,0.374,0.441,0.450,0.941
+human,Trichinella britovi,Nematoda,intracellular,3050,0.352,0.359,0.397,0.454,0.949
+human,Trichinella nativa,Nematoda,intracellular,2364,0.355,0.359,0.400,0.470,0.949
+human,Trichinella nelsoni,Nematoda,intracellular,1542,0.355,0.359,0.400,0.496,0.949
+human,Trichinella pseudospiralis,Nematoda,intracellular,1592,0.355,0.397,0.450,0.654,0.949
+human,Trichinella spiralis,Nematoda,intracellular,1643,0.351,0.359,0.400,0.480,0.949
+human,Clonorchis sinensis,Trematoda,extracellular,301,0.356,0.397,0.450,0.676,0.947
+human,Opisthorchis felineus,Trematoda,extracellular,620,0.356,0.437,0.450,0.928,0.947
+human,Opisthorchis viverrini,Trematoda,extracellular,489,0.356,0.364,0.400,0.450,0.947
+human,Schistosoma haematobium,Trematoda,extracellular,384,0.356,0.437,0.450,0.595,0.949
+human,Schistosoma japonicum,Trematoda,extracellular,506,0.356,0.364,0.441,0.535,0.938
+human,Schistosoma mansoni,Trematoda,extracellular,1075,0.356,0.397,0.441,0.483,0.942
+human,Echinococcus granulosus,Cestoda,extracellular,205,0.358,0.441,0.483,0.654,0.946
+human,Echinococcus multilocularis,Cestoda,extracellular,175,0.359,0.397,0.450,0.654,0.943
+human,Hymenolepis diminuta,Cestoda,extracellular,235,0.359,0.441,0.450,0.654,0.943
+human,Taenia asiatica,Cestoda,extracellular,210,0.358,0.441,0.450,0.654,0.946
+human,Cryptosporidium muris,Apicomplexa,intracellular,325,0.355,0.380,0.441,0.496,0.946
+human,Cryptosporidium parvum,Apicomplexa,intracellular,195,0.357,0.397,0.441,0.520,0.941
+human,Plasmodium falciparum,Apicomplexa,intracellular,2794,0.351,0.400,0.450,0.593,0.949
+human,Plasmodium knowlesi,Apicomplexa,intracellular,1917,0.350,0.388,0.450,0.590,0.949
+human,Plasmodium vivax,Apicomplexa,intracellular,2500,0.350,0.400,0.450,0.633,0.949
+human,Toxoplasma gondii,Apicomplexa,intracellular,444,0.354,0.400,0.448,0.450,0.946
+human,Trypanosoma brucei,Kinetoplastida,extracellular,60,0.356,0.400,0.450,0.450,0.936
+human,Leishmania braziliensis,Kinetoplastida,intracellular,769,0.354,0.359,0.442,0.586,0.947
+human,Leishmania infantum,Kinetoplastida,intracellular,376,0.356,0.436,0.450,0.693,0.942
+human,Leishmania major,Kinetoplastida,intracellular,334,0.356,0.366,0.450,0.657,0.930
+human,Trypanosoma cruzi,Kinetoplastida,intracellular,3509,0.351,0.359,0.400,0.498,0.949
+human,Entamoeba histolytica,Other protozoa,extracellular,565,0.356,0.400,0.450,0.584,0.947
+human,Giardia lamblia,Other protozoa,extracellular,265,0.359,0.450,0.584,0.584,0.947
+human,Trichomonas vaginalis,Other protozoa,extracellular,859,0.354,0.359,0.450,0.593,0.947
+human,Trachipleistophora hominis,Microsporidia,intracellular,1,0.909,0.909,0.909,0.909,0.909
+human,Vittaforma corneae,Microsporidia,intracellular,32,0.360,0.460,0.593,0.750,0.946
+rat,Hymenolepis diminuta,Cestoda,extracellular,74,0.359,0.409,0.441,0.505,0.928
+rat,Cryptosporidium muris,Apicomplexa,intracellular,155,0.355,0.360,0.433,0.496,0.912
+rat,Angiostrongylus cantonensis,Nematoda,extracellular,554,0.357,0.374,0.441,0.550,0.941
+rat,Angiostrongylus costaricensis,Nematoda,extracellular,208,0.357,0.374,0.441,0.450,0.930
+rat,Nippostrongylus brasiliensis,Nematoda,extracellular,901,0.356,0.400,0.449,0.595,0.949
+mouse,Hymenolepis diminuta,Cestoda,extracellular,172,0.357,0.441,0.450,0.595,0.943
+mouse,Cryptosporidium muris,Apicomplexa,intracellular,293,0.355,0.380,0.441,0.492,0.946
+mouse,Leishmania braziliensis,Kinetoplastida,intracellular,895,0.354,0.359,0.433,0.593,0.947
+mouse,Angiostrongylus cantonensis,Nematoda,extracellular,615,0.356,0.374,0.441,0.505,0.941
+mouse,Angiostrongylus costaricensis,Nematoda,extracellular,520,0.357,0.374,0.449,0.550,0.941
+mouse,Nippostrongylus brasiliensis,Nematoda,extracellular,1443,0.356,0.389,0.448,0.595,0.949
+pig,Trichinella pseudospiralis,Nematoda,intracellular,1138,0.355,0.397,0.450,0.675,0.949
+pig,Trichinella spiralis,Nematoda,intracellular,1209,0.351,0.359,0.400,0.505,0.949

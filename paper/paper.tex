@@ -298,6 +298,27 @@ the infected tissues in each host.
   \label{fig:tissues_coverage}
 \end{figure}
 
+\textbf{Supplementary Figure S2}. Confidence scores of the predicted
+interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
+
+% paper/figures/confidence.pdf is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S2}
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/confidence}
+  \caption{Confidence scores of the predicted interactions of every
+  host--parasite pair, laid out as Figure~\ref{fig:networks}: one block per
+  host, one box per parasite. The score of a prediction is the average of the
+  experimental and database evidence of the KOG--KOG link it was transferred
+  from; a link is kept only if one of the two is at least 0.7, so no score is
+  below 0.35. Boxes span the interquartile range with the median marked,
+  whiskers extend to 1.5 times the interquartile range, and outliers are not
+  drawn. \textit{T.~hominis} has a single prediction. The strips beside the
+  names give the niche (outer) and the taxonomic group (inner).}
+  \label{fig:confidence}
+\end{figure}
+
 \section*{Data and code availability}
 \todo{Repository: \url{https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0}}
 

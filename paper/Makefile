@@ -30,7 +30,8 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
 	figures/parasite_similarity.png figures/shared_families.png \
-	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png
+	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
+	figures/confidence.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -71,7 +72,11 @@ figures/networks.svg figures/networks.png tables/networks.csv: ../config.yml ../
 figures/tissues_coverage.svg figures/tissues_coverage.png tables/tissues_coverage.csv: ../config.yml ../scripts/build_tissues_coverage.py
 	cd .. && $(PYTHON) scripts/build_tissues_coverage.py
 
-figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png
+# Supplementary: the confidence scores of the predictions of every host-parasite pair.
+figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.yml ../data/predictions.parquet ../scripts/build_confidence_figure.py
+	cd .. && $(PYTHON) scripts/build_confidence_figure.py
+
+figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

@@ -1,0 +1,84 @@
+host,proteome,tissue,proteins
+Homo sapiens (human),19699,brain,12735
+Homo sapiens (human),19699,intestine,11598
+Homo sapiens (human),19699,urinary tract,11191
+Homo sapiens (human),19699,lung,10150
+Homo sapiens (human),19699,colon,8937
+Homo sapiens (human),19699,small intestine,8729
+Homo sapiens (human),19699,heart,8458
+Homo sapiens (human),19699,muscle,8432
+Homo sapiens (human),19699,spleen,8282
+Homo sapiens (human),19699,placenta,8269
+Homo sapiens (human),19699,stomach,8071
+Homo sapiens (human),19699,urinary bladder,7815
+Homo sapiens (human),19699,liver,7784
+Homo sapiens (human),19699,mouth,7546
+Homo sapiens (human),19699,prostate,7349
+Homo sapiens (human),19699,lymph node,6954
+Homo sapiens (human),19699,skin,6886
+Homo sapiens (human),19699,bone marrow,5845
+Homo sapiens (human),19699,blood,4916
+Homo sapiens (human),19699,rectum,4626
+Homo sapiens (human),19699,eye,4148
+Homo sapiens (human),19699,spinal cord,4099
+Homo sapiens (human),19699,uterine cervix,2225
+Homo sapiens (human),19699,vagina,1367
+Rattus norvegicus (rat),22237,spleen,7571
+Rattus norvegicus (rat),22237,lung,7536
+Rattus norvegicus (rat),22237,brain,7220
+Rattus norvegicus (rat),22237,urinary tract,6013
+Rattus norvegicus (rat),22237,heart,5420
+Rattus norvegicus (rat),22237,liver,5194
+Rattus norvegicus (rat),22237,muscle,4836
+Rattus norvegicus (rat),22237,intestine,4456
+Rattus norvegicus (rat),22237,colon,3994
+Rattus norvegicus (rat),22237,eye,1707
+Rattus norvegicus (rat),22237,small intestine,1304
+Rattus norvegicus (rat),22237,bone marrow,1126
+Mus musculus (mouse),21840,brain,10478
+Mus musculus (mouse),21840,urinary tract,10025
+Mus musculus (mouse),21840,lung,9911
+Mus musculus (mouse),21840,skin,9556
+Mus musculus (mouse),21840,intestine,9470
+Mus musculus (mouse),21840,spleen,9107
+Mus musculus (mouse),21840,macrophage,8873
+Mus musculus (mouse),21840,placenta,8687
+Mus musculus (mouse),21840,muscle,8461
+Mus musculus (mouse),21840,urinary bladder,8414
+Mus musculus (mouse),21840,blood,8131
+Mus musculus (mouse),21840,small intestine,8117
+Mus musculus (mouse),21840,colon,8085
+Mus musculus (mouse),21840,spinal cord,8046
+Mus musculus (mouse),21840,stomach,7749
+Mus musculus (mouse),21840,eye,7664
+Mus musculus (mouse),21840,heart,7260
+Mus musculus (mouse),21840,liver,7051
+Mus musculus (mouse),21840,lymph node,6917
+Mus musculus (mouse),21840,mouth,5842
+Mus musculus (mouse),21840,nose,5711
+Mus musculus (mouse),21840,bone marrow,5453
+Mus musculus (mouse),21840,prostate,3930
+Sus scrofa (pig),21278,macrophage,8375
+Sus scrofa (pig),21278,brain,7684
+Sus scrofa (pig),21278,urinary tract,6381
+Sus scrofa (pig),21278,lung,6264
+Sus scrofa (pig),21278,muscle,6263
+Sus scrofa (pig),21278,liver,6228
+Sus scrofa (pig),21278,spleen,6191
+Sus scrofa (pig),21278,intestine,5684
+Sus scrofa (pig),21278,heart,5530
+Sus scrofa (pig),21278,stomach,5477
+Sus scrofa (pig),21278,lymph node,5386
+Sus scrofa (pig),21278,colon,5270
+Sus scrofa (pig),21278,spinal cord,5121
+Sus scrofa (pig),21278,small intestine,3591
+Sus scrofa (pig),21278,eye,3422
+Sus scrofa (pig),21278,mouth,3202
+Sus scrofa (pig),21278,placenta,2931
+Sus scrofa (pig),21278,blood,2923
+Sus scrofa (pig),21278,uterine cervix,2804
+Sus scrofa (pig),21278,rectum,2715
+Sus scrofa (pig),21278,vagina,2674
+Sus scrofa (pig),21278,skin,2348
+Sus scrofa (pig),21278,urinary bladder,2254
+Sus scrofa (pig),21278,bone marrow,1756

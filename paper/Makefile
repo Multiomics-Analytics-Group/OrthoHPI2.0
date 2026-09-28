@@ -19,20 +19,18 @@
 # edit and `make refs` redundant. The citation keys match either way.
 #
 # The workflow figure is a hand-drawn SVG exported to PNG with Inkscape. Every
-# other figure is one rule per build script, which writes the .pdf the paper
-# includes and, in the same run, an .svg and a .png of it. Only the .pdf is a
-# target: naming the others too would run the script once per extension.
+# other figure is one rule per build script, which writes the 300-dpi .png the
+# paper includes and, in the same run, an .svg of it.
 
 ZOTERO := ../scripts/zotero_to_bib.py
 # the recipes below run from the repo root (`cd ..`), so this is relative to it
 PYTHON := .venv/bin/python
 INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
-# The figures the manuscript includes: workflow as a PNG export, the rest as the
-# vector PDFs the build scripts write.
-FIGURES := figures/workflow.png figures/funnel.pdf figures/networks.pdf \
-	figures/parasite_similarity.pdf figures/shared_families.pdf \
-	figures/multi_host.pdf figures/case_study.pdf
+# The figures the manuscript includes, all as PNGs.
+FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
+	figures/parasite_similarity.png figures/shared_families.png \
+	figures/multi_host.png figures/case_study.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -43,32 +41,37 @@ figures/workflow.png: figures/workflow.svg
 # The filter funnel: proteins left after each stage of the pipeline on the host and
 # parasite side of each host-parasite pair. Rereads the TISSUES downloads and the
 # EggNOG members file, so it takes a minute.
-figures/funnel.svg figures/funnel.pdf tables/funnel.csv tables/funnel_supplementary.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
+figures/funnel.svg figures/funnel.png tables/funnel.csv tables/funnel_supplementary.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_filter_funnel.py
 
 # The multi-host comparison: links shared between and specific to the hosts of each
 # parasite with several, and why a host lacks a link another host carries.
-figures/multi_host.svg figures/multi_host.pdf tables/multi_host.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../scripts/build_multi_host_figure.py
+figures/multi_host.svg figures/multi_host.png tables/multi_host.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../scripts/build_multi_host_figure.py
 	cd .. && $(PYTHON) scripts/build_multi_host_figure.py
 
 # The host families the most parasites converge on, over the parasites of human.
-figures/shared_families.svg figures/shared_families.pdf tables/shared_families.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_families.py
+figures/shared_families.svg figures/shared_families.png tables/shared_families.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_families.py
 	cd .. && $(PYTHON) scripts/build_shared_families.py
 
 # How alike the interactomes of the parasites of human are, pair by pair.
-figures/parasite_similarity.svg figures/parasite_similarity.pdf tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
+figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
 	cd .. && $(PYTHON) scripts/build_parasite_similarity.py
 
 # The case study: one host-parasite pair from parasite family to host cell type.
-figures/case_study.svg figures/case_study.pdf tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
+figures/case_study.svg figures/case_study.png tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
 	cd .. && $(PYTHON) scripts/build_case_study.py
 
 # The predicted networks at a glance: interactions per parasite by host and by
 # host-protein location.
-figures/networks.svg figures/networks.pdf tables/networks.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_networks_figure.py
+figures/networks.svg figures/networks.png tables/networks.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_networks_figure.py
 	cd .. && $(PYTHON) scripts/build_networks_figure.py
 
-figures: figures/workflow.png figures/funnel.pdf figures/multi_host.pdf figures/shared_families.pdf figures/parasite_similarity.pdf figures/case_study.pdf figures/networks.pdf
+# Supplementary: how many STRING proteins of each host TISSUES annotates to each tissue
+# at score 1. Rereads the TISSUES downloads.
+figures/tissues_coverage.svg figures/tissues_coverage.png tables/tissues_coverage.csv: ../config.yml ../scripts/build_tissues_coverage.py
+	cd .. && $(PYTHON) scripts/build_tissues_coverage.py
+
+figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

@@ -550,7 +550,7 @@ else:
     parasites = sorted(hosts_of.index)
 
     # the overview first, so the page has something to read before a parasite is chosen
-    st.subheader('Parasites with more than one host')
+    st.subheader('Shared and host-specific interactions per parasite')
     st.caption('The interactions of every parasite predicted against several hosts, '
                'counted as orthology-group links so that a host with more paralogues does '
                'not count for more: how many carried over to every host, and how many '
@@ -591,7 +591,7 @@ else:
                 tuple(taxid for host in all_hosts for taxid in hosts_taxids[host]),
                 shared_color_scale=True, title_as_subheader=True)
         with sets_column:
-            st.subheader('Shared and host-specific interactions')
+            st.subheader(f'Shared and host-specific interactions of *{parasite}*')
             st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
                        'the matrix below the bars. Interactions are counted as pairs of '
                        'orthology groups rather than pairs of proteins, since the '

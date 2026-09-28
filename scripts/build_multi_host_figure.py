@@ -7,7 +7,7 @@ family fails there: the family is absent from the host proteome, the TISSUES fil
 keeps no member in a tissue the parasite infects, the DeepLoc filter keeps no remaining
 member in a location the parasite reaches, or it is available and STRING transferred
 nothing -- a fourth case the comparison counts but which no link has fallen into. Writes
-paper/tables/multi_host.csv and paper/figures/multi_host.pdf/.svg/.png.
+paper/tables/multi_host.csv and paper/figures/multi_host.svg/.png.
 '''
 import argparse
 import copy
@@ -197,7 +197,7 @@ def draw(table, config, output_stem):
                  frameon=False, handlelength=0.9)
     fig.subplots_adjust(left=0.15, right=0.95, top=1 - 0.35 / fig.get_figheight(),
                         bottom=1.35 / fig.get_figheight())
-    for extension in ('pdf', 'svg', 'png'):
+    for extension in ('svg', 'png'):
         fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)
 
@@ -215,4 +215,4 @@ if __name__ == '__main__':
     table.to_csv(args.table, index=False)
     print(f"Wrote {args.table}")
     draw(table, utils.read_config(filepath=args.config), args.figure)
-    print(f"Wrote {args.figure}.pdf, .svg and .png")
+    print(f"Wrote {args.figure}.svg and .png")

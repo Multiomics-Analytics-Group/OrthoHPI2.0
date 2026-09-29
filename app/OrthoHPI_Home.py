@@ -1139,8 +1139,8 @@ if parasite_proteins is not None:
                'classes, scored on that probability, again over every prediction. Only '
                'unicellular parasites are represented, the secretome filter admitting a '
                'multicellular parasite nothing but its secreted proteins. Individual '
-               'proteins are shown as points; boxes over very few proteins (one each for '
-               '*G. lamblia* and *V. corneae*) should not be read as distributions. The '
+               'proteins are shown as points; boxes over very few proteins (two for '
+               '*V. corneae*) should not be read as distributions. The '
                'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
                f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
                + NICHE_STRIP)

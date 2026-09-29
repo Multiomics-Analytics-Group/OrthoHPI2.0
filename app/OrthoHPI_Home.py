@@ -990,6 +990,8 @@ with st.columns(3)[1]:
                f'at or above {score:g}.')
 
 st.subheader("Number of predicted interactions per parasite")
+# the description depends on the toggles but sits above them
+description = st.empty()
 # narrow columns: a segmented control left to itself is stretched over the page
 controls = st.columns([1.4, 1, 1.6])
 with controls[0]:
@@ -1008,26 +1010,16 @@ side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
 interactions = get_interaction_localisations(overview, data_dir, side)
 
 if interactions is None:
-    st.caption('Predicted interactions per parasite at or above the confidence set above, '
+    description.caption('Predicted interactions per parasite at or above the confidence set above, '
                'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
 elif side == 'target':
-    st.caption('Predicted interactions per parasite at or above the confidence set above, '
-               'grouped by host and split by the subcellular localization DeepLoc 2 '
-               'predicts for the host protein of each interaction, over the four classes '
-               'the host filter reads — extracellular, cell membrane, cytoplasm and '
-               'nucleus. Each parasite is read on the classes its niche let the filter keep '
-               'a host protein for: the surface pair for every parasite, the cytosol and '
-               'the nucleus for the ones with an intracellular stage, which is why the two '
-               'oranges appear under those alone. A host protein called for more than one '
-               'of the classes its parasite can reach is counted as several. ' + BANDS_STRIP)
+    description.caption('Predicted interactions per parasite at or above the confidence set above, '
+               'grouped by host and split by the localization DeepLoc 2 '
+               'assigns the host protein of each interaction.' + BANDS_STRIP)
 else:
-    st.caption('Predicted interactions per parasite at or above the confidence set above, '
+    description.caption('Predicted interactions per parasite at or above the confidence set above, '
                'grouped by host and split by the localization DeepLoc 2 assigns the '
-               'parasite protein of each interaction — cell membrane, extracellular, '
-               'or both. The secretome filter admits a multicellular parasite nothing but '
-               'its secreted proteins, so under the cestodes, nematodes and trematodes the '
-               'split is the filter rather than the parasite; only the unicellular '
-               'parasites had both classes open to them. ' + BANDS_STRIP)
+               'parasite protein of each interaction.' + BANDS_STRIP)
 
 st.plotly_chart(
     generate_interactions_per_parasite(overview if interactions is None else interactions,

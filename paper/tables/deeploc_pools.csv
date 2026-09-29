@@ -1,0 +1,79 @@
+side,localization,species,pool,kept,kept_share,under_cutoff,over_cutoff
+host,Extracellular,human,16508,1283,0.078,74,73
+host,Cell membrane,human,16508,3205,0.194,407,373
+host,Cytoplasm,human,16342,7079,0.433,630,663
+host,Nucleus,human,16342,5015,0.307,672,582
+host,Extracellular,rat,9895,567,0.057,50,44
+host,Cell membrane,rat,9895,1741,0.176,297,231
+host,Cytoplasm,rat,4456,2156,0.484,190,218
+host,Nucleus,rat,4456,1406,0.316,225,205
+host,Extracellular,mouse,14439,1042,0.072,64,65
+host,Cell membrane,mouse,14439,2737,0.190,394,309
+host,Cytoplasm,mouse,13191,5777,0.438,527,546
+host,Nucleus,mouse,13191,4139,0.314,553,503
+host,Extracellular,pig,10482,666,0.064,52,53
+host,Cell membrane,pig,10482,1884,0.180,290,231
+host,Cytoplasm,pig,10482,4718,0.450,441,480
+host,Nucleus,pig,10482,3080,0.294,487,410
+parasite,Extracellular,Ancylostoma ceylanicum,36519,5004,0.137,467,389
+parasite,Extracellular,Angiostrongylus cantonensis,14486,1547,0.107,175,140
+parasite,Extracellular,Angiostrongylus costaricensis,13350,1392,0.104,132,134
+parasite,Extracellular,Brugia malayi,8202,745,0.091,53,48
+parasite,Extracellular,Brugia timori,16199,1578,0.097,198,213
+parasite,Extracellular,Dracunculus medinensis,10868,1323,0.122,97,91
+parasite,Extracellular,Enterobius vermicularis,12840,1714,0.133,154,187
+parasite,Extracellular,Loa loa,12152,1163,0.096,126,115
+parasite,Extracellular,Necator americanus,19125,2768,0.145,258,231
+parasite,Extracellular,Nippostrongylus brasiliensis,22636,3269,0.144,272,290
+parasite,Extracellular,Onchocerca volvulus,12118,1114,0.092,93,82
+parasite,Extracellular,Strongyloides stercoralis,12819,2066,0.161,101,111
+parasite,Extracellular,Toxocara canis,18499,2038,0.110,160,147
+parasite,Extracellular,Trichuris trichiura,9625,835,0.087,79,76
+parasite,Extracellular,Wuchereria bancrofti,9343,858,0.092,68,73
+parasite,Extracellular,Trichinella britovi,15466,1202,0.078,240,200
+parasite,Extracellular,Trichinella nativa,13202,1048,0.079,204,123
+parasite,Extracellular,Trichinella nelsoni,13005,989,0.076,141,133
+parasite,Extracellular,Trichinella pseudospiralis,10629,921,0.087,131,118
+parasite,Extracellular,Trichinella spiralis,14258,1048,0.074,217,165
+parasite,Extracellular,Clonorchis sinensis,14505,816,0.056,226,166
+parasite,Extracellular,Opisthorchis felineus,11402,886,0.078,82,77
+parasite,Extracellular,Opisthorchis viverrini,16307,896,0.055,227,184
+parasite,Extracellular,Schistosoma haematobium,11119,541,0.049,83,80
+parasite,Extracellular,Schistosoma japonicum,10042,611,0.061,61,50
+parasite,Extracellular,Schistosoma mansoni,14110,826,0.059,79,85
+parasite,Extracellular,Echinococcus granulosus,11279,466,0.041,83,74
+parasite,Extracellular,Echinococcus multilocularis,10469,450,0.043,56,60
+parasite,Extracellular,Hymenolepis diminuta,11264,545,0.048,74,76
+parasite,Extracellular,Taenia asiatica,10327,440,0.043,79,66
+parasite,Extracellular,Cryptosporidium muris,3930,175,0.045,39,36
+parasite,Cell membrane,Cryptosporidium muris,3930,130,0.033,40,41
+parasite,Extracellular,Cryptosporidium parvum,3805,222,0.058,31,34
+parasite,Cell membrane,Cryptosporidium parvum,3805,88,0.023,46,29
+parasite,Extracellular,Plasmodium falciparum,5376,202,0.038,61,34
+parasite,Cell membrane,Plasmodium falciparum,5376,806,0.150,237,193
+parasite,Extracellular,Plasmodium knowlesi,5100,229,0.045,75,42
+parasite,Cell membrane,Plasmodium knowlesi,5100,675,0.132,186,172
+parasite,Extracellular,Plasmodium vivax,5389,316,0.059,69,56
+parasite,Cell membrane,Plasmodium vivax,5389,817,0.152,213,173
+parasite,Extracellular,Toxoplasma gondii,8404,527,0.063,131,84
+parasite,Cell membrane,Toxoplasma gondii,8404,258,0.031,116,85
+parasite,Extracellular,Trypanosoma brucei,8561,369,0.043,72,53
+parasite,Cell membrane,Trypanosoma brucei,8561,428,0.050,93,123
+parasite,Extracellular,Leishmania braziliensis,8084,87,0.011,36,20
+parasite,Cell membrane,Leishmania braziliensis,8084,286,0.035,74,90
+parasite,Extracellular,Leishmania infantum,8045,78,0.010,25,23
+parasite,Cell membrane,Leishmania infantum,8045,277,0.034,89,72
+parasite,Extracellular,Leishmania major,8038,102,0.013,32,36
+parasite,Cell membrane,Leishmania major,8038,292,0.036,68,80
+parasite,Extracellular,Trypanosoma cruzi,19242,1268,0.066,405,296
+parasite,Cell membrane,Trypanosoma cruzi,19242,2400,0.125,278,399
+parasite,Extracellular,Entamoeba histolytica,7959,327,0.041,57,37
+parasite,Cell membrane,Entamoeba histolytica,7959,581,0.073,116,115
+parasite,Extracellular,Giardia lamblia,7154,391,0.055,112,105
+parasite,Cell membrane,Giardia lamblia,7154,417,0.058,47,31
+parasite,Extracellular,Trichomonas vaginalis,50190,1695,0.034,580,387
+parasite,Cell membrane,Trichomonas vaginalis,50190,2873,0.057,1216,755
+parasite,Extracellular,Trachipleistophora hominis,3212,179,0.056,24,28
+parasite,Cell membrane,Trachipleistophora hominis,3212,61,0.019,20,15
+parasite,Extracellular,Vittaforma corneae,2236,73,0.033,13,9
+parasite,Cell membrane,Vittaforma corneae,2236,33,0.015,11,16

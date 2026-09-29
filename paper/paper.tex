@@ -319,6 +319,88 @@ interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
   \label{fig:confidence}
 \end{figure}
 
+\textbf{Supplementary Figures S3 and S4}. DeepLoc~2 probabilities of the host
+(Figure~\ref{fig:deeploc_host}) and parasite (Figure~\ref{fig:deeploc_parasite})
+proteins of the predicted interactions.
+
+% paper/figures/deeploc_host.png is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S3}
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{figures/deeploc_host}
+  \caption{DeepLoc~2 probabilities of the host proteins of the predictions for
+  each localization class they were called for: \textbf{(A)}~extracellular,
+  \textbf{(B)}~cell membrane, \textbf{(C)}~cytoplasm and \textbf{(D)}~nucleus,
+  one box per host. The dotted line marks the cut-off the class is called at,
+  DeepLoc~2's default for the Accurate model, so every protein lies to its
+  right. A protein called for several classes appears in each, at the
+  probability of that class. Panels C and D hold only the host proteins of the
+  intracellular parasites, the only ones the filter reads those classes for.
+  Each host protein is counted once per class however many parasites reach it.
+  Boxes span the interquartile range with the median marked, whiskers extend to
+  1.5 times the interquartile range, and every protein is drawn as a point.}
+  \label{fig:deeploc_host}
+\end{figure}
+
+% paper/figures/deeploc_parasite.png is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S4}
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/deeploc_parasite}
+  \caption{DeepLoc~2 probabilities of the parasite proteins of the predictions,
+  one box per parasite. \textbf{(A)}~Extracellular probability of the proteins
+  called extracellular. \textbf{(B)}~Cell-membrane probability of the proteins
+  called cell membrane, for the unicellular parasites only, since the secretome
+  filter keeps only the secreted proteins of a multicellular parasite. The dotted
+  line marks the cut-off, DeepLoc~2's default for the Accurate model. Each protein
+  is counted once per parasite across its hosts. \textit{T.~hominis} has a
+  single extracellular protein and \textit{V.~corneae} two in each class, so
+  their boxes are not distributions. Boxes and points as in
+  Supplementary Figure~\ref{fig:deeploc_host}. The strips beside the names give
+  the niche (outer) and the taxonomic group (inner).}
+  \label{fig:deeploc_parasite}
+\end{figure}
+
+\textbf{Supplementary Figures S5 and S6}. DeepLoc~2 probabilities of every host
+(Figure~\ref{fig:deeploc_pools_host}) and parasite
+(Figure~\ref{fig:deeploc_pools_parasite}) protein the localization filters
+decided on, kept or not.
+
+% paper/figures/deeploc_pools_host.png is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S5}
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{figures/deeploc_pools_host}
+  \caption{DeepLoc~2 probabilities of the host proteins the localization filter
+  decided on, for \textbf{(A)}~extracellular, \textbf{(B)}~cell membrane,
+  \textbf{(C)}~cytoplasm and \textbf{(D)}~nucleus, one violin per host. The
+  filter follows the tissue filter, so the proteins of a host are those expressed
+  in a tissue infected by one of its parasites whose niche reads that class:
+  every parasite for A and B, the intracellular ones for C and D. The dotted line
+  marks the cut-off, DeepLoc~2's default for the Accurate model; the part of a
+  violin over it is shaded, and the share of the proteins it keeps is given at
+  the right. Each violin is scaled to its own widest point.}
+  \label{fig:deeploc_pools_host}
+\end{figure}
+
+% paper/figures/deeploc_pools_parasite.png is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S6}
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/deeploc_pools_parasite}
+  \caption{DeepLoc~2 probabilities of the whole proteome of each parasite, which
+  the secretome filter decides on: \textbf{(A)}~extracellular, for every
+  parasite, and \textbf{(B)}~cell membrane, for the unicellular parasites, the
+  only ones the filter reads that class for. The dotted line, shading and shares
+  are as in Supplementary Figure~\ref{fig:deeploc_pools_host}. The strips beside
+  the names give the niche (outer) and the taxonomic group (inner).}
+  \label{fig:deeploc_pools_parasite}
+\end{figure}
+
 \section*{Data and code availability}
 \todo{Repository: \url{https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0}}
 

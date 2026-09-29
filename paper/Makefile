@@ -31,7 +31,8 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
 	figures/parasite_similarity.png figures/shared_families.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
-	figures/confidence.png
+	figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png \
+	figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -76,7 +77,17 @@ figures/tissues_coverage.svg figures/tissues_coverage.png tables/tissues_coverag
 figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.yml ../data/predictions.parquet ../scripts/build_confidence_figure.py
 	cd .. && $(PYTHON) scripts/build_confidence_figure.py
 
-figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png
+# Supplementary: the DeepLoc 2 probabilities the localization filters kept the host and
+# parasite proteins on.
+figures/deeploc_host.svg figures/deeploc_host.png figures/deeploc_parasite.svg figures/deeploc_parasite.png tables/deeploc.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_deeploc_figure.py
+	cd .. && $(PYTHON) scripts/build_deeploc_figure.py
+
+# Supplementary: the DeepLoc 2 probabilities of every protein the localization filters
+# decided on, kept or not. Rereads the TISSUES downloads.
+figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
+	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
+
+figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

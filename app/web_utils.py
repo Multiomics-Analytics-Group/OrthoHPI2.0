@@ -367,12 +367,29 @@ def filter_tissues(config, df):
 
 # minimum expression for a host protein to count in a cell type: HPA's own detection
 # threshold, which the mouse and pig atlases share since they are pooled the same way
-CELL_TYPE_CUTOFF = 1.0
+CELL_TYPE_CUTOFF = 1
+# the slider's top; about the 90th percentile of the annotated expression values
+CELL_TYPE_MAX_CUTOFF = 200
 
 
-def keep_expressed_cell_types(df):
+def keep_expressed_cell_types(df, cutoff=CELL_TYPE_CUTOFF):
     '''The rows of a tissue-annotated frame where a host protein counts as expressed.'''
-    return df[df['nTPM'] > CELL_TYPE_CUTOFF]
+    return df[df['nTPM'] > cutoff]
+
+
+def expression_slider(key, help=None):
+    '''The nTPM a host protein must exceed in a cell type to count as expressed there.'''
+    return st.slider('Cell-type expression (nTPM)', CELL_TYPE_CUTOFF, CELL_TYPE_MAX_CUTOFF,
+                     CELL_TYPE_CUTOFF, key=key,
+                     help=help or 'A host protein counts towards a cell type when its '
+                                  'expression there is above this. 1 nTPM is HPA\'s own '
+                                  'detection threshold; the mouse and pig atlases are put on '
+                                  'the same scale.')
+
+
+def expression_phrase(cutoff):
+    '''How the captions say what counts as expressed.'''
+    return f'above {cutoff:g} nTPM'
 
 
 def count_ticks(figure, largest, axis='x', **kwargs):

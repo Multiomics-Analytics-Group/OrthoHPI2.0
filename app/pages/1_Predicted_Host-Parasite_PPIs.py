@@ -26,6 +26,7 @@ networks = []
 # named before the column that draws them, so the sections below can say what they show
 selected_tissues = []
 selected_cell_types = []
+expression = web_utils.CELL_TYPE_CUTOFF
 selected_surface = []
 surface_options = []
 selected_rows = []
@@ -116,7 +117,8 @@ GO_TERM_COLUMN = ENRICHMENT_COLUMN_NAMES['go_term']
 
 # filters written as badges above each section, one colour per kind; the score is always one
 # of them
-FILTER_BADGES = {'tissue': 'blue', 'cell type': 'green', 'localisation': 'violet'}
+FILTER_BADGES = {'tissue': 'blue', 'expression': 'green', 'cell type': 'green',
+                 'localisation': 'violet'}
 # names of one kind in a download filename before they are counted instead
 FILENAME_MAX_NAMES = 2
 
@@ -367,11 +369,13 @@ def name_the_selection(table, parasite, host):
     return named[front + [c for c in named.columns if c not in front]]
 
 
-def active_filters(score, tissues, cell_types, surface):
+def active_filters(score, tissues, expression, cell_types, surface):
     '''The filters narrowing what the page shows, as (kind, name) pairs.'''
     active = [('score', f'confidence \u2265 {score:g}')]
-    for kind, selected in (('tissue', tissues), ('cell type', cell_types),
-                           ('localisation', surface)):
+    # the expression cutoff is named only once it is raised above the default
+    expression = [f'nTPM > {expression:g}'] if expression > web_utils.CELL_TYPE_CUTOFF else []
+    for kind, selected in (('tissue', tissues), ('expression', expression),
+                           ('cell type', cell_types), ('localisation', surface)):
         active.extend((kind, str(name)) for name in selected)
 
     return active
@@ -391,12 +395,14 @@ def download_name(parasite, filters, suffix):
     the whole network of that parasite once it is on disk.
     '''
     parts = [parasite]
-    for kind in ('score', 'tissue', 'cell type', 'localisation'):
+    for kind in ('score', 'tissue', 'expression', 'cell type', 'localisation'):
         names = [name for active_kind, name in filters if active_kind == kind]
         if not names:
             continue
         if kind == 'score':
             parts.append(names[0].split()[-1])
+        elif kind == 'expression':
+            parts.append(names[0].replace(' ', ''))
         elif len(names) <= FILENAME_MAX_NAMES:
             parts.extend(names)
         else:
@@ -412,7 +418,7 @@ def generate_tissue_filters(df):
 
     return options
 
-def generate_cell_type_filters(df, score):
+def generate_cell_type_filters(df, score, expression):
     '''
     The cell types on offer, the one holding the most host proteins first, and how many
     each holds.
@@ -421,7 +427,7 @@ def generate_cell_type_filters(df, score):
     if annotated.empty:
         return pd.Series(dtype=int)
 
-    return (web_utils.keep_expressed_cell_types(annotated)
+    return (web_utils.keep_expressed_cell_types(annotated, expression)
                      .groupby('Cell type')['target_name'].nunique()
                      .sort_values(ascending=False, kind='stable'))
 
@@ -441,7 +447,7 @@ def generate_surface_filters(df, surface_calls, niche):
             and (called[web_utils.DEEPLOC_SCORES[c]] > web_utils.DEEPLOC_CUTOFFS[c]).any()]
 
 
-def cell_type_marks(df, score):
+def cell_type_marks(df, score, expression):
     '''
     The host proteins of the network against the cell types they are expressed in
     (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
@@ -451,7 +457,7 @@ def cell_type_marks(df, score):
     if annotated.empty:
         return None, None
 
-    marks = web_utils.keep_expressed_cell_types(annotated).copy()
+    marks = web_utils.keep_expressed_cell_types(annotated, expression).copy()
     # the row a protein reaches its maximum in is always kept, so the darkest of a row is
     # 100%
     marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
@@ -1034,7 +1040,8 @@ with col2:
                 df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
         # cell types are offered on their own; picking tissues first narrows what is offered
-        cell_type_counts = generate_cell_type_filters(df_select, score)
+        expression = web_utils.expression_slider('net_expression')
+        cell_type_counts = generate_cell_type_filters(df_select, score, expression)
         if len(cell_type_counts) > 0:
             def cell_type_label(cell_type):
                 proteins = cell_type_counts[cell_type]
@@ -1050,7 +1057,7 @@ with col2:
                      'cell type is left out once a cell type is chosen.')
             if len(selected_cell_types) > 0:
                 expressed = web_utils.keep_expressed_cell_types(
-                    df_select[df_select['Cell type'].notna()])
+                    df_select[df_select['Cell type'].notna()], expression)
                 df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
         # the tickboxes are drawn above the network; Streamlit hands their state over before
@@ -1088,7 +1095,7 @@ with col2:
         
         
 # resolved after the column that draws the filters, read by every section below
-page_filters = active_filters(score, selected_tissues, selected_cell_types,
+page_filters = active_filters(score, selected_tissues, expression, selected_cell_types,
                               selected_surface) if df_select is not None else []
 
 # drawn after the column that holds the selectors, where the predictions are filtered
@@ -1221,12 +1228,12 @@ if networks:
 
 with st.container():
     if df_select is not None:
-        marks, blocks = cell_type_marks(df_select, score)
+        marks, blocks = cell_type_marks(df_select, score, expression)
         if marks is not None:
             st.header('Cell types expressing the host proteins')
             show_active_filters(page_filters)
-            st.caption('A host protein counts towards a cell type when it is expressed there: '
-                       'above 1 nTPM in HPA, detected in the mouse and pig atlases. The '
+            st.caption('A host protein counts towards a cell type when it is expressed there, '
+                       f'{web_utils.expression_phrase(expression)}. The '
                        'columns of both tabs are those cell types, grouped into the tissues '
                        'the parasite infects, and a cell type is written under its block '
                        'alone, since the same kind of cell is annotated separately in each '

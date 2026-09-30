@@ -72,7 +72,8 @@ DEEPLOC_LABELS = {'surface': 'DeepLoc', 'localizations': 'localizations',
 
 
 @st.cache_data(show_spinner=False)
-def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE):
+def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE,
+                                  expression=web_utils.CELL_TYPE_CUTOFF):
     '''
     Predicted interactions per parasite and tissue, and per parasite, tissue and cell
     type, keeping only the tissues each parasite is known to infect
@@ -102,7 +103,7 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
                      .rename('interactions').reset_index())
 
     return (pairs(aux, 'taxid1_label', 'Tissue'),
-            pairs(web_utils.keep_expressed_cell_types(aux), 'taxid1_label', 'Tissue',
+            pairs(web_utils.keep_expressed_cell_types(aux, expression), 'taxid1_label', 'Tissue',
                   'Cell type'))
 
 
@@ -826,6 +827,7 @@ if selected_host != web_utils.NO_HOST:
                                                               selected_taxids, score)
     ranked = per_tissue.groupby('Tissue')['interactions'].sum().sort_values(ascending=False,
                                                                            kind='stable')
+    # the tissues with cell-type data at all, before the expression slider narrows them
     annotated = set(per_cell_type['Tissue'])
     # every tissue is offered, so a missing cell-type annotation is reported rather than
     # guessed at
@@ -935,15 +937,28 @@ if selected_host != web_utils.NO_HOST:
     with cell_types:
         if choices:
             st.subheader("Cell types of a tissue")
-            st.caption('Predicted interactions per cell type of the selected tissue, stacked by '
-                       'taxonomic group. A host protein counts towards a cell type where it '
-                       'is expressed (above 1 nTPM in HPA, detected in the mouse and pig '
-                       'atlases). A protein expressed in several cell types counts in each, '
-                       'so the bars are not a partition of the tissue.')
-            tissue = st.selectbox('Tissue', choices, index=0,
-                                  help='Tissues the parasites infect, most interactions first')
-            if tissue in annotated:
-                st.plotly_chart(generate_cell_type_bars(per_cell_type, tissue, parasite_groups,
+            caption = st.empty()
+            tissue_column, expression_column = st.columns(2)
+            with tissue_column:
+                tissue = st.selectbox('Tissue', choices, index=0,
+                                      help='Tissues the parasites infect, most interactions '
+                                           'first')
+            with expression_column:
+                expression = web_utils.expression_slider('compare_expression')
+            # written above the selectors once the slider has been read
+            caption.caption('Predicted interactions per cell type of the selected tissue, '
+                            'stacked by taxonomic group. A host protein counts towards a cell '
+                            'type where it is expressed, '
+                            f'{web_utils.expression_phrase(expression)}. A protein expressed '
+                            'in several cell types counts in each, so the bars are not a '
+                            'partition of the tissue.')
+            _, expressed = count_interactions_per_tissue(data_dir, config, selected_taxids,
+                                                         score, expression)
+            if tissue in annotated and tissue not in set(expressed['Tissue']):
+                st.info(f'No host protein interacting with these parasites is expressed '
+                        f'{web_utils.expression_phrase(expression)} in a cell type of {tissue}.')
+            elif tissue in annotated:
+                st.plotly_chart(generate_cell_type_bars(expressed, tissue, parasite_groups,
                                                         config.get('parasite_groups', {})),
                                 width='stretch')
             else:

@@ -365,16 +365,14 @@ def filter_tissues(config, df):
     return df
 
 
-# minimum expression for a host protein to count in a cell type: HPA reports nTPM, the
-# mouse and pig atlases mean log1p(counts per 10k), where 1 TPM is about 0.01
-CELL_TYPE_CUTOFFS = {'9606': 1.0}
-CELL_TYPE_ATLAS_CUTOFF = 0.01
+# minimum expression for a host protein to count in a cell type: HPA's own detection
+# threshold, which the mouse and pig atlases share since they are pooled the same way
+CELL_TYPE_CUTOFF = 1.0
 
 
 def keep_expressed_cell_types(df):
     '''The rows of a tissue-annotated frame where a host protein counts as expressed.'''
-    cutoff = df['target'].str.split('.').str[0].map(CELL_TYPE_CUTOFFS).fillna(CELL_TYPE_ATLAS_CUTOFF)
-    return df[df['nTPM'] > cutoff]
+    return df[df['nTPM'] > CELL_TYPE_CUTOFF]
 
 
 def count_ticks(figure, largest, axis='x', **kwargs):

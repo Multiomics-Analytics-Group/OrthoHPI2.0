@@ -29,7 +29,7 @@ from pipeline import cell_type_annotations, filters, main as pipeline_main
 import compare_tissue_filters
 
 HUMAN = 9606
-# the app's HPA cell-type cutoff (web_utils.CELL_TYPE_CUTOFFS)
+# the app's HPA cell-type cutoff (web_utils.CELL_TYPE_CUTOFF)
 NTPM_CUTOFF = 1.0
 
 # dataviz palette

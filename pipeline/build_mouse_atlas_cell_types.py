@@ -12,7 +12,7 @@ from scipy import sparse
 import utils
 
 MOUSE_TAXID = '10090'
-COUNTS_PER_CELL = 10_000
+COUNTS_PER_MILLION = 1_000_000
 CELLS_PER_CHUNK = 4_096
 DEFAULT_AGE = '3m'
 DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
@@ -113,20 +113,6 @@ def download_atlas(url, output_file):
     return output_file
 
 
-def mean_normalized_expression(matrix):
-    '''Return log1p(CP10K)-normalized mean expression for every gene.'''
-    matrix = matrix.tocsr().astype(np.float64)
-    totals = np.asarray(matrix.sum(axis=1)).ravel()
-    nonzero = totals > 0
-    matrix = matrix[nonzero]
-    if matrix.shape[0] == 0:
-        return np.zeros(matrix.shape[1])
-
-    matrix = sparse.diags(COUNTS_PER_CELL / totals[nonzero]) @ matrix
-    matrix.data = np.log1p(matrix.data)
-    return np.asarray(matrix.mean(axis=0)).ravel()
-
-
 def read_csr_chunk(matrix, start, stop, n_genes):
     '''Read consecutive rows from an H5AD CSR matrix into an in-memory CSR matrix.'''
     offsets = matrix['indptr'][start:stop + 1]
@@ -136,20 +122,6 @@ def read_csr_chunk(matrix, start, stop, n_genes):
          offsets - data_start),
         shape=(stop - start, n_genes),
     )
-
-
-def normalized_expression_sum(matrix):
-    '''Return summed log1p(CP10K) expression and the number of nonempty cells.'''
-    matrix = matrix.tocsr().astype(np.float64)
-    totals = np.asarray(matrix.sum(axis=1)).ravel()
-    nonzero = totals > 0
-    matrix = matrix[nonzero]
-    if matrix.shape[0] == 0:
-        return np.zeros(matrix.shape[1]), 0
-
-    matrix = sparse.diags(COUNTS_PER_CELL / totals[nonzero]) @ matrix
-    matrix.data = np.log1p(matrix.data)
-    return np.asarray(matrix.sum(axis=0)).ravel(), matrix.shape[0]
 
 
 def aggregate_expression(input_file, config_file, age):
@@ -181,8 +153,9 @@ def aggregate_expression(input_file, config_file, age):
         obs[['Tissue', 'cell_ontology_class']]))
     cell_groups = np.full(atlas.n_obs, -1, dtype=np.int32)
     cell_groups[atlas.obs.index.get_indexer(obs.index)] = group_codes
+    # HPA's single-cell pTPM: the raw counts of a cell type pooled, then scaled to a
+    # million
     sums = [np.zeros(atlas.n_vars) for _ in groups]
-    counts = np.zeros(len(groups), dtype=np.int64)
     n_obs = atlas.n_obs
     n_vars = atlas.n_vars
     atlas.file.close()
@@ -196,23 +169,22 @@ def aggregate_expression(input_file, config_file, age):
             chunk_groups = cell_groups[start:stop]
             if not (chunk_groups >= 0).any():
                 continue
-            chunk = read_csr_chunk(matrix, start, stop, n_vars)
+            chunk = read_csr_chunk(matrix, start, stop, n_vars).astype(np.float64)
             for group_code in np.unique(chunk_groups[chunk_groups >= 0]):
-                expression, cell_count = normalized_expression_sum(
-                    chunk[chunk_groups == group_code])
-                sums[group_code] += expression
-                counts[group_code] += cell_count
+                sums[group_code] += np.asarray(
+                    chunk[chunk_groups == group_code].sum(axis=0)).ravel()
 
     rows = []
     for group_code, (tissue, cell_type) in enumerate(groups):
-        if counts[group_code] == 0:
+        total = sums[group_code].sum()
+        if total == 0:
             continue
-        means = (sums[group_code] / counts[group_code])[mapped]
+        tpm = (sums[group_code] * COUNTS_PER_MILLION / total)[mapped]
         frame = pd.DataFrame({
             'Gene': genes[mapped].to_numpy(),
             'Tissue': tissue,
             'Cell type': str(cell_type),
-            'nTPM': means,
+            'nTPM': tpm,
         })
         rows.append(frame[frame['nTPM'] > 0])
 

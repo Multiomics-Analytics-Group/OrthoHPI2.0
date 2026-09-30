@@ -15,8 +15,9 @@ Run the builder from the repository root:
 ```
 
 The builder downloads the H5AD when it is not already present, selects only
-`3m` mice, normalizes each cell to 10,000 counts, applies `log1p`, and averages
-expression for each `(tissue, Cell Ontology cell type, gene)` combination. It
+`3m` mice, pools the raw counts of each `(tissue, Cell Ontology cell type)` and
+scales every pool to a million, as HPA does for its single-cell nTPM, so the
+same `nTPM > 1` cutoff applies to both. It
 maps genes to mouse STRING IDs and writes `data/mouse_atlas_cell_types.parquet`;
 the refresh command adds matching mouse rows to
 `data/tissues_cell_types.parquet`, the annotation artifact read by the app. It

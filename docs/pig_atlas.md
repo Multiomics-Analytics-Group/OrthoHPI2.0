@@ -198,8 +198,9 @@ Rscript scripts/extract_pig_atlas_expression.R data/pig_atlas_20221014.rds \
 .venv/bin/python -m pipeline.main
 ```
 
-The R script reads Seurat's normalized sparse RNA assay and writes the mean
-normalized expression of every gene in each atlas tissue/cell-type pair. The
+The R script reads Seurat's raw RNA counts, pools them over the cells of each
+atlas tissue/cell-type pair and scales each pool to a million, as HPA does for
+its single-cell nTPM, so the same `nTPM > 1` cutoff applies to both. The
 Python step maps the atlas gene symbols and Ensembl IDs to pig STRING IDs,
 normalizes atlas tissue names to the OrthoHPI vocabulary, and writes
 `data/pig_atlas_cell_types.parquet`. `pipeline.main` then appends the rows to

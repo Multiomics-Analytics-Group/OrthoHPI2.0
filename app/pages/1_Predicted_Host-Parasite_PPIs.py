@@ -1197,7 +1197,6 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
 
 if networks:
     st.header('Network of host-parasite PPIs')
-    show_active_filters(page_filters)
     st.caption('Predicted interactions between parasite and host proteins above the '
                'selected confidence score. Nodes are proteins, diamonds parasite and '
                'circles host, coloured by organism and sized by centrality in the '
@@ -1220,6 +1219,8 @@ if networks:
         for box, surface in zip(boxes, surface_options):
             with box:
                 st.checkbox(surface, key=SURFACE_FILTER_KEYS[surface])
+    # under the tickboxes, whose classes it lists, and right above the network it describes
+    show_active_filters(page_filters)
     columns = st.columns(len(networks))
     for column, network in zip(columns, networks):
         with column:

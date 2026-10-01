@@ -771,13 +771,132 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
     return figure
 
 
+# the processes the GO dot matrix shows: those enriched for the most parasites, or the
+# strongest few of each parasite
+GO_ROWS_SHARED = 'enriched for the most parasites'
+GO_ROWS_STRONGEST = 'strongest for each parasite'
+GO_SHARED_ROWS = 40
+GO_STRONGEST_PER_PARASITE = 2
+# the colour ramp of the network page's enrichment figures, for the odds ratio here
+GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
+# characters of a process name on the axis; the hover has the whole of it
+GO_LABEL_WIDTH = 48
+
+
+@st.cache_data(show_spinner=False)
+def get_parasite_enrichments(df_pred, data_dir, host_taxids, niches):
+    '''
+    The biological processes over-represented among the host proteins of each parasite,
+    each tested against the host proteins of that parasite's niche, as the network page
+    tests one.
+    '''
+    backgrounds = {}
+    enrichments = []
+    for parasite, rows in df_pred.groupby('taxid1_label'):
+        niche = niches.get(parasite)
+        if niche not in backgrounds:
+            backgrounds[niche] = web_utils.go_background(data_dir, host_taxids, niche)
+        enrichment = utils.calculate_enrichment(set(rows['target']), backgrounds[niche])
+        if not enrichment.empty:
+            enrichments.append(enrichment.drop(columns=['B', 'C', 'D'])
+                               .rename(columns={'A': 'n_proteins'})
+                               .assign(parasite=parasite))
+    if not enrichments:
+        return None
+
+    return pd.concat(enrichments, ignore_index=True)
+
+
+def select_go_rows(enriched, rows):
+    '''
+    The processes the dot matrix shows, most widely enriched first: the ones enriched for
+    the most parasites, or the union of each parasite's most significant ones.
+    '''
+    reach = enriched.groupby('go_id').agg(parasites=('parasite', 'nunique'),
+                                          best=('fdr_bh', 'min'))
+    if rows == GO_ROWS_STRONGEST:
+        strongest = (enriched.sort_values(['fdr_bh', 'go_id'])
+                     .groupby('parasite').head(GO_STRONGEST_PER_PARASITE)['go_id'])
+        reach = reach.loc[strongest.unique()]
+    order = reach.sort_values(['parasites', 'best'], ascending=[False, True], kind='stable')
+
+    return list(order.index if rows == GO_ROWS_STRONGEST else order.index[:GO_SHARED_ROWS])
+
+
+def short_parasite(label):
+    return f'{label[0]}. {label.split(" ")[1]}'
+
+
+@st.cache_data(show_spinner=False)
+def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width):
+    '''
+    A dot wherever a process is enriched among the host proteins of a parasite, sized by
+    the number of them annotated to it and shaded by its odds ratio, the parasites in the
+    order the other figures use.
+    '''
+    names = dict(zip(enriched['go_id'], enriched['go_term']))
+    labels = [names[t] if len(names[t]) <= GO_LABEL_WIDTH
+              else names[t][:GO_LABEL_WIDTH - 1].rstrip() + '…' for t in terms]
+    columns = [short_parasite(p) for p in parasites]
+    dots = enriched[enriched['go_id'].isin(terms)].copy()
+    dots['x'] = dots['parasite'].map({p: i for i, p in enumerate(parasites)})
+    dots['y'] = dots['go_id'].map({t: i for i, t in enumerate(terms)})
+    odds = pd.to_numeric(dots['odds_ratio'], errors='coerce')
+    finite = odds[np.isfinite(odds)]
+    # an infinite ratio is drawn at the largest finite one and said so in the hover
+    cap = finite.max() if not finite.empty else 1.0
+    dots['log_odds'] = np.log2(odds.where(np.isfinite(odds), cap).clip(lower=1))
+    dots['odds_text'] = np.where(np.isfinite(odds), odds.map('{:.1f}'.format), 'infinite')
+    dots['parasite_name'] = dots['parasite']
+
+    size = dot_size(columns, labels, width)
+    sizeref = max(1, dots['n_proteins'].max()) / size ** 2
+    figure = go.Figure(go.Scatter(
+        x=dots['x'], y=dots['y'], mode='markers', showlegend=False,
+        marker=dict(size=dots['n_proteins'], sizemode='area', sizeref=sizeref, sizemin=3,
+                    color=dots['log_odds'], colorscale=GO_SEQUENTIAL, line=dict(width=0),
+                    colorbar=dict(title='log<sub>2</sub> odds<br>ratio', thickness=12,
+                                  outlinewidth=0, len=0.4, y=1, yanchor='top')),
+        customdata=dots[['go_term', 'parasite_name', 'n_proteins', 'odds_text',
+                         'fdr_bh']].to_numpy(),
+        hovertemplate='<b>%{customdata[0]}</b><br>%{customdata[1]}<br>'
+                      'host proteins annotated to it: %{customdata[2]}<br>'
+                      'odds ratio: %{customdata[3]}<br>FDR: %{customdata[4]:.2e}'
+                      '<extra></extra>'))
+
+    strips = pd.DataFrame({'parasite': columns,
+                           'group': [groups.get(p, UNKNOWN_GROUP) for p in parasites],
+                           'niche': [niches.get(p, web_utils.UNKNOWN_NICHE)
+                                     for p in parasites]})
+    groups_shown, niches_shown = add_parasite_strips(figure, strips, columns, palette)
+    height = max(420, DOT_ROW * len(terms) + DOT_CHROME)
+    legends = add_dot_legend(figure, groups_shown, [], niches_shown, palette,
+                             plot_room(labels, width), height)
+
+    figure.update_layout(height=height, plot_bgcolor='white',
+                         margin=dict(l=0, r=0, t=10, b=legends),
+                         xaxis_title=None, yaxis_title='biological process')
+    figure.update_xaxes(range=[-0.5, len(columns) - 0.5], side='top', tickmode='array',
+                        tickvals=list(range(len(columns))), ticktext=columns,
+                        tickangle=-60, automargin=True, ticks='',
+                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        showgrid=True, gridcolor='#f0f0f0', zeroline=False)
+    # reversed, so the most widely enriched process is the top row
+    figure.update_yaxes(range=[len(terms) - 0.5, -3], tickmode='array',
+                        tickvals=list(range(len(terms))), ticktext=labels, ticks='',
+                        automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
+
+    return figure
+
+
 # the matrix keeps its cells square, so it needs the column width; drawn for
 # DEFAULT_PAGE_WIDTH until the browser answers
 column = web_utils.column_width(2)
 
 st.caption('The parasites predicted against one host, compared with each other: which host '
-           'interactors they share, which host proteins several of them reach, and the '
-           'tissues and cell types in which their interactions can take place.')
+           'interactors they share, which host proteins several of them reach, the '
+           'tissues and cell types in which their interactions can take place, and the '
+           'biological processes their host interactors are enriched in.')
 st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
@@ -803,13 +922,13 @@ if selected_host != web_utils.NO_HOST:
     group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
     niches = web_utils.get_niches(config)
 
-    # one slider for the three figures below; the tissue dots at the foot keep every
+    # one slider for the four figures below; the tissue dots at the foot keep every
     # prediction
     slider_column, order_column = st.columns([2, 1])
     with slider_column:
         score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
                           help='Interactions predicted below this confidence are left out of '
-                               'the three figures below. The tissue plot at the foot of the '
+                               'the four figures below. The tissue plot at the foot of the '
                                'page counts every prediction.')
     with order_column:
         # the order decides which blocks the figures show: contiguous values make a square
@@ -964,6 +1083,51 @@ if selected_host != web_utils.NO_HOST:
             else:
                 st.info(f'No single cell data available for {tissue} in {selected_host}, so '
                         'the interactions there cannot be split by cell type.')
+
+    st.subheader("Biological processes enriched among the host interactors of each parasite")
+    rows_column, fdr_column = st.columns([2, 1])
+    with rows_column:
+        go_rows = st.radio('Processes shown', [GO_ROWS_SHARED, GO_ROWS_STRONGEST],
+                           horizontal=True,
+                           help=f'The {GO_SHARED_ROWS} processes enriched for the most '
+                                'parasites, which favours broad processes many share, or the '
+                                f'{GO_STRONGEST_PER_PARASITE} most significant of each '
+                                'parasite, which brings out what sets one apart.')
+    with fdr_column:
+        go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                          horizontal=True, key='compare_go_fdr',
+                          help='The Benjamini-Hochberg corrected significance a process has '
+                               'to reach to be drawn for a parasite.')
+    st.caption('Gene Ontology biological processes over-represented among the host proteins '
+               'each parasite is predicted to reach, tested one parasite at a time as on the '
+               "network page: one-sided Fisher's exact test against the host proteins of the "
+               "parasite's niche the pipeline passed, corrected with Benjamini-Hochberg. A "
+               'dot wherever a process passes the FDR for a parasite, sized by the number of '
+               'its host interactors annotated to the process and shaded by the odds ratio. '
+               'The odds ratio rather than the FDR is compared, since the FDR follows how '
+               'many interactors a parasite has. Intracellular and extracellular parasites '
+               'are tested against different host proteins, so a missing dot can come from '
+               'the background as well as the biology.')
+    with st.spinner('Testing the host interactors of every parasite'):
+        go_enrichments = get_parasite_enrichments(counted, data_dir, tuple(selected_taxids),
+                                                  niches)
+    go_enriched = (None if go_enrichments is None else
+                   go_enrichments[go_enrichments['fdr_bh'] <= go_fdr])
+    if go_enriched is None or go_enriched.empty:
+        st.info(f'No biological process passes an FDR of {go_fdr} for any parasite at this '
+                'confidence.')
+    else:
+        go_parasites = parasite_order(counted['taxid1_label'].unique(), parasite_groups,
+                                      group_order, niches, order_by)
+        st.plotly_chart(generate_go_dots(go_enriched, select_go_rows(go_enriched, go_rows),
+                                         go_parasites, parasite_groups, niches,
+                                         config.get('parasite_groups', {}),
+                                         2 * column + web_utils.COLUMN_GAP),
+                        width='stretch')
+        st.download_button('Download the enriched processes of every parasite',
+                           data=utils.convert_df(go_enriched.drop(columns=['nodes'])),
+                           file_name=f'{selected_host}_parasite_go_enrichment.tsv',
+                           mime='text/csv')
 
 st.markdown("---")
 

@@ -32,7 +32,8 @@ FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
 	figures/parasite_similarity.png figures/shared_families.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png \
-	figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
+	figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
+	figures/web_overview.png figures/web_network.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -68,6 +69,11 @@ figures/case_study.svg figures/case_study.png tables/case_study_links.csv tables
 figures/networks.svg figures/networks.png tables/networks.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_networks_figure.py
 	cd .. && $(PYTHON) scripts/build_networks_figure.py
 
+# The web interface figures: screenshots of the app (figures/web/*.png, taken from the
+# running app by scripts/capture_web_screenshots.py) laid out as two figures.
+figures/web_overview.svg figures/web_overview.png figures/web_network.svg figures/web_network.png: $(wildcard figures/web/*.png) ../scripts/build_web_interface_figure.py
+	cd .. && $(PYTHON) scripts/build_web_interface_figure.py
+
 # Supplementary: how many STRING proteins of each host TISSUES annotates to each tissue
 # at score 1. Rereads the TISSUES downloads.
 figures/tissues_coverage.svg figures/tissues_coverage.png tables/tissues_coverage.csv: ../config.yml ../scripts/build_tissues_coverage.py
@@ -87,7 +93,7 @@ figures/deeploc_host.svg figures/deeploc_host.png figures/deeploc_parasite.svg f
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
+figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/web_overview.png figures/web_network.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

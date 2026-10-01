@@ -269,6 +269,47 @@ to the host cell types expressing its targets.
   \label{fig:case_study}
 \end{figure}
 
+\subsection{The web interface}
+Figures~\ref{fig:web_overview} and~\ref{fig:web_network} show the web
+interface.
+
+% paper/figures/web_overview.png is built from screenshots of the app: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_overview}
+  \caption{The OrthoHPI 2.0 web interface across hosts and parasites.
+  \textbf{(A)} The home page: the four hosts with the number of parasites
+  predicted against each, and the parasites by taxonomic group, each marked
+  with its hosts. \textbf{(B)} The multi-host parasites page, for
+  \textit{Cryptosporidium muris}: the infected organs of each host, and the
+  interactions shared between its hosts and specific to each. \textbf{(C)} The
+  parasites-of-a-host page, for \textit{Homo sapiens}: the Jaccard similarity
+  of the host interactors of each pair of parasites, and the shared host
+  proteins listed on clicking the \textit{P.~falciparum}--%
+  \textit{P.~vivax} cell.}
+  \label{fig:web_overview}
+\end{figure}
+
+% paper/figures/web_network.png is built from screenshots of the app: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_network}
+  \caption{The host--parasite network page of the OrthoHPI 2.0 web interface,
+  for \textit{Plasmodium falciparum} in \textit{Homo sapiens} at a confidence
+  score of at least 0.7, restricted to the liver. \textbf{(A)} The host,
+  parasite, confidence score, tissues and cell-type expression cutoff are
+  chosen beside a body map of the predicted interactions per infected organ;
+  above the network, the host proteins can be restricted by DeepLoc
+  localisation. \textbf{(B)} Clicking a link opens the AlphaFold models of its
+  parasite and host protein, coloured by pLDDT, with the STRING link between
+  orthologous groups it was transferred from. \textbf{(C)} Predicted
+  interactions per liver cell type, counting a host protein expressed above
+  20 nTPM in the Human Protein Atlas. \textbf{(D)} Gene Ontology biological
+  processes enriched among the host proteins of the network. The network,
+  interaction table and enrichment results can each be downloaded.}
+  \label{fig:web_network}
+\end{figure}
+
 \section{Discussion}
 \todo{discussion}
 

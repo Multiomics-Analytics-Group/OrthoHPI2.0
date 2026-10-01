@@ -152,6 +152,24 @@ def filtered_pool(data_dir, taxids, niche=None):
     return set(tissues.loc[tissues['Gene'].str.split('.').str[0].isin(taxids), 'Gene'])
 
 
+def go_background(data_dir, taxids, niche=None):
+    '''
+    The GO annotations an enrichment of these species is tested against: those of the
+    proteins the network could have been drawn from (filtered_pool).
+    '''
+    species = [int(t) for t in taxids]
+    # fastparquet prunes row groups only, so the exact selection is still applied afterwards
+    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet',
+                                    filters=[('taxid', 'in', species)])
+    go_df = go_df[go_df['taxid'].isin(species)]
+    pool = filtered_pool(data_dir, tuple(str(t) for t in taxids), niche=niche)
+    # a directory carrying neither table is left on the proteome rather than emptied
+    if pool:
+        go_df = go_df[go_df['#string_protein_id'].isin(pool)]
+
+    return go_df
+
+
 def infected_tissue_proteins(data_dir, config, parasite_taxid):
     '''
     The host proteins annotated to a tissue this parasite is known to infect, over every

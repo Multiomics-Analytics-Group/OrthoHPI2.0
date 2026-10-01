@@ -125,9 +125,9 @@ FILENAME_MAX_NAMES = 2
 # rows to a page of either table
 TABLE_PAGE_SIZE = 10
 
-# the two sides of the network, tested separately for enrichment, also when both are shown
+# the two sides of the network, tested separately for enrichment and shown side by side
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
-BOTH = 'Both sides'
+SIDES = (HOST, PARASITE)
 SIDE_COLUMN = 'Side'
 
 # named so a click on the body figure can set it on the following run
@@ -564,17 +564,14 @@ def generate_cell_type_matrix(marks, blocks):
     return style_cell_type_figure(figure, blocks)
 
 
-@st.cache_data(max_entries=3, ttl=1800)
+@st.cache_data(max_entries=6, ttl=1800)
 def get_enrichment(pred_df, data_dir, side, config_file):
     '''
     The processes over-represented among one side of the network, against the proteins
     of that side's species the network could have been drawn from.
     '''
     column, taxid_column = (('target', 'taxid2') if side == HOST else ('source', 'taxid1'))
-    species = [int(s) for s in pred_df[taxid_column].unique()]
-    # fastparquet prunes row groups only, so the exact selection is still applied afterwards
-    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet', filters=[('taxid', 'in', species)])
-    go_df = go_df[go_df['taxid'].isin(species)]
+    species = tuple(str(s) for s in pred_df[taxid_column].unique())
     # the background pool is read from the species of the view and the niche of its
     # parasite; several parasites at once are left on the union
     niche = None
@@ -582,10 +579,7 @@ def get_enrichment(pred_df, data_dir, side, config_file):
         niches = {web_utils.parasite_niche(utils.read_config(config_file), taxid)
                   for taxid in pred_df['taxid1'].unique()}
         niche = niches.pop() if len(niches) == 1 else None
-    pool = web_utils.filtered_pool(data_dir, tuple(str(s) for s in species), niche=niche)
-    # a directory carrying neither table is left on the proteome rather than emptied
-    if pool:
-        go_df = go_df[go_df['#string_protein_id'].isin(pool)]
+    go_df = web_utils.go_background(data_dir, species, niche)
     enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
     # A is the number of proteins of the side annotated to the term
     enrichment = enrichment.rename(columns={'A': 'n_proteins'})
@@ -775,15 +769,12 @@ def nearest_enriched_ancestors(terms, parents_of):
 
 def picked(enrichment_df, selected_rows):
     '''
-    Which rows of the enrichment the rows picked out of the grid are: by process, and by
-    side when the grid shows both, since one process can be enriched on either.
+    Which rows of the enrichment the rows picked out of the grid are: by process and by
+    side, since one process can be enriched on either.
     '''
-    if SIDE_COLUMN in selected_rows:
-        picks = set(zip(selected_rows[SIDE_COLUMN], selected_rows[GO_TERM_COLUMN]))
-        return pd.Series(list(zip(enrichment_df['side'], enrichment_df['go_term'])),
-                         index=enrichment_df.index).isin(picks)
-
-    return enrichment_df['go_term'].isin(set(selected_rows[GO_TERM_COLUMN]))
+    picks = set(zip(selected_rows[SIDE_COLUMN], selected_rows[GO_TERM_COLUMN]))
+    return pd.Series(list(zip(enrichment_df['side'], enrichment_df['go_term'])),
+                     index=enrichment_df.index).isin(picks)
 
 
 def get_enrichment_summary(enrichment_df, parents_of):
@@ -1297,8 +1288,8 @@ with st.container():
     if df_select is not None:
         st.header("Functional enrichment of the network (GO biological processes)")
         show_active_filters(page_filters)
-        st.caption('Biological processes over-represented among the host proteins, the '
-                   'parasite proteins, or both, each side tested on its own. '
+        st.caption('Biological processes over-represented among the host proteins and '
+                   'among the parasite proteins, each side tested on its own. '
                    'A side is tested against the proteins of its own species the '
                    'pipeline had to work with -- the ones its filters passed, the host '
                    'proteins on expression and localisation and the parasite proteins on '
@@ -1309,16 +1300,11 @@ with st.container():
                    'terms with Benjamini-Hochberg; a process is tested when the background '
                    'gives it at least 11 proteins, no more than a quarter of them, and at '
                    'least two are in the network.')
-        side = st.radio('Proteins to test', (HOST, PARASITE, BOTH), horizontal=True,
-                        help='The host proteins the parasite is predicted to reach, the '
-                             'parasite proteins reaching them, or the two tested apart and '
-                             'shown together.')
-        sides = [HOST, PARASITE] if side == BOTH else [side]
         # the sides are tested one at a time and carried together with the side on each row
         enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
                                                data_dir, s,
                                                web_utils.get_config_file()).assign(side=s)
-                                for s in sides], ignore_index=True)
+                                for s in SIDES], ignore_index=True)
         if not enrichment.empty:
             fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
                            horizontal=True,
@@ -1326,14 +1312,11 @@ with st.container():
                                 'has to reach to be counted as enriched.')
             # only the grid and the file it hands out are renamed for reading
             enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
-            # the side is a column of the grid only when both are in it
-            column_names = ({'side': SIDE_COLUMN} if side == BOTH else {}) | ENRICHMENT_COLUMN_NAMES
+            column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
             enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
-            # counted per side when both are shown
             by_side = enrichment_view['side'].value_counts()
-            per_side = (' (' + ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}'
-                                         for s in sides) + ')') if side == BOTH else ''
-            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr}{per_side}. '
+            per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
+            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
                        'Select rows to highlight GO terms in the network.')
             gb = GridOptionsBuilder.from_dataframe(enrichment_table)
             gb.configure_pagination(paginationAutoPageSize=False,
@@ -1370,39 +1353,42 @@ with st.container():
             enrichment_viz = enrichment_viz[picked(enrichment_viz, selected_rows)]
 
         st.subheader("Enriched biological processes")
-        ranked_tab, volcano_tab = st.tabs(["Ranked processes", "All tested processes"])
-        # one figure per side shown, each named when there are two
-        with ranked_tab:
-            st.caption(f'The {GO_TOP_N} most significantly over-represented biological '
-                       f'processes among the {"each side" if side == BOTH else side.lower()} '
-                       'of the network, positioned by odds ratio, sized by the number of '
-                       'them annotated to each process and shaded by significance. Select '
-                       'rows in the table above to restrict the figure.')
-            for s in sides:
-                part = enrichment_viz[enrichment_viz['side'] == s]
-                if side == BOTH:
-                    st.markdown(f'**{s}**')
-                if part.empty:
-                    st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+        st.caption('The ranked view shows the '
+                   f'{GO_TOP_N} most significantly over-represented processes, positioned by '
+                   'odds ratio, sized by the number of proteins annotated to each and shaded '
+                   'by significance. The volcano shows every process tested, with those '
+                   'passing the selected FDR highlighted. The hierarchy nests each process '
+                   'within the closest enriched process above it in the Gene Ontology; click '
+                   'a block to zoom in. Select rows in the table above to restrict the '
+                   'figures.')
+        # one tab per side, the figures of that side inside it
+        for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
+            with side_tab:
+                tested = enrichment[enrichment['side'] == s]
+                passing = enrichment_viz[enrichment_viz['side'] == s]
+                if tested.empty:
+                    st.caption(f'No process could be tested among the {s.lower()}.')
                     continue
-                st.plotly_chart(get_enrichment_dotplot(part), width='stretch',
-                                key=f'dotplot_{s}')
-        with volcano_tab:
-            st.caption('All processes tested against the network: effect size on the x axis '
-                       'and significance on the y axis, with the processes passing the '
-                       'selected FDR highlighted.')
-            for column, s in zip(st.columns(len(sides)), sides):
-                part = enrichment[enrichment['side'] == s]
-                with column:
-                    if side == BOTH:
-                        st.markdown(f'**{s}**')
-                    if part.empty:
-                        st.caption(f'No process could be tested among the {s.lower()}.')
-                        continue
-                    picked_terms = enrichment_viz[enrichment_viz['side'] == s]['go_term'] \
-                        .tolist() if selected_terms else []
-                    st.plotly_chart(get_enrichment_volcano(part, fdr, picked_terms),
+                ranked_tab, volcano_tab, tree_tab = st.tabs(
+                    ["Ranked processes", "All tested processes", "Hierarchy"])
+                with ranked_tab:
+                    if passing.empty:
+                        st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                    else:
+                        st.plotly_chart(get_enrichment_dotplot(passing), width='stretch',
+                                        key=f'dotplot_{s}')
+                with volcano_tab:
+                    picked_terms = passing['go_term'].tolist() if selected_terms else []
+                    st.plotly_chart(get_enrichment_volcano(tested, fdr, picked_terms),
                                     width='stretch', key=f'volcano_{s}')
+                with tree_tab:
+                    part = enrichment_view[enrichment_view['side'] == s]
+                    if part.empty:
+                        st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                    else:
+                        st.plotly_chart(get_enrichment_summary(part,
+                                                               load_ontology_parents(data_dir)),
+                                        width='stretch', key=f'treemap_{s}')
 
         with st.container():
             if len(selected_terms) > 0:
@@ -1434,22 +1420,6 @@ with st.container():
                         file_name=f'{selected_parasite}_enrichment_network.html',
                         mime='text/html',
                     )
-        
-        st.subheader("Hierarchy of enriched biological processes")
-        st.caption('Enriched processes arranged by the Gene Ontology hierarchy: each process '
-                   'is nested within the closest enriched process above it, its area is the '
-                   'number of network proteins annotated to it and its shade is its '
-                   'significance. Click a block to zoom in.')
-        # one hierarchy per side, named when both are shown
-        for s in sides:
-            part = enrichment_view[enrichment_view['side'] == s]
-            if side == BOTH:
-                st.markdown(f'**{s}**')
-            if part.empty:
-                st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
-                continue
-            st.plotly_chart(get_enrichment_summary(part, load_ontology_parents(data_dir)),
-                            width='stretch', key=f'treemap_{s}')
 
 st.markdown("---")
 st.markdown("---")

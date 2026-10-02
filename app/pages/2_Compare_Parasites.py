@@ -1087,12 +1087,12 @@ if selected_host != web_utils.NO_HOST:
     st.subheader("Biological processes enriched among the host interactors of each parasite")
     rows_column, fdr_column = st.columns([2, 1])
     with rows_column:
-        go_rows = st.radio('Processes shown', [GO_ROWS_SHARED, GO_ROWS_STRONGEST],
+        go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
                            horizontal=True,
-                           help=f'The {GO_SHARED_ROWS} processes enriched for the most '
-                                'parasites, which favours broad processes many share, or the '
-                                f'{GO_STRONGEST_PER_PARASITE} most significant of each '
-                                'parasite, which brings out what sets one apart.')
+                           help=f'The {GO_STRONGEST_PER_PARASITE} most significant processes '
+                                'of each parasite, which brings out what sets one apart, or '
+                                f'the {GO_SHARED_ROWS} enriched for the most parasites, which '
+                                'favours broad processes many share.')
     with fdr_column:
         go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
                           horizontal=True, key='compare_go_fdr',

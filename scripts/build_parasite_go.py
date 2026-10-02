@@ -149,20 +149,6 @@ def draw(config, enriched, rows, columns, output_stem):
                                color=taxon_colors[p['group']], linewidth=0, clip_on=False))
     ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.ROW * 72)
 
-    # the margin: of the parasites of each niche, how many the process is enriched for
-    niche_of = {t: parasites[t]['niche'] for t in columns}
-    totals = pd.Series(niche_of).value_counts()
-    counts = (dots.assign(niche=dots['taxid'].map(niche_of))
-              .groupby(['go_id', 'niche'])['taxid'].nunique().unstack(fill_value=0))
-    for j, niche in enumerate(['intracellular', 'extracellular']):
-        x = n_cols + 0.6 + 1.8 * j
-        ax.text(x, -0.6 - 2 * strip - 0.3, f'{niche} (of {totals.get(niche, 0)})',
-                ha='center', va='bottom', rotation=90, color='#555555', clip_on=False)
-        for r in rows:
-            ax.text(x, row_of[r], counts.get(niche, pd.Series(dtype=int)).get(r, 0),
-                    ha='center', va='center', color='#555555', clip_on=False)
-
-
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
               if any(parasites[t]['group'] == group for t in columns)]
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
@@ -172,7 +158,7 @@ def draw(config, enriched, rows, columns, output_stem):
         ('Taxonomic group', groups), ('Niche', niches),
         ('Host proteins annotated to the process', sizes)])
     height = fig.get_figheight()
-    fig.subplots_adjust(left=0.32, right=0.93, top=1 - 1.45 / height,
+    fig.subplots_adjust(left=0.32, right=0.98, top=1 - 1.45 / height,
                         bottom=(legends + 0.1) / height)
     # the colour key sits beside the size key, at the foot of the figure
     key = fig.add_axes([0.7, 0.2 / height, 0.2, 0.07 / height])

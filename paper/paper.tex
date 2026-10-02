@@ -238,13 +238,13 @@ tested against its own niche's pool.}
   a process at FDR $\le 0.05$, its area the number of the parasite's host
   interactors annotated to the process and its shade the odds ratio. The odds ratio
   is shaded rather than the FDR, which follows how many interactors a parasite has.
-  Each parasite contributes its two most significant processes as rows, a process
-  being left out when half or more of its human proteins are those of a row already
-  shown; the rows are clustered by the parasites they are enriched for. The two
-  columns on the right count the intracellular and extracellular parasites the
-  process is enriched for. Parasites are ordered by niche, then taxonomic group,
-  then name, with the niche (outer) and taxonomic group (inner) in the strips above
-  the matrix. All predictions at confidence score $\ge 0.35$; every enriched process
+  For each parasite, its most significant processes are taken in turn until two are
+  represented; a process is merged into an already shown row when the two share half
+  or more of their combined human proteins (Jaccard index $\ge 0.5$). Rows are
+  ordered by hierarchical clustering of which parasites they are enriched for, so
+  processes enriched for similar parasites sit together. Parasites are ordered by
+  niche, then taxonomic group, then name, with the niche (outer) and taxonomic group
+  (inner) in the strips above the matrix. All predictions at confidence score $\ge 0.35$; every enriched process
   of every parasite is in Supplementary Table~\todo{table}.}
   \label{fig:parasite_go}
 \end{figure}

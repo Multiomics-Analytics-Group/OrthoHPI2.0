@@ -1,0 +1,39 @@
+only in,missing from the other host,host family,parasite proteins,host proteins,score
+human,not expressed,KOG3642,"ATG8C.1,ATG8C.3","GABRA2,GABRA4,GABRE",0.884
+human,not expressed,KOG0597,"LBRM_20_1300,LBRM_35_3570","STK36,ULK4",0.45
+human,not expressed,KOG3576,"ATG8C.1,ATG8C.3","OVOL1,OVOL3",0.442
+human,not expressed,KOG3643,"ATG8C.1,ATG8C.3","GABRB1,GABRP,GABRR2",0.442
+human,out of reach,KOG2034,LBRM_19_0430,VPS18,0.855
+human,out of reach,KOG3251,LBRM_19_0430,GOSR2,0.83
+human,out of reach,KOG3251,LBRM_08_0030,GOSR2,0.614
+human,out of reach,KOG2034,LBRM_08_0030,VPS18,0.595
+human,out of reach,KOG3724,GPI8,C2orf66,0.56
+human,out of reach,KOG3496,"ATG8C.1,ATG8C.3",COX17,0.442
+human,out of reach,KOG2381,LBRM_19_0430,PI4K2B,0.359
+mouse,not expressed,KOG3004,"LBRM_20_1300,LBRM_35_3570",Tipin,0.893
+mouse,not expressed,KOG4398,"ATG8C.1,ATG8C.3",Atg14,0.884
+mouse,not expressed,KOG2475,"LBRM_20_1300,LBRM_35_3570",Cdc45,0.868
+mouse,not expressed,KOG0615,"LBRM_20_1300,LBRM_35_3570",Chek2,0.867
+mouse,not expressed,KOG2889,LBRM_10_0630,Prpf38a,0.799
+mouse,not expressed,KOG4398,LBRM_19_0430,Atg14,0.76
+mouse,not expressed,KOG2976,"ATG8C.1,ATG8C.3",Atg5,0.688
+mouse,not expressed,KOG1585,LBRM_19_0430,Napg,0.663
+mouse,not expressed,KOG1167,"LBRM_20_1300,LBRM_35_3570",Cdc7,0.649
+mouse,not expressed,KOG4646,LBRM_10_0630,Armc7,0.461
+mouse,not expressed,KOG0689,LBRM_10_0630,Arhgef25,0.45
+mouse,not expressed,KOG1106,"LBRM_20_1300,LBRM_35_3570",Gins3,0.45
+mouse,not expressed,KOG2232,LBRM_20_3210,Asah2,0.45
+mouse,not expressed,KOG1882,LBRM_10_0630,Snip1,0.425
+mouse,not expressed,KOG2138,LBRM_10_0630,Gpatch1,0.4
+mouse,not expressed,KOG2989,LBRM_10_0630,Yju2,0.4
+mouse,not expressed,KOG3228,LBRM_10_0630,Cwc15,0.4
+mouse,not expressed,KOG3476,LBRM_10_0630,Cript,0.4
+mouse,not expressed,KOG4315,LBRM_10_0630,Gpkow,0.4
+mouse,not expressed,KOG4397,LBRM_10_0630,C330007P06Rik,0.4
+mouse,not expressed,KOG3621,LBRM_19_0430,"Saa3,Tecpr2",0.359
+mouse,not expressed,KOG3895,LBRM_19_0430,Syn1,0.359
+mouse,not expressed,KOG3895,LBRM_08_0030,Syn1,0.359
+mouse,not expressed,KOG4469,"GP63-1,GP63-1-2,GP63-2-13,GP63-2-15,GP63-2-16,GP63-2-17,GP63-2-2,GP63-2-5,GP63-4-2,LBRM_10_0500,LBRM_10_0520,LBRM_10_0530,LBRM_10_0540,LBRM_31_2230,LBRM_31_2240,LBRM_31_2260,LbrM_10_1700",Rgp1,0.359
+mouse,out of reach,KOG0809,LBRM_08_0030,Stx16,0.62
+mouse,out of reach,KOG0809,LBRM_19_0430,Stx16,0.611
+mouse,out of reach,KOG3225,LBRM_10_0630,Cactin,0.4

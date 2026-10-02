@@ -131,31 +131,6 @@ surface-exposed localisations.}
 \subsection{Homology transfer}
 \todo{Transfer of STRING interactions through shared orthologous groups.}
 
-Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
-stage by stage and separately for each host--parasite pair. The DeepLoc filter
-leaves an intracellular parasite roughly five times as many host proteins as an
-extracellular one.
-
-% paper/figures/funnel.pdf is generated: `make figures` (see Makefile).
-\begin{figure}[p]
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel}
-  \caption{Proteins surviving each stage of the pipeline, for every
-  host--parasite pair. Bars are nested on a logarithmic axis, one row per pair,
-  in blocks by host. The host side (left) runs from the STRING proteome through
-  the TISSUES and DeepLoc filters to the proteins in a predicted interaction
-  with that parasite; the parasite side (right) from the STRING proteome
-  through the DeepLoc secretome filter and assignment to an EggNOG orthologous
-  group to the proteins in a predicted interaction with that host. Both filters
-  keep what Figure~\ref{fig:workflow} specifies. The orthologous-group stage is
-  omitted on the host side, where every protein reaching it is already in a
-  group. Rows are ordered by the parasite's niche in the host, then taxonomic
-  group, then name; the strips left of each block give the niche (outer) and
-  the taxonomic group (inner). The counts behind every row, and the number of
-  predicted interactions of each pair, are in Supplementary Table~S1.}
-  \label{fig:funnel}
-\end{figure}
-
 \subsection{Tissue and cell-type annotation}
 \todo{TISSUES confidence scores and HPA single-cell expression.}
 
@@ -183,11 +158,42 @@ the host cell its interactions land.
   \label{fig:networks}
 \end{figure}
 
+Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
+stage by stage and separately for each host--parasite pair. The DeepLoc filter
+leaves an intracellular parasite roughly five times as many host proteins as an
+extracellular one.
+
+% paper/figures/funnel.pdf is generated: `make figures` (see Makefile).
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel}
+  \caption{Proteins surviving each stage of the pipeline, for every
+  host--parasite pair. Bars are nested on a logarithmic axis, one row per pair,
+  in blocks by host. The host side (left) runs from the STRING proteome through
+  the TISSUES and DeepLoc filters to the proteins in a predicted interaction
+  with that parasite; the parasite side (right) from the STRING proteome
+  through the DeepLoc secretome filter and assignment to an EggNOG orthologous
+  group to the proteins in a predicted interaction with that host. Both filters
+  keep what Figure~\ref{fig:workflow} specifies. The orthologous-group stage is
+  omitted on the host side, where every protein reaching it is already in a
+  group. Rows are ordered by the parasite's niche in the host, then taxonomic
+  group, then name; the strips left of each block give the niche (outer) and
+  the taxonomic group (inner). The counts behind every row, and the number of
+  predicted interactions of each pair, are in Supplementary Table~S1.}
+  \label{fig:funnel}
+\end{figure}
+
 \subsection{Parasites of the same host reach overlapping host proteins}
 \todo{Interpretation: similarity within genera and within niches.}
 Figure~\ref{fig:similarity} compares the interactomes of the parasites of human
-pair by pair, and Figure~\ref{fig:shared_families} the host families that the
-most of them converge on.
+pair by pair, Figure~\ref{fig:shared_families} the host families that the
+most of them converge on, and Figure~\ref{fig:parasite_go} the host processes
+they reach. The processes split by niche rather than by taxonomy: the
+intracellular parasites, \textit{Trichinella} among them, reach host proteins of
+RNA splicing, ribonucleoprotein biogenesis and autophagy, and the extracellular
+ones host proteins of cell adhesion, integrin signalling and lipid metabolism.
+\todo{Check the niche split against the literature; note that each parasite is
+tested against its own niche's pool.}
 
 % paper/figures/parasite_similarity.pdf is generated: `make figures`.
 \begin{figure}[p]
@@ -221,6 +227,28 @@ most of them converge on.
   \label{fig:shared_families}
 \end{figure}
 
+% paper/figures/parasite_go.pdf is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go}
+  \caption{Gene Ontology biological processes over-represented among the human
+  proteins each parasite is predicted to reach. Each parasite is tested on its own
+  with a one-sided Fisher's exact test against the human proteins of its niche that
+  passed the pipeline's filters, and corrected with Benjamini--Hochberg; a dot marks
+  a process at FDR $\le 0.05$, its area the number of the parasite's host
+  interactors annotated to the process and its shade the odds ratio. The odds ratio
+  is shaded rather than the FDR, which follows how many interactors a parasite has.
+  Each parasite contributes its two most significant processes as rows, a process
+  being left out when half or more of its human proteins are those of a row already
+  shown; the rows are clustered by the parasites they are enriched for. The two
+  columns on the right count the intracellular and extracellular parasites the
+  process is enriched for. Parasites are ordered by niche, then taxonomic group,
+  then name, with the niche (outer) and taxonomic group (inner) in the strips above
+  the matrix. All predictions at confidence score $\ge 0.35$; every enriched process
+  of every parasite is in Supplementary Table~\todo{table}.}
+  \label{fig:parasite_go}
+\end{figure}
+
 \subsection{Comparing the hosts of one parasite}
 \todo{Interpretation: how much of a parasite's interactome is host specific.}
 Figure~\ref{fig:multi_host} compares, for each parasite predicted against more
@@ -247,26 +275,62 @@ than one host, which interactions are shared and why the others are missing.
   \label{fig:multi_host}
 \end{figure}
 
-\subsection{From parasite protein to host cell type}
-\todo{Interpretation of the \textit{Necator americanus} case study.}
-Figure~\ref{fig:case_study} follows one pair from the parasite protein family
-to the host cell types expressing its targets.
+\todo{Interpretation of the \textit{Leishmania braziliensis} case study.}
+Figure~\ref{fig:lb_case_study} compares the \textit{Leishmania braziliensis}
+networks of human and mouse.
 
-% paper/figures/case_study.pdf is generated: `make figures`.
+% paper/figures/lb_case_study.png is generated: `make figures`.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/lb_case_study}
+  \caption{\textit{Leishmania braziliensis} in human and mouse, its links
+  compared between the hosts as in Figure~\ref{fig:multi_host}.
+  \textbf{(A)} The body figure of each host, as in the OrthoHPI app, its
+  infected organs shaded by the number of predicted interactions whose host
+  protein TISSUES annotates to them, given under each figure; of the tissues
+  the parasite infects, the figures draw skin and blood, but not nose, mouth
+  or macrophages. \textbf{(B)} The links of each host, shared with the other
+  or found only in it, the latter split by the filter that removes the host
+  family in the other host. \textbf{(C, D)} The host families linked to two
+  parasite families, the autophagy-related protein ATG8 (C) and the surface
+  protease leishmanolysin, GP63 (D), in each host (rows). A column is a host family,
+  named by the genes of its members carrying a link; a cell is coloured by the
+  best confidence score of the link in that host, and a host lacking the link
+  is marked by the filter removing its family there (T, TISSUES; L, DeepLoc).
+  (C) shows the 22 best-scoring of the 28 host families linked to ATG8.}
+  \label{fig:lb_case_study}
+\end{figure}
+
+\subsection{From parasite protein to host cell type}
+\todo{Interpretation of the \textit{Plasmodium falciparum} case study.}
+Figure~\ref{fig:pf_case_study} narrows the \textit{Plasmodium falciparum}
+network to the host proteins of the liver stage.
+
+% paper/figures/pf_case_study.png is generated: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/case_study}
-  \caption{\textit{Necator americanus} in \textit{Homo sapiens}.
-  \textbf{(A)} Predicted interactions between parasite orthologous groups
-  (rows, named by the commonest description of their members, with the number
-  of parasite proteins in parentheses) and human proteins (columns), coloured
-  by the confidence score of the prediction. Families reaching fewer than three
-  host proteins are left out. \textbf{(B)} Expression of the same host
-  proteins, sharing the columns of (A), across the cell types of the tissues
-  the parasite infects, from the Human Protein Atlas. The eight cell types of
-  each tissue expressing the most of these host proteins are kept, and the
-  strip beside the names gives the tissue.}
-  \label{fig:case_study}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/pf_case_study}
+  \caption{\textit{Plasmodium falciparum} in \textit{Homo sapiens}, narrowed
+  in stages: the predicted interactions with a confidence score of at least
+  0.7 (A); those whose host protein is found in the liver (B); and from these
+  two branches, those whose host protein is enhanced in hepatocytes (C),
+  following the Human Protein Atlas definition of cell type enhanced (detected
+  at more than 1 normalized transcript per million, nTPM, and at least four
+  times its mean nTPM over the other cell types) applied within the liver cell
+  types of its single-cell RNA-seq data \todo{cite Digre and Lindskog 2023},
+  and those whose host protein is found in none of the other tissues the
+  parasite infects, namely skin, blood, brain and spleen (D).
+  \textbf{(A--D)} The network of each stage, drawn as in the OrthoHPI app:
+  parasite proteins as diamonds, host proteins as circles, and link width by
+  confidence score. In (A) and (B), proteins and links that reach no later
+  stage are greyed. In (C) and (D), a parasite protein is named by its
+  STRING description, or by its gene name where it has none, and a host protein
+  by its gene name. \textbf{(E)} Gene Ontology biological processes enriched
+  among the host proteins of each stage (Fisher's exact test against the host
+  proteins the pipeline could have predicted, Benjamini--Hochberg FDR $<$
+  0.05); each stage contributes its three best terms, leaving out a term
+  covering the same host proteins as a better one.}
+  \label{fig:pf_case_study}
 \end{figure}
 
 \subsection{The web interface}
@@ -320,32 +384,13 @@ host and parasite proteins surviving each stage of the pipeline, and the number
 of predicted interactions of the pair. Supplied as a comma-separated file
 rather than typeset, since the 56 rows are meant to be sorted and filtered.
 
-\textbf{Supplementary Figure~\ref{fig:tissues_coverage}}. TISSUES coverage of
-the infected tissues in each host.
-
-% paper/figures/tissues_coverage.png is generated: `make figures` (see Makefile).
-\begin{figure}[p]
-  \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S1}
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/tissues_coverage}
-  \caption{STRING proteins annotated to each tissue by TISSUES at a confidence
-  score of at least 1, the cutoff the tissue filter applies, for
-  \textbf{(A)}~human, \textbf{(B)}~rat, \textbf{(C)}~mouse and
-  \textbf{(D)}~pig. Only the tissues the configuration maps parasites to are
-  shown, sorted by the number of proteins; the subtitle of each panel gives how
-  many of them TISSUES annotates for that host and the size of its STRING
-  proteome. All panels share one axis.}
-  \label{fig:tissues_coverage}
-\end{figure}
-
-\textbf{Supplementary Figure S2}. Confidence scores of the predicted
+\textbf{Supplementary Figure S1}. Confidence scores of the predicted
 interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
 
 % paper/figures/confidence.pdf is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S2}
+  \renewcommand{\thefigure}{S1}
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/confidence}
   \caption{Confidence scores of the predicted interactions of every
@@ -360,51 +405,26 @@ interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
   \label{fig:confidence}
 \end{figure}
 
-\textbf{Supplementary Figures S3 and S4}. DeepLoc~2 probabilities of the host
-(Figure~\ref{fig:deeploc_host}) and parasite (Figure~\ref{fig:deeploc_parasite})
-proteins of the predicted interactions.
+\textbf{Supplementary Figure~\ref{fig:tissues_coverage}}. TISSUES coverage of
+the infected tissues in each host.
 
-% paper/figures/deeploc_host.png is generated: `make figures` (see Makefile).
+% paper/figures/tissues_coverage.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S3}
+  \renewcommand{\thefigure}{S2}
   \centering
-  \includegraphics[width=\textwidth,keepaspectratio]{figures/deeploc_host}
-  \caption{DeepLoc~2 probabilities of the host proteins of the predictions for
-  each localization class they were called for: \textbf{(A)}~extracellular,
-  \textbf{(B)}~cell membrane, \textbf{(C)}~cytoplasm and \textbf{(D)}~nucleus,
-  one box per host. The dotted line marks the cut-off the class is called at,
-  DeepLoc~2's default for the Accurate model, so every protein lies to its
-  right. A protein called for several classes appears in each, at the
-  probability of that class. Panels C and D hold only the host proteins of the
-  intracellular parasites, the only ones the filter reads those classes for.
-  Each host protein is counted once per class however many parasites reach it.
-  Boxes span the interquartile range with the median marked, whiskers extend to
-  1.5 times the interquartile range, and every protein is drawn as a point.}
-  \label{fig:deeploc_host}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/tissues_coverage}
+  \caption{STRING proteins annotated to each tissue by TISSUES at a confidence
+  score of at least 1, the cutoff the tissue filter applies, for
+  \textbf{(A)}~human, \textbf{(B)}~rat, \textbf{(C)}~mouse and
+  \textbf{(D)}~pig. Only the tissues the configuration maps parasites to are
+  shown, sorted by the number of proteins; the subtitle of each panel gives how
+  many of them TISSUES annotates for that host and the size of its STRING
+  proteome. All panels share one axis.}
+  \label{fig:tissues_coverage}
 \end{figure}
 
-% paper/figures/deeploc_parasite.png is generated: `make figures` (see Makefile).
-\begin{figure}[p]
-  \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S4}
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/deeploc_parasite}
-  \caption{DeepLoc~2 probabilities of the parasite proteins of the predictions,
-  one box per parasite. \textbf{(A)}~Extracellular probability of the proteins
-  called extracellular. \textbf{(B)}~Cell-membrane probability of the proteins
-  called cell membrane, for the unicellular parasites only, since the secretome
-  filter keeps only the secreted proteins of a multicellular parasite. The dotted
-  line marks the cut-off, DeepLoc~2's default for the Accurate model. Each protein
-  is counted once per parasite across its hosts. \textit{T.~hominis} has a
-  single extracellular protein and \textit{V.~corneae} two in each class, so
-  their boxes are not distributions. Boxes and points as in
-  Supplementary Figure~\ref{fig:deeploc_host}. The strips beside the names give
-  the niche (outer) and the taxonomic group (inner).}
-  \label{fig:deeploc_parasite}
-\end{figure}
-
-\textbf{Supplementary Figures S5 and S6}. DeepLoc~2 probabilities of every host
+\textbf{Supplementary Figures S3 and S4}. DeepLoc~2 probabilities of every host
 (Figure~\ref{fig:deeploc_pools_host}) and parasite
 (Figure~\ref{fig:deeploc_pools_parasite}) protein the localization filters
 decided on, kept or not.
@@ -412,7 +432,7 @@ decided on, kept or not.
 % paper/figures/deeploc_pools_host.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S5}
+  \renewcommand{\thefigure}{S3}
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{figures/deeploc_pools_host}
   \caption{DeepLoc~2 probabilities of the host proteins the localization filter
@@ -430,7 +450,7 @@ decided on, kept or not.
 % paper/figures/deeploc_pools_parasite.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S6}
+  \renewcommand{\thefigure}{S4}
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/deeploc_pools_parasite}
   \caption{DeepLoc~2 probabilities of the whole proteome of each parasite, which

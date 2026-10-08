@@ -3,10 +3,10 @@ The AlphaFold 3 Server models of the direct-interaction benchmark
 (scripts/build_alphafold_direct_jobs.py): for each link whose predicted model and human
 reference have both run, the interface confidence of the predicted parasite-host
 complex against that of the reference, as ipTM (A) and ipSAE (B), coloured by the
-link's confidence score, circles where the reference shares the predicted partner. Above the reference's cutoff and below the predicted model's
-are transfers that fail; below both, complexes AlphaFold does not model. Runs on
-whatever results are in so far. Writes paper/figures/alphafold_direct.svg/.png and
-paper/tables/alphafold_direct.csv.
+link's confidence score, circles where the reference shares the predicted partner. Each
+quadrant is counted: an interface in both models, only the reference, only the
+predicted link, or neither. Runs on whatever results are in so far. Writes
+paper/figures/alphafold_direct.svg/.png and paper/tables/alphafold_direct.csv.
 '''
 import argparse
 import os
@@ -59,7 +59,7 @@ def scores(jobs, results):
 
 def outcome(row, metric, cutoff):
     pred, ref = row[f'{metric} predicted'] >= cutoff, row[f'{metric} reference'] >= cutoff
-    return ('both' if pred and ref else 'transfer fails' if ref else
+    return ('both' if pred and ref else 'only reference' if ref else
             'only predicted' if pred else 'neither')
 
 
@@ -79,7 +79,7 @@ def draw(links, out):
         # each quadrant's count in its corner
         for (x, y, ha, va), name in zip([(0.98, 0.98, 'right', 'top'), (0.98, 0.02, 'right', 'bottom'),
                                          (0.02, 0.02, 'left', 'bottom'), (0.02, 0.98, 'left', 'top')],
-                                        ['both', 'transfer fails', 'neither', 'only predicted']):
+                                        ['both', 'only reference', 'neither', 'only predicted']):
             ax.text(x, y, f'{name}: {counts.get(name, 0)}', transform=ax.transAxes, ha=ha,
                     va=va, fontsize=figure_style.FONT, color='#5f5e5a')
         ax.set_xlim(0, 1)

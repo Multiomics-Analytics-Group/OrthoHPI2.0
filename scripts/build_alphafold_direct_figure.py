@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts import alphafold_results, figure_style
 from scripts.build_alphafold_figure import CONFIDENT, FAILED
 
-# ipSAE above which an interface counts as found, as in the benchmark's summaries
+# ipSAE above which an interface counts as found
 IPSAE_FOUND = 0.1
 METRICS = [('iptm', 'ipTM', FAILED), ('ipsae', 'ipSAE', IPSAE_FOUND)]
 # light to dark blue for low to high confidence score

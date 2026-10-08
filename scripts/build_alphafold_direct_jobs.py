@@ -1,16 +1,19 @@
 '''
-AlphaFold 3 Server jobs for a second benchmark, of predicted human links whose
+AlphaFold 3 Server jobs for a benchmark of predicted human links whose
 orthologous groups have human members shown to bind directly in BioGRID or IntAct
-(scripts/build_benchmark_evidence.py). Links are sampled evenly across confidence bins,
+(scripts/binding_evidence.py). Links are sampled evenly across confidence bins,
 one per pair of orthologous groups, from the parasites in turn. Each is run with its
 reference: the human pair of its groups with direct evidence, preferring the predicted
-partner itself, then the pair with the most publications. Direct human links of the
-first benchmark (scripts/build_alphafold_benchmark_jobs.py) are taken over with their
-models, so they are not run again. Writes the jobs not yet run as JSON files of at most
+partner itself, then the pair with the most publications. Direct human links of an
+earlier benchmark of links sampled regardless of evidence, listed in
+paper/alphafold/benchmark.csv, are taken over with their models, so they were not run
+again. Writes the jobs not yet run as JSON files of at most
 --batch-size jobs, a link and its reference together, and a table of them with the
 batch of each; the batches are fixed once written.
 '''
 import argparse
+import glob
+import json
 import os
 import sys
 
@@ -20,9 +23,45 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts import alphafold_results
-from scripts.build_alphafold_benchmark_jobs import BINS, write_batches
+from scripts.binding_evidence import HUMAN, human_members, interactions
 from scripts.build_alphafold_jobs import job, job_name, sequences
-from scripts.build_benchmark_evidence import HUMAN, human_members, interactions
+
+# the confidence-score bins links are sampled across
+BINS = [0.35, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+
+def write_batches(table, jobs, order, out, batch_size, results, rebatch):
+    '''
+    Writes the jobs not yet run as JSON files of at most batch_size, in the order given by
+    order(rows), and the table with the batch of each job to out.csv. The batches are fixed
+    once written: a rerun keeps them, unless rebatch, and reports how far each has run.
+    Batch 0 holds the jobs run before the batches were fixed, or run in another set.
+    '''
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    table = table.copy()
+    table['run'] = [alphafold_results.job_folder(n, results) is not None for n in table['job']]
+    previous = pd.read_csv(f'{out}.csv') if os.path.exists(f'{out}.csv') else None
+    if (not rebatch and previous is not None and 'batch' in previous.columns
+            and list(previous['job']) == list(table['job'])):
+        table['batch'] = previous['batch']
+    else:
+        pending = order(table[~table['run'] & table['job'].isin(jobs)])
+        table['batch'] = 0
+        table.loc[pending.index, 'batch'] = np.arange(len(pending)) // batch_size + 1
+        for old in glob.glob(f'{out}_[0-9][0-9].json'):
+            os.remove(old)
+        for b, names in pending.groupby(table.loc[pending.index, 'batch'], sort=False)['job']:
+            with open(f'{out}_{b:02d}.json', 'w') as f:
+                json.dump([jobs[n] for n in names], f, indent=1)
+    table.drop(columns='run').to_csv(f'{out}.csv', index=False)
+    for b, batch in table[table['batch'] > 0].groupby('batch'):
+        state = ('done' if batch['run'].all() else
+                 f"{batch['run'].sum()} of {len(batch)} run" if batch['run'].any() else 'to run')
+        kinds = ' and '.join(sorted(set(batch['kind'])))
+        print(f'{out}_{b:02d}.json: {len(batch)} jobs, {kinds}: {state}')
+    print(f"{table['run'].sum()} of {len(table)} jobs run")
+
+    return table
 
 
 def direct_pairs(links, members, known, results):
@@ -155,7 +194,7 @@ if __name__ == '__main__':
                         help='split the jobs not yet run into new batch files; otherwise '
                              'the batches written before are kept')
     parser.add_argument('--benchmark', default='paper/alphafold/benchmark.csv',
-                        help='the first benchmark, whose direct human links are taken over')
+                        help='the earlier benchmark, whose direct human links are taken over')
     parser.add_argument('--out', default='paper/alphafold/direct',
                         help='output path without extension')
     args = parser.parse_args()

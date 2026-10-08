@@ -1,21 +1,15 @@
 '''
-What kind of experiment supports each link of the AlphaFold benchmark
-(scripts/build_alphafold_benchmark_jobs.py), from the human members of its two
-orthologous groups in BioGRID and IntAct: direct (two-hybrid, reconstituted complex,
-co-crystal structure and other assays of two purified or fused proteins, or an
-enzymatic reaction of one on the other), co-complex (affinity capture,
-co-fractionation, co-purification), or proximity only (proximity labelling, and in
-IntAct also resonance energy transfer). BioGRID's kind is read from its experimental
-system, IntAct's from its interaction type. A link is labelled by
-the most direct kind either database shows for any human pair of its groups. Downloads
-both databases into data/downloads/ the first time. Writes
-paper/tables/alphafold_benchmark_evidence.csv.
+Human protein interactions in BioGRID and IntAct by what kind of binding they show:
+direct (two-hybrid, reconstituted complex, co-crystal structure and other assays of two
+purified or fused proteins, or an enzymatic reaction of one on the other), co-complex
+(affinity capture, co-fractionation, co-purification), or proximity only (proximity
+labelling, and in IntAct also resonance energy transfer). BioGRID's kind is read from
+its experimental system, IntAct's from its interaction type. Downloads both databases
+into data/downloads/ the first time; used by scripts/build_alphafold_direct_jobs.py.
 '''
-import argparse
 import datetime
 import gzip
 import os
-import re
 import shutil
 import urllib.request
 import zipfile
@@ -162,48 +156,3 @@ def interactions(downloads):
 
 def most_direct(kinds):
     return next((k for k in KINDS if k in kinds), 'none found')
-
-
-def build(benchmark, data_dir, out):
-    downloads = os.path.join(data_dir, 'downloads')
-    links = pd.read_csv(benchmark)
-    links = links[links['kind'] == 'predicted']
-    eligible = pd.read_parquet(os.path.join(data_dir, 'eligible_proteins.parquet'))
-    human = eligible[eligible['taxid'].astype(str) == str(HUMAN)]
-    symbols = dict(zip(human['protein'], human['name']))
-    members = human_members(downloads, set(links['group A']) | set(links['group B']), symbols)
-    known, releases = interactions(downloads)
-    by_pair = {pair: rows for pair, rows in known.groupby('pair')}
-
-    rows = []
-    for link in links.to_dict('records'):
-        a, b = members.get(link['group A'], set()), members.get(link['group B'], set())
-        pairs = {'|'.join(sorted((x, y))) for x in a for y in b if x != y}
-        found = pd.concat([by_pair[p] for p in pairs if p in by_pair] or [known.iloc[:0]])
-        row = {'job': link['job'], 'link': link['link'], 'evidence': link['evidence'],
-               'score': link['score'], 'human A': len(a), 'human B': len(b),
-               'pairs with evidence': found['pair'].nunique(),
-               'publications': found['publication'].dropna().nunique(),
-               'kind': most_direct(set(found['kind']))}
-        for source in ('BioGRID', 'IntAct'):
-            hits = found[found['source'] == source]
-            row[f'kind {source}'] = most_direct(set(hits['kind']))
-            row[f'methods {source}'] = '; '.join(sorted(set(hits['method'])))
-        rows.append(row)
-
-    table = pd.DataFrame(rows).assign(releases=releases)
-    table.to_csv(out, index=False)
-    print(f'{releases}; {len(table)} links, '
-          f'{(table["human A"] * table["human B"] == 0).sum()} with a group lacking human members')
-    print(pd.crosstab(table['kind'], table['evidence'], margins=True))
-    print(pd.crosstab(table['kind BioGRID'], table['kind IntAct'], margins=True))
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--benchmark', default='paper/alphafold/benchmark.csv')
-    parser.add_argument('--data-dir', default='data')
-    parser.add_argument('--out', default='paper/tables/alphafold_benchmark_evidence.csv')
-    args = parser.parse_args()
-    build(args.benchmark, args.data_dir, args.out)

@@ -83,15 +83,6 @@ figures/lb_case_study.svg figures/lb_case_study.png tables/lb_case_study_familie
 figures/alphafold.svg figures/alphafold.png tables/alphafold.csv: alphafold/jobs.csv ../scripts/build_alphafold_figure.py ../scripts/alphafold_results.py
 	cd .. && $(PYTHON) scripts/build_alphafold_figure.py
 
-# The confidence score against ipTM and ipSAE of AlphaFold 3 Server models of sampled
-# links, on whatever results are in data/alphafold/ so far, coloured by the kind of
-# binding BioGRID and IntAct show in human. The first build downloads both databases.
-tables/alphafold_benchmark_evidence.csv: alphafold/benchmark.csv ../scripts/build_benchmark_evidence.py
-	cd .. && $(PYTHON) scripts/build_benchmark_evidence.py
-
-figures/alphafold_benchmark.svg figures/alphafold_benchmark.png tables/alphafold_benchmark.csv: alphafold/benchmark.csv tables/alphafold_benchmark_evidence.csv ../scripts/build_alphafold_benchmark_figure.py ../scripts/alphafold_results.py
-	cd .. && $(PYTHON) scripts/build_alphafold_benchmark_figure.py
-
 # Links transferred from direct binding against their human reference complexes.
 figures/alphafold_direct.svg figures/alphafold_direct.png tables/alphafold_direct.csv: alphafold/direct.csv ../scripts/build_alphafold_direct_figure.py ../scripts/alphafold_results.py
 	cd .. && $(PYTHON) scripts/build_alphafold_direct_figure.py

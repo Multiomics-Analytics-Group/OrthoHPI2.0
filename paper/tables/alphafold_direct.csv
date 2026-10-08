@@ -1,0 +1,46 @@
+link,parasite,bin,score,same partner,iptm predicted,iptm reference,ipsae predicted,ipsae reference,name A predicted,name A reference,name B predicted,name B reference,outcome iptm,outcome ipsae
+0,Trichinella spiralis,"[0.35, 0.5)",0.391,True,0.52,0.72,0.4823092048273739,0.5158173096811398,Cyth3,CYTH3,CNKSR1,CNKSR1,transfer fails,both
+1,Trichinella nelsoni,"[0.35, 0.5)",0.49,True,0.21,0.53,0.012184888797250607,0.28649963569709674,T07_7903,APP,PSEN1,PSEN1,neither,transfer fails
+2,Trichinella britovi,"[0.35, 0.5)",0.357,True,0.31,0.3,0.012325041280299764,0.5412894570976318,T03_16320,APLP2,DAB2,DAB2,neither,transfer fails
+3,Schistosoma haematobium,"[0.35, 0.5)",0.471,True,0.19,0.2,0.0,0.0,MS3_07547,EGFR,SPARCL1,SPARCL1,neither,neither
+4,Ancylostoma ceylanicum,"[0.35, 0.5)",0.49,True,0.17,0.36,0.0,0.26488109443844804,Y032_0049g1815,MYO6,GIPC1,GIPC1,neither,transfer fails
+5,Cryptosporidium muris,"[0.35, 0.5)",0.402,False,0.18,0.31,0.0,0.03139481555325472,CMU_006570,CHMP4B,USP2,USP8,neither,neither
+6,Trichuris trichiura,"[0.35, 0.5)",0.471,True,0.25,0.2,0.0,0.0,A0A077Z8G5,SPARCL1,EGFR,EGFR,neither,neither
+7,Leishmania infantum,"[0.35, 0.5)",0.442,False,0.4,0.67,0.0,0.08675627385895752,ATG8B.2,MAP1LC3B,RUBCNL,PLEKHM1,transfer fails,neither
+8,Entamoeba histolytica,"[0.5, 0.6)",0.556,False,0.18,0.24,0.011113087013012413,0.012700322963874877,136.t00019,ITSN1,TRIP10,FCHSD2,neither,neither
+10,Toxocara canis,"[0.5, 0.6)",0.595,False,0.17,0.19,0.0,0.0,unc-6,NTN1,UNC5CL,UNC5A,neither,neither
+11,Trichinella nelsoni,"[0.5, 0.6)",0.557,False,0.31,0.2,0.010892147088307965,0.0,C05D9.3,ITGB1,MICALL2,ACTN1,neither,neither
+12,Plasmodium vivax,"[0.5, 0.6)",0.512,True,0.46,0.35,0.0,0.23491299720226394,PVX_098805,TBC1D1,MAP1LC3A,MAP1LC3A,neither,transfer fails
+13,Trichinella pseudospiralis,"[0.5, 0.6)",0.529,True,0.16,0.15,0.0,0.017430676089790344,T4E_1857,VPS37C,STAM2,STAM2,neither,neither
+14,Enterobius vermicularis,"[0.5, 0.6)",0.595,False,0.14,0.17,0.0,0.0,A0A0N4VQM4,UNC5A,NTN3,NTN1,neither,neither
+15,Leishmania infantum,"[0.5, 0.6)",0.512,True,0.35,0.36,0.015065686719474782,0.27120479067647424,ATG8B.2,MAP1LC3A,TBC1D1,TBC1D1,neither,transfer fails
+16,Trichinella nativa,"[0.6, 0.7)",0.665,True,0.61,0.62,0.19018973272363357,0.24221798235959927,cul-2,CUL2,DCUN1D5,DCUN1D5,both,both
+17,Trypanosoma cruzi,"[0.6, 0.7)",0.679,False,0.19,0.35,0.0,0.01708950992542514,Q4DHC3_TRYCC,SMCR8,STK35,ULK1,neither,neither
+18,Plasmodium knowlesi,"[0.6, 0.7)",0.679,True,0.13,0.3,0.0,0.497763011688152,PKH_121830,MAF,JUNB,JUNB,neither,transfer fails
+19,Trichinella nelsoni,"[0.6, 0.7)",0.699,False,0.16,0.16,0.0,0.0,C05D9.3,ITGB3,SHC4,SHC1,neither,neither
+20,Plasmodium vivax,"[0.6, 0.7)",0.641,False,0.17,0.44,0.0,0.01374560451044487,PVX_092850,RAB6B,BICD1,BICD2,neither,neither
+21,Taenia asiatica,"[0.6, 0.7)",0.613,False,0.22,0.24,0.0,0.0,TASK_LOCUS7553,NOTUM,GPC2,GPC3,neither,neither
+22,Leishmania infantum,"[0.6, 0.7)",0.648,False,0.15,0.29,0.0,0.0,ATG8B.2,MAP1LC3B,ATG16L1,ATG16L2,neither,neither
+23,Schistosoma japonicum,"[0.6, 0.7)",0.691,False,0.14,0.17,0.0,0.0,EWB00_002871,ITGB2,PRKCA,PRKCG,neither,neither
+24,Echinococcus granulosus,"[0.7, 0.8)",0.737,True,0.16,0.3,0.0,0.0,EGR_04409,GRIN2C,CASK,CASK,neither,neither
+25,Trichinella nativa,"[0.7, 0.8)",0.766,True,0.25,0.16,0.011113087013012413,0.0,nas-14,TCERG1,SF3A3,SF3A3,neither,neither
+26,Opisthorchis viverrini,"[0.7, 0.8)",0.721,False,0.15,0.46,0.0,0.015065686719474782,T265_06942,ITGB1,FERMT2,FERMT1,neither,neither
+27,Trichinella nelsoni,"[0.7, 0.8)",0.766,True,0.22,0.16,0.2052864075189825,0.0,nas-14-2,TCERG1,SF3A1,SF3A1,neither,only predicted
+28,Toxocara canis,"[0.7, 0.8)",0.704,True,0.32,0.36,0.015826818644945877,0.01535637785157487,flp-6,MAPT,CASK,CASK,neither,neither
+29,Leishmania infantum,"[0.7, 0.8)",0.774,True,0.16,0.58,0.0,0.5782607062775736,LINJ_36_3830,METTL22,KIN,KIN,neither,transfer fails
+30,Trypanosoma cruzi,"[0.7, 0.8)",0.739,True,0.38,0.25,0.021454339157631386,0.013016810008823487,Q4DQM4_TRYCC,PTP4A2,RABGGTB,RABGGTB,neither,neither
+31,Trichinella pseudospiralis,"[0.7, 0.8)",0.766,False,0.5,0.16,0.3846612758487269,0.0,tyr-3-2,TCERG1,LUC7L2,LUC7L,neither,only predicted
+32,Necator americanus,"[0.8, 0.9)",0.861,False,0.34,0.56,0.0,0.36515422974772344,NECAME_06752,APP,SORCS1,SORT1,neither,transfer fails
+33,Leishmania major,"[0.8, 0.9)",0.884,False,0.13,0.47,0.0,0.017243319142259593,ATG8B.6,GABARAP,GABRA2,GABRG2,neither,neither
+35,Trypanosoma cruzi,"[0.8, 0.9)",0.861,True,0.47,0.54,0.6103595115030563,0.6238656094619702,Q4D3L1_TRYCC,POLE3,DR1,DR1,neither,both
+36,Trichinella pseudospiralis,"[0.8, 0.9)",0.849,True,0.32,0.83,0.0,0.621996354364106,T16H12.9-2,PQBP1,TXNL4A,TXNL4A,transfer fails,transfer fails
+37,Taenia asiatica,"[0.8, 0.9)",0.867,True,0.34,0.26,0.0,0.0,TASK_LOCUS8708,EGFR,CTNND1,CTNND1,neither,neither
+38,Leishmania braziliensis,"[0.8, 0.9)",0.895,True,0.21,0.62,0.0,0.03914581074735148,ATG8C.1,GABARAP,ATG3,ATG3,transfer fails,neither
+39,Plasmodium falciparum,"[0.8, 0.9)",0.899,True,0.14,0.64,0.0,0.5338289942408222,PF3D7_1230500,ATG16L1,WIPI2,WIPI2,transfer fails,transfer fails
+40,Opisthorchis felineus,"[0.9, 1.0)",0.928,False,0.19,0.68,0.0,0.2899415832763295,CRM22_005395,NPC2,SCAP,NPC1,transfer fails,transfer fails
+41,Echinococcus granulosus,"[0.9, 1.0)",0.946,True,0.33,0.32,0.014120144829697128,0.026601379497241038,EGR_07163,EGFR,SHC1,SHC1,neither,neither
+43,Plasmodium falciparum,"[0.9, 1.0)",0.947,True,0.58,0.57,0.4862381102088044,0.6171725814170315,PF3D7_1104100,STX12,SNAP29,SNAP29,neither,both
+44,Plasmodium vivax,"[0.9, 1.0)",0.948,True,0.49,0.81,0.433843410905624,0.47500111523136385,LSM1,LSM1,PATL1,PATL1,transfer fails,both
+45,Leishmania braziliensis,"[0.9, 1.0)",0.93,False,0.24,0.81,0.0,0.5012420750297978,ATG8C.1,MAP1LC3B,GSAP,SQSTM1,transfer fails,transfer fails
+46,Ancylostoma ceylanicum,"[0.9, 1.0)",0.934,False,0.12,0.72,0.0,0.7072557254312336,Y032_0117g701,GABRB3,GABRA6,GABRA1,transfer fails,transfer fails
+47,Trypanosoma cruzi,"[0.9, 1.0)",0.937,False,0.14,0.69,0.0,0.719105926490715,Q4D3L1_TRYCC,POLE3,SPDYC,CHRAC1,transfer fails,transfer fails

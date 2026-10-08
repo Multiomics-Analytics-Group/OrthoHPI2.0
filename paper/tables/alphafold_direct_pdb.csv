@@ -1,0 +1,49 @@
+job,link,name A,name B,uniprot A,uniprot B,structures,entries,first released,before training cutoff
+dr000_reference_CYTH3_CNKSR1,0,CYTH3,CNKSR1,O43739,Q969H4,0,,,False
+dr001_reference_APP_PSEN1,1,APP,PSEN1,P05067,P49768,4,"8X52 (electron microscopy, 2024-05-29) 8X53 (electron microscopy, 2024-05-29) 8X54 (electron microscopy, 2024-05-29) 6IYC (electron microscopy, 2019-01-23)",2019-01-23,True
+dr002_reference_APLP2_DAB2,2,APLP2,DAB2,Q06481,P98082,0,,,False
+dr003_reference_EGFR_SPARCL1,3,EGFR,SPARCL1,P00533,Q14515,0,,,False
+dr004_reference_MYO6_GIPC1,4,MYO6,GIPC1,Q9UM54,O14908,0,,,False
+dr005_reference_CHMP4B_USP8,5,CHMP4B,USP8,Q9H444,P40818,0,,,False
+dr006_reference_SPARCL1_EGFR,6,SPARCL1,EGFR,Q14515,P00533,0,,,False
+dr007_reference_MAP1LC3B_PLEKHM1,7,MAP1LC3B,PLEKHM1,Q9GZQ8,Q9Y4G2,0,,,False
+dr008_reference_ITSN1_FCHSD2,8,ITSN1,FCHSD2,Q15811,O94868,1,"6GBU (x-ray diffraction, 2018-06-13)",2018-06-13,True
+dr009_reference_KCTD6_CUL3,9,KCTD6,CUL3,Q8NC69,Q13618,0,,,False
+dr010_reference_NTN1_UNC5A,10,NTN1,UNC5A,O95631,Q6ZN44,0,,,False
+dr011_reference_ITGB1_ACTN1,11,ITGB1,ACTN1,P05556,P12814,0,,,False
+dr012_reference_TBC1D1_MAP1LC3A,12,TBC1D1,MAP1LC3A,Q86TI0,Q9H492,0,,,False
+dr013_reference_VPS37C_STAM2,13,VPS37C,STAM2,A5D8V6,O75886,0,,,False
+dr014_reference_UNC5A_NTN1,14,UNC5A,NTN1,Q6ZN44,O95631,0,,,False
+dr015_reference_MAP1LC3A_TBC1D1,15,MAP1LC3A,TBC1D1,Q9H492,Q86TI0,0,,,False
+dr016_reference_CUL2_DCUN1D5,16,CUL2,DCUN1D5,Q13617,Q9BTE7,0,,,False
+dr017_reference_SMCR8_ULK1,17,SMCR8,ULK1,Q8TEV9,O75385,0,,,False
+dr018_reference_MAF_JUNB,18,MAF,JUNB,O75444,P17275,0,,,False
+dr019_reference_ITGB3_SHC1,19,ITGB3,SHC1,P05106,P29353,1,"2L1C (solution nmr, 2010-08-18)",2010-08-18,True
+dr020_reference_RAB6B_BICD2,20,RAB6B,BICD2,Q9NRW1,Q8TD16,0,,,False
+dr021_reference_NOTUM_GPC3,21,NOTUM,GPC3,Q6P988,P51654,0,,,False
+dr022_reference_MAP1LC3B_ATG16L2,22,MAP1LC3B,ATG16L2,Q9GZQ8,Q8NAA4,0,,,False
+dr023_reference_ITGB2_PRKCG,23,ITGB2,PRKCG,P05107,P05129,0,,,False
+dr024_reference_GRIN2C_CASK,24,GRIN2C,CASK,Q14957,O14936,0,,,False
+dr025_reference_TCERG1_SF3A3,25,TCERG1,SF3A3,O14776,Q12874,3,"7ABG (electron microscopy, 2020-12-23) 8QO9 (electron microscopy, 2024-01-24) 9R8V (electron microscopy, 2026-05-27)",2020-12-23,True
+dr026_reference_ITGB1_FERMT1,26,ITGB1,FERMT1,P05556,Q9BQL6,0,,,False
+dr027_reference_TCERG1_SF3A1,27,TCERG1,SF3A1,O14776,Q15459,4,"7ABG (electron microscopy, 2020-12-23) 8Q7N (electron microscopy, 2024-01-24) 8QO9 (electron microscopy, 2024-01-24) 9R8V (electron microscopy, 2026-05-27)",2020-12-23,True
+dr028_reference_MAPT_CASK,28,MAPT,CASK,P10636,O14936,0,,,False
+dr029_reference_METTL22_KIN,29,METTL22,KIN,Q9BUU2,O60870,0,,,False
+dr030_reference_PTP4A2_RABGGTB,30,PTP4A2,RABGGTB,Q12974,P53611,0,,,False
+dr031_reference_TCERG1_LUC7L,31,TCERG1,LUC7L,O14776,Q9NQ29,0,,,False
+dr032_reference_APP_SORT1,32,APP,SORT1,P05067,Q99523,0,,,False
+dr033_reference_GABARAP_GABRG2,33,GABARAP,GABRG2,O95166,P18507,0,,,False
+dr034_reference_UPF2_RNPS1,34,UPF2,RNPS1,Q9HAU5,Q15287,0,,,False
+dr035_reference_POLE3_DR1,35,POLE3,DR1,Q9NRF9,Q01658,0,,,False
+dr036_reference_PQBP1_TXNL4A,36,PQBP1,TXNL4A,O60828,P83876,3,"4BWQ (x-ray diffraction, 2014-04-30) 4CDO (x-ray diffraction, 2014-04-30) 4BWS (x-ray diffraction, 2014-04-30)",2014-04-30,True
+dr037_reference_EGFR_CTNND1,37,EGFR,CTNND1,P00533,O60716,0,,,False
+dr038_reference_GABARAP_ATG3,38,GABARAP,ATG3,O95166,Q9NT62,2,"8AFI (x-ray diffraction, 2023-05-10) 9E8P (x-ray diffraction, 2025-08-06)",2023-05-10,False
+dr039_reference_ATG16L1_WIPI2,39,ATG16L1,WIPI2,Q676U5,Q9Y4P8,2,"7F69 (x-ray diffraction, 2022-07-27) 7XFR (x-ray diffraction, 2023-03-08)",2022-07-27,False
+dr040_reference_NPC2_NPC1,40,NPC2,NPC1,P61916,O15118,3,"5KWY (x-ray diffraction, 2016-08-24) 6W5V (electron microscopy, 2020-06-17) 37LU (electron microscopy, 2026-09-30)",2016-08-24,True
+dr041_reference_EGFR_SHC1,41,EGFR,SHC1,P00533,P29353,1,"5CZI (x-ray diffraction, 2015-09-30)",2015-09-30,True
+dr042_reference_ADRM1_PSMD2,42,ADRM1,PSMD2,Q16186,Q13200,0,,,False
+dr043_reference_STX12_SNAP29,43,STX12,SNAP29,Q86Y82,O95721,0,,,False
+dr044_reference_LSM1_PATL1,44,LSM1,PATL1,O15116,Q86TB9,0,,,False
+dr045_reference_MAP1LC3B_SQSTM1,45,MAP1LC3B,SQSTM1,Q9GZQ8,Q13501,0,,,False
+dr046_reference_GABRB3_GABRA1,46,GABRB3,GABRA1,P28472,P14867,54,"6HUO (electron microscopy, 2019-01-02) 6I53 (electron microscopy, 2019-01-02) 7PBD (electron microscopy, 2022-02-09) 7PC0 (electron microscopy, 2022-02-09) 7QNE (electron microscopy, 2022-04-13) 8PET (electron microscopy, 2025-07-02) 9CSB (electron microscopy, 2025-01-22) 9CTJ (electron microscopy, 2025-01-22) 9CX7 (electron microscopy, 2025-01-22) 9CXC (electron microscopy, 2025-01-22) 9EQG (electron microscopy, 2024-09-18) 9FAM (electron microscopy, 2025-07-02) 9FAS (electron microscopy, 2025-05-28) 9FAT (electron microscopy, 2025-07-02) 9FFL (electron microscopy, 2025-06-04) 9FFM (electron microscopy, 2025-06-04) 9FFN (electron microscopy, 2025-06-04) 9FFO (electron microscopy, 2025-06-04) 9FFQ (electron microscopy, 2025-06-04) 9FFR (electron microscopy, 2025-06-04) 9FFS (electron microscopy, 2025-06-04) 9FFU (electron microscopy, 2025-06-04) 9FFV (electron microscopy, 2025-06-04) 9FFW (electron microscopy, 2025-06-04) 9FFX (electron microscopy, 2025-06-04) 9FFY (electron microscopy, 2025-06-04) 9FFZ (electron microscopy, 2025-06-04) 9FG2 (electron microscopy, 2025-06-04) 9FG3 (electron microscopy, 2025-06-04) 9FG4 (electron microscopy, 2025-06-04) 9FG5 (electron microscopy, 2025-06-04) 9FG6 (electron microscopy, 2025-06-04) 9FG7 (electron microscopy, 2025-06-04) 9FG8 (electron microscopy, 2025-06-04) 9FG9 (electron microscopy, 2025-06-04) 9FGA (electron microscopy, 2025-06-04) 9FGC (electron microscopy, 2025-06-04) 9FGF (electron microscopy, 2025-06-04) 9FGH (electron microscopy, 2025-06-04) 9RGD (electron microscopy, 2026-06-17) 9RGE (electron microscopy, 2026-06-17) 9FGG (electron microscopy, 2025-06-04) 9FGD (electron microscopy, 2025-06-04) 9FGB (electron microscopy, 2025-06-04) 9FG1 (electron microscopy, 2025-06-04) 9FG0 (electron microscopy, 2025-06-11) 9FFT (electron microscopy, 2025-06-04) 9FFP (electron microscopy, 2025-06-04) 9FAQ (electron microscopy, 2025-07-02) 9FAP (electron microscopy, 2025-07-02) 9FAK (electron microscopy, 2025-07-02) 9FAJ (electron microscopy, 2025-07-02) 9CXA (electron microscopy, 2025-01-22) 7PBZ (electron microscopy, 2022-02-09)",2019-01-02,True
+dr047_reference_POLE3_CHRAC1,47,POLE3,CHRAC1,Q9NRF9,Q9NRG0,0,,,False

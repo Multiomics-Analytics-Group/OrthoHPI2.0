@@ -170,13 +170,13 @@ extracellular one.
   \caption{Proteins surviving each stage of the pipeline, for every
   host--parasite pair. Bars are nested on a logarithmic axis, one row per pair,
   in blocks by host. The host side (left) runs from the STRING proteome through
-  the TISSUES and DeepLoc filters to the proteins in a predicted interaction
-  with that parasite; the parasite side (right) from the STRING proteome
-  through the DeepLoc secretome filter and assignment to an EggNOG orthologous
-  group to the proteins in a predicted interaction with that host. Both filters
-  keep what Figure~\ref{fig:workflow} specifies. The orthologous-group stage is
-  omitted on the host side, where every protein reaching it is already in a
-  group. Rows are ordered by the parasite's niche in the host, then taxonomic
+  the TISSUES and DeepLoc filters and membership of a KOG group to the proteins
+  in a predicted interaction with that parasite; the parasite side (right) from
+  the STRING proteome through the DeepLoc secretome filter and membership of a
+  KOG group to the proteins in a predicted interaction with that host. Both
+  filters keep what Figure~\ref{fig:workflow} specifies. Only the KOG groups of
+  EggNOG carry interactions in STRING, so only their members can be linked.
+  Rows are ordered by the parasite's niche in the host, then taxonomic
   group, then name; the strips left of each block give the niche (outer) and
   the taxonomic group (inner). The counts behind every row, and the number of
   predicted interactions of each pair, are in Supplementary Table~S1.}

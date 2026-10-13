@@ -67,12 +67,12 @@ def host_pools(config_file, config, data_dir):
 
 def parasite_pools(config, data_dir):
     '''{(parasite, class): probabilities of its whole proteome}, on extracellular for
-    every parasite and cell membrane for the unicellular ones; parasites by group, niche
+    every parasite and cell membrane for the unicellular ones; parasites by niche, group
     then name.'''
     groups = list(config['parasite_groups'])
     ordered = sorted(config['parasites'].items(),
-                     key=lambda item: (groups.index(item[1]['group']),
-                                       list(NICHE_COLORS).index(item[1]['niche']),
+                     key=lambda item: (list(NICHE_COLORS).index(item[1]['niche']),
+                                       groups.index(item[1]['group']),
                                        item[1]['label']))
     pools = {}
     for taxid, parasite in ordered:

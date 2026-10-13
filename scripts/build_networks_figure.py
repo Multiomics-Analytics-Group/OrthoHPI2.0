@@ -22,7 +22,7 @@ import utils
 from pipeline import main
 from scripts import figure_style
 
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 PLACES = ['surface', 'both', 'interior']
 PLACE_LABELS = {'surface': 'surface (extracellular, cell membrane)',
                 'both': 'surface and interior', 'interior': 'interior (cytoplasm, nucleus)'}
@@ -50,7 +50,7 @@ def host_places(data_dir):
 
 def count(config, data_dir):
     '''One row per host-parasite pair: interactions, by host-protein place, and the
-    proteins on either side; hosts in config order, parasites by group then name.'''
+    proteins on either side; hosts in config order, parasites by niche, group then name.'''
     parasites = config['parasites']
     hosts = {str(t): h['label'].split('(')[1].rstrip(')') for t, h in config['hosts'].items()}
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
@@ -60,8 +60,8 @@ def count(config, data_dir):
     rows = []
     for host, host_name in hosts.items():
         for taxid, parasite in sorted(parasites.items(),
-                                      key=lambda item: (order.index(item[1]['group']),
-                                                        list(NICHE_COLORS).index(item[1]['niche']),
+                                      key=lambda item: (list(NICHE_COLORS).index(item[1]['niche']),
+                                                        order.index(item[1]['group']),
                                                         item[1]['label'])):
             if int(host) not in parasite['hosts']:
                 continue

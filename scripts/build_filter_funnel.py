@@ -45,7 +45,7 @@ STAGE_COLORS = {
 # the host-side DeepLoc filter turns on the niche, so the rows are ordered by it; the
 # wider-reaching niche first, as in the workflow figure
 NICHE_ORDER = ['intracellular', 'extracellular']
-NICHE_COLORS = {'intracellular': '#555555', 'extracellular': '#bdbdbd'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # the colour strips left of a block, as (column, colours, offset in axes fractions)
 STRIPS = [('niche', NICHE_COLORS, -0.10), ('group', None, -0.05)]
 STRIP_WIDTH = 0.025

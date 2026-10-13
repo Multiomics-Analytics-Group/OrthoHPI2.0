@@ -25,7 +25,7 @@ import utils
 from pipeline import main
 from scripts import figure_style
 
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # how DeepLoc's class names are spelt in the localisations table
 COLUMN_OF = {'Extracellular': 'extracellular', 'Cell membrane': 'cell_membrane',
              'Cytoplasm': 'cytoplasm', 'Nucleus': 'nucleus'}
@@ -81,7 +81,7 @@ def host_scores(proteins, config):
 def parasite_scores(proteins, config):
     '''The extracellular probability of each parasite protein called extracellular, and
     the cell-membrane probability of each unicellular parasite protein called cell
-    membrane, once per parasite; parasites by group, niche then name.'''
+    membrane, once per parasite; parasites by niche, group then name.'''
     parasites = proteins[proteins['side'] == 'parasite'].drop_duplicates(['parasite', 'protein'])
     rows = []
     for surface_class in SURFACE:
@@ -91,8 +91,8 @@ def parasite_scores(proteins, config):
         rows.append(called.assign(localization=surface_class, probability=called[column]))
     scores = pd.concat(rows, ignore_index=True)
     groups = list(config['parasite_groups'])
-    scores['rank'] = list(zip(scores['group'].map(groups.index),
-                              scores['niche'].map(list(NICHE_COLORS).index), scores['parasite']))
+    scores['rank'] = list(zip(scores['niche'].map(list(NICHE_COLORS).index),
+                              scores['group'].map(groups.index), scores['parasite']))
 
     return scores.sort_values('rank')[['localization', 'parasite', 'group', 'niche',
                                        'protein', 'probability']]

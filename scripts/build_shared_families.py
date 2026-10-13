@@ -24,7 +24,7 @@ import utils
 from scripts import figure_style
 
 HELMINTHS = {'Nematoda', 'Trematoda', 'Cestoda'}
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 DOT_COLOR = '#2a62ab'
 # most gene symbols in a family label before the rest are left as an ellipsis
 SYMBOLS_IN_LABEL = 2
@@ -73,8 +73,8 @@ def draw(config, families, edges, output_stem):
     taxon_order = list(config['parasite_groups'])
     taxon_colors = config['parasite_groups']
     columns = sorted(set(edges['taxid1']),
-                     key=lambda t: (taxon_order.index(parasites[int(t)]['group']),
-                                    list(NICHE_COLORS).index(parasites[int(t)]['niche']),
+                     key=lambda t: (list(NICHE_COLORS).index(parasites[int(t)]['niche']),
+                                    taxon_order.index(parasites[int(t)]['group']),
                                     parasites[int(t)]['label']))
     col_of = {t: i for i, t in enumerate(columns)}
     row_of = {f: i for i, f in enumerate(families['family'])}

@@ -30,7 +30,7 @@ import utils
 import web_utils
 from scripts import figure_style
 
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # the colour ramp of the app's enrichment figures
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
 # two processes are one row when this share of their host proteins is common to both

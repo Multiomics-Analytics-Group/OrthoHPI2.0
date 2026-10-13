@@ -22,7 +22,7 @@ import utils
 from pipeline import homology
 from scripts import figure_style
 
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # a host with fewer parasites still gets a block this many boxes tall
 MIN_COLUMN = 3
 # the lowest score a kept link can have
@@ -31,7 +31,7 @@ SCORE_FLOOR = homology.EVIDENCE_CUTOFF / 2
 
 def collect(config, data_dir):
     '''The score of every prediction, labelled with its host and parasite; hosts in config
-    order, parasites by group, niche then name.'''
+    order, parasites by niche, group then name.'''
     parasites = config['parasites']
     hosts = {str(t): h['label'].split('(')[1].rstrip(')') for t, h in config['hosts'].items()}
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
@@ -41,8 +41,8 @@ def collect(config, data_dir):
     frames = []
     for host, host_name in hosts.items():
         for taxid, parasite in sorted(parasites.items(),
-                                      key=lambda item: (order.index(item[1]['group']),
-                                                        list(NICHE_COLORS).index(item[1]['niche']),
+                                      key=lambda item: (list(NICHE_COLORS).index(item[1]['niche']),
+                                                        order.index(item[1]['group']),
                                                         item[1]['label'])):
             if int(host) not in parasite['hosts']:
                 continue

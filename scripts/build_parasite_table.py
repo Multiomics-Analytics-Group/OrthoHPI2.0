@@ -17,8 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 
-COLUMNS = ['Species', 'U/M', 'I/E', 'Hosts', 'Tissues']
+# The niche shows as a swatch in the tex and html, so only the csv spells it out.
+COLUMNS = ['Species', 'U/M', 'Hosts', 'Tissues']
 TEXT_COLUMNS = COLUMNS[1:]
+CSV_COLUMNS = ['Species', 'Group', 'U/M', 'I/E', 'Hosts', 'Tissues']
 # The niche colours of the figures, which mark each parasite with a group strip
 # and a niche strip; the table marks each species the same way.
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
@@ -51,7 +53,7 @@ def build_rows(config_file):
             'Hosts': ', '.join(host_names[host] for host in parasite['hosts']),
             'Tissues': ', '.join(tissues[bto] for bto in parasite['tissues']),
         })
-    return pd.DataFrame(rows, columns=['Group', 'Niche'] + COLUMNS)
+    return pd.DataFrame(rows, columns=['Niche'] + CSV_COLUMNS)
 
 
 def color_name(label):
@@ -80,15 +82,12 @@ def write_tex(table, path, group_colors):
         r'\singlespacing\scriptsize',
         r'\setlength{\LTcapwidth}{\textwidth}',
         r'\rowcolors{2}{rowblue}{white}',
-        # Narrower column gaps make room for the swatches before each species.
-        r'\setlength{\tabcolsep}{4pt}',
         # The widths add up to the 180 mm text block, so the table sits
         # upright on the page, and each is a little wider than its widest
         # entry, so that no cell wraps.
-        r'\begin{longtable}{@{}L{4.4cm}cc L{2.6cm}L{8.65cm}@{}}',
+        r'\begin{longtable}{@{}L{4.4cm}c L{2.6cm}L{9.05cm}@{}}',
         r'\caption{Parasites included in OrthoHPI 2.0, ordered by niche'
-        r' in the host, then taxonomic group. U/M: unicellular or multicellular; I/E: intracellular or'
-        r' extracellular niche in the host; tissues are those the parasite'
+        r' in the host, then taxonomic group. U/M: unicellular or multicellular; tissues are those the parasite'
         r' occupies in the host during its lifecycle. The squares before each'
         r' species mark its taxonomic group and its niche'
         rf' (\swatch{{{color_name("intracellular")}}}\,intracellular,'
@@ -140,8 +139,7 @@ def build(config_file, out_dir):
     table = build_rows(config_file)
     group_colors = utils.read_config(filepath=config_file, field='parasite_groups')
     os.makedirs(out_dir, exist_ok=True)
-    table[['Species', 'Group'] + TEXT_COLUMNS].to_csv(os.path.join(out_dir, 'parasites.csv'),
-                                                     index=False)
+    table[CSV_COLUMNS].to_csv(os.path.join(out_dir, 'parasites.csv'), index=False)
     write_tex(table, os.path.join(out_dir, 'parasites.tex'), group_colors)
     write_html(table, os.path.join(out_dir, 'parasites.html'), group_colors)
     print(f"Wrote {out_dir}/parasites.{{tex,csv,html}}: {len(table)} parasites")

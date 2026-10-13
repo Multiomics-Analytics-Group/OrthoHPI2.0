@@ -1,10 +1,11 @@
 '''
 Draw the share of proteins each stage of the pipeline keeps from the stage before it,
-per host-parasite pair, from the counts build_filter_funnel.py writes. The funnel
-figure's log axis shows fold reductions, so a late stage with a small count can look
-wide; here every cell is kept / previous on the same 0-100% scale. One row per pair,
-in the funnel's order and blocks, the host stages left and the parasite stages right.
-Writes paper/tables/funnel_shares.csv and paper/figures/funnel_shares.svg/.png.
+per host-parasite pair, from the counts build_filter_funnel.py writes. Every share is
+on the same 0-100% scale, so a filter that removes much reads as a pale cell whatever
+the size of the proteome. Two counts frame the shares: the parasite's STRING proteome
+before its stages and the predicted interactions after them; the host's proteome is one
+number per host, given in the block title. One row per pair, in the funnel's order and
+blocks. Writes paper/tables/funnel_shares.csv and paper/figures/funnel_shares.svg/.png.
 '''
 import argparse
 import os
@@ -33,47 +34,70 @@ PARASITE_STEPS = [('DeepLoc', 'parasite_localization', 'parasite_proteome'),
 # the scale of the similarity figure, white at nothing kept
 SCALE = ['#ffffff', '#deebf7', '#9ecae1', '#6baed6', '#3182bd', '#08519c']
 EMPTY_COLOR = '#d9d9d9'
+COUNT_COLOR = '#555555'
 # cells darker than this share take white text
 DARK = 0.6
-# the layout in inches: a cell is square-ish and wide enough for "100"; the parasite
-# columns sit SIDE_GAP cells right of the host ones; the strips sit left of the cells
+# the layout in inches; a cell is at most CELL wide, narrower when the two columns of
+# blocks would not otherwise fit the page. In cell units: the gap between the host and
+# parasite columns, the one before the interactions, and the strips left of the cells
 CELL = 0.27
 SIDE_GAP = 0.45
+COUNT_GAP = 0.3
 STRIP_X = (-0.8, -0.5)
 STRIP_WIDTH = 0.22
-NAMES = 1.15
-LEFT, TOP, BOTTOM, COLUMN_GAP = 0.05, 1.05, 0.3, 0.15
+NAMES = 1.0
+LEFT, RIGHT, TOP, BOTTOM, COLUMN_GAP = 0.05, 0.12, 1.25, 0.3, 0.15
 # rows between the stacked blocks of the right column, for the next header
-BLOCK_GAP = 7.5
+BLOCK_GAP = 9
 
 
 def shares(table):
-    '''The share of each step per pair, empty where the stage before kept nothing.'''
-    out = table[['host', 'species', 'group', 'niche']].copy()
+    '''Per pair: the share each stage keeps of the stage before, empty where that kept
+    nothing, and the counts that frame them.'''
+    out = table[['host', 'species', 'group', 'niche', 'host_proteome', 'parasite_proteome']].copy()
     for side, steps in (('host', HOST_STEPS), ('parasite', PARASITE_STEPS)):
         for label, kept, before in steps:
             out[f'{side} {label}'] = (table[kept] / table[before].replace(0, np.nan)).round(4)
+    out['interactions'] = table['edges']
 
     return out
 
 
-def x_positions():
-    '''The left edge of every cell column in cell units, host then parasite.'''
-    host = list(range(len(HOST_STEPS)))
-    parasite = [len(HOST_STEPS) + SIDE_GAP + i for i in range(len(PARASITE_STEPS))]
+def layout():
+    '''[(left edge in cell units, column, header, is a count)] of one row of cells,
+    with the edges of the host and parasite groups for the labels over them.'''
+    cells = [(i, f'host {label}', label, False) for i, (label, _, _) in enumerate(HOST_STEPS)]
+    host = (0, len(HOST_STEPS))
+    start = len(HOST_STEPS) + SIDE_GAP
+    cells.append((start, 'parasite_proteome', 'Proteome', True))
+    cells += [(start + 1 + i, f'parasite {label}', label, False)
+              for i, (label, _, _) in enumerate(PARASITE_STEPS)]
+    parasite = (start, start + 1 + len(PARASITE_STEPS))
+    cells.append((parasite[1] + COUNT_GAP, 'interactions', 'Interactions', True))
 
-    return host, parasite
+    return cells, {'Host': host, 'Parasite': parasite}
 
 
-def draw_block(ax, rows, group_colors, cmap, host_name):
-    '''One host's pairs: a row of cells per pair, the share printed in each, the
-    niche and group strips left of the cells and the parasite names left of those.'''
-    host_x, parasite_x = x_positions()
-    columns = [(x, f'host {label}') for x, (label, _, _) in zip(host_x, HOST_STEPS)] + \
-              [(x, f'parasite {label}') for x, (label, _, _) in zip(parasite_x, PARASITE_STEPS)]
+def count_label(value):
+    '''A count in at most four characters: thousands abbreviated.'''
+    if value >= 9950:
+        return f'{value / 1000:.0f}k'
+
+    return f'{value / 1000:.1f}k' if value >= 1000 else f'{value:.0f}'
+
+
+def draw_block(ax, rows, group_colors, cmap):
+    '''One host's pairs: a row of cells per pair, the share printed in each and the
+    counts in plain text, the niche and group strips left of the cells and the parasite
+    names left of those.'''
+    cells, groups = layout()
     for i, row in rows.iterrows():
-        for x, column in columns:
+        for x, column, _, is_count in cells:
             value = row[column]
+            if is_count:
+                ax.text(x + 0.5, i + 0.52, count_label(value), ha='center', va='center',
+                        color=COUNT_COLOR)
+                continue
             empty = pd.isna(value)
             ax.add_patch(Rectangle((x, i), 1, 1, facecolor=EMPTY_COLOR if empty else cmap(value),
                                    edgecolor='white', linewidth=1))
@@ -85,8 +109,7 @@ def draw_block(ax, rows, group_colors, cmap, host_name):
         for x, color in zip(STRIP_X, (NICHE_COLORS[row['niche']], group_colors[row['group']])):
             ax.add_patch(Rectangle((x, i + 0.04), STRIP_WIDTH, 0.92, color=color, linewidth=0))
 
-    right = parasite_x[-1] + 1
-    ax.set_xlim(STRIP_X[0] - 0.05, right)
+    ax.set_xlim(STRIP_X[0] - 0.05, cells[-1][0] + 1)
     ax.set_ylim(len(rows), 0)
     ax.set_yticks([i + 0.5 for i in range(len(rows))])
     ax.set_yticklabels([figure_style.short_name(s) for s in rows['species']], fontstyle='italic')
@@ -95,16 +118,15 @@ def draw_block(ax, rows, group_colors, cmap, host_name):
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-    # the step names over the cells, the side over them, the host over all
-    for x, (label, _, _) in [*zip(host_x, HOST_STEPS), *zip(parasite_x, PARASITE_STEPS)]:
-        ax.text(x + 0.5, -0.3, label, ha='center', va='bottom', rotation=90)
-    for xs, side in ((host_x, 'Host'), (parasite_x, 'Parasite')):
-        ax.annotate('', xy=(xs[0] + 0.05, -4.3), xytext=(xs[-1] + 0.95, -4.3),
+    # the column names over the cells, the side over its group
+    for x, _, header, is_count in cells:
+        ax.text(x + 0.5, -0.3, header, ha='center', va='bottom', rotation=90,
+                color=COUNT_COLOR if is_count else 'black')
+    for side, (start, end) in groups.items():
+        ax.annotate('', xy=(start + 0.05, -4.3), xytext=(end - 0.05, -4.3),
                     arrowprops=dict(arrowstyle='-', color='#999999', linewidth=0.6),
                     annotation_clip=False)
-        ax.text((xs[0] + xs[-1] + 1) / 2, -4.5, side, ha='center', va='bottom')
-    ax.text(STRIP_X[0] - 0.05, -4.5, host_name, ha='right', va='bottom', fontweight='bold',
-            fontsize=figure_style.TITLE)
+        ax.text((start + end) / 2, -4.5, side, ha='center', va='bottom')
 
 
 def draw(table, group_colors, output_stem):
@@ -119,22 +141,28 @@ def draw(table, group_colors, output_stem):
     row = figure_style.ROW
     height = sizes[first] * row + TOP + BOTTOM
     fig = plt.figure(figsize=(figure_style.WIDTH, height))
-    _, parasite_x = x_positions()
-    width = (parasite_x[-1] + 1 - STRIP_X[0] + 0.05) * CELL
+    cells, _ = layout()
+    units = cells[-1][0] + 1 - STRIP_X[0] + 0.05
+    cell = min(CELL, (figure_style.WIDTH - LEFT - RIGHT - 2 * NAMES - COLUMN_GAP) / 2 / units)
+    width = units * cell
     figure_width = figure_style.WIDTH
 
-    def add_axes(x, y_top, n):
-        return fig.add_axes([x / figure_width, (y_top - n * row) / height,
-                             width / figure_width, n * row / height])
+    def block(host, x, y_top):
+        rows = table[table['host'] == host].reset_index(drop=True)
+        ax = fig.add_axes([x / figure_width, (y_top - len(rows) * row) / height,
+                           width / figure_width, len(rows) * row / height])
+        draw_block(ax, rows, group_colors, cmap)
+        # the host and its proteome on a line of their own over the side labels
+        fig.text((x - NAMES) / figure_width, (y_top + 6.2 * row) / height,
+                 f"{host} ({rows['host_proteome'].iloc[0]:,} proteins)", ha='left', va='bottom',
+                 fontweight='bold', fontsize=figure_style.TITLE)
 
     x_first = LEFT + NAMES
-    draw_block(add_axes(x_first, height - TOP, sizes[first]),
-               table[table['host'] == first].reset_index(drop=True), group_colors, cmap, first)
+    block(first, x_first, height - TOP)
     x_other = x_first + width + COLUMN_GAP + NAMES
     y = height - TOP
     for host in others:
-        draw_block(add_axes(x_other, y, sizes[host]),
-                   table[table['host'] == host].reset_index(drop=True), group_colors, cmap, host)
+        block(host, x_other, y)
         y -= (sizes[host] + BLOCK_GAP) * row
 
     # the colour bar under the right column, the legends under it

@@ -28,12 +28,12 @@ PYTHON := .venv/bin/python
 INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
-FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
+FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
 	figures/parasite_similarity.png figures/shared_families.png figures/parasite_go.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png \
-	figures/web_network.png figures/funnel_shares.png
+	figures/web_network.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -41,14 +41,15 @@ paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 figures/workflow.png: figures/workflow.svg
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-# The filter funnel: proteins left after each stage of the pipeline on the host and
-# parasite side of each host-parasite pair. Rereads the TISSUES downloads and the
-# EggNOG members file, so it takes a minute.
+# The proteins left after each stage of the pipeline on the host and parasite side of
+# each host-parasite pair: the counts behind Figure 3 and Supplementary Table S1, and a
+# log-axis funnel the paper does not use. Rereads the TISSUES downloads and the EggNOG
+# members file, so it takes a minute.
 figures/funnel.svg figures/funnel.png tables/funnel.csv tables/funnel_supplementary.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_filter_funnel.py
 
-# The share of proteins each funnel stage keeps from the one before, from the funnel's
-# counts, so it reruns without rereading the downloads.
+# Figure 3: the share of proteins each stage keeps from the one before, from the
+# funnel's counts, so it reruns without rereading the downloads.
 figures/funnel_shares.svg figures/funnel_shares.png tables/funnel_shares.csv: ../config.yml tables/funnel.csv ../scripts/build_funnel_shares.py ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_funnel_shares.py
 
@@ -116,7 +117,7 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/funnel.png figures/funnel_shares.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png figures/web_network.png
+figures: figures/workflow.png figures/funnel_shares.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png figures/web_network.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

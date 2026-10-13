@@ -159,30 +159,31 @@ the host cell its interactions land.
 \end{figure}
 
 Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
-stage by stage and separately for each host--parasite pair. The DeepLoc filter
-leaves an intracellular parasite roughly five times as many host proteins as an
-extracellular one.
+stage by stage and separately for each host--parasite pair, as the share of
+proteins each stage keeps. The DeepLoc filter keeps 77--84\% of the host
+proteins expressed in the infected tissues for an intracellular parasite,
+against 18--26\% for an extracellular one.
 
-% paper/figures/funnel.pdf is generated: `make figures` (see Makefile).
+% paper/figures/funnel_shares.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel}
-  \caption{Proteins surviving each stage of the pipeline, for every
-  host--parasite pair. Bars are nested on a logarithmic axis, one row per pair,
-  in blocks by host. The host side (left) runs from the STRING proteome through
-  the TISSUES and DeepLoc filters and membership of a KOG group to the proteins
-  in a predicted interaction with that parasite; the parasite side (right) from
-  the STRING proteome through the DeepLoc secretome filter and membership of a
-  KOG group to the proteins in a predicted interaction with that host. Both
-  filters keep what Figure~\ref{fig:workflow} specifies. Only the KOG groups of
-  EggNOG carry interactions in STRING, so only their members can be linked.
-  Rows are ordered by the parasite's niche in the host, then taxonomic
-  group, then name; the strips left of each block give the niche (outer) and
-  the taxonomic group (inner). The counts behind every row, and the number of
-  predicted interactions of each pair, are in Supplementary Table~S1. On the
-  logarithmic axis the width of a band reflects the fold reduction, not the
-  number of proteins removed; the share each stage keeps is in Supplementary
-  Figure~\ref{fig:funnel_shares}.}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel_shares}
+  \caption{Share of proteins each stage of the pipeline keeps, for every
+  host--parasite pair, one row per pair in blocks by host. Each coloured cell is
+  the percentage of proteins kept from the stage before. Host side: expressed in
+  a tissue the parasite infects (TISSUES) of the STRING proteome, in a reachable
+  localisation (DeepLoc) of those, in a KOG group of those, and in a predicted
+  interaction (PPI) of those. Parasite side: secreted or on the surface
+  (DeepLoc) of the STRING proteome, in a KOG group of those, and in a predicted
+  interaction (PPI) of those. Both filters keep what
+  Figure~\ref{fig:workflow} specifies; only the KOG groups of EggNOG carry
+  interactions in STRING, so only their members can be linked. The grey counts
+  give the size of the parasite's STRING proteome and the number of predicted
+  interactions of the pair; the size of the host's proteome follows its name.
+  Rows are ordered by the parasite's niche in the host, then taxonomic group,
+  then name; the strips beside the names give the niche (outer) and the
+  taxonomic group (inner). The counts behind every cell are in Supplementary
+  Table~S1.}
   \label{fig:funnel}
 \end{figure}
 
@@ -463,27 +464,6 @@ decided on, kept or not.
   are as in Supplementary Figure~\ref{fig:deeploc_pools_host}. The strips beside
   the names give the niche (outer) and the taxonomic group (inner).}
   \label{fig:deeploc_pools_parasite}
-\end{figure}
-
-\textbf{Supplementary Figure~\ref{fig:funnel_shares}}. Share of proteins each
-stage of the pipeline keeps.
-
-% paper/figures/funnel_shares.png is generated: `make figures` (see Makefile).
-\begin{figure}[p]
-  \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S5}
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel_shares}
-  \caption{Percentage of proteins each stage of Figure~\ref{fig:funnel} keeps
-  from the stage before it, for every host--parasite pair, in the same order
-  and blocks. Host side: expressed in an infected tissue (TISSUES) of the
-  STRING proteome, in a reachable localisation (DeepLoc) of those, in a KOG
-  group of those, and in a predicted interaction (PPI) of those. Parasite
-  side: secreted or on the surface (DeepLoc) of the STRING proteome, in a KOG
-  group of those, and in a predicted interaction (PPI) of those. The counts
-  are in Supplementary Table~S1. The strips beside the names give the niche
-  (outer) and the taxonomic group (inner).}
-  \label{fig:funnel_shares}
 \end{figure}
 
 \section*{Data and code availability}

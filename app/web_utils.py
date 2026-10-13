@@ -211,6 +211,29 @@ def load_protein_annotations(data_dir):
 
 
 @st.cache_data(show_spinner=False)
+def load_protein_sequences(data_dir):
+    '''
+    Protein sequences, keyed by STRING id, written by pipeline/build_protein_sequences.py.
+    '''
+    input_file = os.path.join(data_dir, 'protein_sequences.parquet')
+    if not os.path.exists(input_file):
+        return {}
+    sequences = utils.read_parquet_file(input_file=input_file)
+
+    return dict(sequences[['protein', 'sequence']].values)
+
+
+def to_fasta(records, width=60):
+    '''FASTA text of (header, sequence) records, wrapped at width residues.'''
+    lines = []
+    for header, sequence in records:
+        lines.append(f'>{header}')
+        lines.extend(sequence[i:i + width] for i in range(0, len(sequence), width))
+
+    return '\n'.join(lines) + '\n'
+
+
+@st.cache_data(show_spinner=False)
 def load_deeploc_localisations(data_dir):
     '''
     Where DeepLoc 2 predicts each protein of the predictions sits, keyed by STRING id,

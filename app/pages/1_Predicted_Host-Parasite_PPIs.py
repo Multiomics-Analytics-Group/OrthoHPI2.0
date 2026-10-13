@@ -890,11 +890,13 @@ def annotate_edges(edges, df, annotations):
     for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
         pairs[frozenset((row.source, row.target))] = {
             'parasite': str(row.source_name),
+            'parasite_id': str(row.source),
             # NaN does not survive the trip to the browser
             'parasite_uniprot': None if pd.isna(row.source_uniprot) else str(row.source_uniprot),
             'parasite_full': annotations.get(row.source, ''),
             'parasite_species': str(row.taxid1_label),
             'host': str(row.target_name),
+            'host_id': str(row.target),
             'host_uniprot': None if pd.isna(row.target_uniprot) else str(row.target_uniprot),
             'host_full': annotations.get(row.target, ''),
             'host_species': str(row.taxid2_label),
@@ -918,6 +920,29 @@ def annotate_edges(edges, df, annotations):
         annotated.append(edge)
 
     return annotated
+
+
+def fasta_header(protein, name, species, uniprot):
+    '''Names a protein in a FASTA file by its STRING id, then what a reader knows it by.'''
+    parts = [f'{protein} {name}', str(species)]
+    if uniprot:
+        parts.append(f'UniProt {uniprot}')
+
+    return ' | '.join(parts)
+
+
+def network_fasta(G, df, sequences):
+    '''FASTA text of every protein drawn in the network, parasite proteins first.'''
+    records = []
+    for prefix, taxid_col in [('source', 'taxid1_label'), ('target', 'taxid2_label')]:
+        cols = [prefix, f'{prefix}_name', taxid_col, f'{prefix}_uniprot']
+        for protein, name, species, uniprot in df[cols].drop_duplicates(subset=prefix).values:
+            if protein in G and protein in sequences:
+                header = fasta_header(protein, name, species,
+                                      uniprot if pd.notna(uniprot) else None)
+                records.append((header, sequences[protein]))
+
+    return web_utils.to_fasta(records)
 
 
 def network_options(net):
@@ -959,6 +984,17 @@ def show_structures_dialog(edge):
                  edge['parasite_full'], edge['parasite_species']),
                 (edge['host'], edge['host_uniprot'],
                  edge['host_full'], edge['host_species'])]
+    sequences = web_utils.load_protein_sequences(data_dir)
+    # parasite then host, ready to paste into AlphaFold Server as a two-chain job
+    fasta = {protein: (fasta_header(edge[f'{side}_id'], protein, species, uniprot),
+                       sequences.get(edge[f'{side}_id']))
+             for side, (protein, uniprot, _, species) in zip(('parasite', 'host'), proteins)}
+    if all(sequence for _, sequence in fasta.values()):
+        # a download would otherwise rerun the page, which closes the dialog
+        st.download_button('Download both sequences as FASTA',
+                           web_utils.to_fasta(fasta.values()),
+                           file_name=f"{edge['parasite']}_{edge['host']}.fasta",
+                           mime='text/plain', on_click='ignore')
     query_proteins = {edge['parasite']: edge['parasite_uniprot'],
                       edge['host']: edge['host_uniprot']}
     with st.spinner('Fetching the AlphaFold models...'):
@@ -973,7 +1009,7 @@ def show_structures_dialog(edge):
             st.caption(subtitle)
             if pdb_file is not None:
                 show_structure(pdb_file=pdb_file)
-                bcol1, bcol2 = st.columns(2)
+                bcol1, bcol2, bcol3 = st.columns(3)
                 with bcol1:
                     st.link_button('PDB file', url)
                 with bcol2:
@@ -981,6 +1017,13 @@ def show_structures_dialog(edge):
             else:
                 st.markdown('''<h5>No AlphaFold model</h5>''', unsafe_allow_html=True)
                 st.caption(reason)
+                bcol3 = st.container()
+            header, sequence = fasta[protein]
+            if sequence:
+                with bcol3:
+                    st.download_button('FASTA', web_utils.to_fasta([(header, sequence)]),
+                                       file_name=f'{protein}.fasta', mime='text/plain',
+                                       on_click='ignore', key=f'fasta_{i}')
 
 
 st.caption('The predicted interactions of one host and one parasite as a network, with '
@@ -1158,7 +1201,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             st.session_state[shown_edge_key] = selected_edge['nonce']
             show_structures_dialog(selected_edge['edge'])
         with st.container():
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
 
             with c1:
                 st.download_button(
@@ -1184,6 +1227,15 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                                             f'{host_taxid}_network.json'),
                     mime='text/plain',
                 )
+            with c4:
+                st.download_button(
+                    label="Download Sequences as FASTA",
+                    data=network_fasta(G, host_df,
+                                       web_utils.load_protein_sequences(data_dir)),
+                    file_name=download_name(selected_parasite, page_filters,
+                                            f'{host_taxid}_network.fasta'),
+                    mime='text/plain',
+                )
 
 
 if networks:
@@ -1192,8 +1244,8 @@ if networks:
                'selected confidence score. Nodes are proteins, diamonds parasite and '
                'circles host, coloured by organism and sized by centrality in the '
                'network. Edge width is the confidence score. Hover a node for its full '
-               'name and identifiers; click an edge for the AlphaFold model of both '
-               'proteins.')
+               'name and identifiers; click an edge for the AlphaFold model and '
+               'sequence of both proteins.')
     if selected_host == 'Rodent':
         st.caption('Rat and Mouse networks are shown separately; their host nodes use '
                    'their species-specific colors.')

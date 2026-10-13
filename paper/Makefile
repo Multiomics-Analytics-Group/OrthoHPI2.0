@@ -33,7 +33,7 @@ FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png \
-	figures/web_network.png
+	figures/web_network.png figures/funnel_shares.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
@@ -46,6 +46,11 @@ figures/workflow.png: figures/workflow.svg
 # EggNOG members file, so it takes a minute.
 figures/funnel.svg figures/funnel.png tables/funnel.csv tables/funnel_supplementary.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_filter_funnel.py
+
+# The share of proteins each funnel stage keeps from the one before, from the funnel's
+# counts, so it reruns without rereading the downloads.
+figures/funnel_shares.svg figures/funnel_shares.png tables/funnel_shares.csv: ../config.yml tables/funnel.csv ../scripts/build_funnel_shares.py ../scripts/build_filter_funnel.py
+	cd .. && $(PYTHON) scripts/build_funnel_shares.py
 
 # The multi-host comparison: links shared between and specific to the hosts of each
 # parasite with several, and why a host lacks a link another host carries.
@@ -111,7 +116,7 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png figures/web_network.png
+figures: figures/workflow.png figures/funnel.png figures/funnel_shares.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/lb_case_study.png figures/web_overview.png figures/web_network.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

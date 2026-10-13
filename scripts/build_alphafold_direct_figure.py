@@ -30,7 +30,7 @@ SCORE_COLORS = LinearSegmentedColormap.from_list('score', ['#86b6ef', '#2a78d6',
 # references sharing the predicted partner, and those of another human pair of the groups
 PARTNER_MARKERS = {True: 'o', False: 'D'}
 PARTNER_LABELS = {True: 'Reference shares the predicted partner',
-                  False: 'Reference is another human pair of the groups'}
+                  False: 'Reference does not share the predicted partner'}
 
 
 def scores(jobs, results):

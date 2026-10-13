@@ -187,6 +187,32 @@ against 18--26\% for an extracellular one.
   \label{fig:funnel}
 \end{figure}
 
+\subsection{Structural models of the transferred interactions}
+\todo{Interpretation; cite AlphaFold 3 and ipSAE.}
+Figure~\ref{fig:alphafold_direct} compares AlphaFold 3 models of 48 predicted
+links from 25 parasites against models of the human interactions they were
+transferred from. Of the 20 human references with an ipSAE interface, the
+predicted link reproduces it in 6; ipTM finds an interface in one pair only.
+
+% paper/figures/alphafold_direct.png is generated: `make figures`.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/alphafold_direct}
+  \caption{AlphaFold 3 interface confidence of predicted parasite--human links
+  against that of the human interaction each was transferred from. The 48 links
+  are predicted against human, eight from each confidence-score bin between 0.35
+  and 1, at most one per pair of orthologous groups. Each is paired with a human
+  reference: a pair of human members of the same two orthologous groups shown to
+  bind directly in BioGRID or IntAct, the predicted human partner itself where
+  possible (circles), otherwise the pair with the most publications (diamonds).
+  \textbf{(A)} ipTM and \textbf{(B)} ipSAE of the best-ranked model of each
+  complex, coloured by the confidence score of the link. The dashed lines mark
+  an interface as found (ipTM $\ge 0.6$, ipSAE $\ge 0.1$), and the counts give
+  the links in each quadrant: an interface in both models, only in the
+  reference, only in the predicted link, or in neither.}
+  \label{fig:alphafold_direct}
+\end{figure}
+
 \subsection{Parasites of the same host reach overlapping host proteins}
 \todo{Interpretation: similarity within genera and within niches.}
 Figure~\ref{fig:similarity} compares the interactomes of the parasites of human

@@ -3,7 +3,7 @@ Screenshots of the running app for the web interface figures, written to
 paper/figures/web/ for scripts/build_web_interface_figure.py.
 
   home              the home page's hosts and parasites
-  multi_host        the multi-host parasites page for C. muris
+  multi_host        the multi-host parasites page for T. spiralis
   parasite_overlap  the parasites-of-a-host page for human, the parasites ordered by niche
                     as in the paper's similarity figure, the P. falciparum - P. vivax
                     cell clicked
@@ -195,7 +195,7 @@ def home_page(page, base, out):
 def multi_host_page(page, base, out):
     page.goto(f'{base}/Hosts_of_a_Parasite')
     wait(page)
-    choose(page, 'Select a parasite to compare', 'Cryptosporidium muris')
+    choose(page, 'Select a parasite to compare', 'Trichinella spiralis')
     hide_captions(page)
     top = page.get_by_role('heading', name='Predicted interactions per infected organ').bounding_box()
     bottom = page.get_by_text('missing links, one row each').bounding_box()

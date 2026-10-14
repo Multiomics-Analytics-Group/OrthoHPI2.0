@@ -37,7 +37,7 @@ GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a
 # two processes are one row when this share of their host proteins is common to both
 REDUNDANT_JACCARD = 0.5
 # process names wrap onto lines of at most this many characters
-LABEL_CHARS = 40
+LABEL_CHARS = 44
 # the left margin, a figure fraction, that the wrapped names take
 LEFT = 0.37
 
@@ -102,20 +102,6 @@ def order_rows(enriched, rows, columns):
     return [rows[i] for i in hierarchy.leaves_list(tree)]
 
 
-def row_positions(labels):
-    '''
-    The y of each row, in rows of figure_style.ROW: a row is one ROW from the next
-    unless their wrapped names need more room.
-    '''
-    line = 1.05 * figure_style.FONT / 72 / figure_style.ROW
-    halves = [line * (label.count('\n') + 1) / 2 for label in labels]
-    ys = [0.0]
-    for above, below in zip(halves, halves[1:]):
-        ys.append(ys[-1] + max(1, above + below + 0.1))
-
-    return ys
-
-
 def draw(config, enriched, rows, columns, output_stem):
     figure_style.apply()
     parasites = config['parasites']
@@ -130,10 +116,10 @@ def draw(config, enriched, rows, columns, output_stem):
     dots['log_odds'] = np.log2(odds.where(np.isfinite(odds), cap).clip(lower=1))
 
     labels = [textwrap.fill(names[r], LABEL_CHARS) for r in rows]
-    ys = row_positions(labels)
+    ys = figure_style.row_positions(labels, figure_style.DENSE_ROW)
     y_of = dict(zip(rows, ys))
     n_cols = len(columns)
-    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.ROW * (ys[-1] + 1) + 2.35))
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.DENSE_ROW * (ys[-1] + 1) + 1.98))
     cmap = LinearSegmentedColormap.from_list('go', GO_SEQUENTIAL)
     norm = Normalize(vmin=0, vmax=np.ceil(dots['log_odds'].max()))
     # the area of a dot grows with the proteins annotated
@@ -163,21 +149,25 @@ def draw(config, enriched, rows, columns, output_stem):
                                color=NICHE_COLORS[p['niche']], linewidth=0, clip_on=False))
         ax.add_patch(Rectangle((i - 0.5, -0.6 - strip), 1, strip * 0.8,
                                color=taxon_colors[p['group']], linewidth=0, clip_on=False))
-    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.ROW * 72)
+    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.DENSE_ROW * 72)
 
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
               if any(parasites[t]['group'] == group for t in columns)]
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
     sizes = [Line2D([], [], linestyle='', marker='o', color='#7fc0dd',
                     markersize=np.sqrt(size(n)), label=str(n)) for n in (5, 20, 60)]
-    legends = figure_style.stack_legends(fig, left=LEFT, blocks=[
-        ('Taxonomic group', groups), ('Niche', niches),
-        ('Host proteins annotated to the process', sizes)])
+    # the keys take the full width: the colour key sits beside the taxonomic groups and
+    # the size key under it, beside the niches
+    legends = figure_style.stack_legends(fig, left=0.01, blocks=[
+        ('Taxonomic group', groups), ('Niche', niches)])
     height = fig.get_figheight()
-    fig.subplots_adjust(left=LEFT, right=0.98, top=1 - 1.2 / height,
-                        bottom=(legends + 0.1) / height)
-    # the colour key sits beside the size key, at the foot of the figure
-    key = fig.add_axes([0.7, 0.2 / height, 0.2, 0.07 / height])
+    fig.legend(handles=sizes, title='Annotated host proteins', loc='lower left',
+               ncol=len(sizes), frameon=False, handlelength=0.9, columnspacing=1.2,
+               alignment='left', bbox_to_anchor=(0.705, 0.02 / height),
+               title_fontsize=figure_style.FONT)
+    fig.subplots_adjust(left=LEFT, right=0.98, top=1 - 1.15 / height,
+                        bottom=(legends + 0.13) / height)
+    key = fig.add_axes([0.72, (legends - 0.2) / height, 0.22, 0.07 / height])
     colorbar = fig.colorbar(points, cax=key, orientation='horizontal')
     colorbar.set_label('log$_2$ odds ratio', labelpad=2)
     colorbar.ax.xaxis.set_label_position('top')

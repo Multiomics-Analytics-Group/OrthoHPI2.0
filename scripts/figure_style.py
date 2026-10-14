@@ -13,6 +13,9 @@ FONT = 8
 TITLE = 9
 # inches per row of 8 pt names, with a gap between them
 ROW = 0.17
+# a tighter row, for figures of many rows to stay within the paper's float height
+# (0.83 of the text height, 8.39 in) at the full text width
+DENSE_ROW = 0.155
 
 
 def apply():
@@ -33,6 +36,21 @@ def short_name(species):
     parts = species.split(' ')
 
     return f'{parts[0][0]}. {" ".join(parts[1:])}' if len(parts) > 1 else species
+
+
+def row_positions(labels, row=ROW):
+    '''
+    The y of each row, in rows of `row` inches: a row is one row from the next unless
+    their wrapped names need more room, and then the names are as far apart as those
+    of two single-line rows, so that a wrapped name reads as one row.
+    '''
+    line = 1.05 * FONT / 72 / row
+    halves = [line * (label.count('\n') + 1) / 2 for label in labels]
+    ys = [0.0]
+    for above, below in zip(halves, halves[1:]):
+        ys.append(ys[-1] + max(1, above + below + 1 - line))
+
+    return ys
 
 
 def stack_legends(fig, blocks, ncol=4, left=0.1, bottom=0.02):

@@ -2,19 +2,21 @@
 Which host protein families the parasites of one host converge on. A family is the
 orthology group of the host protein, and a family is reached by a parasite when any of
 its proteins is predicted to interact with any protein of the family. Beside the count
-of parasites, the two figures that say whether the convergence is real: how many
-distinct parasite orthology groups reach the family (one means a single conserved
-parasite protein transferred many times), and how many helminths and protozoa do.
-Writes paper/tables/shared_families.csv (every family reached by two or more parasites)
-and paper/figures/shared_families.svg/.png (the families reached by at least
---min-parasites, as a dot matrix over the parasites).
+of parasites, the figure that says whether the convergence is real: how many distinct
+parasite orthology groups reach the family (one means a single conserved parasite
+protein transferred many times).
+Writes paper/tables/shared_families.csv (every family reached by two or more parasites,
+with how many helminths and protozoa reach it) and paper/figures/shared_families.svg/.png
+(the families reached by at least --min-parasites, as a dot matrix over the parasites).
 '''
 import argparse
 import os
 import sys
+import textwrap
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 import pandas as pd
 
@@ -26,22 +28,10 @@ from scripts import figure_style
 HELMINTHS = {'Nematoda', 'Trematoda', 'Cestoda'}
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 DOT_COLOR = '#2a62ab'
-# most gene symbols in a family label before the rest are left as an ellipsis
-SYMBOLS_IN_LABEL = 2
-LABEL_CHARS = 16
-
-
-def family_label(names):
-    '''The symbols of the family's proteins that were reached, the way the app names it.'''
-    names = sorted(set(str(n).upper() for n in names))
-    named = []
-    for name in names[:SYMBOLS_IN_LABEL]:
-        if named and len(', '.join(named + [name])) > LABEL_CHARS:
-            break
-        named.append(name)
-    label = ', '.join(named)
-
-    return f'{label}…' if len(named) < len(names) else label
+# family labels wrap onto lines of at most this many characters
+LABEL_CHARS = 34
+# the left margin, a figure fraction, that the wrapped labels take
+LEFT = 0.32
 
 
 def count_families(config, predictions, host):
@@ -58,8 +48,7 @@ def count_families(config, predictions, host):
         parasite_groups=('group1', 'nunique'),
         host_proteins=('target', 'nunique'),
         interactions=('target', 'size'),
-        symbols=('target_name', lambda n: ', '.join(sorted(set(str(x).upper() for x in n)))),
-        label=('target_name', family_label))
+        symbols=('target_name', lambda n: ', '.join(sorted(set(str(x).upper() for x in n)))))
     families = families[families['parasites'] > 1].sort_values(
         ['parasites', 'parasite_groups', 'interactions'], ascending=False, kind='stable')
     families.index.name = 'family'
@@ -77,19 +66,22 @@ def draw(config, families, edges, output_stem):
                                     taxon_order.index(parasites[int(t)]['group']),
                                     parasites[int(t)]['label']))
     col_of = {t: i for i, t in enumerate(columns)}
-    row_of = {f: i for i, f in enumerate(families['family'])}
+    labels = [textwrap.fill(s, LABEL_CHARS) for s in families['symbols']]
+    ys = figure_style.row_positions(labels, figure_style.DENSE_ROW)
+    row_of = dict(zip(families['family'], ys))
 
     # a dot per (family, parasite), its area the parasite proteins reaching the family
     dots = (edges[edges['group2'].isin(row_of)]
             .groupby(['group2', 'taxid1'])['source'].nunique().reset_index())
-    n_rows, n_cols = len(row_of), len(columns)
-    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.ROW * n_rows + 2.6))
+    n_cols = len(columns)
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.DENSE_ROW * (ys[-1] + 1) + 2.35))
+    size = lambda n: 6 + 3 * min(n, 20)
     ax.scatter([col_of[t] for t in dots['taxid1']], [row_of[f] for f in dots['group2']],
-               s=6 + 3 * dots['source'].clip(upper=20), color=DOT_COLOR, linewidths=0, zorder=3)
+               s=dots['source'].map(size), color=DOT_COLOR, linewidths=0, zorder=3)
     ax.set_xlim(-0.6, n_cols - 0.4)
-    ax.set_ylim(n_rows - 0.4, -0.6)
-    ax.set_yticks(range(n_rows))
-    ax.set_yticklabels(families['label'])
+    ax.set_ylim(ys[-1] + 0.6, -0.6)
+    ax.set_yticks(ys)
+    ax.set_yticklabels(labels, linespacing=1.05)
     ax.set_xticks(range(n_cols))
     ax.set_xticklabels([figure_style.short_name(parasites[int(t)]['label']) for t in columns],
                        rotation=90, style='italic')
@@ -109,30 +101,36 @@ def draw(config, families, edges, output_stem):
                                color=taxon_colors[p['group']], linewidth=0, clip_on=False))
         ax.add_patch(Rectangle((i - 0.5, -0.6 - 2 * strip), 1, strip * 0.8,
                                color=NICHE_COLORS[p['niche']], linewidth=0, clip_on=False))
-    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.ROW * 72)
+    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.DENSE_ROW * 72)
 
-    # the margin columns: parasites, parasite groups, helminths / protozoa
+    # the margin columns: parasites, parasite groups
     margin_x = n_cols + 0.6
-    headers = [('parasites', 'parasites'), ('parasite_groups', 'parasite groups'),
-               (None, 'helminths / protozoa')]
+    headers = [('parasites', 'parasites'), ('parasite_groups', 'parasite groups')]
     for j, (column, header) in enumerate(headers):
-        x = margin_x + 2.5 * j
+        x = margin_x + 3.5 * j
         # the headers stand like the parasite names, from the top of the strips up
         ax.text(x, -0.6 - 2 * strip - 0.3, header, ha='center', va='bottom',
                 rotation=90, color='#555555', clip_on=False)
         for row in families.itertuples():
             y = row_of[row.family]
-            text = (f'{row.helminths} / {row.protozoa}' if column is None
-                    else f'{getattr(row, column)}')
-            ax.text(x, y, text, ha='center', va='center', color='#555555', clip_on=False)
+            ax.text(x, y, f'{getattr(row, column)}', ha='center', va='center', color='#555555', clip_on=False)
 
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
               if any(parasites[int(t)]['group'] == group for t in columns)]
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
-    legends = figure_style.stack_legends(fig, left=0.18, blocks=[('Taxonomic group', groups), ('Niche', niches)])
+    sizes = [Line2D([], [], linestyle='', marker='o', color=DOT_COLOR,
+                    markersize=size(n) ** 0.5, label=label) for n, label in ((1, '1'), (5, '5'), (20, '20+'))]
+    # the keys take the full width: the size key sits beside the niches, as in the GO figure
+    legends = figure_style.stack_legends(fig, left=0.01, blocks=[
+        ('Taxonomic group', groups), ('Niche', niches)])
+    height = fig.get_figheight()
+    fig.legend(handles=sizes, title='Parasite proteins', loc='lower left',
+               ncol=len(sizes), frameon=False, handlelength=0.9, columnspacing=1.2,
+               alignment='left', bbox_to_anchor=(0.705, 0.02 / height),
+               title_fontsize=figure_style.FONT)
     # room above the dots for the strips and the parasite names standing on them
-    fig.subplots_adjust(left=0.18, right=0.85, top=1 - 1.45 / fig.get_figheight(),
-                        bottom=(legends + 0.1) / fig.get_figheight())
+    fig.subplots_adjust(left=LEFT, right=0.92, top=1 - 1.2 / height,
+                        bottom=(legends + 0.2) / height)
     for extension in ('svg', 'png'):
         fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)

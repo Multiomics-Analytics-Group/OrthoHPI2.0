@@ -280,9 +280,45 @@ tested against its own niche's pool.}
 \end{figure}
 
 \subsection{Comparing the hosts of one parasite}
-\todo{Interpretation: how much of a parasite's interactome is host specific.}
-Figure~\ref{fig:multi_host} compares, for each parasite predicted against more
-than one host, which interactions are shared and why the others are missing.
+Eight parasites were predicted against more than one host, and for each we
+compared their interactions between hosts as group-pair links
+(Figure~\ref{fig:multi_host}). Most of a parasite's interactome is shared:
+76\% of the 2{,}006 links are found in every host of their parasite, from 48\%
+for \textit{Hymenolepis diminuta} to 84\% for \textit{Angiostrongylus
+cantonensis} and \textit{Leishmania braziliensis}
+(Figure~\ref{fig:multi_host}A). The rest are not evenly spread. In each
+parasite one host carries clearly fewer links than the others: rat for
+\textit{Cryptosporidium muris}, \textit{H.~diminuta}, \textit{A.~costaricensis}
+and \textit{Nippostrongylus brasiliensis}, and pig for both
+\textit{Trichinella} species. These hosts lack up to 112 links that the other
+host carries (Figure~\ref{fig:multi_host}B).
+
+Of the 510 links missing from a host, 362 (71\%) are lost at the TISSUES
+filter, 127 (25\%) at the DeepLoc filter, and only 21 (4\%) because the host
+proteome has no member of the family. The TISSUES losses follow how well each
+host's infected tissues are annotated
+(Supplementary Figure~\ref{fig:tissues_coverage}). Rat has no annotations for
+blood, skin or stomach, and its small intestine has only 1{,}304 annotated
+proteins against 8{,}117 in mouse. This costs rat 59 links of
+\textit{Cryptosporidium muris} (stomach, intestine), 23 of
+\textit{Hymenolepis diminuta} (small intestine) and 32 of
+\textit{Angiostrongylus costaricensis} (blood, intestine). By contrast,
+\textit{A.~cantonensis}, which infects lung and brain, both well covered in
+rat, loses only 3. Pig covers every tissue \textit{Trichinella} infects, but
+with fewer proteins per tissue (5{,}684 in intestine against 11{,}598 in
+human). It loses 75 and 92 links of the two \textit{Trichinella} species at
+this filter, against 2 and 3 in human. Human, in turn, has no annotations for
+macrophages, the host cell of \textit{L.~braziliensis}, or for the nose, and
+loses 24 of the parasite's links against 4 in mouse. Among them are the links
+of the parasite's ATG8 to the core autophagy proteins ATG5 and ATG14, which
+are certainly expressed in human but are not annotated to any tissue the
+parasite infects. Most of the host-specific part of an interactome thus
+reflects how well each host is annotated rather than a difference in its
+biology. A link missing from a poorly covered host should be read as
+unsupported, not as absent. The DeepLoc losses, which dominate only for
+\textit{N.~brasiliensis} in rat (24 of 38) and \textit{A.~cantonensis} in rat
+(12 of 15), are harder to separate from real differences in where orthologous
+proteins are localised.
 
 % paper/figures/multi_host.pdf is generated: `make figures`.
 \begin{figure}[htbp]

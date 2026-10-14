@@ -37,6 +37,16 @@ FIGURES = {
 }
 # a click in the first screenshot opens the second
 ARROWS = {'web_network': [('network', 'alphafold')]}
+# the name each screenshot's panel is titled with, after its letter
+TITLES = {
+    'home': 'Home page',
+    'multi_host': 'Multi-host parasites page',
+    'parasite_overlap': 'Parasites of a host page',
+    'network': 'Network page',
+    'alphafold': 'AlphaFold models of a link',
+    'cell_types': 'Host cell types',
+    'enrichment': 'Enriched GO processes',
+}
 # inches between panels across a row, and for the letter above each screenshot
 GAP = 0.2
 TITLE_ROOM = 0.2
@@ -81,7 +91,7 @@ def draw(rows, arrows, screenshot_dir, output_stem):
             for spine in ax.spines.values():
                 spine.set_color(BORDER_COLOR)
                 spine.set_linewidth(0.6)
-            ax.set_title(next(letters), loc='left', fontweight='bold', fontsize=figure_style.TITLE, pad=3)
+            ax.set_title(f'{next(letters)}  {TITLES[name]}', loc='left', fontweight='bold', pad=3)
             axes[name] = ax
             x += width + GAP
         top -= height

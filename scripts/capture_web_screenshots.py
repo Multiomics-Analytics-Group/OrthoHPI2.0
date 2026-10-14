@@ -4,7 +4,8 @@ paper/figures/web/ for scripts/build_web_interface_figure.py.
 
   home              the home page's hosts and parasites
   multi_host        the multi-host parasites page for C. muris
-  parasite_overlap  the parasites-of-a-host page for human, the P. falciparum - P. vivax
+  parasite_overlap  the parasites-of-a-host page for human, the parasites ordered by niche
+                    as in the paper's similarity figure, the P. falciparum - P. vivax
                     cell clicked
   network, alphafold, cell_types, enrichment
                     the network page: P. falciparum in human at confidence 0.7, liver and
@@ -206,6 +207,8 @@ def parasites_page(page, base, out):
     page.goto(f'{base}/Compare_Parasites')
     wait(page)
     choose(page, 'Select a host', 'Human')
+    page.get_by_role('radiogroup').first.get_by_text('intracellular / extracellular').click()
+    wait(page)
     hide_captions(page)
     heading = page.get_by_role('heading', name='Overlap of the host interactors').bounding_box()
     chart = page.locator('.js-plotly-plot').first.bounding_box()

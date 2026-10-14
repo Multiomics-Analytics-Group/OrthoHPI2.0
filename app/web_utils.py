@@ -305,7 +305,7 @@ def classify_localisation(localisations, classes=HOST_CLASSES, multiple=SEVERAL)
 # where a parasite sits relative to the host cell, i.e. which host proteins it can reach;
 # independent of `multicellular`
 UNKNOWN_NICHE = 'Unknown'
-NICHE_ORDER = ['Extracellular', 'Intracellular']
+NICHE_ORDER = ['Intracellular', 'Extracellular']
 # greys, so the niche is not read as a third categorical split beside the clades and the
 # DeepLoc classes
 NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Intracellular': '#3d3d3d',

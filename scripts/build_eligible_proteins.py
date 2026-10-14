@@ -26,8 +26,8 @@ def build(config_file, data_dir):
     print(f"  {sum(len(v) for v in proteins.values())} proteins before filtering")
 
     print("Applying secretome/tissue/DeepLoc filters...")
-    proteins, _, reachable = main.filter_proteins(config_file=config_file,
-                                                 data_dir=data_dir, proteins=proteins)
+    proteins, _, reachable, _ = main.filter_proteins(config_file=config_file,
+                                                    data_dir=data_dir, proteins=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 
     output_file = os.path.join(data_dir, 'eligible_proteins.parquet')

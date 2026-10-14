@@ -170,6 +170,34 @@ def go_background(data_dir, taxids, niche=None):
     return go_df
 
 
+@st.cache_data(show_spinner=False)
+def load_host_tissues(data_dir):
+    '''
+    Every host protein the TISSUES filter passes with its tissues, before the DeepLoc
+    filter, as scripts/build_host_tissues.py writes it; None when it has not been built.
+    '''
+    tissue_file = os.path.join(data_dir, 'host_tissues.parquet')
+    if not os.path.exists(tissue_file):
+        return None
+
+    return utils.read_parquet_file(input_file=tissue_file)
+
+
+def expressed_infected_tissue_proteins(data_dir, config, parasite_taxid):
+    '''
+    The host proteins annotated to a tissue this parasite infects, whether or not DeepLoc
+    later removes them; the filtered pool's when host_tissues.parquet has not been built.
+    '''
+    tissues = load_host_tissues(data_dir)
+    if tissues is None:
+        return infected_tissue_proteins(data_dir, config, parasite_taxid)
+
+    mapped = config['tissues']
+    infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}
+
+    return set(tissues.loc[tissues['tissue'].isin(infected), 'protein'])
+
+
 def infected_tissue_proteins(data_dir, config, parasite_taxid):
     '''
     The host proteins annotated to a tissue this parasite is known to infect, over every

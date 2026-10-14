@@ -486,7 +486,8 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     if orthologs is None:
         return None
 
-    expressed = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
+    # before DeepLoc, so a family DeepLoc removes is told apart from one never expressed
+    expressed = web_utils.expressed_infected_tissue_proteins(data_dir, config, parasite_taxid)
     # the niche half of the pool, which homology.get_links applies as it transfers and the
     # pool the rest of the page counts against does not
     in_reach = web_utils.filtered_pool(

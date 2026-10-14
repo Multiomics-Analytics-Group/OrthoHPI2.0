@@ -18,7 +18,7 @@
 # BibLaTeX with "keep updated" ticked makes the file rewrite itself on every
 # edit and `make refs` redundant. The citation keys match either way.
 #
-# The workflow figure is a hand-drawn SVG exported to PNG with Inkscape. Every
+# The workflow figure is an SVG edited in Inkscape and exported to PNG. Every
 # other figure is one rule per build script, which writes the 300-dpi .png the
 # paper includes and, in the same run, an .svg of it.
 
@@ -38,8 +38,15 @@ FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
 
-figures/workflow.png: figures/workflow.svg
+# The workflow figure links the BioRender icons in ../biorender/, the logos in
+# ../images/logos/ and the app's body figure, so it is exported from here, where
+# those relative links resolve.
+figures/workflow.png: figures/workflow.svg figures/workflow_body.svg $(wildcard ../biorender/*.png)
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
+
+# The app's frontal human body figure with the liver shaded, for step 2 of the workflow.
+figures/workflow_body.svg: ../images/tissues/tissues_human.svg ../app/body_figure.py ../scripts/build_workflow_body.py
+	cd .. && $(PYTHON) scripts/build_workflow_body.py
 
 # The proteins left after each stage of the pipeline on the host and parasite side of
 # each host-parasite pair: the counts behind Figure 3 and Supplementary Table S1, and a

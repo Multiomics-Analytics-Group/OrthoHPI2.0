@@ -4,6 +4,7 @@ figures/*
 # Except the hand-drawn workflow diagram, which cannot be regenerated. The PNG
 # the paper includes is exported from it by `make figures`.
 !figures/workflow.svg
+!figures/workflow_body.svg
 
 # LaTeX build products.
 *.aux

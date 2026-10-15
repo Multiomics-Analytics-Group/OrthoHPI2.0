@@ -18,9 +18,7 @@ config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-# opens at the bottom of the range: the multi-host parasites are the small interactomes, and
-# 0.7 leaves two of them on the page
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+MIN_SCORE = web_utils.MIN_SCORE
 # a link shared by every host, and the greys a link shared by some of three or more hosts
 # is drawn in, as in the paper's multi-host figure; a link of one host takes the host's
 # config colour
@@ -522,11 +520,10 @@ st.markdown("---")
 
 settings, _ = st.columns([1, 1])
 with settings:
-    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                      help='Interactions predicted below this confidence are left out, as '
-                           'on the other pages. These are the smallest interactomes of the '
-                           'set, so this page starts at the bottom of the range: raising it '
-                           'leaves fewer parasites with more than one host.')
+    score = web_utils.score_slider(
+        help='Interactions predicted below this confidence are left out, as '
+             'on the other pages. These are the smallest interactomes of the '
+             'set: raising it leaves fewer parasites with more than one host.')
 
 df_pred = get_multi_host_predictions(data_dir, config, score)
 

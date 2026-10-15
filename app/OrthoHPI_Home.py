@@ -38,9 +38,6 @@ NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives
 BANDS_STRIP = ('The upper strip below the columns indicates the taxonomic group of the '
                'parasite, the lower one whether it lives inside a host cell or outside '
                'one. ' + INTRACELLULAR_NOTE)
-# same default and range as the network page, so the counts agree with the network opened
-# next
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # subplot titles are shrunk and wrapped until they fit their column; about 0.55 of the font
 # size a character
 TITLE_CHAR = 0.55
@@ -978,12 +975,12 @@ if coverage:
 
 # one slider for the page, in the middle column so it does not take the whole width
 with st.columns(3)[1]:
-    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                      help='Interactions predicted below this confidence are left out '
-                           'of the counts and of the localization split drawn on them. The '
-                           'boxplots keep every prediction: the confidence figure draws '
-                           'this threshold as a line instead, and the localization ones '
-                           'stand on too few proteins to be thresholded as well.')
+    score = web_utils.score_slider(
+        help='Interactions predicted below this confidence are left out '
+             'of the counts and of the localization split drawn on them. The '
+             'boxplots keep every prediction: the confidence figure draws '
+             'this threshold as a line instead, and the localization ones '
+             'stand on too few proteins to be thresholded as well.')
     # what the threshold keeps, under the slider
     kept = int((overview['weight'] >= score).sum())
     st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '

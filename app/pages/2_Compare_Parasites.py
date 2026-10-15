@@ -21,8 +21,7 @@ data_dir = web_utils.get_data_dir()
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
-# same default and range as the network page
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+MIN_SCORE = web_utils.MIN_SCORE
 # side of a heatmap cell in pixels, which sizes the shared-interactor figure
 CELL = 22
 # the diagonal of the heatmap: a grey, so it is not read as a count
@@ -926,10 +925,10 @@ if selected_host != web_utils.NO_HOST:
     # prediction
     slider_column, order_column = st.columns([2, 1])
     with slider_column:
-        score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                          help='Interactions predicted below this confidence are left out of '
-                               'the four figures below. The tissue plot at the foot of the '
-                               'page counts every prediction.')
+        score = web_utils.score_slider(
+            help='Interactions predicted below this confidence are left out of '
+                 'the four figures below. The tissue plot at the foot of the '
+                 'page counts every prediction.')
     with order_column:
         # the order decides which blocks the figures show: contiguous values make a square
         # against the diagonal

@@ -425,6 +425,23 @@ def host_selector(config, predictions, label='Select a host', include_rodents=Fa
     return selected, tuple(groups.get(selected, ()))
 
 
+# the confidence score is shared across pages the same way as the host
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+SCORE_STATE_KEY = 'selected_score'
+SCORE_WIDGET_KEY = 'selected_score_widget'
+
+
+def score_slider(help=None):
+    '''Draws the confidence score slider, shared across pages through SCORE_STATE_KEY.'''
+    if SCORE_WIDGET_KEY not in st.session_state:
+        st.session_state[SCORE_WIDGET_KEY] = st.session_state.get(SCORE_STATE_KEY, DEFAULT_SCORE)
+
+    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, key=SCORE_WIDGET_KEY, help=help)
+    st.session_state[SCORE_STATE_KEY] = score
+
+    return score
+
+
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]
     mapped_tissues = config['tissues']

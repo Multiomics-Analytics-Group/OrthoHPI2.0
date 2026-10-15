@@ -39,9 +39,9 @@ human,Echinococcus multilocularis,Cestoda,extracellular,19699,10469,0.5857,0.226
 human,Hymenolepis diminuta,Cestoda,extracellular,19699,11264,0.5888,0.2386,0.7705,0.0492,0.0484,0.4587,0.116,235
 human,Taenia asiatica,Cestoda,extracellular,19699,10327,0.5888,0.2386,0.7705,0.0558,0.0426,0.5136,0.115,210
 human,Trypanosoma brucei,Kinetoplastida,extracellular,19699,8561,0.715,0.2441,0.7789,0.0179,0.0773,0.3474,0.0652,60
-human,Entamoeba histolytica,Other protozoa,extracellular,19699,7959,0.7779,0.2593,0.772,0.043,0.113,0.3871,0.1379,565
-human,Giardia lamblia,Other protozoa,extracellular,19699,7154,0.5888,0.2386,0.7705,0.0263,0.1043,0.311,0.1638,265
-human,Trichomonas vaginalis,Other protozoa,extracellular,19699,50190,0.6076,0.2327,0.7846,0.0476,0.0885,0.178,0.1833,859
+human,Giardia lamblia,Metamonada,extracellular,19699,7154,0.5888,0.2386,0.7705,0.0263,0.1043,0.311,0.1638,265
+human,Trichomonas vaginalis,Metamonada,extracellular,19699,50190,0.6076,0.2327,0.7846,0.0476,0.0885,0.178,0.1833,859
+human,Entamoeba histolytica,Amoebozoa,extracellular,19699,7959,0.7779,0.2593,0.772,0.043,0.113,0.3871,0.1379,565
 rat,Cryptosporidium muris,Apicomplexa,intracellular,22237,3930,0.2004,0.7749,0.8717,0.0415,0.0771,0.3036,0.163,155
 rat,Angiostrongylus cantonensis,Nematoda,extracellular,22237,14486,0.4231,0.2223,0.8015,0.0943,0.1068,0.5811,0.1101,554
 rat,Angiostrongylus costaricensis,Nematoda,extracellular,22237,13350,0.2004,0.1813,0.771,0.0883,0.1043,0.579,0.103,208

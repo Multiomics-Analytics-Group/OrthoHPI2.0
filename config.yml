@@ -84,7 +84,8 @@ parasite_groups:
     Cestoda: "#E69F00"
     Apicomplexa: "#009E73"
     Kinetoplastida: "#CC79A7"
-    Other protozoa: "#56B4E9"
+    Metamonada: "#56B4E9"
+    Amoebozoa: "#7F7F7F"
     Microsporidia: "#C9A227"
 
 # `multicellular` and `niche` are the two sides of the interface, and are read
@@ -186,7 +187,7 @@ parasites:
             - 9606
     5759:
         label: Entamoeba histolytica
-        group: Other protozoa
+        group: Amoebozoa
         niche: extracellular
         color: "#b2df8a"
         tissues:
@@ -471,7 +472,7 @@ parasites:
             - 9606
     5722:
         label: Trichomonas vaginalis
-        group: Other protozoa
+        group: Metamonada
         niche: extracellular
         color: "#b3de69"
         tissues:
@@ -650,7 +651,7 @@ parasites:
             - 9606
     184922:
         label: Giardia lamblia
-        group: Other protozoa
+        group: Metamonada
         niche: extracellular
         color: "#4d4d4d"
         tissues:

@@ -71,9 +71,9 @@ parasite,Extracellular,Hymenolepis diminuta,11264,545,0.048,74,76
 parasite,Extracellular,Taenia asiatica,10327,440,0.043,79,66
 parasite,Extracellular,Trypanosoma brucei,8561,369,0.043,72,53
 parasite,Cell membrane,Trypanosoma brucei,8561,428,0.050,93,123
-parasite,Extracellular,Entamoeba histolytica,7959,327,0.041,57,37
-parasite,Cell membrane,Entamoeba histolytica,7959,581,0.073,116,115
 parasite,Extracellular,Giardia lamblia,7154,391,0.055,112,105
 parasite,Cell membrane,Giardia lamblia,7154,417,0.058,47,31
 parasite,Extracellular,Trichomonas vaginalis,50190,1695,0.034,580,387
 parasite,Cell membrane,Trichomonas vaginalis,50190,2873,0.057,1216,755
+parasite,Extracellular,Entamoeba histolytica,7959,327,0.041,57,37
+parasite,Cell membrane,Entamoeba histolytica,7959,581,0.073,116,115

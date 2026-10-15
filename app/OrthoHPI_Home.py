@@ -24,7 +24,8 @@ data_dir = web_utils.get_data_dir()
 UNKNOWN_GROUP = 'Unclassified'
 # the membrane figure is drawn over these: a multicellular parasite reaches its host with
 # secreted proteins alone
-UNICELLULAR_GROUPS = ('Apicomplexa', 'Kinetoplastida', 'Other protozoa', 'Microsporidia')
+UNICELLULAR_GROUPS = ('Apicomplexa', 'Kinetoplastida', 'Metamonada', 'Amoebozoa',
+                      'Microsporidia')
 UNKNOWN_COLOR = '#999999'
 # columns are sized as if every host had at least this many parasites, so a two-parasite
 # host still fits its labels

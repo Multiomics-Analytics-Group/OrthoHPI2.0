@@ -7,12 +7,12 @@
 <rect x="56.0" y="152" width="5" height="76" rx="2.5" fill="#0072B2"/>
 <text x="84.0" y="180.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Human</text>
 <text x="84.0" y="204.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#6b737c" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Homo sapiens (human)</text>
-<text x="84.0" y="236.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#0072B2" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">42 parasites</text>
+<text x="84.0" y="236.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#0072B2" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">43 parasites</text>
 <rect x="433.0" y="138" width="357.0" height="104" rx="14" fill="#D55E00" opacity="0.08"/>
 <rect x="433.0" y="152" width="5" height="76" rx="2.5" fill="#D55E00"/>
 <text x="461.0" y="180.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Rat</text>
 <text x="461.0" y="204.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#6b737c" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Rattus norvegicus (rat)</text>
-<text x="461.0" y="236.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#D55E00" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">6 parasites</text>
+<text x="461.0" y="236.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#D55E00" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">5 parasites</text>
 <rect x="810.0" y="138" width="357.0" height="104" rx="14" fill="#009E73" opacity="0.08"/>
 <rect x="810.0" y="152" width="5" height="76" rx="2.5" fill="#009E73"/>
 <text x="838.0" y="180.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Mouse</text>
@@ -135,7 +135,7 @@
 <text x="1034.0" y="638.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Kinetoplastida</text>
 <text x="1034.0" y="656.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">trypanosomatids</text>
 <text x="1226.0" y="642.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#CC79A7" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">5</text>
-<circle cx="992.0" cy="677.5" r="4.6" fill="#D55E00"/>
+<circle cx="981.0" cy="677.5" r="4.6" fill="#0072B2"/>
 <circle cx="1003.0" cy="677.5" r="4.6" fill="#009E73"/>
 <text x="1030.0" y="682.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Leishmania braziliensis</text>
 <circle cx="981.0" cy="707.5" r="4.6" fill="#0072B2"/>
@@ -146,28 +146,34 @@
 <text x="1030.0" y="772.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trypanosoma brucei</text>
 <circle cx="981.0" cy="797.5" r="4.6" fill="#0072B2"/>
 <text x="1030.0" y="802.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trypanosoma cruzi</text>
-<rect x="1264.0" y="298" width="280.0" height="190" rx="14" fill="#f6f7f9" stroke="#e2e5e9"/>
+<rect x="1264.0" y="298" width="280.0" height="160" rx="14" fill="#f6f7f9" stroke="#e2e5e9"/>
 <rect x="1264.0" y="298" width="280.0" height="5" rx="2.5" fill="#56B4E9"/>
-<g transform="translate(1278.0,314.0) scale(0.4600)"><path d="M28,20 C44,8 62,12 70,24 C78,36 94,34 92,48 C90,62 76,62 74,74 C72,88 54,96 40,88 C26,80 30,68 20,62 C8,54 12,30 28,20 Z" fill="#56B4E9"/><circle cx="46" cy="50" r="11" fill="#ffffff" opacity="0.85"/><circle cx="46" cy="50" r="4" fill="#56B4E9" opacity="0.55"/><circle cx="68" cy="66" r="5" fill="#ffffff" opacity="0.5"/></g>
-<text x="1336.0" y="338.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Other protozoa</text>
-<text x="1336.0" y="356.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">amoeba, flagellates</text>
-<text x="1528.0" y="342.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#56B4E9" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">3</text>
+<g transform="translate(1278.0,314.0) scale(0.4600)"><path d="M46,80 C40,88 34,90 28,96 M54,80 C60,88 66,90 72,96 M42,72 C30,78 20,80 10,84 M58,72 C70,78 80,80 90,84" stroke="#56B4E9" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M50,10 C70,10 80,28 78,46 C76,64 62,78 50,84 C38,78 24,64 22,46 C20,28 30,10 50,10 Z" fill="#56B4E9"/><ellipse cx="40" cy="36" rx="7" ry="9" fill="#ffffff" opacity="0.85"/><ellipse cx="60" cy="36" rx="7" ry="9" fill="#ffffff" opacity="0.85"/></g>
+<text x="1336.0" y="338.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Metamonada</text>
+<text x="1336.0" y="356.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">anaerobic flagellates</text>
+<text x="1528.0" y="342.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#56B4E9" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">2</text>
 <circle cx="1283.0" cy="377.5" r="4.6" fill="#0072B2"/>
-<text x="1332.0" y="382.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Entamoeba histolytica</text>
+<text x="1332.0" y="382.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Giardia lamblia</text>
 <circle cx="1283.0" cy="407.5" r="4.6" fill="#0072B2"/>
-<text x="1332.0" y="412.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Giardia lamblia</text>
-<circle cx="1283.0" cy="437.5" r="4.6" fill="#0072B2"/>
-<text x="1332.0" y="442.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trichomonas vaginalis</text>
-<rect x="1264.0" y="508" width="280.0" height="160" rx="14" fill="#f6f7f9" stroke="#e2e5e9"/>
-<rect x="1264.0" y="508" width="280.0" height="5" rx="2.5" fill="#C9A227"/>
-<g transform="translate(1278.0,524.0) scale(0.4600)"><ellipse cx="50" cy="50" rx="27" ry="42" fill="#C9A227"/><ellipse cx="50" cy="28" rx="9" ry="7" fill="#ffffff" opacity="0.55"/><path d="M32,40 C44,33 58,33 68,40" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,49 C44,42 58,42 68,49" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,58 C44,51 58,51 68,58" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,67 C44,60 58,60 68,67" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,76 C44,69 58,69 68,76" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/></g>
-<text x="1336.0" y="548.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Microsporidia</text>
-<text x="1336.0" y="566.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">spore-forming fungi</text>
-<text x="1528.0" y="552.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#C9A227" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">2</text>
-<circle cx="1283.0" cy="587.5" r="4.6" fill="#0072B2"/>
-<text x="1332.0" y="592.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trachipleistophora hominis</text>
-<circle cx="1283.0" cy="617.5" r="4.6" fill="#0072B2"/>
-<text x="1332.0" y="622.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Vittaforma corneae</text>
+<text x="1332.0" y="412.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trichomonas vaginalis</text>
+<rect x="1264.0" y="478" width="280.0" height="130" rx="14" fill="#f6f7f9" stroke="#e2e5e9"/>
+<rect x="1264.0" y="478" width="280.0" height="5" rx="2.5" fill="#7F7F7F"/>
+<g transform="translate(1278.0,494.0) scale(0.4600)"><path d="M28,20 C44,8 62,12 70,24 C78,36 94,34 92,48 C90,62 76,62 74,74 C72,88 54,96 40,88 C26,80 30,68 20,62 C8,54 12,30 28,20 Z" fill="#7F7F7F"/><circle cx="46" cy="50" r="11" fill="#ffffff" opacity="0.85"/><circle cx="46" cy="50" r="4" fill="#7F7F7F" opacity="0.55"/><circle cx="68" cy="66" r="5" fill="#ffffff" opacity="0.5"/></g>
+<text x="1336.0" y="518.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Amoebozoa</text>
+<text x="1336.0" y="536.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">amoebae</text>
+<text x="1528.0" y="522.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#7F7F7F" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">1</text>
+<circle cx="1283.0" cy="557.5" r="4.6" fill="#0072B2"/>
+<text x="1332.0" y="562.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Entamoeba histolytica</text>
+<rect x="1264.0" y="628" width="280.0" height="160" rx="14" fill="#f6f7f9" stroke="#e2e5e9"/>
+<rect x="1264.0" y="628" width="280.0" height="5" rx="2.5" fill="#C9A227"/>
+<g transform="translate(1278.0,644.0) scale(0.4600)"><ellipse cx="50" cy="50" rx="27" ry="42" fill="#C9A227"/><ellipse cx="50" cy="28" rx="9" ry="7" fill="#ffffff" opacity="0.55"/><path d="M32,40 C44,33 58,33 68,40" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,49 C44,42 58,42 68,49" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,58 C44,51 58,51 68,58" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,67 C44,60 58,60 68,67" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/><path d="M32,76 C44,69 58,69 68,76" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/></g>
+<text x="1336.0" y="668.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" fill="#22262b" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Microsporidia</text>
+<text x="1336.0" y="686.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">spore-forming fungi</text>
+<text x="1528.0" y="672.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" fill="#C9A227" font-weight="700" font-style="normal" text-anchor="end" letter-spacing="0">2</text>
+<circle cx="1283.0" cy="707.5" r="4.6" fill="#0072B2"/>
+<text x="1332.0" y="712.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Trachipleistophora hominis</text>
+<circle cx="1283.0" cy="737.5" r="4.6" fill="#0072B2"/>
+<text x="1332.0" y="742.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14.5" fill="#22262b" font-weight="normal" font-style="italic" text-anchor="start" letter-spacing="0">Vittaforma corneae</text>
 <text x="56.0" y="870.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13" fill="#6b737c" font-weight="600" font-style="normal" text-anchor="start" letter-spacing="0">Host:</text>
 <circle cx="100" cy="865.5" r="4.6" fill="#0072B2"/>
 <text x="112.0" y="870.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13" fill="#6b737c" font-weight="normal" font-style="normal" text-anchor="start" letter-spacing="0">Human</text>

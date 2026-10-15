@@ -51,19 +51,20 @@
 % A note to self that survives into the PDF but is obviously not prose.
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 
-\title{OrthoHPI 2.0: homology-derived host--parasite protein--protein
-interactions at tissue and cell-type resolution}
+\title{OrthoHPI 2.0: Predicting host--parasite protein--protein interactions
+across multiple hosts at cell-type resolution}
 
-% Author list and affiliations as given on the EMBL poster
-% (scripts/build_poster.py on branch poster-embl).
-\author[1]{Ida K.S. Meitil}
-\author[2]{Yesid Cuesta Astroz}
+\author[1,3]{Ida K.S. Meitil}
 \author[2]{Juan Esteban Vargas Gomez}
-\author[1]{Alberto Santos}
+\author[2]{Yesid Cuesta Astroz}
+\author[1,3]{Alberto Santos}
 \affil[1]{Department of Health Technology, Technical University of Denmark,
 Kgs.\ Lyngby, Denmark}
 \affil[2]{Escuela de Microbiolog\'ia, Universidad de Antioquia, Medell\'in,
 Colombia}
+\affil[3]{Novo Nordisk Foundation Biotechnology Research Institute for the
+Green Transition (BRIGHT), Technical University of Denmark, Kgs.\ Lyngby,
+Denmark}
 
 \date{\today}
 
@@ -72,139 +73,324 @@ Colombia}
 \maketitle
 
 \begin{abstract}
-\todo{abstract}
+Parasitic infections cause a large global disease burden, yet the molecular
+interactions between parasite and host remain poorly characterised for most
+species. Knowing which parasite proteins interact with which host proteins can
+reveal infection mechanisms and point to drug and vaccine targets.
+
+We present OrthoHPI 2.0, which predicts host--parasite protein--protein
+interactions (PPIs) by orthology transfer of intra-species interactions from
+STRING. Only protein pairs that can physically interact are retained: host
+proteins must be expressed in the tissues the parasite infects, and both
+proteins must be in subcellular compartments where they can meet. Version 2.0
+extends the resource from one host to four (human, pig, mouse, and rat) and
+from 15 to 46 parasites. Predictions are now resolved to the cell-type level
+using single-cell atlas data, and subcellular localization is predicted with
+DeepLoc 2.1.
+
+All predictions are available through an interactive web resource, where users
+can browse the PPI network of a host--parasite pair, filter by confidence
+score, tissue, cell type and localization, view AlphaFold models of interacting
+pairs, and explore Gene Ontology enrichment of the interactors. Further pages
+compare parasites of the same host and compare the hosts of multi-host
+parasites.
+
+OrthoHPI 2.0 generates testable hypotheses and enables comparison across
+parasites sharing a host, or hosts of the same parasite, revealing common and
+unique interaction strategies.
 \end{abstract}
 
 \section{Introduction}
-OrthoHPI 2.0 renews and extends the original OrthoHPI
-resource~\cite{cuestaastroz2019analysis}, integrating current releases of the
-underlying databases and predictors and broadening the set of parasites
-covered. Host proteins are restricted to surface-exposed localisations
-predicted by DeepLoc~\cite{dum2024deeploc}.
+\todo{Parasites disease burden -- numbers?}
+\todo{Mention intra- and extracellular.}
+\todo{Tissue tropism, cell types.}
+\todo{Lifecycle.}
+\todo{Molecular interactions are important for the different life stages? Local
+adaptation $\rightarrow$ networks.}
+\todo{``interplay between the parasite survival mechanisms and the host's
+defense and metabolic systems''}
+\todo{Find interactions that could be targeted.}
+\todo{Other studies of host--parasite PPI prediction?}
+\todo{Big amounts of experimental intra-species PPI data, mention databases?}
+\todo{Little amount of host--parasite PPI data.}
+\todo{Going from intra-species PPIs to inter-species PPIs. Homology-based
+prediction. Interlogs.}
 
-\todo{introduction}
+We have previously developed OrthoHPI, a tool that predicts host--parasite
+PPIs by orthology transfer of intra-species interactions from the STRING
+database~\cite{cuestaastroz2019analysis}. The method constrains transfer by
+including only high-confidence intra-species interactions, using fine-grained
+orthology assignment (EggNOG~\todo{ref} eukaryote groups), and constraining the
+predictions to host proteins expressed in a tissue that the parasite infects
+(TISSUES~\todo{ref}) and host and parasite proteins with a cellular
+localization where they are physically able to interact. For cellular
+localization, this version used the COMPARTMENTS database~\todo{ref} for host
+proteins, and SignalP~\todo{ref}, TargetP~\todo{ref} and TMHMM~\todo{ref} to
+predict the parasite protein localization.
 
-\section{Methods}
+\todo{How has OrthoHPI been used? Any nice results came out of people using
+it?}
 
-% The stages below mirror docs/pipeline.md, which is the running description
-% of what `python -m pipeline.main` actually does. Keep the two in step.
+Here we present OrthoHPI 2.0, which extends the resource from one host to four
+(human, pig, mouse, and rat), and from 15 to 46 parasites. We use DeepLoc
+2.1~\cite{dum2024deeploc} for prediction of subcellular localization of both
+the host and parasite proteins. We further extend the resource to include
+cell-type level resolution for human, pig, and mouse, by utilizing single-cell
+atlas data. Finally, we provide an interactive web resource that allows for
+detailed investigation of individual host--parasite PPI networks as well as
+comparisons across parasites and hosts at different score thresholds.
 
-Figure~\ref{fig:workflow} gives an overview of the prediction workflow: the
-host and parasite proteomes are filtered by tissue expression and predicted
-subcellular localisation, and interactions are then transferred between the
-remaining proteins through shared orthologous groups.
+\todo{Evaluation not really possible\ldots}
 
 % paper/figures/workflow.png is exported from workflow.svg: `make figures`.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/workflow}
-  \caption{Overview of the OrthoHPI 2.0 prediction workflow. For each
-  host--parasite pair, the host proteome is restricted to proteins expressed in
-  the tissues the parasite infects (TISSUES) and to localisations the parasite
-  can reach (DeepLoc), and the parasite proteome to extracellular and, for
-  unicellular parasites, cell-membrane proteins. STRING interactions between
-  EggNOG orthologous groups are transferred to the remaining host and parasite
-  proteins, each predicted pair scored by the mean of the experimental and
-  database evidence scores.}
+  \caption{The OrthoHPI 2.0 prediction pipeline. For each host--parasite pair,
+  the host proteome is restricted to proteins expressed in the tissues the
+  parasite infects (TISSUES) and to localisations the parasite can reach
+  (DeepLoc), and the parasite proteome to extracellular and, for unicellular
+  parasites, cell-membrane proteins. STRING interactions between EggNOG
+  orthologous groups are transferred to the remaining host and parasite
+  proteins. The predicted pairs are scored by the mean of the experimental and
+  database evidence scores of the group link.}
   \label{fig:workflow}
 \end{figure}
 
-\subsection{Data sources}
-\todo{STRING v12.0, EggNOG 6, JensenLab TISSUES, Human Protein Atlas, Gene
-Ontology. Canonical URLs and versions are in config.yml lines 1--32.}
+\section{Materials and methods}
 
-\subsection{Proteomes and orthologous groups}
-\todo{EggNOG Eukaryota (2759) groups; hosts human, rat, mouse, pig.}
-The 45 parasite species, their hosts and the tissues they occupy are listed in
-Table~\ref{tab:parasites}.
+% The stages below mirror docs/pipeline.md, which is the running description
+% of what `python -m pipeline.main` actually does. Keep the two in step.
+
+\subsection{Proteomes}
+The hosts are the four species covered by the TISSUES database~\todo{ref}:
+human, pig, mouse and rat. The parasites are the 46 endoparasites of these
+hosts that have a proteome in STRING v12.0~\todo{ref}
+(Table~\ref{tab:parasites}). Two parasites infect human, mouse and rat
+(\textit{Hymenolepis diminuta} and \textit{Cryptosporidium muris}), two infect
+human and pig (\textit{Trichinella spiralis} and \textit{Trichinella
+pseudospiralis}), four infect mouse and rat (\textit{Angiostrongylus
+cantonensis}, \textit{Angiostrongylus costaricensis}, \textit{Leishmania
+braziliensis}, and \textit{Nippostrongylus brasiliensis}), and the remaining 38
+infect only human. Each parasite is annotated with the tissues it occupies in
+its host during its life cycle, with whether it is unicellular or
+multicellular, and with whether it is intracellular or extracellular. A
+parasite with an intracellular stage in the host is recorded as intracellular
+even if another stage is extracellular (e.g.\ \textit{Plasmodium} spp.,
+\textit{Trypanosoma cruzi}), since the intracellular stage has a wider reach.
 
 % paper/tables/parasites.tex is generated: `make tables` (see Makefile).
 \input{tables/parasites}
 
-\subsection{Filtering the parasite proteome}
-\todo{Secretome filter via DeepLoc.}
+\subsection{Proteome filtering}
+Interactions are predicted only between proteins that can physically meet. For
+each host--parasite pair, the host proteome is narrowed to the proteins
+expressed where the parasite is and localized where the parasite can reach,
+and the parasite proteome to the proteins localized where it can reach the
+host proteins.
 
-\subsection{Filtering the host proteome}
-\todo{Tissue filter against parasite lifecycle tissues; DeepLoc filter to
-surface-exposed localisations.}
+A host protein is kept if TISSUES~\todo{ref} gives it an expression confidence
+score of at least 1.0 in at least one of the tissues the parasite occupies.
+
+Localization is predicted for every host and parasite protein with DeepLoc
+2.1~\cite{dum2024deeploc}, Accurate model (ProtT5 embeddings). A protein is
+assigned to a class when its class probability exceeds DeepLoc's own per-class
+threshold for the Accurate model (Extracellular 0.617, Cell membrane 0.565,
+Cytoplasm 0.476, Nucleus 0.501); a protein can belong to several classes.
+
+For an extracellular parasite, host proteins are kept if they are predicted
+extracellular or cell membrane. For an intracellular parasite, cytoplasm and
+nucleus are added, since the parasite reaches the cytoplasm and nucleus. The
+surface proteins are retained, because an intracellular parasite also has an
+invasive extracellular stage.
+
+On the parasite side, a unicellular parasite faces the host with its plasma
+membrane, so its proteins are kept if predicted extracellular or cell
+membrane. A multicellular parasite's cell membrane is buried inside the
+organism and it reaches its host with secreted proteins alone, so only
+proteins predicted extracellular are kept.
 
 \subsection{Homology transfer}
-\todo{Transfer of STRING interactions through shared orthologous groups.}
+Interactions are transferred from STRING's orthologous-group level network
+(\texttt{COG.links.detailed}, v12.0), in which the intra-species interactions
+of every STRING species are summarized between EggNOG 6.0~\todo{ref}
+orthologous groups. Every eligible host and parasite protein is mapped to its
+group at the eukaryote level (taxonomic level 2759). A host--parasite protein
+pair is predicted to interact if their two groups are linked in STRING with an
+experimental-evidence score or a database-evidence score of at least 0.7
+(STRING scores divided by 1000). The OrthoHPI confidence score is the mean of
+the two channel scores, so it ranges from 0.35 (one channel at 0.7, the other
+at 0) to 1.0 (both channels at 1).
 
-\subsection{Tissue and cell-type annotation}
-\todo{TISSUES confidence scores and HPA single-cell expression.}
+\subsection{Cell-type annotation}
+For human, pig and mouse, host proteins are further annotated with the cell
+types that express them in each tissue, from single-cell transcriptome atlases:
+the Human Protein Atlas single-cell type data (\todo{ref}, version 23) for
+human, the Pig Single Cell Transcriptome Atlas (\todo{ref}, release 2022-10-14)
+for pig, and the Tabula Muris Senis~\todo{ref} for mouse. Rat has no comparable
+atlas and is given tissue resolution only. Atlas tissues are mapped onto the
+TISSUES tissue vocabulary used above. For mouse, only the 3-month-old animals
+are used, from the droplet dataset, with the FACS dataset as a fallback for
+tissues the droplet dataset lacks. So that all three hosts share one scale, pig
+and mouse expression is computed the way the Human Protein Atlas computes it:
+the raw counts of all cells of a (tissue, cell type) are pooled and scaled to
+one million transcripts. A protein is annotated to a cell type when its
+expression there exceeds 1 nTPM. Cell-type annotation is not used to filter
+predictions, but as an extra annotation layer.
 
-\subsection{Implementation and availability}
-\todo{Streamlit application, repository URL, data snapshot.}
+\subsection{Structural modelling of predicted interactions}
+To test whether the predicted interactions can be modelled using
+AlphaFold3~\todo{ref Abramson 2024}, we created a small benchmarking dataset.
+Since the predicted interactions can reflect membership of the same complex,
+where a model of the two proteins alone is not expected to show an interface,
+we only included interactions transferred from direct binding, alongside a
+human reference complex.
+
+Human physical interactions were taken from BioGRID (release 5.0.262) and
+IntAct (release of 10 January 2026). An interaction was considered direct if
+BioGRID recorded it by two-hybrid, reconstituted complex, co-crystal structure,
+far-western, protein-fragment complementation, protein--peptide or biochemical
+activity assay, or if IntAct typed it as a direct interaction, an enzymatic
+reaction, cleavage or covalent binding. Proteins were matched between the
+databases and the orthologous groups by gene name. We considered predicted
+interactions with a human host whose two orthologous groups contain a pair of
+human proteins with direct evidence, and divided them by confidence score into
+six bins (0.35--0.5, 0.5--0.6, 0.6--0.7, 0.7--0.8, 0.8--0.9, 0.9--1.0). Eight
+interactions were drawn per bin, at most one per pair of orthologous groups,
+from the parasites in turn, and excluding pairs longer than 1{,}500 residues in
+total. This gave 48 interactions from 25 parasites.
+
+The reference for each interaction was the human pair of its orthologous
+groups with direct evidence, preferring pairs that include the predicted human
+partner, then the pair with the most publications reporting direct binding.
+For 27 interactions the reference shares the predicted human partner.
+References were limited to 2{,}500 residues, since human proteins with direct
+evidence are often longer than their parasite counterparts.
+
+Each predicted and reference pair was submitted to the AlphaFold Server with
+default settings (5--8 October 2026), giving five models per pair. For the
+top-ranked model we report the interface predicted TM-score (ipTM) and the
+ipSAE score~\todo{ref Dunbrack 2025}. ipSAE was computed from the predicted
+aligned error matrix with a 10\,\AA{} cutoff, and is less sensitive than ipTM
+to disordered regions outside the interface. An interface was considered found
+at an ipSAE of at least 0.1.
+
+To assess whether references might score higher because more evolutionary
+information is available, we counted the rows of the paired multiple sequence
+alignment built by the AlphaFold Server in which both chains have a homolog. A
+row is counted as a homolog when at least 10\% of its aligned positions are
+residues rather than gaps. The server's alignments are limited to 50{,}000
+rows.
+
+\subsection{The web resource}
+All predictions are available in an interactive resource at
+\url{https://orthohpi.streamlit.app}. For a chosen parasite and host, the
+predicted network is shown as an interactive graph and as a downloadable
+table, and can be filtered by confidence score, by tissue, by cell type, and by
+the DeepLoc class of the host protein. The host and parasite proteins of the
+network are tested for enrichment of Gene Ontology biological processes with
+Fisher's exact test and Benjamini--Hochberg FDR, with the enriched terms shown
+in their GO hierarchy. AlphaFold~\todo{ref} monomer structures of both
+interactors are retrieved from the AlphaFold Protein Structure Database and
+displayed for any selected interaction. Further pages compare the host
+interactors shared between parasites, and for a parasite with several hosts,
+the interactions shared between and specific to each host.
 
 \section{Results}
 
 \subsection{The predicted networks}
-\todo{Size of the networks; what drives the spread between parasites.}
-Figure~\ref{fig:networks} shows the size of each predicted network and where in
-the host cell its interactions land.
+We predict in total 43{,}923 PPIs across 46 parasites and 4 hosts (13{,}856
+human, 1{,}892 rat, 1{,}804 mouse, 1{,}484 pig,
+Figure~\ref{fig:networks}). Boxplots of confidence scores of the predictions
+are shown in Supplementary Figure~\ref{fig:confidence}. The number of predicted
+PPIs varies from 1 in \textit{T.~hominis} to 3{,}509 in \textit{T.~cruzi}.
 
 % paper/figures/networks.pdf is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/networks}
-  \caption{Predicted interactions of every host--parasite pair, one block per
-  host, the blocks sharing an axis so that a bar is comparable across hosts.
-  Each bar is split by where DeepLoc places the host protein: on the surface
-  (extracellular or cell membrane), in the interior (cytoplasm or nucleus), or
-  called for both. The interior fraction is what the parasite's niche opens to
-  it, so it is substantial only for the intracellular parasites. The strips
-  beside the names give the niche (outer) and the taxonomic group (inner).}
+  \caption{Predicted interactions of every host--parasite pair. The bars are
+  split by the localization of the host proteins predicted by DeepLoc. The
+  strips give each parasite's taxonomic group and niche.}
   \label{fig:networks}
 \end{figure}
 
-Figure~\ref{fig:funnel} quantifies the filters of Figure~\ref{fig:workflow},
-stage by stage and separately for each host--parasite pair, as the share of
-proteins each stage keeps. The DeepLoc filter keeps 77--84\% of the host
-proteins expressed in the infected tissues for an intracellular parasite,
-against 18--26\% for an extracellular one.
+To explain the differences in the number of predicted PPIs, we show in
+Figure~\ref{fig:funnel} the percentage of proteins kept at each stage of the
+pipeline. The first factor is the size of the proteomes. The host proteomes are
+comparable in size, but the parasite proteomes range from 2{,}236
+(\textit{V.~corneae}) to 50{,}190 (\textit{T.~vaginalis}).
+
+The next factor is the tissue filter. The pool of eligible host proteins
+depends on how many tissues a parasite infects and how well TISSUES annotates
+them, which varies widely between tissues and hosts (Supplementary
+Figure~\ref{fig:tissues_coverage}). For example, in rat,
+\textit{Angiostrongylus costaricensis} keeps only the 4{,}456 host proteins
+annotated to intestine, whereas \textit{A.~cantonensis}, which infects lung and
+brain, keeps 9{,}408. Although the two parasites contribute a similar number of
+secreted or surface proteins (1{,}392 and 1{,}547), \textit{A.~costaricensis}
+gets only 208 predicted interactions against 554 for \textit{A.~cantonensis}.
+
+The DeepLoc filter on the host side is much stricter for the extracellular
+parasites, as only extracellular and cell-membrane proteins are kept, whereas
+host proteins in the cytoplasm and nucleus are also kept for intracellular
+parasites (Figure~\ref{fig:funnel}). On the parasite side, unicellular
+parasites keep both extracellular and membrane proteins, while multicellular
+parasites keep only extracellular proteins.
+
+The DeepLoc probabilities also differ between parasites (Supplementary
+Figure~\ref{fig:deeploc_pools_parasite}). The secretome filter keeps 7--16\% of
+the proteome of the nematodes as extracellular, against 4--8\% for the
+trematodes and cestodes. On the host side, the distributions are similar
+(Supplementary Figure~\ref{fig:deeploc_pools_host}), with slightly larger
+percentages of human proteins kept as extracellular (7.8\% against 5.7--7.2\%
+in the other hosts) and cell membrane (19.4\% against 17.6--19.0\%).
+
+Finally, only proteins in a KOG group can be linked, since these are the only
+EggNOG groups that are linked in STRING. On the host side, this keeps 76--91\%
+of the remaining proteins. On the parasite side, it keeps 41--66\% of the
+secreted and surface proteins of nematodes, flatworms, \textit{Plasmodium} and
+\textit{Leishmania}, but only 17--39\% for the other protozoa and the
+microsporidia, down to 18\% for \textit{T.~vaginalis} (791 of 4{,}443).
 
 % paper/figures/funnel_shares.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/funnel_shares}
-  \caption{Share of proteins each stage of the pipeline keeps, for every
-  host--parasite pair, one row per pair in blocks by host. Each coloured cell is
-  the percentage of proteins kept from the stage before. Host side: expressed in
-  a tissue the parasite infects (TISSUES) of the STRING proteome, in a reachable
-  localisation (DeepLoc) of those, in a KOG group of those, and in a predicted
-  interaction (PPI) of those. Parasite side: secreted or on the surface
-  (DeepLoc) of the STRING proteome, in a KOG group of those, and in a predicted
-  interaction (PPI) of those. Both filters keep what
-  Figure~\ref{fig:workflow} specifies; only the KOG groups of EggNOG carry
-  interactions in STRING, so only their members can be linked. The grey counts
-  give the size of the parasite's STRING proteome and the number of predicted
-  interactions of the pair; the size of the host's proteome follows its name.
-  Rows are ordered by the parasite's niche in the host, then taxonomic group,
-  then name; the strips beside the names give the niche (outer) and the
-  taxonomic group (inner). The counts behind every cell are in Supplementary
-  Table~S1.}
+  \caption{Percentage of proteins each stage of the pipeline keeps for every
+  host--parasite pair. The coloured cells show the percentage of proteins kept
+  from the stage before. The grey counts show the size of the parasite's STRING
+  proteome and the number of predicted interactions of the pair. The size of
+  the host proteome is given in parentheses after its name. The strips beside
+  the names give the niche (outer) and the taxonomic group (inner). The counts
+  behind every cell are in Supplementary Table~S1.}
   \label{fig:funnel}
 \end{figure}
 
-\subsection{Structural models of the transferred interactions}
-\todo{Interpretation; cite AlphaFold 3 and ipSAE.}
-Figure~\ref{fig:alphafold_direct} compares AlphaFold 3 models of 48 predicted
-links from 25 parasites against models of the human interactions they were
-transferred from. Of the 20 human references with an ipSAE interface, the
-predicted link reproduces it in 6; ipTM finds an interface in one pair only.
+\subsection{Structural modelling of interactions}
+To test whether transferred interactions are structurally plausible, we
+modelled 48 predicted interactions whose human counterparts have evidence of
+direct binding, each alongside a human reference complex, using AlphaFold3
+(Figure~\ref{fig:alphafold_direct}). The modelled complexes had a confident
+interface (ipSAE $\ge 0.1$) in 20 of the 48 human references, but only in 8 of
+the predicted parasite--human pairs. By ipTM, 11 references and one predicted
+pair reached 0.6. Reference complexes scored higher than their predicted
+counterparts in most pairs (ipSAE higher in 30 and lower in 6, 12 tied). The
+references also scored higher when the reference shared the predicted human
+partner.
 
 % paper/figures/alphafold_direct.png is generated: `make figures`.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/alphafold_direct}
-  \caption{AlphaFold 3 interface confidence of predicted parasite--human links
-  against that of the human interaction each was transferred from. The 48 links
-  are predicted against human, eight from each confidence-score bin between 0.35
-  and 1, at most one per pair of orthologous groups. Each is paired with a human
-  reference: a pair of human members of the same two orthologous groups shown to
-  bind directly in BioGRID or IntAct, the predicted human partner itself where
-  possible (circles), otherwise the pair with the most publications (diamonds).
+  \caption{Structural modelling of interactions. AlphaFold 3 interface
+  confidence of predicted parasite--human links against that of the human
+  interaction each was transferred from. The 48 links are predicted against
+  human, eight from each confidence-score bin between 0.35 and 1, at most one
+  per pair of orthologous groups. Each is paired with a human reference: a pair
+  of human members of the same two orthologous groups shown to bind directly in
+  BioGRID or IntAct, the predicted human partner itself where possible
+  (circles), otherwise the pair with the most publications (diamonds).
   \textbf{(A)} ipTM and \textbf{(B)} ipSAE of the best-ranked model of each
   complex, coloured by the confidence score of the link. The dashed lines mark
   an interface as found (ipTM $\ge 0.6$, ipSAE $\ge 0.1$), and the counts give
@@ -213,159 +399,176 @@ predicted link reproduces it in 6; ipTM finds an interface in one pair only.
   \label{fig:alphafold_direct}
 \end{figure}
 
-\subsection{Parasites of the same host reach overlapping host proteins}
-\todo{Interpretation: similarity within genera and within niches.}
-Figure~\ref{fig:similarity} compares the interactomes of the parasites of human
-pair by pair, Figure~\ref{fig:shared_families} the host families that the
-most of them converge on, and Figure~\ref{fig:parasite_go} the host processes
-they reach. The processes split by niche rather than by taxonomy: the
-intracellular parasites, \textit{Trichinella} among them, reach host proteins of
-RNA splicing, ribonucleoprotein biogenesis and autophagy, and the extracellular
-ones host proteins of cell adhesion, integrin signalling and lipid metabolism.
-\todo{Check the niche split against the literature; note that each parasite is
-tested against its own niche's pool.}
+The paired alignments AlphaFold built for the predicted pairs were shallower
+than those of their references (median 3{,}757 against 10{,}607 rows with
+homologs of both proteins), which may explain part of the difference in
+interface score between the predicted pairs and the references. Since many
+human complexes with evidence of direct binding were not modelled confidently,
+a low score for a parasite--host pair does not necessarily mean that they
+cannot interact. \todo{Move to discussion?}
+
+\subsection{Shared host interactors across parasites}
+To investigate which human parasites interact with the same human proteins, we
+show in Figure~\ref{fig:similarity} the Jaccard similarity of the sets of human
+proteins reached by each parasite. The niche (extracellular vs intracellular)
+clearly separates the parasites. For example, the intracellular
+\textit{Trichinella} species have higher similarity to the intracellular
+protozoa than to the extracellular nematodes, and \textit{T.~cruzi} is closer
+to \textit{P.~falciparum} (0.29) than to the extracellular \textit{T.~brucei}
+(0.05). Part of the niche split follows from the method, since the DeepLoc
+filter is different for the extracellular and intracellular parasites
+(Figure~\ref{fig:workflow}).
+
+There is also a higher similarity between parasites of the same taxonomic
+group. Most clearly, the five \textit{Trichinella} species reach nearly the
+same host proteins (Jaccard similarity 0.65--0.81).
 
 % paper/figures/parasite_similarity.pdf is generated: `make figures`.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_similarity}
   \caption{Jaccard similarity of the sets of human proteins reached by each
-  pair of parasites predicted against human. Parasites are ordered by niche in
-  the host, then taxonomic group, then name, so that the two niches read as
-  blocks; the strips along both axes give the niche (outer) and the taxonomic
-  group (inner), and the diagonal is left grey. Similarity is highest within a
-  genus and falls away sharply between the niches, which draw on different host
-  localisations.}
+  pair of parasites. The strips along both axes show each parasite's taxonomic
+  group and niche. The diagonal is left grey.}
   \label{fig:similarity}
 \end{figure}
+
+Next, we investigated which human protein families most parasites are
+predicted to interact with. In Figure~\ref{fig:shared_families} we show the
+human protein families reached by at least 24 parasites. Of the 909 families
+reached by at least two parasites, 31 are reached by 24 or more of the 43
+human parasites. The most widely reached are the laminins (37 parasites), the
+integrin beta subunits (36) and the amyloid precursor proteins (36), followed
+by the lipid-handling families such as LCAT and PLA2G15 (33), the sphingomyelin
+synthases (32), the BPI/LBP/CETP lipid-transfer proteins (32) and
+apolipoprotein (31). These proteins are cell membrane or extracellular
+proteins, which is why they can be reached by both the intracellular and
+extracellular parasites. Most families are shared by helminths and protozoa,
+but a few are helminth-specific: the netrin receptors DCC/neogenin, the
+sortilins, SPARC and CHID1 are reached by 24 to 26 helminths and at most one
+protozoan. \todo{How many host families are reached in total?}
 
 % paper/figures/shared_families.pdf is generated: `make figures`.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_families}
-  \caption{Host protein families of human reached by at least 24
-  parasites, as a dot matrix over the parasites predicted against human. A
-  family is the orthologous group of the host protein, labelled by the gene
-  symbols of its members, and is reached by a parasite when any parasite
-  protein is predicted to interact with any member. The area of a dot is the
-  number of parasite proteins reaching that family, drawn at 20 for more. The two columns on the
-  right count the parasites reaching the family and the distinct parasite
-  orthologous groups they do so through --- one group means a single conserved
-  parasite protein transferred many times, rather than independent
-  convergence. The strips above the matrix
-  give the niche (outer) and the taxonomic group (inner).}
+  \caption{Human protein families reached by at least 24 parasites. Rows are
+  the human orthologous-group families with a predicted interaction from at
+  least 24 of the 41 human parasites, ordered by count; columns are the
+  parasites, grouped by taxon (lower strip) with their niche (upper strip). Dot
+  area is the number of proteins of the parasite predicted to interact with the
+  family. The right-hand columns give the number of parasites and the number of
+  distinct parasite orthologous groups from which the family is reached (one
+  would mean a single conserved parasite protein transferred many times).
+  Families are named by the members reached.}
   \label{fig:shared_families}
 \end{figure}
+
+The host Gene Ontology processes reached split by niche rather than by
+taxonomy (Figure~\ref{fig:parasite_go}). Every parasite except
+\textit{T.~hominis}, which only has one prediction, reaches at least one
+over-represented process. Among the 16 intracellular parasites autophagy is
+shared: 15 are enriched for autophagosome organisation and all 16 for
+autophagosome maturation. The spliceosome (RNA splicing, U2-type
+prespliceosome assembly and mRNA transport) is also reached by a large part of
+the intracellular parasites: the five \textit{Trichinella} species, the three
+\textit{Plasmodium} species, \textit{L.~braziliensis} and \textit{T.~cruzi}.
+
+The 26 extracellular parasites, on the other hand, mostly target the cell
+surface and its signalling (Figure~\ref{fig:parasite_go}). All 26 are enriched
+for cell-substrate adhesion, 24 for integrin-mediated signalling, 25 for lipid
+metabolism, and most for cell motility and neuron development. A few processes
+are shared across the niches, most clearly vesicle fusion and lysosomal
+transport (14 parasites of each niche). \todo{Mention that they are tested
+against proteins of their own niche?}
 
 % paper/figures/parasite_go.pdf is generated: `make figures`.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go}
   \caption{Gene Ontology biological processes over-represented among the human
-  proteins each parasite is predicted to reach. Each parasite is tested on its own
-  with a one-sided Fisher's exact test against the human proteins of its niche that
-  passed the pipeline's filters, and corrected with Benjamini--Hochberg; a dot marks
-  a process at FDR $\le 0.05$, its area the number of the parasite's host
-  interactors annotated to the process and its shade the odds ratio. The odds ratio
-  is shaded rather than the FDR, which follows how many interactors a parasite has.
-  For each parasite, its most significant processes are taken in turn until two are
-  represented; a process is merged into an already shown row when the two share half
-  or more of their combined human proteins (Jaccard index $\ge 0.5$). Rows are
-  ordered by hierarchical clustering of which parasites they are enriched for, so
-  processes enriched for similar parasites sit together. Parasites are ordered by
-  niche, then taxonomic group, then name, with the niche (outer) and taxonomic group
-  (inner) in the strips above the matrix. All predictions at confidence score $\ge 0.35$; every enriched process
-  of every parasite is in Supplementary Table~\todo{table}.}
+  proteins each parasite is predicted to interact with. Each parasite is tested
+  on its own with a one-sided Fisher's exact test against the human proteins
+  that passed the pipeline's filters, and corrected with Benjamini--Hochberg. A
+  dot marks a process at FDR $\le 0.05$, sized by the number of the parasite's
+  host interactors annotated to the process and shaded by the odds ratio. Rows
+  are chosen per parasite: its processes are taken from the most significant
+  down until two are represented, where a process counts as represented by a
+  row already chosen if the two share at least half of their annotated human
+  proteins, and is then not drawn separately.}
   \label{fig:parasite_go}
 \end{figure}
 
 \subsection{Comparing the hosts of one parasite}
 Eight parasites were predicted against more than one host, and for each we
-compared their interactions between hosts as group-pair links
-(Figure~\ref{fig:multi_host}). Most of a parasite's interactome is shared:
-76\% of the 2{,}006 links are found in every host of their parasite, from 48\%
-for \textit{Hymenolepis diminuta} to 84\% for \textit{Angiostrongylus
-cantonensis} and \textit{Leishmania braziliensis}
-(Figure~\ref{fig:multi_host}A). The rest are not evenly spread. In each
-parasite one host carries clearly fewer links than the others: rat for
-\textit{Cryptosporidium muris}, \textit{H.~diminuta}, \textit{A.~costaricensis}
-and \textit{Nippostrongylus brasiliensis}, and pig for both
-\textit{Trichinella} species. These hosts lack up to 112 links that the other
-host carries (Figure~\ref{fig:multi_host}B).
-
-Of the 510 links missing from a host, 362 (71\%) are lost at the TISSUES
-filter, 127 (25\%) at the DeepLoc filter, and only 21 (4\%) because the host
-proteome has no member of the family. The TISSUES losses follow how well each
-host's infected tissues are annotated
-(Supplementary Figure~\ref{fig:tissues_coverage}). Rat has no annotations for
-blood, skin or stomach, and its small intestine has only 1{,}304 annotated
-proteins against 8{,}117 in mouse. This costs rat 59 links of
-\textit{Cryptosporidium muris} (stomach, intestine), 23 of
-\textit{Hymenolepis diminuta} (small intestine) and 32 of
-\textit{Angiostrongylus costaricensis} (blood, intestine). By contrast,
-\textit{A.~cantonensis}, which infects lung and brain, both well covered in
-rat, loses only 3. Pig covers every tissue \textit{Trichinella} infects, but
-with fewer proteins per tissue (5{,}684 in intestine against 11{,}598 in
-human). It loses 75 and 92 links of the two \textit{Trichinella} species at
-this filter, against 2 and 3 in human. Human, in turn, has no annotations for
-macrophages, the host cell of \textit{L.~braziliensis}, or for the nose, and
-loses 24 of the parasite's links against 4 in mouse. Among them are the links
-of the parasite's ATG8 to the core autophagy proteins ATG5 and ATG14, which
-are certainly expressed in human but are not annotated to any tissue the
-parasite infects. Most of the host-specific part of an interactome thus
-reflects how well each host is annotated rather than a difference in its
-biology. A link missing from a poorly covered host should be read as
-unsupported, not as absent. The DeepLoc losses, which dominate only for
-\textit{N.~brasiliensis} in rat (24 of 38) and \textit{A.~cantonensis} in rat
-(12 of 15), are harder to separate from real differences in where orthologous
-proteins are localised.
+compared their interactions between hosts (Figure~\ref{fig:multi_host}). To be
+able to compare them between hosts, we look at KOG links instead of single
+PPIs. For most of the parasites, most of the interactome is shared: 76\% of the
+2{,}006 links are found in every host of their parasite, from 48\% for
+\textit{Hymenolepis diminuta} to 84\% for \textit{Angiostrongylus cantonensis}
+and \textit{Leishmania braziliensis} (Figure~\ref{fig:multi_host}A). In each
+parasite one host has clearly fewer links than the others: rat for
+\textit{Cryptosporidium muris}, \textit{H.~diminuta},
+\textit{A.~costaricensis} and \textit{Nippostrongylus brasiliensis}, and pig
+for both \textit{Trichinella} species. These hosts lack up to 112 links that
+the other host carries (Figure~\ref{fig:multi_host}B).
 
 % paper/figures/multi_host.pdf is generated: `make figures`.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/multi_host}
-  \caption{Hosts compared for every parasite predicted against more than one.
-  An interaction is compared between hosts as the pair of orthologous groups it
-  was transferred from, so a link counts as shared when both hosts carry a
-  protein of the host group interacting with the parasite's. \textbf{(A)} The
-  links of each parasite, split by the hosts carrying them. \textbf{(B)} For
-  each host, the links it lacks that another host of the same parasite carries,
-  attributed to the first filter the host family fails there: the family is
-  absent from the host proteome, the TISSUES filter keeps no member in a tissue
-  the parasite infects, or the DeepLoc filter keeps no remaining member in a
-  location the parasite reaches. Every missing link falls into one of these
-  three; none is a family that passes every filter and carries no transferred
-  link, since a link is transferred at the level of the orthologous group. The
-  last two causes reflect the coverage of TISSUES and the accuracy of DeepLoc
-  for that host as much as the biology of the host family.}
+  \caption{Comparison of hosts for the parasites that infect more than one
+  host. An interaction is compared between hosts as the pair of orthologous
+  groups it was transferred from, so a link counts as shared when both hosts
+  carry a protein of the host group interacting with the parasite's.
+  \textbf{(A)} The predicted interactions of each parasite, coloured by the
+  hosts in which they are predicted. \textbf{(B)} For each host, the links it
+  lacks that another host of the same parasite carries, coloured by the first
+  filter that removes it: absent from the host proteome, removed by the TISSUES
+  filter, or removed by the DeepLoc filter.}
   \label{fig:multi_host}
 \end{figure}
 
-\subsection{From parasite protein to host cell type}
-\todo{Interpretation of the \textit{Plasmodium falciparum} case study.}
-Figure~\ref{fig:pf_case_study} narrows the \textit{Plasmodium falciparum}
-network to the host proteins of the liver stage.
+Of the 510 links missing from a host, 362 (71\%) are lost at the TISSUES
+filter, 127 (25\%) at the DeepLoc filter, and only 21 (4\%) because the host
+proteome has no member of the family. The TISSUES losses follow how well each
+host's infected tissues are annotated (Supplementary
+Figure~\ref{fig:tissues_coverage}). Rat has no annotation for blood, skin or
+stomach, and its small intestine has only 1{,}304 annotated proteins against
+8{,}117 in mouse. This results in a loss of 59 links of \textit{Cryptosporidium
+muris} (stomach, intestine), 23 of \textit{Hymenolepis diminuta} (small
+intestine) and 32 of \textit{Angiostrongylus costaricensis} (blood, intestine).
+By contrast, \textit{A.~cantonensis}, which infects lung and brain, which are
+well annotated in rat, loses only 3. Pig covers every tissue
+\textit{Trichinella} infects, but with fewer proteins per tissue (5{,}684 in
+intestine against 11{,}598 in human). It loses 75 and 92 links of the two
+\textit{Trichinella} species at this filter, against 2 and 3 in human. Human
+has no nose or macrophage annotations, and therefore loses 24 links for
+\textit{Leishmania braziliensis} against 4 in mouse. Most of the differences in
+interactions between hosts thus reflect differences in annotation rather than
+biology.
+
+\subsection{Case study: \textit{P.~falciparum}}
+\todo{Case study text.}
 
 % paper/figures/pf_case_study.png is generated: `make figures`.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/pf_case_study}
-  \caption{\textit{Plasmodium falciparum} in \textit{Homo sapiens}, narrowed
+  \caption{Case study: human--\textit{P.~falciparum} network, narrowed
   in stages: the predicted interactions with a confidence score of at least
-  0.7 (A); those whose host protein is found in the liver (B); and from these
-  two branches, those whose host protein is enhanced in hepatocytes (C),
-  following the Human Protein Atlas definition of cell type enhanced (detected
-  at more than 1 normalized counts per million, nCPM, and at least four
-  times its mean nCPM over the other cell types) applied within the liver cell
-  types of its single-cell RNA-seq data \todo{cite Digre and Lindskog 2023},
+  0.7 (A); those whose host protein is found in blood (B); and from these
+  two branches, those whose host protein is detected in erythrocytes, at more
+  than 1 normalized count per million (nCPM), in the blood single-cell RNA-seq
+  data of the Human Protein Atlas (C) \todo{cite Digre and Lindskog 2023},
   and those whose host protein is found in none of the other tissues the
-  parasite infects, namely skin, blood, brain and spleen (D).
+  parasite infects, namely skin, liver, brain and spleen (D).
   \textbf{(A--D)} The network of each stage, drawn as in the OrthoHPI app:
   parasite proteins as diamonds, host proteins as circles, and link width by
   confidence score. In (A) and (B), proteins and links that reach no later
-  stage are greyed. In (C) and (D), a parasite protein is named by its
-  STRING description, or by its gene name where it has none, and a host protein
-  by its gene name. \textbf{(E)} Gene Ontology biological processes enriched
+  stage are greyed. In (D), a parasite protein is named by its STRING
+  description, or by its gene name where it has none, and a host protein by its
+  gene name; the links of (C) and (D) are listed in Supplementary Table S3. \textbf{(E)} Gene Ontology biological processes enriched
   among the host proteins of each stage (Fisher's exact test against the host
   proteins the pipeline could have predicted, Benjamini--Hochberg FDR $<$
   0.05); each stage contributes its three best terms, leaving out a term
@@ -373,16 +576,32 @@ network to the host proteins of the liver stage.
   \label{fig:pf_case_study}
 \end{figure}
 
-\subsection{The web interface}
-Figures~\ref{fig:web_overview} and~\ref{fig:web_network} show the web
-interface.
+\subsection{The web resource}
+The predicted networks are made available through an interactive web resource
+hosted at \url{https://orthohpi.streamlit.app/}.
+
+\todo{Network page: subnetworks filtered on tissue, cell type, host protein
+localization, prediction score\ldots\ downloadable tables. Calculate GO
+enrichment for the subnetworks. Click on an edge in the network to view the
+AlphaFold models for the proteins in the predicted interaction and download
+FASTA files.}
+
+\todo{Home page.}
+
+\todo{Parasites of a host page: investigate the similarity between host
+interactors for pairs of parasites -- get a list of shared host interactors for
+a specific pair of parasites.}
+
+\todo{Multi-host page: investigate the shared host protein families for the
+different hosts. Get a table of the reasons why some interactions are missing
+from one host.}
 
 % paper/figures/web_overview.png is built from screenshots of the app: `make figures`.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_overview}
-  \caption{The OrthoHPI 2.0 web interface across hosts and parasites.
-  \textbf{(A)} The home page: the four hosts with the number of parasites
+  \caption{The web resource: overview, multi-host and parasites-of-a-host
+  pages. \textbf{(A)} The home page: the four hosts with the number of parasites
   predicted against each, and the parasites by taxonomic group, each marked
   with its hosts. \textbf{(B)} The multi-host parasites page, for
   \textit{Trichinella spiralis} in human and pig: the infected organs of each host, and the
@@ -398,7 +617,7 @@ interface.
 \begin{figure}[p]
   \centering
   \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_network}
-  \caption{The host--parasite network page of the OrthoHPI 2.0 web interface,
+  \caption{The web resource: network page,
   for \textit{Plasmodium falciparum} in \textit{Homo sapiens} at a confidence
   score of at least 0.7, restricted to the liver. \textbf{(A)} The host,
   parasite, confidence score, tissues and cell-type expression cutoff are
@@ -415,17 +634,49 @@ interface.
 \end{figure}
 
 \section{Discussion}
-\todo{discussion}
+\todo{Complexes: STRING interactions can mean that they are part of the same
+complex, not necessarily that those two proteins are in direct contact.}
+\todo{Mention somewhere that we lowered the cut-off for TISSUES compared to the
+previous version.}
+\todo{Discuss false positives.}
+\todo{Single residue mutations can change binding.}
+\todo{The expression filter is only on the host side, so the parasites'
+proteins are not filtered by life stage. We have very little transcriptomics
+data for the parasites. Check what we have in VEuPathDB
+(\url{https://veupathdb.org/veupathdb/app}). We can't include this at this
+point.}
+\todo{False negatives: parasite proteins that don't look like any proteins in
+intra-species interactions.}
+
+\section{Conclusion}
+\todo{conclusion}
+
+\section*{Acknowledgements}
+We acknowledge Christian Stolte for making the body/tissue illustrations.
+\todo{Lars Juul Jensen?}
+This project was funded by the Novo Nordisk Foundation (grants: Efficient ---
+NNF21OC0069089, Phase Out --- NNF25SA0109652, BRIGHT --- NNF24SA0100980).
 
 \section*{Supplementary material}
+\subsection*{Supplementary tables}
 \textbf{Supplementary Table S1} (\texttt{funnel\_supplementary.csv}). One row
-per host--parasite pair, in the order Figure~\ref{fig:funnel} draws them: the
+per host--parasite pair, in the order Figure~\ref{fig:networks} draws them: the
 host and parasite proteins surviving each stage of the pipeline, and the number
 of predicted interactions of the pair. Supplied as a comma-separated file
-rather than typeset, since the 56 rows are meant to be sorted and filtered.
+rather than typeset, since the rows are meant to be sorted and filtered.
 
-\textbf{Supplementary Figure S1}. Confidence scores of the predicted
-interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
+\textbf{Supplementary Table S2} (\texttt{shared\_families.csv}). The data for
+the common host interactors plot (Figure~\ref{fig:shared_families}).
+
+\textbf{Supplementary Table S3} (\texttt{pf\_case\_study\_links.csv}). The
+predicted interactions of stages C and D of Figure~\ref{fig:pf_case_study}, one
+row per interaction: the stage, the \textit{P.~falciparum} protein with its
+STRING identifier, gene name and description, the human protein with its STRING
+identifier and gene name, and the confidence score.
+
+\subsection*{Supplementary figures}
+\textbf{Supplementary Figure~\ref{fig:confidence}}. Boxplots of the confidence
+scores of the predictions.
 
 % paper/figures/confidence.pdf is generated: `make figures` (see Makefile).
 \begin{figure}[p]
@@ -445,8 +696,9 @@ interactions of each host--parasite pair (Figure~\ref{fig:confidence}).
   \label{fig:confidence}
 \end{figure}
 
-\textbf{Supplementary Figure~\ref{fig:tissues_coverage}}. TISSUES coverage of
-the infected tissues in each host.
+\textbf{Supplementary Figure~\ref{fig:tissues_coverage}}. TISSUES coverage for
+the different hosts at score threshold 1.0. Rat is missing coverage for several
+tissues, such as blood and skin.
 
 % paper/figures/tissues_coverage.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]
@@ -464,10 +716,9 @@ the infected tissues in each host.
   \label{fig:tissues_coverage}
 \end{figure}
 
-\textbf{Supplementary Figures S3 and S4}. DeepLoc~2 probabilities of every host
-(Figure~\ref{fig:deeploc_pools_host}) and parasite
-(Figure~\ref{fig:deeploc_pools_parasite}) protein the localization filters
-decided on, kept or not.
+\textbf{Supplementary Figures S3 and S4}. DeepLoc probability distributions
+for the host (Figure~\ref{fig:deeploc_pools_host}) and parasite
+(Figure~\ref{fig:deeploc_pools_parasite}) proteins.
 
 % paper/figures/deeploc_pools_host.png is generated: `make figures` (see Makefile).
 \begin{figure}[p]

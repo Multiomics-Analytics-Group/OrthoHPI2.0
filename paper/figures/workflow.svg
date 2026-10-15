@@ -41,10 +41,10 @@
     <text class="head" x="110" y="58" id="text4">Proteomes</text>
     <circle class="step" cx="290" cy="26" r="13" id="circle4" />
     <text class="stepno" x="290" y="31" id="text5">2</text>
-    <text class="head" x="290" y="50" id="text6">Tissue expression<tspan x="290" dy="19">filter</tspan></text>
+    <text class="head" x="290" y="58" id="text6">Tissue expression<tspan x="290" dy="19">filter</tspan></text>
     <circle class="step" cx="472" cy="26" r="13" id="circle6" />
     <text class="stepno" x="472" y="31" id="text7">3</text>
-    <text class="head" x="472" y="50" id="text8">Subcellular<tspan x="472" dy="19">localisation filter</tspan></text>
+    <text class="head" x="472" y="58" id="text8">Subcellular<tspan x="472" dy="19">localisation filter</tspan></text>
     <circle class="step" cx="680" cy="26" r="13" id="circle8" />
     <text class="stepno" x="680" y="31" id="text9">4</text>
     <text class="head" x="680" y="58" id="text10">Orthology transfer</text>
@@ -104,7 +104,7 @@
     <path d="M 28 30 c 4 -6 8 4 12 -2" fill="none" stroke="#6a3d9a" stroke-width="3" stroke-linecap="round" id="path33" />
   </g></g>
   <g transform="translate(0 18)"><text class="note" x="532" y="188.0" id="text33">extracellular</text></g>
-  <g transform="translate(0 18)"><text class="lbl" x="472" y="216.0" id="text34">compartments the</text></g>
+  <g transform="translate(0 18)"><text class="lbl" x="472" y="216.0" id="text34">located where the</text></g>
   <g transform="translate(0 18)"><text class="lbl" x="472" y="235.0" id="text35">parasite can reach</text></g>
   <g transform="translate(0 18)"><text class="src" x="472" y="259.0" id="text36">DeepLoc 2.1</text></g>
   <!-- parasite, unicellular: surface and secreted -->

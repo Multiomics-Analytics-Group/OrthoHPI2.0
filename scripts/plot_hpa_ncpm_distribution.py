@@ -25,7 +25,6 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import matplotlib.pyplot as plt
-import utils
 from pipeline import cell_type_annotations
 
 # dataviz palette: one measure, so one hue
@@ -39,12 +38,7 @@ GRID = '#dcdbd5'
 
 def read_hpa_with_zeros(config_file):
     '''The HPA single-cell table mapped to config tissues and STRING proteins, zeros kept.'''
-    urls = utils.read_config(filepath=config_file, field='urls')
-    filename = utils.download_file(url=urls['hpa_single_cell_tissue_url'], data_dir='data/downloads')
-    data = pd.read_csv(utils.read_zipped_file(filepath=filename), sep='\t', header=0)
-    data = data.rename(columns={'nTPM': 'nCPM'})
-    data = data.sort_values(by='nCPM', ascending=False)
-    data = data.drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
+    data = cell_type_annotations.read_hpa_clusters(config_file)
     data = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
     return data.dropna(subset=['Gene'])
 

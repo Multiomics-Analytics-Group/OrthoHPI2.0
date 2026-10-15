@@ -8,21 +8,24 @@ MOUSE_TAXID = '10090'
 CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nCPM']
 
 # HPA tissue names -> config['tissues'] labels. The gut tissues are written under their own
-# label and `intestine`, since TISSUES annotates both; `pbmc` is HPA's only blood data (no
-# erythrocytes or granulocytes)
+# label and `intestine`, since TISSUES annotates both
 HPA_TISSUE_LABELS = {
     'heart muscle': ['heart'],
     'skeletal muscle': ['muscle'],
-    'bronchus': ['lung'],
-    'pbmc': ['blood'],
+    'brain neurons': ['brain'],
+    'brain non-neurons': ['brain'],
+    'retina': ['eye'],
     'colon': ['colon', 'intestine'],
     'rectum': ['rectum', 'intestine'],
     'small intestine': ['small intestine', 'intestine'],
 }
 
 
-def read_hpa(config_file):
-    '''Reads the HPA file containing cell type protein expression profiles per tissue.'''
+def read_hpa_clusters(config_file):
+    '''
+    The HPA single-cell cluster table, one row per (Gene, Tissue, Cell type) at its highest
+    cluster.
+    '''
     urls = utils.read_config(filepath=config_file, field='urls')
     if 'hpa_single_cell_tissue_url' not in urls:
         raise KeyError("hpa_single_cell_tissue_url missing from config urls")
@@ -31,10 +34,13 @@ def read_hpa(config_file):
     hpa_file = utils.read_zipped_file(filepath=filename)
     # HPA before v24 labels the same pooled counts nTPM
     data = pd.read_csv(hpa_file, sep='\t', header=0).rename(columns={'nTPM': 'nCPM'})
-    data = data.sort_values(by='nCPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
-    data = data[data['nCPM'] > 0.0]
+    return data.sort_values(by='nCPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
 
-    return data
+
+def read_hpa(config_file):
+    '''Reads the HPA file containing cell type protein expression profiles per tissue.'''
+    data = read_hpa_clusters(config_file)
+    return data[data['nCPM'] > 0.0]
 
 
 def map_hpa_data(config_file, hpa_data):

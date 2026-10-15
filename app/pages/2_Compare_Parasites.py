@@ -84,7 +84,7 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
-                                                         'nTPM']]
+                                                         'nCPM']]
 
     mapped_tissues = config['tissues']
     infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())

@@ -373,7 +373,7 @@ def active_filters(score, tissues, expression, cell_types, surface):
     '''The filters narrowing what the page shows, as (kind, name) pairs.'''
     active = [('score', f'confidence \u2265 {score:g}')]
     # the expression cutoff is named only once it is raised above the default
-    expression = [f'nTPM > {expression:g}'] if expression > web_utils.CELL_TYPE_CUTOFF else []
+    expression = [f'nCPM > {expression:g}'] if expression > web_utils.CELL_TYPE_CUTOFF else []
     for kind, selected in (('tissue', tissues), ('expression', expression),
                            ('cell type', cell_types), ('localisation', surface)):
         active.extend((kind, str(name)) for name in selected)
@@ -460,7 +460,7 @@ def cell_type_marks(df, score, expression):
     marks = web_utils.keep_expressed_cell_types(annotated, expression).copy()
     # the row a protein reaches its maximum in is always kept, so the darkest of a row is
     # 100%
-    marks['share'] = marks['nTPM'] / marks.groupby(['target', 'Tissue'])['nTPM'].transform('max')
+    marks['share'] = marks['nCPM'] / marks.groupby(['target', 'Tissue'])['nCPM'].transform('max')
     marks['column'] = marks['Tissue'] + MATRIX_SEPARATOR + marks['Cell type']
     if (marks['target_name'].nunique() < MATRIX_MIN_PROTEINS
             or marks['column'].nunique() < 2):
@@ -548,11 +548,11 @@ def generate_cell_type_matrix(marks, blocks):
                         range_color=(0, 1),
                         # plotly express flips category_orders on a y axis
                         category_orders={'column': columns, 'target_name': proteins},
-                        custom_data=['Tissue', 'Cell type', 'nTPM', 'share'])
+                        custom_data=['Tissue', 'Cell type', 'nCPM', 'share'])
     figure.update_traces(marker=dict(size=MATRIX_MARK_SIZE, symbol='square',
                                      line=dict(color=NETWORK_BACKGROUND, width=1)),
                          hovertemplate='<b>%{y}</b><br>%{customdata[1]} (%{customdata[0]})'
-                                       '<br>nTPM: %{customdata[2]:.1f}<br>'
+                                       '<br>nCPM: %{customdata[2]:.1f}<br>'
                                        'Share of its peak in the tissue: '
                                        '%{customdata[3]:.0%}<extra></extra>')
     figure.update_yaxes(title=None, ticksuffix='  ')

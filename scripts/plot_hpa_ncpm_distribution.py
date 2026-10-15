@@ -1,16 +1,16 @@
 '''
-Ridgeline of the HPA single-cell nTPM distribution, one ridge per tissue (--by tissue)
+Ridgeline of the HPA single-cell nCPM distribution, one ridge per tissue (--by tissue)
 or per cell type (--by cell-type), over the tissues and genes OrthoHPI maps.
 
-nTPM spans five orders of magnitude, so the ridges are histograms of log10(nTPM) over the
-detected values; the undetected (nTPM = 0) share is printed in the left gutter and counts
+nCPM spans five orders of magnitude, so the ridges are histograms of log10(nCPM) over the
+detected values; the undetected (nCPM = 0) share is printed in the left gutter and counts
 towards the "% kept" columns on the right, which are the share of all (gene, tissue, cell
 type) combinations a cutoff would keep.
 
 --per-gene-max reduces each (gene, tissue) to its highest cell type first, which is what the
 pipeline's HPA filter actually tests.
 
-Usage: .venv/bin/python scripts/plot_hpa_ntpm_distribution.py [--by tissue|cell-type]
+Usage: .venv/bin/python scripts/plot_hpa_ncpm_distribution.py [--by tissue|cell-type]
            [--tissue TISSUE] [--per-gene-max] [--cutoffs 1 20] [--columns 3] [--output FILE]
 '''
 import argparse
@@ -42,7 +42,8 @@ def read_hpa_with_zeros(config_file):
     urls = utils.read_config(filepath=config_file, field='urls')
     filename = utils.download_file(url=urls['hpa_single_cell_tissue_url'], data_dir='data/downloads')
     data = pd.read_csv(utils.read_zipped_file(filepath=filename), sep='\t', header=0)
-    data = data.sort_values(by='nTPM', ascending=False)
+    data = data.rename(columns={'nTPM': 'nCPM'})
+    data = data.sort_values(by='nCPM', ascending=False)
     data = data.drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
     data = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
     return data.dropna(subset=['Gene'])
@@ -51,7 +52,7 @@ def read_hpa_with_zeros(config_file):
 def ridge_rows(data, group, cutoffs):
     '''One record per group: its detected log10 values, its zero share and its kept shares.'''
     rows = []
-    for name, values in data.groupby(group)['nTPM']:
+    for name, values in data.groupby(group)['nCPM']:
         detected = values[values > 0]
         rows.append({
             'name': name,
@@ -88,7 +89,7 @@ def draw_panel(ax, rows, cutoffs, lo, hi, edges, centres, kernel, overlap, ymax,
     ax.set_xlim(lo, hi)
     ax.set_xticks(range(int(lo), int(hi) + 1))
     ax.set_xticklabels([f'{10.0 ** x:g}' for x in range(int(lo), int(hi) + 1)], color=INK_SECONDARY)
-    ax.set_xlabel('nTPM (log scale)', color=INK_SECONDARY)
+    ax.set_xlabel('nCPM (log scale)', color=INK_SECONDARY)
     ax.tick_params(axis='both', length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -96,7 +97,7 @@ def draw_panel(ax, rows, cutoffs, lo, hi, edges, centres, kernel, overlap, ymax,
     # the cutoff rules label themselves at the top of the plot, where a panel is wide
     # enough; in a narrow one the labels would run into each other and the subtitle names them
     for cutoff in cutoffs if label_cutoffs else ():
-        ax.annotate(f'nTPM > {cutoff:g}', xy=(np.log10(cutoff), ymax + overlap),
+        ax.annotate(f'nCPM > {cutoff:g}', xy=(np.log10(cutoff), ymax + overlap),
                     xytext=(0, 4), textcoords='offset points', ha='center', va='bottom',
                     fontsize=9, color=CUTOFF_COLOR, fontweight='bold', annotation_clip=False,
                     zorder=100)
@@ -125,7 +126,7 @@ def ridge_axis(rows):
     hi = np.ceil(np.percentile(np.concatenate([row['log10'] for row in rows]), 99.9))
     edges = np.linspace(lo, hi, 160)
     centres = (edges[:-1] + edges[1:]) / 2
-    # nTPM is reported to one decimal, so the raw histogram combs below ~1; smooth it
+    # nCPM is reported to one decimal, so the raw histogram combs below ~1; smooth it
     kernel = np.exp(-0.5 * (np.arange(-12, 13) / 3.0) ** 2)
     kernel /= kernel.sum()
     return lo, hi, edges, centres, kernel
@@ -156,7 +157,7 @@ def draw_facets(groups, cutoffs, title, subtitle, output, columns=4):
 
 
 def draw(rows, cutoffs, title, subtitle, output, columns=1):
-    '''Ridgeline over log10(nTPM). Several columns split the rows over side-by-side panels.'''
+    '''Ridgeline over log10(nCPM). Several columns split the rows over side-by-side panels.'''
     lo, hi, edges, centres, kernel = ridge_axis(rows)
     # side by side there is room to keep every ridge inside its own band; stacked in one
     # column they have to bleed over their neighbours to stay readable
@@ -205,8 +206,8 @@ def main():
                         help='split the rows over this many side-by-side panels, which leaves '
                              'room for the ridges not to overlap (default: 1)')
     parser.add_argument('--cutoffs', type=float, nargs='*', default=[1.0, 20.0],
-                        help='nTPM cutoffs to mark (default: 1 20)')
-    parser.add_argument('--output', help='PNG to write (default: snapshots/hpa_ntpm_<by>.png)')
+                        help='nCPM cutoffs to mark (default: 1 20)')
+    parser.add_argument('--output', help='PNG to write (default: snapshots/hpa_ncpm_<by>.png)')
     args = parser.parse_args()
     if args.per_gene_max and args.by != 'tissue':
         parser.error('--per-gene-max collapses the cell types, so it only applies to --by tissue')
@@ -219,27 +220,27 @@ def main():
         if data.empty:
             parser.error(f'no HPA data for tissue {args.tissue!r}')
     if args.per_gene_max:
-        data = data.groupby(['Gene', 'Tissue'], as_index=False)['nTPM'].max()
+        data = data.groupby(['Gene', 'Tissue'], as_index=False)['nCPM'].max()
 
     unit = 'gene, tissue' if args.per_gene_max else 'gene, tissue, cell type'
-    output = args.output or os.path.join('snapshots', f"hpa_ntpm_{args.by.replace('-', '')}"
+    output = args.output or os.path.join('snapshots', f"hpa_ncpm_{args.by.replace('-', '')}"
                                                       f"{'_pergenemax' if args.per_gene_max else ''}.png")
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
 
     def report(rows, prefix=()):
         return [{**dict(zip(('tissue',), prefix)), 'name': row['name'], 'n': row['n'],
-                 'zero %': round(100 * row['zero'], 1), 'median nTPM': row['median'],
+                 'zero %': round(100 * row['zero'], 1), 'median nCPM': row['median'],
                  **{f'% > {c:g}': round(100 * k, 1) for c, k in zip(args.cutoffs, row['kept'])}}
                 for row in reversed(rows)]
 
     if args.by == 'tissue-cell-type':
         groups = [(tissue, ridge_rows(part, 'Cell type', args.cutoffs))
                   for tissue, part in data.groupby('Tissue')]
-        title = 'How HPA single-cell nTPM is distributed across the cell types of each tissue'
+        title = 'How HPA single-cell nCPM is distributed across the cell types of each tissue'
         subtitle = (f'{len(data):,} ({unit}) combinations over '
                     f'{sum(len(rows) for _, rows in groups)} (tissue, cell type) pairs in '
                     f'{len(groups)} tissues; ridges are the detected values, cell types '
-                    'ordered by median within each tissue; dashed rules mark nTPM = '
+                    'ordered by median within each tissue; dashed rules mark nCPM = '
                     + ' and '.join(f'{c:g}' for c in args.cutoffs))
         print(pd.DataFrame([r for tissue, rows in groups
                             for r in report(rows, (tissue,))]).to_string(index=False))
@@ -250,7 +251,7 @@ def main():
     group = 'Tissue' if args.by == 'tissue' else 'Cell type'
     rows = ridge_rows(data, group, args.cutoffs)
     noun = 'tissues' if args.by == 'tissue' else 'cell types'
-    title = f'How HPA single-cell nTPM is distributed across {noun}'
+    title = f'How HPA single-cell nCPM is distributed across {noun}'
     subtitle = (f'{len(data):,} ({unit}) combinations over {len(rows)} {noun}'
                 + (f" in {args.tissue.lower()}" if args.tissue else '')
                 + ('; each gene at its highest cell type' if args.per_gene_max else '')

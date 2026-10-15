@@ -53,10 +53,10 @@ FDR_CAP = 10
 TERM_CHARS = 44
 
 
-def stages(config, data_dir, parasite, host, tissue, cell_type, min_score, min_ntpm=None):
+def stages(config, data_dir, parasite, host, tissue, cell_type, min_score, min_ncpm=None):
     '''
     The links left at each stage, as [(label, edges)], and the GO annotation. The cell
-    type stage keeps the host proteins enhanced in the cell type, or with min_ntpm those
+    type stage keeps the host proteins enhanced in the cell type, or with min_ncpm those
     expressed above it there.
     '''
     edges, annotation, go_df = load(config, data_dir, parasite, host)
@@ -65,13 +65,13 @@ def stages(config, data_dir, parasite, host, tissue, cell_type, min_score, min_n
     in_tissue = tissue_proteins(config, annotation, parasite)
     others = set().union(*(proteins for t, proteins in in_tissue.items() if t != tissue))
     tissue_edges = edges[edges['target'].isin(in_tissue[tissue])]
-    if min_ntpm is None:
+    if min_ncpm is None:
         in_cell = enhanced(annotation, tissue)[cell_type]
         cell_label = f'Enhanced in\n{cell_type}'
     else:
         cells = annotation[(annotation['Tissue'] == tissue) & (annotation['Cell type'] == cell_type)]
-        in_cell = set(cells.loc[cells['nTPM'] > min_ntpm, 'Gene'])
-        cell_label = f'{cell_type.capitalize()},\nnTPM > {min_ntpm:g}'
+        in_cell = set(cells.loc[cells['nCPM'] > min_ncpm, 'Gene'])
+        cell_label = f'{cell_type.capitalize()},\nnCPM > {min_ncpm:g}'
     cell_edges = tissue_edges[tissue_edges['target'].isin(in_cell)]
     specific = tissue_edges[~tissue_edges['target'].isin(others)]
 
@@ -340,8 +340,8 @@ if __name__ == '__main__':
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
     parser.add_argument('--tissue', default='liver')
     parser.add_argument('--cell-type', default='hepatocytes')
-    parser.add_argument('--min-ntpm', type=float,
-                        help='keep the host proteins expressed above this nTPM in the cell '
+    parser.add_argument('--min-ncpm', type=float,
+                        help='keep the host proteins expressed above this nCPM in the cell '
                              'type, instead of those enhanced in it')
     parser.add_argument('--min-score', type=float, default=0.7,
                         help='links below this confidence score are left out')
@@ -353,7 +353,7 @@ if __name__ == '__main__':
 
     config = utils.read_config(filepath=args.config)
     staged, go_df = stages(config, args.data_dir, args.parasite, args.host, args.tissue,
-                           args.cell_type, args.min_score, args.min_ntpm)
+                           args.cell_type, args.min_score, args.min_ncpm)
     terms, shown = enrichment(staged, go_df)
     descriptions = pd.read_parquet(os.path.join(args.data_dir, 'protein_annotations.parquet')
                                    ).set_index('protein')['description']

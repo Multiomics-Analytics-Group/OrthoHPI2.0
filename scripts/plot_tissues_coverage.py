@@ -1,10 +1,10 @@
 '''
 Bar plot per host of how many STRING proteins each config tissue has expression evidence
-for: TISSUES (>= the host's cutoff) or the single-cell atlases: HPA for human (nTPM >
+for: TISSUES (>= the host's cutoff) or the single-cell atlases: HPA for human (nCPM >
 cutoff in some cell type) and Tabula Muris Senis / the pig atlas for mouse and pig, whose
 values are mean log-normalised expression, so a gene counts where that is > 0.
 
-Usage: .venv/bin/python scripts/plot_tissues_coverage.py [--source tissues|atlas] [--ntpm 1.0]
+Usage: .venv/bin/python scripts/plot_tissues_coverage.py [--source tissues|atlas] [--ncpm 1.0]
            [--cutoff SCORE] [--output FILE]
 '''
 import argparse
@@ -31,7 +31,7 @@ INK = '#0b0b0b'
 INK_SECONDARY = '#52514e'
 
 
-def atlas_tissue_proteins(config_file, data_dir, taxid, pool, ntpm_cutoff):
+def atlas_tissue_proteins(config_file, data_dir, taxid, pool, ncpm_cutoff):
     '''{config tissue label: pool proteins above the cutoff in some cell type}, per atlas.'''
     if taxid == venn.HUMAN:
         data = cell_type_annotations.read_hpa(config_file=config_file)
@@ -42,8 +42,8 @@ def atlas_tissue_proteins(config_file, data_dir, taxid, pool, ntpm_cutoff):
         data = cell_type_annotations.read_pig_atlas(data_dir, pool)
     else:
         return {}
-    cutoff = ntpm_cutoff if taxid == venn.HUMAN else 0.0
-    data = data[data['Gene'].isin(pool) & (data['nTPM'] > cutoff)]
+    cutoff = ncpm_cutoff if taxid == venn.HUMAN else 0.0
+    data = data[data['Gene'].isin(pool) & (data['nCPM'] > cutoff)]
     return data.groupby('Tissue')['Gene'].apply(set).to_dict()
 
 
@@ -52,7 +52,7 @@ def main():
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--source', choices=['tissues', 'atlas'], default='tissues')
-    parser.add_argument('--ntpm', type=float, default=venn.NTPM_CUTOFF, help='atlas nTPM cutoff')
+    parser.add_argument('--ncpm', type=float, default=venn.NCPM_CUTOFF, help='atlas nCPM cutoff')
     parser.add_argument('--cutoff', type=float, help='one TISSUES cutoff for every host (default: each host\'s config cutoff)')
     parser.add_argument('--output', help='PNG to write (default: snapshots/<source>_coverage.png)')
     args = parser.parse_args()
@@ -72,8 +72,8 @@ def main():
             cutoff = args.cutoff if args.cutoff is not None else host.get('tissue_cutoff', pipeline_main.TISSUE_CUTOFF)
             ylabel = f'proteins, TISSUES score ≥ {cutoff:g}'
         else:
-            by_tissue = atlas_tissue_proteins(args.config, args.data_dir, taxid, pool, args.ntpm)
-            ylabel = (f'proteins, nTPM > {args.ntpm:g} in a cell type' if taxid == venn.HUMAN
+            by_tissue = atlas_tissue_proteins(args.config, args.data_dir, taxid, pool, args.ncpm)
+            ylabel = (f'proteins, nCPM > {args.ncpm:g} in a cell type' if taxid == venn.HUMAN
                       else 'proteins detected in a cell type')
         counts = sorted(((len(p), t) for t, p in by_tissue.items()), reverse=True)
         if not counts:

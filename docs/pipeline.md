@@ -150,7 +150,7 @@ before the join: `heart muscle` → `heart`, `skeletal muscle` → `muscle`,
 or granulocytes). `colon`, `rectum` and `small intestine` are written under
 both their own label and `intestine`, since TISSUES annotates host proteins
 under both. Where several HPA tissues or Ensembl genes land on the same
-`(protein, tissue, cell type)`, the highest nTPM is kept. Config tissues HPA
+`(protein, tissue, cell type)`, the highest nCPM is kept. Config tissues HPA
 has no single-cell data for (e.g. `mouth`, `nose`, `spinal cord`,
 `urinary bladder`, `vagina`, `macrophage`) stay without cell types rather than
 borrowing rows from a neighbouring tissue.

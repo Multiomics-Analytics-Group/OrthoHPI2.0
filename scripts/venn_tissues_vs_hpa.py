@@ -1,6 +1,6 @@
 '''
 Venn of the human proteins the parasite-specific TISSUES filter keeps against the ones
-HPA single-cell expression (nTPM > cutoff in a cell type of an infected tissue) keeps,
+HPA single-cell expression (nCPM > cutoff in a cell type of an infected tissue) keeps,
 pooled over the parasites as (parasite, protein) pairs. Only tissues HPA covers count.
 
 The pool is each parasite's predicted human interactors (--universe predictions; these
@@ -8,7 +8,7 @@ all passed TISSUES already) or the human STRING proteome (--universe proteome, w
 --after-deeploc for the part the DeepLoc filter lets through).
 
 Usage: .venv/bin/python scripts/venn_tissues_vs_hpa.py [--universe predictions|proteome]
-           [--after-deeploc] [--ntpm 1.0] [--tissues-cutoff 2.5] [--output FILE]
+           [--after-deeploc] [--ncpm 1.0] [--tissues-cutoff 2.5] [--output FILE]
 '''
 import argparse
 import math
@@ -30,7 +30,7 @@ import compare_tissue_filters
 
 HUMAN = 9606
 # the app's HPA cell-type cutoff (web_utils.CELL_TYPE_CUTOFF)
-NTPM_CUTOFF = 1.0
+NCPM_CUTOFF = 1.0
 
 # dataviz palette
 TISSUES_COLOR = '#2a78d6'
@@ -41,12 +41,12 @@ INK = '#0b0b0b'
 INK_SECONDARY = '#52514e'
 
 
-def hpa_tissue_proteins(config_file, ntpm_cutoff):
+def hpa_tissue_proteins(config_file, ncpm_cutoff):
     '''{config tissue label: human proteins expressed above the cutoff in some cell type}.'''
     data = cell_type_annotations.read_hpa(config_file=config_file)
     data = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
     data = data.dropna(subset=['Gene'])
-    data = data[data['nTPM'] > ntpm_cutoff]
+    data = data[data['nCPM'] > ncpm_cutoff]
     return data.groupby('Tissue')['Gene'].apply(set).to_dict()
 
 
@@ -87,12 +87,12 @@ def proteome_universe(config_file, after_deeploc):
     return set(pool[HUMAN]), pool[HUMAN]
 
 
-def compare(config_file, data_dir, ntpm_cutoff, universe='predictions', after_deeploc=False,
+def compare(config_file, data_dir, ncpm_cutoff, universe='predictions', after_deeploc=False,
             tissues_cutoff=None):
     '''One row per parasite with the four Venn regions, plus the tissues HPA lacks.'''
     config = utils.read_config(config_file)
     labels = {bto: name.lower() for bto, name in config['tissues'].items()}
-    hpa = hpa_tissue_proteins(config_file, ntpm_cutoff)
+    hpa = hpa_tissue_proteins(config_file, ncpm_cutoff)
 
     if universe == 'proteome':
         proteome, pool = proteome_universe(config_file, after_deeploc)
@@ -178,7 +178,7 @@ def circle_distance(r1, r2, shared):
     return (lo + hi) / 2
 
 
-def draw_venn(totals, ntpm_cutoff, output, universe_label, tissues_cutoff):
+def draw_venn(totals, ncpm_cutoff, output, universe_label, tissues_cutoff):
     '''Area-proportional Venn: the two filters inside a circle that is the whole pool.'''
     left, both, right = totals['TISSUES only'], totals['both'], totals['HPA only']
     r1 = math.sqrt((left + both) / math.pi)
@@ -230,7 +230,7 @@ def draw_venn(totals, ntpm_cutoff, output, universe_label, tissues_cutoff):
                Patch(facecolor=TISSUES_COLOR, alpha=0.5, edgecolor=TISSUES_COLOR,
                      label=f'TISSUES keeps: ≥ {tissues_cutoff:g} in an infected tissue'),
                Patch(facecolor=HPA_COLOR, alpha=0.5, edgecolor=HPA_COLOR,
-                     label=f'HPA keeps: nTPM > {ntpm_cutoff:g} in a cell type of an infected tissue')]
+                     label=f'HPA keeps: nCPM > {ncpm_cutoff:g} in a cell type of an infected tissue')]
     ax.legend(handles=handles, loc='lower center', bbox_to_anchor=(0.5, -0.02), ncol=1,
               frameon=False, fontsize=10, labelcolor=INK, handlelength=1.4)
 
@@ -243,7 +243,7 @@ def draw_venn(totals, ntpm_cutoff, output, universe_label, tissues_cutoff):
     return output
 
 
-def draw_barplot(table, ntpm_cutoff, output, universe_label, tissues_cutoff):
+def draw_barplot(table, ncpm_cutoff, output, universe_label, tissues_cutoff):
     '''One 100%-stacked bar per parasite over the four regions, sorted by HPA only.'''
     table = table.sort_values('HPA only', ascending=True)
     segments = [('both', 'kept by both', BOTH_COLOR), ('HPA only', 'HPA only (TISSUES drops)', HPA_COLOR),
@@ -270,7 +270,7 @@ def draw_barplot(table, ntpm_cutoff, output, universe_label, tissues_cutoff):
     ax.spines['bottom'].set_color('#c9c8c2')
     ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=8.5)
     ax.set_title(f'Human proteins each parasite-specific tissue filter keeps '
-                 f'(TISSUES ≥ {tissues_cutoff:g}, HPA nTPM > {ntpm_cutoff:g}; HPA-covered tissues only)',
+                 f'(TISSUES ≥ {tissues_cutoff:g}, HPA nCPM > {ncpm_cutoff:g}; HPA-covered tissues only)',
                  fontsize=10, color=INK, pad=28)
 
     fig.savefig(output, dpi=200, bbox_inches='tight', facecolor='white')
@@ -285,7 +285,7 @@ def main():
                         help='the human proteins each parasite is judged on (default: predictions)')
     parser.add_argument('--after-deeploc', action='store_true',
                         help='with --universe proteome: only the proteins the DeepLoc filter keeps')
-    parser.add_argument('--ntpm', type=float, default=NTPM_CUTOFF, help='HPA nTPM cutoff (default: the app\'s cell-type cutoff)')
+    parser.add_argument('--ncpm', type=float, default=NCPM_CUTOFF, help='HPA nCPM cutoff (default: the app\'s cell-type cutoff)')
     parser.add_argument('--tissues-cutoff', type=float,
                         help='TISSUES confidence cutoff (default: the host\'s config value); '
                              'only applies to --universe proteome')
@@ -312,7 +312,7 @@ def main():
                      f"{'_deeploc' if args.after_deeploc else ''}{'_proteins' if args.proteins else ''}"
                      f"{'' if args.tissues_cutoff is None else f'_tissues{args.tissues_cutoff:g}'}.png")
 
-    table, skipped = compare(args.config, args.data_dir, args.ntpm, args.universe, args.after_deeploc,
+    table, skipped = compare(args.config, args.data_dir, args.ncpm, args.universe, args.after_deeploc,
                              args.tissues_cutoff)
     regions = ['interactors', 'both', 'TISSUES only', 'HPA only', 'neither']
     totals = pool_proteins(table) if args.proteins else pool_pairs(table)
@@ -334,7 +334,7 @@ def main():
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
     draw = draw_barplot if args.barplot else draw_venn
     data = table if args.barplot else totals
-    print('\nwrote', draw(data, args.ntpm, output, universe_label, tissues_cutoff))
+    print('\nwrote', draw(data, args.ncpm, output, universe_label, tissues_cutoff))
 
 
 if __name__ == '__main__':

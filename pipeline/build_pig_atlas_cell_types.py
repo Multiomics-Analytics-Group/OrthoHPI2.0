@@ -7,7 +7,7 @@ import pandas as pd
 import utils
 
 PIG_TAXID = '9823'
-REQUIRED_COLUMNS = {'Gene', 'Tissue', 'Cell type', 'nTPM'}
+REQUIRED_COLUMNS = {'Gene', 'Tissue', 'Cell type', 'nCPM'}
 TISSUE_MAPPING = {
     'Intestine': 'intestine',
     'Neonatal Ileum_D0': 'intestine',
@@ -38,9 +38,9 @@ def map_expression(input_file, config_file):
     data = data[list(REQUIRED_COLUMNS)].copy()
     data['Gene'] = data['Gene'].map(aliases)
     data['Tissue'] = data['Tissue'].replace(TISSUE_MAPPING).str.lower()
-    data['nTPM'] = pd.to_numeric(data['nTPM'], errors='raise')
-    data = data[data['Gene'].notna() & data['Tissue'].isin(valid_tissues) & (data['nTPM'] > 0)]
-    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nTPM']
+    data['nCPM'] = pd.to_numeric(data['nCPM'], errors='raise')
+    data = data[data['Gene'].notna() & data['Tissue'].isin(valid_tissues) & (data['nCPM'] > 0)]
+    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nCPM']
             .mean())
     return data
 

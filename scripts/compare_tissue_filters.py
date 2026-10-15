@@ -15,7 +15,7 @@ import utils
 from pipeline import cell_type_annotations, filters, main
 
 CONFIG = 'config.yml'
-HPA_NTPM_CUTOFFS = [0.0, 1.0]
+HPA_NCPM_CUTOFFS = [0.0, 1.0]
 
 # column holding the confidence score in each jensenlab channel's TSV
 SCORE_COL = {'experiments': 6, 'integrated': 4}
@@ -92,11 +92,11 @@ def deeploc_pass(config_file, pool):
 
 def hpa_pass(config_file, cutoffs):
     '''
-    Human proteins with HPA single-cell expression in a config tissue, per nTPM cutoff.
+    Human proteins with HPA single-cell expression in a config tissue, per nCPM cutoff.
     '''
     data = cell_type_annotations.read_hpa(config_file=config_file)
     mapped = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
-    return {c: set(mapped.loc[mapped['nTPM'] > c, 'Gene'].dropna()) for c in cutoffs}
+    return {c: set(mapped.loc[mapped['nCPM'] > c, 'Gene'].dropna()) for c in cutoffs}
 
 
 def hpa_any_tissue_universe(config_file):
@@ -141,21 +141,21 @@ def main_(channel='experiments'):
     print("\n=== Human: TISSUES vs HPA single-cell expression ===")
     human = 9606
     total = len(pool[human])
-    hpa_sets = hpa_pass(CONFIG, HPA_NTPM_CUTOFFS)
+    hpa_sets = hpa_pass(CONFIG, HPA_NCPM_CUTOFFS)
     hpa_any = hpa_any_tissue_universe(CONFIG)
     print(f"human STRING proteins                          {total:>7}")
     print(f"mappable to an HPA gene (any tissue)           {len(hpa_any):>7}  {pct(len(hpa_any), total)}")
     t = tis[human]
     print(f"pass TISSUES (>= {main.TISSUE_CUTOFF})                          {len(t):>7}  {pct(len(t), total)}")
-    for c in HPA_NTPM_CUTOFFS:
+    for c in HPA_NCPM_CUTOFFS:
         h = hpa_sets[c]
-        print(f"pass HPA in a config tissue (nTPM > {c})       {len(h):>7}  {pct(len(h), total)}")
+        print(f"pass HPA in a config tissue (nCPM > {c})       {len(h):>7}  {pct(len(h), total)}")
 
     print("\n=== Agreement on human (restricted to HPA-mappable proteins) ===")
-    for c in HPA_NTPM_CUTOFFS:
+    for c in HPA_NCPM_CUTOFFS:
         h = hpa_sets[c]
         tm, hm = t & hpa_any, h & hpa_any
-        print(f"\n nTPM > {c}:")
+        print(f"\n nCPM > {c}:")
         print(f"  both filters keep            {len(tm & hm):>7}")
         print(f"  TISSUES only (HPA drops)     {len(tm - hm):>7}")
         print(f"  HPA only (TISSUES drops)     {len(hm - tm):>7}")

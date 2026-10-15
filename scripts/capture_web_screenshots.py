@@ -9,7 +9,7 @@ paper/figures/web/ for scripts/build_web_interface_figure.py.
                     cell clicked
   network, alphafold, cell_types, enrichment
                     the network page: P. falciparum in human at confidence 0.7, liver and
-                    20 nTPM, a link clicked for its AlphaFold models
+                    20 nCPM, a link clicked for its AlphaFold models
 
 Needs the app running and Playwright with Chromium, both in the streamlit environment:
 
@@ -138,7 +138,7 @@ def network_page(page, base, out):
     page.keyboard.press('Enter')
     page.keyboard.press('Escape')
     wait(page)
-    slide(page, 1, 19)   # cell-type expression 1 -> 20 nTPM
+    slide(page, 1, 19)   # cell-type expression 1 -> 20 nCPM
 
     # the AlphaFold dialog, before the captions go: the dialog's line on the STRING link is one
     frame = next(f for f in page.frames if 'ppi_network' in f.url)

@@ -32,7 +32,7 @@ KNOWN_PAIRS = [
 ]
 TOP_TERMS = 5
 # HPA's specificity rule: a gene is enhanced in a cell type where it is detected and its
-# nTPM is at least this many times the mean over the other cell types, here of one tissue
+# nCPM is at least this many times the mean over the other cell types, here of one tissue
 ENHANCED_FOLD = 4
 DETECTED = 1.0
 
@@ -40,9 +40,9 @@ DETECTED = 1.0
 def enhanced(annotation, tissue):
     '''The host proteins enhanced in each cell type of one tissue, as {cell type: set}.'''
     cells = annotation[annotation['Tissue'] == tissue].dropna(subset=['Cell type'])
-    ntpm = cells.groupby(['Gene', 'Cell type'])['nTPM'].max().unstack().fillna(0)
-    others = (ntpm.sum(axis=1).to_numpy()[:, None] - ntpm) / (ntpm.shape[1] - 1)
-    calls = (ntpm > DETECTED) & (ntpm >= ENHANCED_FOLD * others)
+    ncpm = cells.groupby(['Gene', 'Cell type'])['nCPM'].max().unstack().fillna(0)
+    others = (ncpm.sum(axis=1).to_numpy()[:, None] - ncpm) / (ncpm.shape[1] - 1)
+    calls = (ncpm > DETECTED) & (ncpm >= ENHANCED_FOLD * others)
 
     return {cell_type: set(calls.index[calls[cell_type]]) for cell_type in calls.columns}
 

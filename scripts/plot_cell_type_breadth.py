@@ -3,11 +3,11 @@ How broadly the predicted human interactors are expressed across the cell types 
 tissues they are predicted in, against every HPA gene detected in the same tissues.
 
 For each (human target, infected tissue) pair, the breadth is the share of the tissue's HPA
-cell types where the target's nTPM is above the cutoff; pairs the target is not detected in
+cell types where the target's nCPM is above the cutoff; pairs the target is not detected in
 at all, or whose tissue HPA does not cover, are left out, and the background is held to the
 same rule.
 
-Usage: .venv/bin/python scripts/plot_cell_type_breadth.py [--ntpm 1] [--output FILE]
+Usage: .venv/bin/python scripts/plot_cell_type_breadth.py [--ncpm 1] [--output FILE]
 '''
 import argparse
 import os
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import matplotlib.pyplot as plt
 import figure_style
 import utils
-from plot_hpa_ntpm_distribution import read_hpa_with_zeros
+from plot_hpa_ncpm_distribution import read_hpa_with_zeros
 
 PREDICTED_COLOR = '#2a78d6'
 BACKGROUND_COLOR = '#a8a79f'
@@ -50,7 +50,7 @@ def predicted_pairs(config):
 def breadth(hpa, cutoff):
     '''Per (gene, tissue): the share of the tissue's cell types expressing the gene.'''
     cell_types = hpa.groupby('Tissue')['Cell type'].nunique()
-    data = (hpa.assign(on=hpa['nTPM'] > cutoff)
+    data = (hpa.assign(on=hpa['nCPM'] > cutoff)
             .groupby(['Gene', 'Tissue'])['on'].sum().rename('n_on').reset_index())
     data['n_cell'] = data['Tissue'].map(cell_types)
     data['share'] = data['n_on'] / data['n_cell']
@@ -60,12 +60,12 @@ def breadth(hpa, cutoff):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    parser.add_argument('--ntpm', type=float, default=1.0)
+    parser.add_argument('--ncpm', type=float, default=1.0)
     parser.add_argument('--output', default='paper/figures/cell_type_breadth.pdf')
     args = parser.parse_args()
 
     config = utils.read_config(filepath='config.yml')
-    per_gene = breadth(read_hpa_with_zeros('config.yml'), args.ntpm)
+    per_gene = breadth(read_hpa_with_zeros('config.yml'), args.ncpm)
     per_gene = per_gene[per_gene['n_on'] > 0]
     pairs = predicted_pairs(config)
     predicted = pairs.merge(per_gene, on=['Gene', 'Tissue'])
@@ -91,7 +91,7 @@ def main():
             left.text(xi, value * 100 + 1, f'{value:.0%}', ha='center', va='bottom', fontsize=6,
                       color=INK_SECONDARY)
     left.set_xticks(x, BIN_LABELS)
-    left.set_xlabel(f"Share of the tissue's cell types\nexpressing the protein (nTPM > {args.ntpm:g})")
+    left.set_xlabel(f"Share of the tissue's cell types\nexpressing the protein (nCPM > {args.ncpm:g})")
     left.set_ylabel('% of (protein, tissue) pairs')
     fig.legend(*left.get_legend_handles_labels(), frameon=False, loc='upper center', ncol=2,
                bbox_to_anchor=(0.5, 1.04))

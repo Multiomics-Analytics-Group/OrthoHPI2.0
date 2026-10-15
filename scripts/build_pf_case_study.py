@@ -1,8 +1,9 @@
 '''
 One parasite in one host, narrowed as a funnel: the predicted links at or above a
 confidence score, the links of one tissue the parasite infects, and from those two
-branches, the links whose host protein is enhanced in one cell type of the tissue and
-those whose host protein is found in none of the parasite's other tissues. Draws the
+branches, the links whose host protein is expressed above a cutoff in one cell type of
+the tissue, or enhanced in it, and those whose host protein is found in none of the
+parasite's other tissues. Draws the
 network of each stage (A-D) the way the app draws it, the proteins and links going on to
 a later stage in their species colour and the rest muted, and (E) the host processes
 most enriched at each stage. The stages are those of scripts/explore_pf_case_study.py. Writes paper/figures/pf_case_study.svg/.png
@@ -87,9 +88,12 @@ def enrichment(staged, go_df):
     '''
     tests = {label: utils.calculate_enrichment(set(edges['target']), go_df)
              for label, edges in staged}
+    # a stage too small to test comes back without columns
+    tests = {label: test if not test.empty else pd.DataFrame(columns=['go_term', 'fdr_bh', 'A', 'nodes'])
+             for label, test in tests.items()}
     shown = []
     for label, test in tests.items():
-        significant = test[test['fdr_bh'] < FDR] if not test.empty else test
+        significant = test[test['fdr_bh'] < FDR]
         seen, picked = set(), 0
         for row in significant.itertuples():
             if picked == TERMS_PER_STAGE:
@@ -102,7 +106,9 @@ def enrichment(staged, go_df):
                 shown.append(row.go_term)
     frames = []
     for label, test in tests.items():
-        rows = test[test['go_term'].isin(shown) & (test['fdr_bh'] < FDR)] if not test.empty else test
+        rows = test[test['go_term'].isin(shown) & (test['fdr_bh'] < FDR)]
+        if rows.empty:
+            continue
         frames.append(pd.DataFrame({'term': rows['go_term'], 'stage': label,
                                     'fdr': rows['fdr_bh'], 'proteins': rows['A']}))
 
@@ -167,7 +173,7 @@ def node_labels(edges, descriptions):
         labels[protein] = name if description == 'uncharacterized' else (
             textwrap.fill(description if len(description) <= NODE_LABEL_CHARS
                           else description[:NODE_LABEL_CHARS - 1].rstrip() + '\u2026',
-                          NODE_LABEL_WRAP, break_on_hyphens=False, break_long_words=False))
+                          NODE_LABEL_WRAP, break_long_words=False))
 
     return labels
 
@@ -207,8 +213,9 @@ def two_row_layout(edges, row_width):
     '''
     Each connected component as two rows, its parasite proteins over its host proteins a
     unit apart, ordered so the links cross less; the components packed into rows of at
-    most row_width units, each in the first row with room, the largest first. Returns the
-    positions and the number of rows.
+    most row_width units, each in the first row with room, the largest first; a component
+    wider than that gets a row of its own. Returns the positions, the number of rows and
+    the width used.
     '''
     graph = nx.Graph()
     graph.add_edges_from(zip(edges['source'], edges['target']))
@@ -229,7 +236,7 @@ def two_row_layout(edges, row_width):
                 placed[node] = (x + (i + 0.5) * size / len(nodes_in_row), y + offset)
         filled[row] += size
 
-    return placed, len(filled)
+    return placed, len(filled), max(row_width, *filled)
 
 
 def draw_network(ax, edges, kept, labels, title, labelled, aspect, row_width=None):
@@ -241,7 +248,7 @@ def draw_network(ax, edges, kept, labels, title, labelled, aspect, row_width=Non
     graph = nx.Graph()
     graph.add_edges_from(zip(edges['source'], edges['target']))
     if labelled:
-        position, rows = two_row_layout(edges, row_width)
+        position, rows, row_width = two_row_layout(edges, row_width)
     else:
         position = packed_layout(graph, aspect, spread=0.3, gap=0.25)
     colors = dict(zip(edges['source'], edges['source_color']))
@@ -280,16 +287,25 @@ def draw_network(ax, edges, kept, labels, title, labelled, aspect, row_width=Non
         ax.margins(0.02)
     ax.axis('off')
     ax.set_title(title, loc='left', pad=13, fontsize=figure_style.TITLE)
+    hosts = edges['target'].nunique()
     ax.text(0, 1.0, f"{len(edges)} links, {edges['source'].nunique()} parasite, "
-            f"{edges['target'].nunique()} host proteins", transform=ax.transAxes,
+            f"{hosts} host protein{'' if hosts == 1 else 's'}", transform=ax.transAxes,
             ha='left', va='bottom', color='#555555')
+
+
+def labelled(edges):
+    '''Whether a stage is small enough to name its proteins.'''
+    return edges['source'].nunique() + edges['target'].nunique() <= MAX_LABELLED
 
 
 def draw(staged, terms, shown, labels, parasite_color, host_color, min_score, title,
          output_stem):
     figure_style.apply()
     width = figure_style.WIDTH
-    top_h, bottom_h = 2.2, 2.4
+    # the labelled networks take about an inch per row of components
+    top_h = 2.2
+    bottom_h = max([2.4] + [1.15 * two_row_layout(edges, width)[1] for width, (_, edges)
+                            in zip((5, 2), staged[2:]) if labelled(edges)])
     go_h = figure_style.ROW * len(shown) + 0.1
     gaps = [0.6, 0.6, 0.55, 0.65]
     height = top_h + bottom_h + go_h + sum(gaps) + 0.15
@@ -307,7 +323,7 @@ def draw(staged, terms, shown, labels, parasite_color, host_color, min_score, ti
         bounds = ax.get_position()
         draw_network(ax, edges, kept, labels,
                      f'{"ABCD"[i]}  {label.replace(chr(10), " ").replace("- ", "-")}',
-                     labelled=edges['source'].nunique() + edges['target'].nunique() <= MAX_LABELLED,
+                     labelled=labelled(edges),
                      aspect=bounds.width * width / (bounds.height * height),
                      row_width=max(1, round(bounds.width * width)))
     handles = [Line2D([], [], marker='D', linestyle='', markersize=4.5,
@@ -338,11 +354,12 @@ if __name__ == '__main__':
     parser.add_argument('--parasite', type=int, default=36329,
                         help='parasite taxid (default: Plasmodium falciparum)')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
-    parser.add_argument('--tissue', default='liver')
-    parser.add_argument('--cell-type', default='hepatocytes')
-    parser.add_argument('--min-ncpm', type=float,
-                        help='keep the host proteins expressed above this nCPM in the cell '
-                             'type, instead of those enhanced in it')
+    parser.add_argument('--tissue', default='blood')
+    parser.add_argument('--cell-type', default='erythrocytes')
+    parser.add_argument('--min-ncpm', type=float, default=1,
+                        help="keep the host proteins expressed above this nCPM in the cell "
+                             "type (default: 1, HPA's detection threshold); 0 keeps those "
+                             "enhanced in it instead")
     parser.add_argument('--min-score', type=float, default=0.7,
                         help='links below this confidence score are left out')
     parser.add_argument('--tables', default='paper/tables/pf_case_study',
@@ -353,7 +370,7 @@ if __name__ == '__main__':
 
     config = utils.read_config(filepath=args.config)
     staged, go_df = stages(config, args.data_dir, args.parasite, args.host, args.tissue,
-                           args.cell_type, args.min_score, args.min_ncpm)
+                           args.cell_type, args.min_score, args.min_ncpm or None)
     terms, shown = enrichment(staged, go_df)
     descriptions = pd.read_parquet(os.path.join(args.data_dir, 'protein_annotations.parquet')
                                    ).set_index('protein')['description']
@@ -370,7 +387,8 @@ if __name__ == '__main__':
     terms.assign(stage=terms['stage'].map(dict(zip([l for l, _ in staged], names)))
                  ).to_csv(f'{args.tables}_go.csv', index=False)
     pd.concat([edges.assign(stage=name) for name, (_, edges) in zip(names[2:], staged[2:])]
-              ).assign(parasite_label=lambda d: d['source'].map(labels))[
+              ).assign(parasite_label=lambda d: d['source'].map(labels).str.replace('-\n', '-')
+                       .str.replace('\n', ' '))[
         ['stage', 'source', 'source_name', 'parasite_label', 'target', 'target_name', 'weight']
     ].to_csv(f'{args.tables}_links.csv', index=False)
     print(counts.to_string(index=False))

@@ -82,7 +82,7 @@ figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_
 figures/case_study.svg figures/case_study.png tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
 	cd .. && $(PYTHON) scripts/build_case_study.py
 
-# The P. falciparum case study: the network narrowed to liver, hepatocytes and liver-only links.
+# The P. falciparum case study: the network narrowed to blood, erythrocytes and blood-only links.
 figures/pf_case_study.svg figures/pf_case_study.png tables/pf_case_study_funnel.csv tables/pf_case_study_go.csv tables/pf_case_study_links.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../scripts/build_pf_case_study.py ../scripts/explore_pf_case_study.py
 	cd .. && $(PYTHON) scripts/build_pf_case_study.py
 

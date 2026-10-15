@@ -3,15 +3,11 @@ term,stage,fdr,proteins
 "mRNA splicing, via spliceosome",All predicted,8.672577131699246e-75,80
 mRNA processing,All predicted,4.2130838059837615e-67,91
 RNA splicing,All predicted,4.586404973505e-67,86
-Sodium-independent organic anion transport,All predicted,2.622805533278546e-10,8
-ERBB2 signaling pathway,All predicted,0.004259642183634935,4
-"mRNA splicing, via spliceosome",Liver,1.558125810815477e-74,71
-"RNA splicing, via transesterification reactions with bulged adenosine as nucleophile",Liver,1.558125810815477e-74,71
-RNA splicing,Liver,4.893498368391627e-68,76
-mRNA processing,Liver,7.034976472321345e-67,79
-Sodium-independent organic anion transport,Liver,0.004953109386453946,3
-ERBB2 signaling pathway,Liver,0.015155598254339034,3
-Sodium-independent organic anion transport,Enhanced in hepatocytes,2.1236001782422077e-06,3
-ERBB2 signaling pathway,Enhanced in hepatocytes,0.00039470775286375186,2
-Positive regulation of muscle tissue development,Enhanced in hepatocytes,0.0004461252794602635,2
-Sodium-independent organic anion transport,Liver-only,4.3193647811593923e-05,2
+"mRNA splicing, via spliceosome",Blood,3.431295287386164e-67,62
+"RNA splicing, via transesterification reactions with bulged adenosine as nucleophile",Blood,3.431295287386164e-67,62
+RNA splicing,Blood,7.038495708583987e-60,65
+mRNA processing,Blood,3.170725676541055e-58,67
+"RNA splicing, via transesterification reactions with bulged adenosine as nucleophile","Erythrocytes, nCPM > 1",6.643763275339252e-26,28
+"mRNA splicing, via spliceosome","Erythrocytes, nCPM > 1",6.643763275339252e-26,28
+RNA splicing,"Erythrocytes, nCPM > 1",1.754017669151185e-22,29
+mRNA processing,"Erythrocytes, nCPM > 1",6.712402630919557e-22,30

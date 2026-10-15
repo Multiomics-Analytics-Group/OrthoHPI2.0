@@ -1,978 +1,206 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="1000"
-   height="470"
-   viewBox="0 0 1000 470"
-   font-family="Helvetica, Arial, sans-serif"
-   version="1.1"
-   id="svg103"
-   sodipodi:docname="workflow.svg"
-   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
-   inkscape:export-filename="workflow.png"
-   inkscape:export-xdpi="96"
-   inkscape:export-ydpi="96"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg">
-  <sodipodi:namedview
-     id="namedview103"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="0.91274794"
-     inkscape:cx="493.56452"
-     inkscape:cy="221.30973"
-     inkscape:window-width="1512"
-     inkscape:window-height="921"
-     inkscape:window-x="0"
-     inkscape:window-y="33"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg103" />
-  <defs
-     id="defs1">
-    <marker
-       id="arrow"
-       viewBox="0 0 10 10"
-       refX="8"
-       refY="5"
-       markerWidth="7"
-       markerHeight="7"
-       orient="auto">
-      <path
-         d="M 0 0 L 10 5 L 0 10 z"
-         fill="#8a8f98"
-         id="path1" />
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="562" viewBox="0 0 1000 562" font-family="Helvetica, Arial, sans-serif" version="1.1" id="svg103" sodipodi:docname="workflow.svg" inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)" inkscape:export-filename="workflow.png" inkscape:export-xdpi="96" inkscape:export-ydpi="96">
+  <sodipodi:namedview id="namedview103" pagecolor="#ffffff" bordercolor="#000000" borderopacity="0.25" inkscape:showpageshadow="2" inkscape:pageopacity="0.0" inkscape:pagecheckerboard="0" inkscape:deskcolor="#d1d1d1" inkscape:zoom="0.91274794" inkscape:cx="493.56452" inkscape:cy="221.30973" inkscape:window-width="1512" inkscape:window-height="921" inkscape:window-x="0" inkscape:window-y="33" inkscape:window-maximized="1" inkscape:current-layer="svg103" />
+  <defs id="defs1">
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a8f98" id="path1" />
     </marker>
     <!-- the step 1 nematode in grey: its body is not what the filter keeps -->
-    <filter
-       id="grey"
-       x="0"
-       y="0"
-       width="1"
-       height="1">
-      <feColorMatrix
-         type="saturate"
-         values="0"
-         id="feColorMatrix1" />
+    <filter id="grey" x="0" y="0" width="1" height="1">
+      <feColorMatrix type="saturate" values="0" id="feColorMatrix1" />
     </filter>
   </defs>
-  <style
-     id="style1">
+  <style id="style1">
     .step   { fill: #3a3f47; }
-    .stepno { fill: #fff; font-size: 12px; font-weight: bold; text-anchor: middle; }
-    .head   { fill: #222; font-size: 14px; font-weight: bold; text-anchor: middle; }
-    .lbl    { fill: #222; font-size: 12px; text-anchor: middle; }
-    .src    { fill: #8a8f98; font-size: 10px; letter-spacing: 0.5px; text-anchor: middle; }
-    .note   { fill: #555; font-size: 10.5px; font-style: italic; text-anchor: middle; }
-    .leg    { fill: #444; font-size: 10.5px; }
-    .lane   { font-size: 13px; font-weight: bold; letter-spacing: 3px; text-anchor: middle; }
+    .stepno { fill: #fff; font-size: 15px; font-weight: bold; text-anchor: middle; }
+    .head   { fill: #222; font-size: 17px; font-weight: bold; text-anchor: middle; }
+    .lbl    { fill: #222; font-size: 16px; text-anchor: middle; }
+    .src    { fill: #8a8f98; font-size: 16px; letter-spacing: 0.5px; text-anchor: middle; }
+    .note   { fill: #555; font-size: 16px; font-style: italic; text-anchor: middle; }
+    .leg    { fill: #444; font-size: 16px; }
+    .lane   { font-size: 18px; font-weight: bold; letter-spacing: 3px; text-anchor: middle; }
     .flow   { fill: none; stroke: #8a8f98; stroke-width: 2; marker-end: url(#arrow); }
   </style>
   <!-- lane labels -->
-  <text
-     class="lane"
-     fill="#0072b2"
-     transform="rotate(-90)"
-     id="text1"
-     x="-140"
-     y="20">Host</text>
-  <text
-     class="lane"
-     fill="#6a3d9a"
-     transform="rotate(-90)"
-     id="text2"
-     x="-356"
-     y="20">Parasite</text>
+  <text class="lane" fill="#0072b2" transform="rotate(-90)" id="text1" x="-158" y="20">Host</text>
+  <text class="lane" fill="#6a3d9a" transform="rotate(-90)" id="text2" x="-436" y="20">Parasite</text>
   <!-- step headers -->
-  <g
-     id="g12">
-    <circle
-       class="step"
-       cx="110"
-       cy="26"
-       r="11"
-       id="circle2" />
-    <text
-       class="stepno"
-       x="110"
-       y="30"
-       id="text3">1</text>
-    <text
-       class="head"
-       x="110"
-       y="58"
-       id="text4">Proteomes</text>
-    <circle
-       class="step"
-       cx="290"
-       cy="26"
-       r="11"
-       id="circle4" />
-    <text
-       class="stepno"
-       x="290"
-       y="30"
-       id="text5">2</text>
-    <text
-       class="head"
-       x="290"
-       y="51"
-       id="text6">Tissue expression<tspan
-   x="290"
-   dy="16"
-   id="tspan5">filter</tspan></text>
-    <circle
-       class="step"
-       cx="472"
-       cy="26"
-       r="11"
-       id="circle6" />
-    <text
-       class="stepno"
-       x="472"
-       y="30"
-       id="text7">3</text>
-    <text
-       class="head"
-       x="472"
-       y="51"
-       id="text8">Subcellular localisation<tspan
-   x="472"
-   dy="16"
-   id="tspan7">filter</tspan></text>
-    <circle
-       class="step"
-       cx="680"
-       cy="26"
-       r="11"
-       id="circle8" />
-    <text
-       class="stepno"
-       x="680"
-       y="30"
-       id="text9">4</text>
-    <text
-       class="head"
-       x="680"
-       y="58"
-       id="text10">Orthology transfer</text>
-    <circle
-       class="step"
-       cx="900"
-       cy="26"
-       r="11"
-       id="circle10" />
-    <text
-       class="stepno"
-       x="900"
-       y="30"
-       id="text11">5</text>
-    <text
-       class="head"
-       x="900"
-       y="58"
-       id="text12">Predicted PPIs</text>
+  <g id="g12">
+    <circle class="step" cx="110" cy="26" r="13" id="circle2" />
+    <text class="stepno" x="110" y="31" id="text3">1</text>
+    <text class="head" x="110" y="58" id="text4">Proteomes</text>
+    <circle class="step" cx="290" cy="26" r="13" id="circle4" />
+    <text class="stepno" x="290" y="31" id="text5">2</text>
+    <text class="head" x="290" y="50" id="text6">Tissue expression<tspan x="290" dy="19">filter</tspan></text>
+    <circle class="step" cx="472" cy="26" r="13" id="circle6" />
+    <text class="stepno" x="472" y="31" id="text7">3</text>
+    <text class="head" x="472" y="50" id="text8">Subcellular<tspan x="472" dy="19">localisation filter</tspan></text>
+    <circle class="step" cx="680" cy="26" r="13" id="circle8" />
+    <text class="stepno" x="680" y="31" id="text9">4</text>
+    <text class="head" x="680" y="58" id="text10">Orthology transfer</text>
+    <circle class="step" cx="900" cy="26" r="13" id="circle10" />
+    <text class="stepno" x="900" y="31" id="text11">5</text>
+    <text class="head" x="900" y="58" id="text12">Predicted PPIs</text>
   </g>
   <!-- ===== 1. Proteomes ===== -->
   <!-- hosts: human, pig, rat, mouse (BioRender) -->
-  <g
-     id="g15">
-    <image
-       xlink:href="../../biorender/human.png"
-       x="34"
-       y="88"
-       width="52"
-       height="93"
-       id="image12" />
-    <image
-       xlink:href="../../biorender/pig.png"
-       x="100"
-       y="88"
-       width="80"
-       height="42.6"
-       id="image13" />
-    <image
-       xlink:href="../../biorender/rat.png"
-       x="90"
-       y="144"
-       width="58"
-       height="31.7"
-       id="image14" />
-    <image
-       xlink:href="../../biorender/mouse.png"
-       x="148"
-       y="152"
-       width="40"
-       height="20"
-       id="image15" />
-  </g>
-  <text
-     class="lbl"
-     x="110"
-     y="200"
-     id="text15">Host proteome</text>
-  <text
-     class="note"
-     x="110"
-     y="214"
-     id="text16">human, mouse, rat, pig</text>
-  <image
-     xlink:href="../../images/logos/string.png"
-     x="77.6"
-     y="222"
-     width="64.8"
-     height="16"
-     id="image16" />
+  <g transform="translate(0 18)"><g id="g15">
+    <image xlink:href="../../biorender/human.png" x="34" y="88" width="52" height="93" id="image12" />
+    <image xlink:href="../../biorender/pig.png" x="100" y="88" width="80" height="42.6" id="image13" />
+    <image xlink:href="../../biorender/rat.png" x="90" y="144" width="58" height="31.7" id="image14" />
+    <image xlink:href="../../biorender/mouse.png" x="148" y="152" width="40" height="20" id="image15" />
+  </g></g>
+  <g transform="translate(0 18)"><text class="lbl" x="110" y="216.0" id="text15">Host proteome</text></g>
+  <g transform="translate(0 18)"><text class="note" x="110" y="235.0" id="text16">human, mouse, rat, pig</text></g>
+  <g transform="translate(0 18)"><image xlink:href="../../images/logos/string.png" x="77.6" y="243.0" width="64.8" height="16" id="image16" /></g>
   <!-- parasites: nematode, schistosome, trypanosome, Plasmodium (BioRender) -->
-  <g
-     id="g20">
-    <image
-       xlink:href="../../biorender/nematode.png"
-       x="30"
-       y="318"
-       width="56"
-       height="36.1"
-       id="image17" />
-    <image
-       xlink:href="../../biorender/schistosoma.png"
-       x="94"
-       y="314"
-       width="39.6"
-       height="54.9"
-       id="image18" />
-    <image
-       xlink:href="../../biorender/tripanosoma.png"
-       x="140"
-       y="316"
-       width="44.3"
-       height="51.9"
-       id="image19" />
-    <image
-       xlink:href="../../biorender/plasmodium.png"
-       x="30"
-       y="364"
-       width="72"
-       height="12.9"
-       id="image20" />
-  </g>
-  <text
-     class="lbl"
-     x="110"
-     y="410"
-     id="text20">Parasite proteome</text>
-  <text
-     class="note"
-     x="110"
-     y="424"
-     id="text21">45 species</text>
-  <image
-     xlink:href="../../images/logos/string.png"
-     x="77.6"
-     y="432"
-     width="64.8"
-     height="16"
-     id="image21" />
+  <g transform="translate(0 80)"><g id="g20">
+    <image xlink:href="../../biorender/nematode.png" x="30" y="318" width="56" height="36.1" id="image17" />
+    <image xlink:href="../../biorender/schistosoma.png" x="94" y="314" width="39.6" height="54.9" id="image18" />
+    <image xlink:href="../../biorender/tripanosoma.png" x="140" y="316" width="44.3" height="51.9" id="image19" />
+    <image xlink:href="../../biorender/plasmodium.png" x="30" y="364" width="72" height="12.9" id="image20" />
+  </g></g>
+  <g transform="translate(0 80)"><text class="lbl" x="110" y="424.0" id="text20">Parasite proteome</text></g>
+  <g transform="translate(0 80)"><text class="note" x="110" y="443.0" id="text21">45 species</text></g>
+  <g transform="translate(0 80)"><image xlink:href="../../images/logos/string.png" x="77.6" y="451.0" width="64.8" height="16" id="image21" /></g>
   <!-- ===== 2. Tissue expression (host only) ===== -->
-  <path
-     class="flow"
-     d="M 188 140 H 236"
-     id="path21" />
+  <g transform="translate(0 18)"><path class="flow" d="M 188 140 H 236" id="path21" /></g>
   <!-- the app's body figure, from scripts/build_workflow_body.py -->
-  <image
-     xlink:href="workflow_body.svg"
-     x="258"
-     y="80"
-     width="64"
-     height="113.7"
-     id="image22" />
-  <text
-     class="lbl"
-     x="290"
-     y="200"
-     id="text22">expressed in the</text>
-  <text
-     class="lbl"
-     x="290"
-     y="214"
-     id="text23">tissues the parasite infects</text>
-  <image
-     xlink:href="../../images/logos/tissues.png"
-     x="257.2"
-     y="224"
-     width="65.7"
-     height="12"
-     id="image23" />
+  <g transform="translate(0 18)"><image xlink:href="workflow_body.svg" x="258" y="80" width="64" height="113.7" id="image22" /></g>
+  <g transform="translate(0 18)"><text class="lbl" x="290" y="216.0" id="text22">expressed in the</text></g>
+  <g transform="translate(0 18)"><text class="lbl" x="290" y="235.0" id="text23">infected tissues</text></g>
+  <g transform="translate(0 18)"><image xlink:href="../../images/logos/tissues.png" x="257.2" y="246.0" width="65.7" height="12" id="image23" /></g>
   <!-- parasite proteome is not filtered by tissue -->
-  <path
-     class="flow"
-     d="M 192 352 H 404"
-     id="path23" />
+  <g transform="translate(0 80)"><path class="flow" d="M 192 352 H 380" id="path23" /></g>
   <!-- ===== 3. Localisation ===== -->
-  <path
-     class="flow"
-     d="M 344 140 H 404"
-     id="path24" />
+  <g transform="translate(0 18)"><path class="flow" d="M 344 140 H 380" id="path24" /></g>
   <!-- host cell, intracellular parasite: every compartment it can reach -->
-  <g
-     transform="translate(440 138)"
-     id="g28">
-    <circle
-       r="24"
-       fill="#cfe3f1"
-       stroke="#0072B2"
-       stroke-width="3"
-       id="circle24" />
-    <circle
-       cx="-5"
-       cy="-4"
-       r="9"
-       fill="#7fb2d9"
-       id="circle25" />
-    <path
-       d="M 4 9 C 8 4 14 4 17 6 C 13 9 8 11 4 9 Z"
-       fill="#6a3d9a"
-       id="path25" />
-    <circle
-       cx="-30"
-       cy="-12"
-       r="2.6"
-       fill="#0072B2"
-       id="circle26" />
-    <circle
-       cx="27"
-       cy="-20"
-       r="2.6"
-       fill="#0072B2"
-       id="circle27" />
-    <circle
-       cx="-22"
-       cy="26"
-       r="2.6"
-       fill="#0072B2"
-       id="circle28" />
-  </g>
-  <text
-     class="note"
-     x="440"
-     y="182"
-     id="text28">intracellular</text>
+  <g transform="translate(0 18)"><g transform="translate(416 138)" id="g28">
+    <circle r="24" fill="#cfe3f1" stroke="#0072B2" stroke-width="3" id="circle24" />
+    <circle cx="-5" cy="-4" r="9" fill="#7fb2d9" id="circle25" />
+    <path d="M 4 9 C 8 4 14 4 17 6 C 13 9 8 11 4 9 Z" fill="#6a3d9a" id="path25" />
+    <circle cx="-30" cy="-12" r="2.6" fill="#0072B2" id="circle26" />
+    <circle cx="27" cy="-20" r="2.6" fill="#0072B2" id="circle27" />
+    <circle cx="-22" cy="26" r="2.6" fill="#0072B2" id="circle28" />
+  </g></g>
+  <g transform="translate(0 18)"><text class="note" x="416" y="188.0" id="text28">intracellular</text></g>
   <!-- host cell, extracellular parasite: surface and secreted only -->
-  <g
-     transform="translate(508 138)"
-     id="g33">
-    <circle
-       r="24"
-       fill="#f1f1f1"
-       stroke="#0072B2"
-       stroke-width="3"
-       id="circle29" />
-    <circle
-       cx="-5"
-       cy="-4"
-       r="9"
-       fill="#d9d9d9"
-       id="circle30" />
-    <circle
-       cx="-28"
-       cy="18"
-       r="2.6"
-       fill="#0072B2"
-       id="circle31" />
-    <circle
-       cx="28"
-       cy="-16"
-       r="2.6"
-       fill="#0072B2"
-       id="circle32" />
-    <circle
-       cx="-18"
-       cy="-28"
-       r="2.6"
-       fill="#0072B2"
-       id="circle33" />
-    <path
-       d="M 28 30 c 4 -6 8 4 12 -2"
-       fill="none"
-       stroke="#6a3d9a"
-       stroke-width="3"
-       stroke-linecap="round"
-       id="path33" />
-  </g>
-  <text
-     class="note"
-     x="508"
-     y="182"
-     id="text33">extracellular</text>
-  <text
-     class="lbl"
-     x="472"
-     y="200"
-     id="text34">compartments the</text>
-  <text
-     class="lbl"
-     x="472"
-     y="214"
-     id="text35">parasite can reach</text>
-  <text
-     class="src"
-     x="472"
-     y="232"
-     id="text36">DeepLoc 2.1</text>
+  <g transform="translate(0 18)"><g transform="translate(532 138)" id="g33">
+    <circle r="24" fill="#f1f1f1" stroke="#0072B2" stroke-width="3" id="circle29" />
+    <circle cx="-5" cy="-4" r="9" fill="#d9d9d9" id="circle30" />
+    <circle cx="-28" cy="18" r="2.6" fill="#0072B2" id="circle31" />
+    <circle cx="28" cy="-16" r="2.6" fill="#0072B2" id="circle32" />
+    <circle cx="-18" cy="-28" r="2.6" fill="#0072B2" id="circle33" />
+    <path d="M 28 30 c 4 -6 8 4 12 -2" fill="none" stroke="#6a3d9a" stroke-width="3" stroke-linecap="round" id="path33" />
+  </g></g>
+  <g transform="translate(0 18)"><text class="note" x="532" y="188.0" id="text33">extracellular</text></g>
+  <g transform="translate(0 18)"><text class="lbl" x="472" y="216.0" id="text34">compartments the</text></g>
+  <g transform="translate(0 18)"><text class="lbl" x="472" y="235.0" id="text35">parasite can reach</text></g>
+  <g transform="translate(0 18)"><text class="src" x="472" y="259.0" id="text36">DeepLoc 2.1</text></g>
   <!-- parasite, unicellular: surface and secreted -->
-  <g
-     transform="translate(440 352)"
-     id="g39">
-    <ellipse
-       rx="22"
-       ry="17"
-       fill="#f1f1f1"
-       stroke="#6a3d9a"
-       stroke-width="3"
-       id="ellipse36" />
-    <circle
-       cx="-4"
-       cy="-2"
-       r="7"
-       fill="#d9d9d9"
-       id="circle36" />
-    <circle
-       cx="-28"
-       cy="-10"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle37" />
-    <circle
-       cx="26"
-       cy="-16"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle38" />
-    <circle
-       cx="20"
-       cy="22"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle39" />
-  </g>
-  <text
-     class="note"
-     x="440"
-     y="392"
-     id="text39">unicellular</text>
+  <g transform="translate(0 80)"><g transform="translate(416 352)" id="g39">
+    <ellipse rx="22" ry="17" fill="#f1f1f1" stroke="#6a3d9a" stroke-width="3" id="ellipse36" />
+    <circle cx="-4" cy="-2" r="7" fill="#d9d9d9" id="circle36" />
+    <circle cx="-28" cy="-10" r="2.6" fill="#6a3d9a" id="circle37" />
+    <circle cx="26" cy="-16" r="2.6" fill="#6a3d9a" id="circle38" />
+    <circle cx="20" cy="22" r="2.6" fill="#6a3d9a" id="circle39" />
+  </g></g>
+  <g transform="translate(0 80)"><text class="note" x="416" y="397.0" id="text39">unicellular</text></g>
   <!-- parasite, multicellular: secreted only -->
-  <g
-     transform="translate(508 352)"
-     id="g43">
-    <image
-       xlink:href="../../biorender/nematode.png"
-       x="-24"
-       y="-15"
-       width="48"
-       height="30.9"
-       filter="url(#grey)"
-       opacity="0.55"
-       id="image39" />
-    <circle
-       cx="-16"
-       cy="-14"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle40" />
-    <circle
-       cx="10"
-       cy="-20"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle41" />
-    <circle
-       cx="-4"
-       cy="20"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle42" />
-    <circle
-       cx="24"
-       cy="14"
-       r="2.6"
-       fill="#6a3d9a"
-       id="circle43" />
-  </g>
-  <text
-     class="note"
-     x="508"
-     y="392"
-     id="text43">multicellular</text>
-  <text
-     class="lbl"
-     x="472"
-     y="410"
-     id="text44">secreted or on</text>
-  <text
-     class="lbl"
-     x="472"
-     y="424"
-     id="text45">the parasite surface</text>
-  <text
-     class="src"
-     x="472"
-     y="442"
-     id="text46">DeepLoc 2.1</text>
+  <g transform="translate(0 80)"><g transform="translate(532 352)" id="g43">
+    <image xlink:href="../../biorender/nematode.png" x="-24" y="-15" width="48" height="30.9" filter="url(#grey)" opacity="0.55" id="image39" />
+    <circle cx="-16" cy="-14" r="2.6" fill="#6a3d9a" id="circle40" />
+    <circle cx="10" cy="-20" r="2.6" fill="#6a3d9a" id="circle41" />
+    <circle cx="-4" cy="20" r="2.6" fill="#6a3d9a" id="circle42" />
+    <circle cx="24" cy="14" r="2.6" fill="#6a3d9a" id="circle43" />
+  </g></g>
+  <g transform="translate(0 80)"><text class="note" x="532" y="397.0" id="text43">multicellular</text></g>
+  <g transform="translate(0 80)"><text class="lbl" x="472" y="424.0" id="text44">secreted or on</text></g>
+  <g transform="translate(0 80)"><text class="lbl" x="472" y="443.0" id="text45">the parasite surface</text></g>
+  <g transform="translate(0 80)"><text class="src" x="472" y="466.0" id="text46">DeepLoc 2.1</text></g>
   <!-- ===== 4. Orthology transfer ===== -->
-  <path
-     class="flow"
-     d="M 544 140 H 612"
-     id="path46" />
-  <path
-     class="flow"
-     d="M 544 352 H 612"
-     id="path47" />
+  <g transform="translate(0 18)"><path class="flow" d="M 568 140 H 612" id="path46" /></g>
+  <g transform="translate(0 80)"><path class="flow" d="M 568 352 H 612" id="path47" /></g>
   <!-- the STRING link between the two orthologous groups -->
-  <path
-     d="M 630 162 C 596 210 596 282 630 330"
-     fill="none"
-     stroke="#b8bcc2"
-     stroke-width="7"
-     stroke-linecap="round"
-     id="path48" />
-  <ellipse
-     cx="680"
-     cy="140"
-     rx="62"
-     ry="28"
-     fill="#eef5fb"
-     stroke="#0072B2"
-     stroke-width="1.2"
-     stroke-dasharray="4 3"
-     id="ellipse48" />
-  <ellipse
-     cx="680"
-     cy="352"
-     rx="62"
-     ry="28"
-     fill="#f0ecf5"
-     stroke="#6a3d9a"
-     stroke-width="1.2"
-     stroke-dasharray="4 3"
-     id="ellipse49" />
+  <path d="M 630 180 C 596 238 596 352 630 410" fill="none" stroke="#b8bcc2" stroke-width="7" stroke-linecap="round" id="path48" />
+  <g transform="translate(0 18)"><ellipse cx="680" cy="140" rx="62" ry="28" fill="#eef5fb" stroke="#0072B2" stroke-width="1.2" stroke-dasharray="4 3" id="ellipse48" /></g>
+  <g transform="translate(0 80)"><ellipse cx="680" cy="352" rx="62" ry="28" fill="#f0ecf5" stroke="#6a3d9a" stroke-width="1.2" stroke-dasharray="4 3" id="ellipse49" /></g>
   <!-- the link transferred to the member proteins left after the filters -->
-  <g
-     stroke="#3a3f47"
-     stroke-width="1.1"
-     stroke-dasharray="3 3"
-     id="g54">
-    <line
-       x1="650"
-       y1="140"
-       x2="660"
-       y2="350"
-       id="line49" />
-    <line
-       x1="650"
-       y1="140"
-       x2="690"
-       y2="358"
-       id="line50" />
-    <line
-       x1="675"
-       y1="130"
-       x2="660"
-       y2="350"
-       id="line51" />
-    <line
-       x1="675"
-       y1="130"
-       x2="690"
-       y2="358"
-       id="line52" />
-    <line
-       x1="700"
-       y1="144"
-       x2="660"
-       y2="350"
-       id="line53" />
-    <line
-       x1="700"
-       y1="144"
-       x2="690"
-       y2="358"
-       id="line54" />
+  <g stroke="#3a3f47" stroke-width="1.1" stroke-dasharray="3 3" id="g54">
+    <line x1="650" y1="158.0" x2="660" y2="430.0" id="line49" />
+    <line x1="650" y1="158.0" x2="690" y2="438.0" id="line50" />
+    <line x1="675" y1="148.0" x2="660" y2="430.0" id="line51" />
+    <line x1="675" y1="148.0" x2="690" y2="438.0" id="line52" />
+    <line x1="700" y1="162.0" x2="660" y2="430.0" id="line53" />
+    <line x1="700" y1="162.0" x2="690" y2="438.0" id="line54" />
   </g>
-  <circle
-     cx="650"
-     cy="140"
-     r="6"
-     fill="#0072B2"
-     id="circle54" />
-  <circle
-     cx="675"
-     cy="130"
-     r="6"
-     fill="#0072B2"
-     id="circle55" />
-  <circle
-     cx="700"
-     cy="144"
-     r="6"
-     fill="#0072B2"
-     id="circle56" />
-  <circle
-     cx="722"
-     cy="132"
-     r="6"
-     fill="#cfcfcf"
-     id="circle57" />
-  <rect
-     x="-5" y="-5" width="10" height="10"
-     transform="translate(660 350) rotate(45)"
-     fill="#6a3d9a"
-     id="circle58" />
-  <rect
-     x="-5" y="-5" width="10" height="10"
-     transform="translate(690 358) rotate(45)"
-     fill="#6a3d9a"
-     id="circle59" />
-  <rect
-     x="-5" y="-5" width="10" height="10"
-     transform="translate(716 344) rotate(45)"
-     fill="#cfcfcf"
-     id="circle60" />
+  <g transform="translate(0 18)"><circle cx="650" cy="140" r="6" fill="#0072B2" id="circle54" /></g>
+  <g transform="translate(0 18)"><circle cx="675" cy="130" r="6" fill="#0072B2" id="circle55" /></g>
+  <g transform="translate(0 18)"><circle cx="700" cy="144" r="6" fill="#0072B2" id="circle56" /></g>
+  <g transform="translate(0 18)"><circle cx="722" cy="132" r="6" fill="#cfcfcf" id="circle57" /></g>
+  <g transform="translate(0 80)"><rect x="-5" y="-5" width="10" height="10" transform="translate(660 350) rotate(45)" fill="#6a3d9a" id="circle58" /></g>
+  <g transform="translate(0 80)"><rect x="-5" y="-5" width="10" height="10" transform="translate(690 358) rotate(45)" fill="#6a3d9a" id="circle59" /></g>
+  <g transform="translate(0 80)"><rect x="-5" y="-5" width="10" height="10" transform="translate(716 344) rotate(45)" fill="#cfcfcf" id="circle60" /></g>
   <!-- white backing so the labels read over the transferred links -->
-  <text
-     class="note"
-     x="677.80878"
-     y="107.11732"
-     id="text62">host orthologous group</text>
-  <text
-     class="note"
-     x="673.42645"
-     y="391.97827"
-     id="text63">parasite orthologous group</text>
-  <image
-     xlink:href="../../images/logos/eggnog.png"
-     x="698.32538"
-     y="234.71323"
-     width="69.599998"
-     height="16"
-     id="image63" />
-  <image
-     xlink:href="../../images/logos/string.png"
-     x="700.74707"
-     y="253.3383"
-     width="64.800003"
-     height="16"
-     id="image64" />
+  <g transform="translate(0 18)"><text class="note" x="677.80878" y="107.11732" id="text62">host orthologous group</text></g>
+  <g transform="translate(0 80)"><text class="note" x="706" y="405.0" id="text63">parasite orthologous group</text></g>
+  <g transform="translate(0 49)"><image xlink:href="../../images/logos/eggnog.png" x="698.32538" y="234.71323" width="69.599998" height="16" id="image63" /></g>
+  <g transform="translate(0 49)"><image xlink:href="../../images/logos/string.png" x="700.74707" y="253.3383" width="64.800003" height="16" id="image64" /></g>
   <!-- legend -->
-  <g
-     transform="translate(596 404)"
-     id="g66">
-    <text
-       class="leg"
-       x="-102.94909"
-       y="-140.61824"
-       id="text64"
-       style="white-space:pre;inline-size:88.0473;display:inline"
-       dx="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-       transform="translate(30,-12)"
-       xml:space="preserve"><tspan
-         x="-102.94909"
-         y="-140.61824"
-         id="tspan1">STRING link </tspan><tspan
-         x="-102.94909"
-         y="-127.49325"
-         id="tspan2">between groups</tspan></text>
-    <line
-       x1="0"
-       y1="18"
-       x2="24"
-       y2="18"
-       stroke="#3a3f47"
-       stroke-width="1.1"
-       stroke-dasharray="3 3"
-       id="line65" />
-    <text
-       class="leg"
-       x="34"
-       y="22"
-       id="text65">transferred to the member proteins</text>
-    <circle
-       cx="6"
-       cy="36"
-       r="5"
-       fill="#cfcfcf"
-       id="circle65" />
-    <rect
-       x="-4" y="-4" width="8" height="8"
-       transform="translate(20 36) rotate(45)"
-       fill="#cfcfcf"
-       id="rect65" />
-    <text
-       class="leg"
-       x="34"
-       y="40"
-       id="text66">member removed by the filters</text>
-  </g>
+  <g transform="translate(0 80)"><g transform="translate(596 404)" id="g66">
+    <text class="leg" x="-6" y="-155.0" id="text64" style="text-anchor:end">STRING link<tspan x="-6" dy="19">between groups</tspan></text>
+    <line x1="0" y1="34" x2="24" y2="34" stroke="#3a3f47" stroke-width="1.1" stroke-dasharray="3 3" id="line65" />
+    <text class="leg" x="34" y="39.0" id="text65">transferred to the member proteins</text>
+    <circle cx="6" cy="58" r="5" fill="#cfcfcf" id="circle65" />
+    <rect x="-4" y="-4" width="8" height="8" transform="translate(20 58) rotate(45)" fill="#cfcfcf" id="rect65" />
+    <text class="leg" x="34" y="63.0" id="text66">member removed by the filters</text>
+  </g></g>
   <!-- ===== 5. Predicted host-parasite PPIs ===== -->
-  <path
-     class="flow"
-     d="M 778 246 H 828"
-     id="path66" />
+  <g transform="translate(0 49)"><path class="flow" d="M 778 246 H 828" id="path66" /></g>
   <!-- drawn as the networks of Figure 9: parasite proteins as diamonds, host proteins
        as circles, link width by confidence score -->
-  <g
-     stroke="#c7cfd9"
-     stroke-linecap="round"
-     id="g83">
-    <line
-       x1="870"
-       y1="198"
-       x2="846"
-       y2="186"
-       stroke-width="3.20"
-       id="line66" />
-    <line
-       x1="870"
-       y1="198"
-       x2="850"
-       y2="214"
-       stroke-width="1.60"
-       id="line67" />
-    <line
-       x1="870"
-       y1="198"
-       x2="862"
-       y2="172"
-       stroke-width="2.16"
-       id="line68" />
-    <line
-       x1="870"
-       y1="198"
-       x2="888"
-       y2="176"
-       stroke-width="2.80"
-       id="line69" />
-    <line
-       x1="870"
-       y1="198"
-       x2="860"
-       y2="222"
-       stroke-width="1.36"
-       id="line70" />
-    <line
-       x1="870"
-       y1="198"
-       x2="892"
-       y2="214"
-       stroke-width="2.64"
-       id="line71" />
-    <line
-       x1="914"
-       y1="232"
-       x2="892"
-       y2="214"
-       stroke-width="1.84"
-       id="line72" />
-    <line
-       x1="914"
-       y1="232"
-       x2="938"
-       y2="220"
-       stroke-width="3.36"
-       id="line73" />
-    <line
-       x1="914"
-       y1="232"
-       x2="934"
-       y2="254"
-       stroke-width="1.52"
-       id="line74" />
-    <line
-       x1="914"
-       y1="232"
-       x2="906"
-       y2="258"
-       stroke-width="2.40"
-       id="line75" />
-    <line
-       x1="914"
-       y1="232"
-       x2="930"
-       y2="200"
-       stroke-width="2.00"
-       id="line76" />
-    <line
-       x1="946"
-       y1="176"
-       x2="930"
-       y2="200"
-       stroke-width="2.96"
-       id="line77" />
-    <line
-       x1="946"
-       y1="176"
-       x2="962"
-       y2="156"
-       stroke-width="1.68"
-       id="line78" />
-    <line
-       x1="946"
-       y1="176"
-       x2="968"
-       y2="190"
-       stroke-width="2.32"
-       id="line79" />
-    <line
-       x1="946"
-       y1="176"
-       x2="938"
-       y2="150"
-       stroke-width="1.28"
-       id="line80" />
-    <line
-       x1="872"
-       y1="286"
-       x2="850"
-       y2="274"
-       stroke-width="3.52"
-       id="line81" />
-    <line
-       x1="872"
-       y1="286"
-       x2="852"
-       y2="302"
-       stroke-width="2.00"
-       id="line82" />
-    <line
-       x1="872"
-       y1="286"
-       x2="894"
-       y2="298"
-       stroke-width="1.44"
-       id="line83" />
-  </g>
-  <g
-     fill="#bddaeb"
-     stroke="#0072B2"
-     stroke-width="1.2"
-     id="g98">
-    <circle
-       cx="846"
-       cy="186"
-       r="5"
-       id="circle83" />
-    <circle
-       cx="850"
-       cy="214"
-       r="5"
-       id="circle84" />
-    <circle
-       cx="862"
-       cy="172"
-       r="5"
-       id="circle85" />
-    <circle
-       cx="888"
-       cy="176"
-       r="5"
-       id="circle86" />
-    <circle
-       cx="860"
-       cy="222"
-       r="5"
-       id="circle87" />
-    <circle
-       cx="892"
-       cy="214"
-       r="5"
-       id="circle88" />
-    <circle
-       cx="938"
-       cy="220"
-       r="5"
-       id="circle89" />
-    <circle
-       cx="934"
-       cy="254"
-       r="5"
-       id="circle90" />
-    <circle
-       cx="906"
-       cy="258"
-       r="5"
-       id="circle91" />
-    <circle
-       cx="930"
-       cy="200"
-       r="5"
-       id="circle92" />
-    <circle
-       cx="962"
-       cy="156"
-       r="5"
-       id="circle93" />
-    <circle
-       cx="968"
-       cy="190"
-       r="5"
-       id="circle94" />
-    <circle
-       cx="938"
-       cy="150"
-       r="5"
-       id="circle95" />
-    <circle
-       cx="850"
-       cy="274"
-       r="5"
-       id="circle96" />
-    <circle
-       cx="852"
-       cy="302"
-       r="5"
-       id="circle97" />
-    <circle
-       cx="894"
-       cy="298"
-       r="5"
-       id="circle98" />
-  </g>
-  <g
-     fill="#d8cde5"
-     stroke="#6a3d9a"
-     stroke-width="1.3"
-     id="g101">
-    <rect
-       x="-5.5"
-       y="-5.5"
-       width="11"
-       height="11"
-       transform="translate(870 198) rotate(45)"
-       id="rect98" />
-    <rect
-       x="-5.5"
-       y="-5.5"
-       width="11"
-       height="11"
-       transform="translate(914 232) rotate(45)"
-       id="rect99" />
-    <rect
-       x="-5.5"
-       y="-5.5"
-       width="11"
-       height="11"
-       transform="translate(946 176) rotate(45)"
-       id="rect100" />
-    <rect
-       x="-5.5"
-       y="-5.5"
-       width="11"
-       height="11"
-       transform="translate(872 286) rotate(45)"
-       id="rect101" />
-  </g>
+  <g transform="translate(0 49)"><g stroke="#c7cfd9" stroke-linecap="round" id="g83">
+    <line x1="870" y1="198" x2="846" y2="186" stroke-width="3.20" id="line66" />
+    <line x1="870" y1="198" x2="850" y2="214" stroke-width="1.60" id="line67" />
+    <line x1="870" y1="198" x2="862" y2="172" stroke-width="2.16" id="line68" />
+    <line x1="870" y1="198" x2="888" y2="176" stroke-width="2.80" id="line69" />
+    <line x1="870" y1="198" x2="860" y2="222" stroke-width="1.36" id="line70" />
+    <line x1="870" y1="198" x2="892" y2="214" stroke-width="2.64" id="line71" />
+    <line x1="914" y1="232" x2="892" y2="214" stroke-width="1.84" id="line72" />
+    <line x1="914" y1="232" x2="938" y2="220" stroke-width="3.36" id="line73" />
+    <line x1="914" y1="232" x2="934" y2="254" stroke-width="1.52" id="line74" />
+    <line x1="914" y1="232" x2="906" y2="258" stroke-width="2.40" id="line75" />
+    <line x1="914" y1="232" x2="930" y2="200" stroke-width="2.00" id="line76" />
+    <line x1="946" y1="176" x2="930" y2="200" stroke-width="2.96" id="line77" />
+    <line x1="946" y1="176" x2="962" y2="156" stroke-width="1.68" id="line78" />
+    <line x1="946" y1="176" x2="968" y2="190" stroke-width="2.32" id="line79" />
+    <line x1="946" y1="176" x2="938" y2="150" stroke-width="1.28" id="line80" />
+    <line x1="872" y1="286" x2="850" y2="274" stroke-width="3.52" id="line81" />
+    <line x1="872" y1="286" x2="852" y2="302" stroke-width="2.00" id="line82" />
+    <line x1="872" y1="286" x2="894" y2="298" stroke-width="1.44" id="line83" />
+  </g></g>
+  <g transform="translate(0 49)"><g fill="#bddaeb" stroke="#0072B2" stroke-width="1.2" id="g98">
+    <circle cx="846" cy="186" r="5" id="circle83" />
+    <circle cx="850" cy="214" r="5" id="circle84" />
+    <circle cx="862" cy="172" r="5" id="circle85" />
+    <circle cx="888" cy="176" r="5" id="circle86" />
+    <circle cx="860" cy="222" r="5" id="circle87" />
+    <circle cx="892" cy="214" r="5" id="circle88" />
+    <circle cx="938" cy="220" r="5" id="circle89" />
+    <circle cx="934" cy="254" r="5" id="circle90" />
+    <circle cx="906" cy="258" r="5" id="circle91" />
+    <circle cx="930" cy="200" r="5" id="circle92" />
+    <circle cx="962" cy="156" r="5" id="circle93" />
+    <circle cx="968" cy="190" r="5" id="circle94" />
+    <circle cx="938" cy="150" r="5" id="circle95" />
+    <circle cx="850" cy="274" r="5" id="circle96" />
+    <circle cx="852" cy="302" r="5" id="circle97" />
+    <circle cx="894" cy="298" r="5" id="circle98" />
+  </g></g>
+  <g transform="translate(0 49)"><g fill="#d8cde5" stroke="#6a3d9a" stroke-width="1.3" id="g101">
+    <rect x="-5.5" y="-5.5" width="11" height="11" transform="translate(870 198) rotate(45)" id="rect98" />
+    <rect x="-5.5" y="-5.5" width="11" height="11" transform="translate(914 232) rotate(45)" id="rect99" />
+    <rect x="-5.5" y="-5.5" width="11" height="11" transform="translate(946 176) rotate(45)" id="rect100" />
+    <rect x="-5.5" y="-5.5" width="11" height="11" transform="translate(872 286) rotate(45)" id="rect101" />
+  </g></g>
 </svg>

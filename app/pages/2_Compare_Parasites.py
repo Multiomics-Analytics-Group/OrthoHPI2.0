@@ -932,7 +932,7 @@ if selected_host != web_utils.NO_HOST:
     with order_column:
         # the order decides which blocks the figures show: contiguous values make a square
         # against the diagonal
-        order_by = st.radio('Order the parasites by', [ORDER_BY_GROUP, ORDER_BY_NICHE],
+        order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
                             horizontal=True,
                             help='Which annotation the two figures below put next to each '
                                  'other on their axes. The strips beside the axes show both '

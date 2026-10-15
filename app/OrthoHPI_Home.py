@@ -179,8 +179,8 @@ def get_overview_predictions(data_dir, config):
     df = pd.concat(frames, ignore_index=True)
 
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
-    # the order of the circos: taxonomic group as configured, then niche, then name,
-    # unclassified last
+    # the order of the paper's figures: niche, then taxonomic group as configured, then
+    # name, unclassified last
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
     df['name'] = df['taxid1_label'].map(short_name)
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
@@ -202,7 +202,7 @@ def host_columns(df, width, bands=0, band_height=BAND_HEIGHT):
         parasites = host_df[['taxid1_label', 'name', 'group_rank']].drop_duplicates(
             'taxid1_label')
         parasites['niche_rank'] = parasites.index.map(host_df['niche']).map(web_utils.niche_rank)
-        parasites = parasites.sort_values(by=['group_rank', 'niche_rank', 'taxid1_label'],
+        parasites = parasites.sort_values(by=['niche_rank', 'group_rank', 'taxid1_label'],
                                           kind='stable')
         hosts.append((host, host_df, parasites['name'].tolist()))
 
@@ -707,7 +707,7 @@ def generate_tissue_matrix(config, palette, width):
                          'tissue': tissue, 'tissues': len(tissues)})
     df = pd.DataFrame(rows)
     df['niche_rank'] = df['niche'].map(web_utils.niche_rank)
-    df = df.sort_values(by=['group_rank', 'niche_rank', 'label'], kind='stable')
+    df = df.sort_values(by=['niche_rank', 'group_rank', 'label'], kind='stable')
     parasites = df['name'].unique().tolist()
     # how many parasites infect each tissue, most first; ties in alphabetical order
     counts = df.groupby('tissue').size().sort_index()

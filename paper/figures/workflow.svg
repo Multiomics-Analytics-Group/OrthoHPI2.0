@@ -9,6 +9,16 @@
     <filter id="grey" x="0" y="0" width="1" height="1">
       <feColorMatrix type="saturate" values="0" id="feColorMatrix1" />
     </filter>
+      <!-- each organism is cropped from the licensed BioRender sheet, biorender/organisms.png -->
+    <clipPath id="clip-image12" clipPathUnits="userSpaceOnUse"><rect x="35.09" y="88.00" width="49.82" height="93.00" /></clipPath>
+    <clipPath id="clip-image13" clipPathUnits="userSpaceOnUse"><rect x="100.20" y="88.00" width="79.61" height="42.60" /></clipPath>
+    <clipPath id="clip-image14" clipPathUnits="userSpaceOnUse"><rect x="90.00" y="144.24" width="58.00" height="31.22" /></clipPath>
+    <clipPath id="clip-image15" clipPathUnits="userSpaceOnUse"><rect x="148.00" y="152.02" width="40.00" height="19.96" /></clipPath>
+    <clipPath id="clip-image17" clipPathUnits="userSpaceOnUse"><rect x="30.00" y="318.52" width="56.00" height="35.06" /></clipPath>
+    <clipPath id="clip-image18" clipPathUnits="userSpaceOnUse"><rect x="94.05" y="314.00" width="39.50" height="54.90" /></clipPath>
+    <clipPath id="clip-image19" clipPathUnits="userSpaceOnUse"><rect x="140.46" y="316.00" width="43.38" height="51.90" /></clipPath>
+    <clipPath id="clip-image20" clipPathUnits="userSpaceOnUse"><rect x="30.00" y="364.73" width="72.00" height="11.45" /></clipPath>
+    <clipPath id="clip-image39" clipPathUnits="userSpaceOnUse"><rect x="-24.00" y="-14.58" width="48.00" height="30.05" /></clipPath>
   </defs>
   <style id="style1">
     .step   { fill: #3a3f47; }
@@ -45,20 +55,20 @@
   <!-- ===== 1. Proteomes ===== -->
   <!-- hosts: human, pig, rat, mouse (BioRender) -->
   <g transform="translate(0 18)"><g id="g15">
-    <image xlink:href="../../biorender/human.png" x="34.25" y="88" width="51.5" height="93" id="image12" />
-    <image xlink:href="../../biorender/pig.png" x="100" y="88" width="80" height="42.6" id="image13" />
-    <image xlink:href="../../biorender/rat.png" x="90" y="144" width="58" height="31.7" id="image14" />
-    <image xlink:href="../../biorender/mouse.png" x="148" y="152" width="40" height="20" id="image15" />
+    <g clip-path="url(#clip-image12)"><image xlink:href="../../biorender/organisms.png" x="31.15" y="86.95" width="369.05" height="258.33" id="image12" /></g>
+    <g clip-path="url(#clip-image13)"><image xlink:href="../../biorender/organisms.png" x="-88.84" y="77.54" width="272.79" height="190.95" id="image13" /></g>
+    <g clip-path="url(#clip-image14)"><image xlink:href="../../biorender/organisms.png" x="-45.77" y="126.18" width="302.61" height="211.83" id="image14" /></g>
+    <g clip-path="url(#clip-image15)"><image xlink:href="../../biorender/organisms.png" x="114.50" y="142.97" width="168.19" height="117.73" id="image15" /></g>
   </g></g>
   <g transform="translate(0 18)"><text class="lbl" x="110" y="216.0" id="text15">Host proteome</text></g>
   <g transform="translate(0 18)"><text class="note" x="110" y="235.0" id="text16">human, mouse, rat, pig</text></g>
   <g transform="translate(0 18)"><image xlink:href="../../images/logos/string.png" x="77.6" y="243.0" width="64.8" height="16" id="image16" /></g>
   <!-- parasites: nematode, schistosome, trypanosome, Plasmodium (BioRender) -->
   <g transform="translate(0 80)"><g id="g20">
-    <image xlink:href="../../biorender/nematode.png" x="30" y="318" width="56" height="36.1" id="image17" />
-    <image xlink:href="../../biorender/schistosoma.png" x="94" y="314" width="39.6" height="54.9" id="image18" />
-    <image xlink:href="../../biorender/tripanosoma.png" x="140" y="316" width="44.3" height="51.9" id="image19" />
-    <image xlink:href="../../biorender/plasmodium.png" x="30" y="364" width="72" height="12.9" id="image20" />
+    <g clip-path="url(#clip-image17)"><image xlink:href="../../biorender/organisms.png" x="-27.58" y="208.35" width="255.90" height="179.13" id="image17" /></g>
+    <g clip-path="url(#clip-image18)"><image xlink:href="../../biorender/organisms.png" x="-141.37" y="132.86" width="418.02" height="292.61" id="image18" /></g>
+    <g clip-path="url(#clip-image19)"><image xlink:href="../../biorender/organisms.png" x="111.27" y="135.37" width="532.31" height="372.62" id="image19" /></g>
+    <g clip-path="url(#clip-image20)"><image xlink:href="../../biorender/organisms.png" x="-112.20" y="244.73" width="348.67" height="244.07" id="image20" /></g>
   </g></g>
   <g transform="translate(0 80)"><text class="lbl" x="110" y="424.0" id="text20">Parasite proteome</text></g>
   <g transform="translate(0 80)"><text class="note" x="110" y="443.0" id="text21">45 species</text></g>
@@ -108,7 +118,7 @@
   <g transform="translate(0 80)"><text class="note" x="416" y="397.0" id="text39">unicellular</text></g>
   <!-- parasite, multicellular: secreted only -->
   <g transform="translate(0 80)"><g transform="translate(532 352)" id="g43">
-    <image xlink:href="../../biorender/nematode.png" x="-24" y="-15" width="48" height="30.9" filter="url(#grey)" opacity="0.55" id="image39" />
+    <g clip-path="url(#clip-image39)" filter="url(#grey)" opacity="0.55"><image xlink:href="../../biorender/organisms.png" x="-73.35" y="-109.00" width="219.35" height="153.54" id="image39" /></g>
     <circle cx="-16" cy="-14" r="2.6" fill="#6a3d9a" id="circle40" />
     <circle cx="10" cy="-20" r="2.6" fill="#6a3d9a" id="circle41" />
     <circle cx="-4" cy="20" r="2.6" fill="#6a3d9a" id="circle42" />

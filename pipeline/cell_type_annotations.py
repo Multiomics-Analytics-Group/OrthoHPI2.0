@@ -5,7 +5,7 @@ import utils
 
 PIG_TAXID = '9823'
 MOUSE_TAXID = '10090'
-CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nTPM']
+CELL_TYPE_COLUMNS = ['Gene', 'Tissue', 'Cell type', 'nCPM']
 
 # HPA tissue names -> config['tissues'] labels. The gut tissues are written under their own
 # label and `intestine`, since TISSUES annotates both
@@ -24,7 +24,7 @@ HPA_TISSUE_LABELS = {
 def read_hpa_clusters(config_file):
     '''
     The HPA single-cell cluster table, one row per (Gene, Tissue, Cell type) at its highest
-    cluster. HPA's nCPM is read into the `nTPM` column the pig and mouse atlases share.
+    cluster.
     '''
     urls = utils.read_config(filepath=config_file, field='urls')
     if 'hpa_single_cell_tissue_url' not in urls:
@@ -32,14 +32,15 @@ def read_hpa_clusters(config_file):
 
     filename = utils.download_file(url=urls['hpa_single_cell_tissue_url'], data_dir='data/downloads')
     hpa_file = utils.read_zipped_file(filepath=filename)
-    data = pd.read_csv(hpa_file, sep='\t', header=0).rename(columns={'nCPM': 'nTPM'})
-    return data.sort_values(by='nTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
+    # HPA before v24 labels the same pooled counts nTPM
+    data = pd.read_csv(hpa_file, sep='\t', header=0).rename(columns={'nTPM': 'nCPM'})
+    return data.sort_values(by='nCPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
 
 
 def read_hpa(config_file):
     '''Reads the HPA file containing cell type protein expression profiles per tissue.'''
     data = read_hpa_clusters(config_file)
-    return data[data['nTPM'] > 0.0]
+    return data[data['nCPM'] > 0.0]
 
 
 def map_hpa_data(config_file, hpa_data):
@@ -56,8 +57,8 @@ def map_hpa_data(config_file, hpa_data):
     hpa_data['Gene'] = hpa_data['Gene'].map(aliases)
 
     # several HPA tissues and Ensembl genes now fall under one label and protein; keep the
-    # highest nTPM of each
-    hpa_data = hpa_data.sort_values(by='nTPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
+    # highest nCPM of each
+    hpa_data = hpa_data.sort_values(by='nCPM', ascending=False).drop_duplicates(['Gene', 'Tissue', 'Cell type'], keep='first')
 
     return hpa_data
 
@@ -71,7 +72,7 @@ def filter_valid_proteins(hpa_data, valid_proteins):
 
 def parse_hpa(config_file, valid_proteins):
     '''
-    Load, map, and filter HPA single-cell data to (Gene, Tissue, Cell type, nTPM) rows
+    Load, map, and filter HPA single-cell data to (Gene, Tissue, Cell type, nCPM) rows
     for the given valid proteins.
     '''
     data = read_hpa(config_file=config_file)

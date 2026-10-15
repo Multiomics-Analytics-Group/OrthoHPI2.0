@@ -24,7 +24,8 @@ data_dir = web_utils.get_data_dir()
 UNKNOWN_GROUP = 'Unclassified'
 # the membrane figure is drawn over these: a multicellular parasite reaches its host with
 # secreted proteins alone
-UNICELLULAR_GROUPS = ('Apicomplexa', 'Kinetoplastida', 'Other protozoa', 'Microsporidia')
+UNICELLULAR_GROUPS = ('Apicomplexa', 'Kinetoplastida', 'Metamonada', 'Amoebozoa',
+                      'Microsporidia')
 UNKNOWN_COLOR = '#999999'
 # columns are sized as if every host had at least this many parasites, so a two-parasite
 # host still fits its labels
@@ -38,9 +39,6 @@ NICHE_STRIP = ('The strip below the columns indicates whether the parasite lives
 BANDS_STRIP = ('The upper strip below the columns indicates the taxonomic group of the '
                'parasite, the lower one whether it lives inside a host cell or outside '
                'one. ' + INTRACELLULAR_NOTE)
-# same default and range as the network page, so the counts agree with the network opened
-# next
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
 # subplot titles are shrunk and wrapped until they fit their column; about 0.55 of the font
 # size a character
 TITLE_CHAR = 0.55
@@ -181,8 +179,8 @@ def get_overview_predictions(data_dir, config):
     df = pd.concat(frames, ignore_index=True)
 
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
-    # the order of the circos: taxonomic group as configured, then niche, then name,
-    # unclassified last
+    # the order of the paper's figures: niche, then taxonomic group as configured, then
+    # name, unclassified last
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
     df['name'] = df['taxid1_label'].map(short_name)
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
@@ -204,7 +202,7 @@ def host_columns(df, width, bands=0, band_height=BAND_HEIGHT):
         parasites = host_df[['taxid1_label', 'name', 'group_rank']].drop_duplicates(
             'taxid1_label')
         parasites['niche_rank'] = parasites.index.map(host_df['niche']).map(web_utils.niche_rank)
-        parasites = parasites.sort_values(by=['group_rank', 'niche_rank', 'taxid1_label'],
+        parasites = parasites.sort_values(by=['niche_rank', 'group_rank', 'taxid1_label'],
                                           kind='stable')
         hosts.append((host, host_df, parasites['name'].tolist()))
 
@@ -709,7 +707,7 @@ def generate_tissue_matrix(config, palette, width):
                          'tissue': tissue, 'tissues': len(tissues)})
     df = pd.DataFrame(rows)
     df['niche_rank'] = df['niche'].map(web_utils.niche_rank)
-    df = df.sort_values(by=['group_rank', 'niche_rank', 'label'], kind='stable')
+    df = df.sort_values(by=['niche_rank', 'group_rank', 'label'], kind='stable')
     parasites = df['name'].unique().tolist()
     # how many parasites infect each tissue, most first; ties in alphabetical order
     counts = df.groupby('tissue').size().sort_index()
@@ -978,12 +976,12 @@ if coverage:
 
 # one slider for the page, in the middle column so it does not take the whole width
 with st.columns(3)[1]:
-    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                      help='Interactions predicted below this confidence are left out '
-                           'of the counts and of the localization split drawn on them. The '
-                           'boxplots keep every prediction: the confidence figure draws '
-                           'this threshold as a line instead, and the localization ones '
-                           'stand on too few proteins to be thresholded as well.')
+    score = web_utils.score_slider(
+        help='Interactions predicted below this confidence are left out '
+             'of the counts and of the localization split drawn on them. The '
+             'boxplots keep every prediction: the confidence figure draws '
+             'this threshold as a line instead, and the localization ones '
+             'stand on too few proteins to be thresholded as well.')
     # what the threshold keeps, under the slider
     kept = int((overview['weight'] >= score).sum())
     st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '

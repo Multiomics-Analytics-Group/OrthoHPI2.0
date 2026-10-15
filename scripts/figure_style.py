@@ -13,6 +13,9 @@ FONT = 8
 TITLE = 9
 # inches per row of 8 pt names, with a gap between them
 ROW = 0.17
+# a tighter row, for figures of many rows to stay within the paper's float height
+# (0.83 of the text height, 8.39 in) at the full text width
+DENSE_ROW = 0.155
 
 
 def apply():
@@ -35,13 +38,29 @@ def short_name(species):
     return f'{parts[0][0]}. {" ".join(parts[1:])}' if len(parts) > 1 else species
 
 
+def row_positions(labels, row=ROW):
+    '''
+    The y of each row, in rows of `row` inches: a row is one row from the next unless
+    their wrapped names need more room, and then the names are as far apart as those
+    of two single-line rows, so that a wrapped name reads as one row.
+    '''
+    line = 1.05 * FONT / 72 / row
+    halves = [line * (label.count('\n') + 1) / 2 for label in labels]
+    ys = [0.0]
+    for above, below in zip(halves, halves[1:]):
+        ys.append(ys[-1] + max(1, above + below + 1 - line))
+
+    return ys
+
+
 def stack_legends(fig, blocks, ncol=4, left=0.1, bottom=0.02):
     '''
     One legend per kind of colour, one under another at the foot of the figure and
     flush with the same left edge (`left`, a figure fraction), so that no two kinds
     share a column. `blocks` is [(title, handles)] or [(title, handles, ncol)] for a
-    block with entries too long for the default columns, top block first. Returns the
-    height taken, in inches, for the caller to leave under its axes.
+    block with entries too long for the default columns, top block first. Entries read
+    row by row, left to right. Returns the height taken, in inches, for the caller to
+    leave under its axes.
     '''
     height = fig.get_figheight()
     line = 1.1 * FONT / 72
@@ -50,6 +69,8 @@ def stack_legends(fig, blocks, ncol=4, left=0.1, bottom=0.02):
         title, handles = block[:2]
         columns = min(block[2] if len(block) > 2 else ncol, len(handles))
         rows = -(-len(handles) // columns)
+        # matplotlib fills a legend column by column; transpose so it reads by rows
+        handles = [h for c in range(columns) for h in handles[c::columns]]
         fig.legend(handles=handles, title=title, loc='lower left', ncol=columns,
                    frameon=False, handlelength=0.9, columnspacing=1.2, alignment='left',
                    bbox_to_anchor=(left, y / height), title_fontsize=FONT)

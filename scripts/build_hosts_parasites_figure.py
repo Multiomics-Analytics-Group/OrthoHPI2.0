@@ -25,17 +25,18 @@ COMMON_NAME = {9606: "Human", 10116: "Rat", 10090: "Mouse", 9823: "Pig"}
 DOT_HOSTS = [(9606, "Human"), (10116, "Rat"), (10090, "Mouse"), (9823, "Pig")]
 
 GROUP_ORDER = ["Nematoda", "Trematoda", "Cestoda", "Apicomplexa",
-               "Kinetoplastida", "Other protozoa", "Microsporidia"]
+               "Kinetoplastida", "Metamonada", "Amoebozoa", "Microsporidia"]
 # which icon to draw for each taxonomic group
 GROUP_ICON = {
     "Nematoda": "nematode", "Trematoda": "fluke", "Cestoda": "tapeworm",
     "Apicomplexa": "apicomplexan", "Kinetoplastida": "trypanosome",
-    "Other protozoa": "amoeba", "Microsporidia": "spore",
+    "Metamonada": "flagellate", "Amoebozoa": "amoeba", "Microsporidia": "spore",
 }
 GROUP_SUB = {
     "Nematoda": "roundworms", "Trematoda": "flukes", "Cestoda": "tapeworms",
     "Apicomplexa": "apicomplexans", "Kinetoplastida": "trypanosomatids",
-    "Other protozoa": "amoeba, flagellates", "Microsporidia": "spore-forming fungi",
+    "Metamonada": "anaerobic flagellates", "Amoebozoa": "amoebae",
+    "Microsporidia": "spore-forming fungi",
 }
 
 
@@ -145,6 +146,19 @@ def icon_amoeba(c):
             f'<circle cx="68" cy="66" r="5" fill="#ffffff" opacity="0.5"/>')
 
 
+def icon_flagellate(c):
+    body = ("M50,10 C70,10 80,28 78,46 C76,64 62,78 50,84 "
+            "C38,78 24,64 22,46 C20,28 30,10 50,10 Z")
+    # paired flagella trailing off the posterior end
+    flag = ("M46,80 C40,88 34,90 28,96 M54,80 C60,88 66,90 72,96 "
+            "M42,72 C30,78 20,80 10,84 M58,72 C70,78 80,80 90,84")
+    return (f'<path d="{flag}" stroke="{c}" stroke-width="3" fill="none"'
+            f' stroke-linecap="round"/>'
+            f'<path d="{body}" fill="{c}"/>'
+            f'<ellipse cx="40" cy="36" rx="7" ry="9" fill="#ffffff" opacity="0.85"/>'
+            f'<ellipse cx="60" cy="36" rx="7" ry="9" fill="#ffffff" opacity="0.85"/>')
+
+
 def icon_spore(c):
     coil = []
     for i in range(5):                       # polar tube coiled inside the spore
@@ -176,7 +190,7 @@ def icon_tick(c):
 
 ICONS = {"nematode": icon_nematode, "fluke": icon_fluke, "tapeworm": icon_tapeworm,
          "apicomplexan": icon_apicomplexan, "trypanosome": icon_trypanosome,
-         "amoeba": icon_amoeba, "spore": icon_spore, "tick": icon_tick}
+         "flagellate": icon_flagellate, "amoeba": icon_amoeba, "spore": icon_spore, "tick": icon_tick}
 
 
 # --- host silhouettes (off by default; --host-icons brings them back). PhyloPic CC0
@@ -300,7 +314,7 @@ def build(cfg, title, host_icons=False):
         (2, ["Nematoda"]),
         (1, ["Trematoda", "Cestoda"]),
         (1, ["Apicomplexa", "Kinetoplastida"]),
-        (1, ["Other protozoa", "Microsporidia"]),
+        (1, ["Metamonada", "Amoebozoa", "Microsporidia"]),
     ]
     head_h, line_h, pad_b = 84, 30, 16
 

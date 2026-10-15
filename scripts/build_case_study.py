@@ -85,7 +85,7 @@ def build(config, data_dir, parasite, host, min_targets, cells_per_tissue):
     cells = pd.read_parquet(os.path.join(data_dir, 'tissues_cell_types.parquet'))
     cells = cells[cells['Gene'].isin(links.columns) & cells['Tissue'].isin(tissue_labels)]
     cells = cells.dropna(subset=['Cell type'])
-    expression = (cells.groupby(['Tissue', 'Cell type', 'Gene'])['nTPM'].max().unstack()
+    expression = (cells.groupby(['Tissue', 'Cell type', 'Gene'])['nCPM'].max().unstack()
                   .reindex(columns=links.columns))
     # tissues in the parasite's order; cell types by how many of the targets they express
     expressed = (expression > 0).sum(axis=1)
@@ -120,7 +120,7 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
     # B: the cell types of the infected tissues expressing each host protein
     values = expression.to_numpy(dtype=float)
     values = np.where(values > 0, values, np.nan)
-    heat_cmap = LinearSegmentedColormap.from_list('ntpm', HEAT_SCALE)
+    heat_cmap = LinearSegmentedColormap.from_list('ncpm', HEAT_SCALE)
     heat_cmap.set_bad('#ffffff')
     floor = max(np.nanmin(values), 0.1)
     heat = bottom.imshow(np.ma.masked_invalid(values), cmap=heat_cmap, aspect='auto',
@@ -156,7 +156,7 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
     score_bar.ax.tick_params(length=2)
     score_bar.outline.set_visible(False)
     heat_bar = fig.colorbar(heat, ax=bottom, fraction=0.02, pad=0.01)
-    heat_bar.set_label('nTPM')
+    heat_bar.set_label('nCPM')
     heat_bar.ax.tick_params(length=2)
     heat_bar.outline.set_visible(False)
     handles = [Patch(color=tissue_color[t], label=t) for t in tissue_labels if t in {i[0] for i in expression.index}]

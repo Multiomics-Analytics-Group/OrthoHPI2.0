@@ -2,8 +2,8 @@
 Count how many proteins survive each stage of the pipeline, per host-parasite pair, and
 draw it as the two branches of the workflow figure. On the host side: proteome ->
 expressed in a tissue this parasite infects (TISSUES) -> put by DeepLoc where its niche
-reaches -> in a predicted interaction with this parasite. On the
-parasite side: proteome -> secreted or on the surface (DeepLoc) -> in an EggNOG group
+reaches -> in a KOG group -> in a predicted interaction with this parasite. On the
+parasite side: proteome -> secreted or on the surface (DeepLoc) -> in a KOG group
 -> in a predicted interaction with this host. Writes paper/tables/funnel.csv (the counts)
 and paper/figures/funnel.svg/.png, a butterfly chart: one row per pair, the host stages
 nested leftwards and the parasite stages rightwards of the parasite's name, on log axes
@@ -24,32 +24,28 @@ import utils
 from pipeline import filters, homology, main
 from scripts import figure_style
 
-# the orthologous group is left off the host side: every host protein that reaches this
-# far is already in one, so the band is zero wide in every row and only costs contrast
-HOST_STAGES = ['proteome', 'tissue', 'localization', 'interactor']
-PARASITE_STAGES = ['proteome', 'localization', 'eggnog', 'interactor']
+HOST_STAGES = ['proteome', 'tissue', 'localization', 'kog', 'interactor']
+PARASITE_STAGES = ['proteome', 'localization', 'kog', 'interactor']
 # the stage names follow the boxes of the workflow figure
 STAGE_LABELS = {
     'proteome': 'STRING proteome',
     'tissue': 'TISSUES filter: expressed in a tissue the parasite infects (host side)',
     'localization': 'DeepLoc filter: in a relevant subcellular location',
-    'eggnog': 'in an EggNOG orthologous group (parasite side)',
+    'kog': 'in a KOG orthologous group',
     'interactor': 'in a predicted host–parasite PPI',
 }
-# one hue, later stage darker; keyed by stage so both sides agree with the legend. Each
-# side draws four of the five, and the two subsets differ, so neighbouring bands within
-# a bar are two steps of the ramp apart rather than one
+# one hue, later stage darker; keyed by stage so both sides agree with the legend
 STAGE_COLORS = {
     'proteome': '#e4ecf7',
     'tissue': '#b9d0ec',
     'localization': '#87b0de',
-    'eggnog': '#4a7fc1',
+    'kog': '#4a7fc1',
     'interactor': '#10315e',
 }
 # the host-side DeepLoc filter turns on the niche, so the rows are ordered by it; the
 # wider-reaching niche first, as in the workflow figure
 NICHE_ORDER = ['intracellular', 'extracellular']
-NICHE_COLORS = {'intracellular': '#555555', 'extracellular': '#bdbdbd'}
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # the colour strips left of a block, as (column, colours, offset in axes fractions)
 STRIPS = [('niche', NICHE_COLORS, -0.10), ('group', None, -0.05)]
 STRIP_WIDTH = 0.025
@@ -64,11 +60,11 @@ SUPPLEMENTARY_COLUMNS = {
     'host_proteome': 'Host proteins: STRING proteome',
     'host_tissue': 'Host proteins: expressed in an infected tissue',
     'host_localization': 'Host proteins: in a reachable localisation',
-    'host_eggnog': 'Host proteins: in an orthologous group',
+    'host_kog': 'Host proteins: in a KOG group',
     'host_interactor': 'Host proteins: in a predicted PPI',
     'parasite_proteome': 'Parasite proteins: STRING proteome',
     'parasite_localization': 'Parasite proteins: secreted or on the surface',
-    'parasite_eggnog': 'Parasite proteins: in an orthologous group',
+    'parasite_kog': 'Parasite proteins: in a KOG group',
     'parasite_interactor': 'Parasite proteins: in a predicted PPI',
     'edges': 'Predicted interactions',
 }
@@ -82,8 +78,8 @@ COLUMN_GAP, NAME_GAP, BLOCK_GAP = 0.35, 1.05, 4
 
 def load(config_file, data_dir):
     '''Everything the counts read: the proteomes, per host protein its infected-tissue
-    labels and the niches reaching it, the eligible pool, which proteins sit in an
-    EggNOG group, and the predictions.'''
+    labels and the niches reaching it, the eligible pool, which proteins sit in a
+    KOG group, and the predictions.'''
     downloads = os.path.join(data_dir, 'downloads')
     print("Getting proteins...")
     proteins = main.get_proteins(config_file)
@@ -103,10 +99,12 @@ def load(config_file, data_dir):
     print("Scanning EggNOG groups...")
     groups = homology.get_eggnog_groups(os.path.join(downloads, '2759_members.tsv.gz'),
                                         eligible['protein'])
-    in_group = set().union(*groups.values()) if groups else set()
+    # only KOG groups carry links in STRING's COG.links.detailed, so only they can transfer
+    kogs = [members for group, members in groups.items() if group.startswith('KOG')]
+    in_kog = set().union(*kogs) if kogs else set()
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
 
-    return proteins, tissues, reachable, eligible, in_group, predictions
+    return proteins, tissues, reachable, eligible, in_kog, predictions
 
 
 def count_pairs(config, data):
@@ -114,7 +112,7 @@ def count_pairs(config, data):
     the tissue and localization filters being the parasite's own, and the parasite
     proteins left after every parasite stage, the last being those in a predicted
     interaction with this host.'''
-    proteins, tissues, reachable, eligible, in_group, predictions = data
+    proteins, tissues, reachable, eligible, in_kog, predictions = data
     group_order = list(config['parasite_groups'])
     hosts = {t: h['label'].split('(')[1].rstrip(')') for t, h in config['hosts'].items()}
     # niche first, so that the host side's two regimes sit together; congeners share a
@@ -137,10 +135,10 @@ def count_pairs(config, data):
             rows.append({'host': host_name, 'taxid': taxid, 'species': parasite['label'],
                          'group': parasite['group'], 'niche': parasite['niche'],
                          'host_proteome': len(proteins[host]), 'host_tissue': len(expressed),
-                         'host_localization': len(reach), 'host_eggnog': len(reach & in_group),
+                         'host_localization': len(reach), 'host_kog': len(reach & in_kog),
                          'host_interactor': edges['target'].nunique(),
                          'parasite_proteome': len(proteins[taxid]), 'parasite_localization': len(pool),
-                         'parasite_eggnog': len(pool & in_group),
+                         'parasite_kog': len(pool & in_kog),
                          'parasite_interactor': edges['source'].nunique(),
                          'edges': len(edges)})
 

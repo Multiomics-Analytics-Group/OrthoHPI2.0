@@ -153,7 +153,7 @@ def aggregate_expression(input_file, config_file, age):
         obs[['Tissue', 'cell_ontology_class']]))
     cell_groups = np.full(atlas.n_obs, -1, dtype=np.int32)
     cell_groups[atlas.obs.index.get_indexer(obs.index)] = group_codes
-    # HPA's single-cell pTPM: the raw counts of a cell type pooled, then scaled to a
+    # HPA's single-cell CPM: the raw counts of a cell type pooled, then scaled to a
     # million
     sums = [np.zeros(atlas.n_vars) for _ in groups]
     n_obs = atlas.n_obs
@@ -179,19 +179,19 @@ def aggregate_expression(input_file, config_file, age):
         total = sums[group_code].sum()
         if total == 0:
             continue
-        tpm = (sums[group_code] * COUNTS_PER_MILLION / total)[mapped]
+        cpm = (sums[group_code] * COUNTS_PER_MILLION / total)[mapped]
         frame = pd.DataFrame({
             'Gene': genes[mapped].to_numpy(),
             'Tissue': tissue,
             'Cell type': str(cell_type),
-            'nTPM': tpm,
+            'nCPM': cpm,
         })
-        rows.append(frame[frame['nTPM'] > 0])
+        rows.append(frame[frame['nCPM'] > 0])
 
     if not rows:
-        return pd.DataFrame(columns=['Gene', 'Tissue', 'Cell type', 'nTPM'])
+        return pd.DataFrame(columns=['Gene', 'Tissue', 'Cell type', 'nCPM'])
     data = pd.concat(rows, ignore_index=True)
-    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nTPM']
+    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nCPM']
             .mean())
     return add_shared_labels(data)
 

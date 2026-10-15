@@ -131,6 +131,7 @@ dmypy.json
 # Project-specific
 data/downloads/
 data/deeploc/
+data/alphafold/
 data/tmp/
 data/*.gz
 data/*.fa

@@ -144,8 +144,7 @@ or Tabula Muris Senis mouse single-cell RNA data
 top of tissue resolution.
 
 The HPA data is the v25 single-cell cluster file, reduced to the highest cluster
-per `(gene, tissue, cell type)`. HPA reports it as nCPM, which is read into the
-`nTPM` column the pig and mouse atlases share.
+per `(gene, tissue, cell type)`, in HPA's nCPM.
 
 HPA names its single-cell tissues differently from the BTO-derived labels in
 `config['tissues']`, so `cell_type_annotations.HPA_TISSUE_LABELS` renames them
@@ -154,7 +153,7 @@ before the join: `heart muscle` → `heart`, `skeletal muscle` → `muscle`,
 `colon`, `rectum` and `small intestine` are written under both their own label
 and `intestine`, since TISSUES annotates host proteins under both. Where
 several HPA tissues or Ensembl genes land on the same
-`(protein, tissue, cell type)`, the highest nTPM is kept. Config tissues HPA
+`(protein, tissue, cell type)`, the highest nCPM is kept. Config tissues HPA
 has no single-cell data for (e.g. `mouth`, `nose`, `spinal cord`, `vagina`,
 `macrophage`) stay without cell types rather than borrowing rows from a
 neighbouring tissue.

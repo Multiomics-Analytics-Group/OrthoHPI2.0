@@ -26,8 +26,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 from scripts import figure_style
 
-NICHE_COLORS = {'extracellular': '#c7c7c7', 'intracellular': '#3d3d3d'}
-NICHE_ORDER = ['extracellular', 'intracellular']
+NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
+NICHE_ORDER = ['intracellular', 'extracellular']
 # the scale of the app's heatmap
 SCALE = ['#ffffff', '#deebf7', '#9ecae1', '#6baed6', '#3182bd', '#08519c']
 DIAGONAL_COLOR = '#d9d9d9'

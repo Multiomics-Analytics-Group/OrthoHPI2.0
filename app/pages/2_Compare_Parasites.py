@@ -21,8 +21,7 @@ data_dir = web_utils.get_data_dir()
 # fallback for a parasite without a `group` in the config
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
-# same default and range as the network page
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+MIN_SCORE = web_utils.MIN_SCORE
 # side of a heatmap cell in pixels, which sizes the shared-interactor figure
 CELL = 22
 # the diagonal of the heatmap: a grey, so it is not read as a count
@@ -84,7 +83,7 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
-                                                         'nTPM']]
+                                                         'nCPM']]
 
     mapped_tissues = config['tissues']
     infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
@@ -926,14 +925,14 @@ if selected_host != web_utils.NO_HOST:
     # prediction
     slider_column, order_column = st.columns([2, 1])
     with slider_column:
-        score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                          help='Interactions predicted below this confidence are left out of '
-                               'the four figures below. The tissue plot at the foot of the '
-                               'page counts every prediction.')
+        score = web_utils.score_slider(
+            help='Interactions predicted below this confidence are left out of '
+                 'the four figures below. The tissue plot at the foot of the '
+                 'page counts every prediction.')
     with order_column:
         # the order decides which blocks the figures show: contiguous values make a square
         # against the diagonal
-        order_by = st.radio('Order the parasites by', [ORDER_BY_GROUP, ORDER_BY_NICHE],
+        order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
                             horizontal=True,
                             help='Which annotation the two figures below put next to each '
                                  'other on their axes. The strips beside the axes show both '
@@ -1087,12 +1086,12 @@ if selected_host != web_utils.NO_HOST:
     st.subheader("Biological processes enriched among the host interactors of each parasite")
     rows_column, fdr_column = st.columns([2, 1])
     with rows_column:
-        go_rows = st.radio('Processes shown', [GO_ROWS_SHARED, GO_ROWS_STRONGEST],
+        go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
                            horizontal=True,
-                           help=f'The {GO_SHARED_ROWS} processes enriched for the most '
-                                'parasites, which favours broad processes many share, or the '
-                                f'{GO_STRONGEST_PER_PARASITE} most significant of each '
-                                'parasite, which brings out what sets one apart.')
+                           help=f'The {GO_STRONGEST_PER_PARASITE} most significant processes '
+                                'of each parasite, which brings out what sets one apart, or '
+                                f'the {GO_SHARED_ROWS} enriched for the most parasites, which '
+                                'favours broad processes many share.')
     with fdr_column:
         go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
                           horizontal=True, key='compare_go_fdr',

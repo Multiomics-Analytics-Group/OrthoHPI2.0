@@ -1,0 +1,74 @@
+stage,tissue,cell_type,links,parasite_proteins,host_proteins,top_go
+network,,,2794,106,1208,"mRNA processing (5.3e-51); RNA splicing (2.2e-50); RNA splicing, via transesterification reactions (5.2e-47); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (5.2e-47); mRNA splicing, via spliceosome (5.2e-47)"
+tissue,skin,,1561,99,668,"RNA splicing (2.8e-50); mRNA processing (8.3e-49); RNA splicing, via transesterification reactions (2.2e-44); mRNA splicing, via spliceosome (3.2e-44); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (3.2e-44)"
+tissue-specific,skin,,9,8,8,Vesicle fusion (1.3e-03); Organelle fusion (1.3e-03); Organelle membrane fusion (1.3e-03); Membrane fusion (2.0e-03); Vesicle organization (8.7e-03)
+cell type,skin,b-cells,12,11,5,Homologous chromosome segregation (3.0e-03); Meiosis I cell cycle process (3.1e-03); Phosphatidylinositol metabolic process (3.1e-03); Phosphatidylinositol biosynthetic process (3.1e-03); Meiosis I (3.1e-03)
+"cell type, tissue-specific",skin,b-cells,0,0,0,
+cell type,skin,basal keratinocytes,20,17,12,Inositol phosphate biosynthetic process (3.3e-03); Negative regulation of epidermal growth factor receptor signaling pathway (4.9e-03); Negative regulation of ERBB signaling pathway (4.9e-03); Inositol phosphate metabolic process (5.3e-03); Polyol biosynthetic process (5.3e-03)
+"cell type, tissue-specific",skin,basal keratinocytes,2,2,2,
+cell type,skin,endothelial cells,29,18,13,Small GTPase mediated signal transduction (1.7e-03); Regulation of small GTPase mediated signal transduction (1.9e-03); Regulation of GTPase activity (2.2e-03); Establishment of protein localization to plasma membrane (3.8e-03); Actin filament capping (3.8e-03)
+"cell type, tissue-specific",skin,endothelial cells,0,0,0,
+cell type,skin,fibroblasts,13,11,10,Phosphatidylglycerol metabolic process (7.3e-04); Plasma lipoprotein particle remodeling (7.5e-04); Protein-lipid complex remodeling (7.5e-04); Protein-containing complex remodeling (7.5e-04); Protein-lipid complex subunit organization (7.9e-04)
+"cell type, tissue-specific",skin,fibroblasts,2,2,2,
+cell type,skin,langerhans cells,19,14,6,Intracellular protein transport (1.8e-02); Positive regulation of cellular component biogenesis (1.8e-02)
+"cell type, tissue-specific",skin,langerhans cells,0,0,0,
+cell type,skin,macrophages,14,11,6,Negative regulation of intracellular steroid hormone receptor signaling pathway (1.6e-03); Regulation of intracellular steroid hormone receptor signaling pathway (2.6e-03); Positive regulation of lipid transport (2.6e-03); Positive regulation of lipid localization (2.6e-03); Regulation of epithelial to mesenchymal transition (2.6e-03)
+"cell type, tissue-specific",skin,macrophages,0,0,0,
+cell type,skin,smooth muscle cells,16,13,11,Muscle cell migration (3.6e-03); Muscle system process (2.9e-02); Phospholipid metabolic process (2.9e-02); Glycerophospholipid metabolic process (2.9e-02); Glycerolipid metabolic process (2.9e-02)
+"cell type, tissue-specific",skin,smooth muscle cells,1,1,1,
+cell type,skin,suprabasal keratinocytes,33,19,18,Eyelid development in camera-type eye (5.3e-03); Microtubule anchoring at microtubule organizing center (5.3e-03); Negative regulation of epidermal growth factor receptor signaling pathway (5.7e-03); Microtubule anchoring (5.7e-03); Regulation of water loss via skin (5.7e-03)
+"cell type, tissue-specific",skin,suprabasal keratinocytes,2,2,2,
+tissue,liver,,1650,101,705,"mRNA processing (4.8e-57); RNA splicing (6.4e-57); RNA splicing, via transesterification reactions (2.8e-54); mRNA splicing, via spliceosome (3.5e-54); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (3.5e-54)"
+tissue-specific,liver,,43,31,22,Lipid localization (1.1e-04); Lipid transport (1.1e-04); Sodium-independent organic anion transport (4.0e-03); Porphyrin-containing compound metabolic process (8.1e-03); Intestinal absorption (8.1e-03)
+cell type,liver,b-cells,5,5,5,Germ cell development (3.5e-03); Cellular process involved in reproduction in multicellular organism (3.5e-03)
+"cell type, tissue-specific",liver,b-cells,0,0,0,
+cell type,liver,cholangiocytes,32,20,14,Actin filament organization (2.7e-04); Phosphatidylinositol 3-kinase signaling (4.2e-04); Phosphatidylinositol-mediated signaling (1.2e-03); Inositol lipid-mediated signaling (1.2e-03); ERBB2 signaling pathway (2.2e-03)
+"cell type, tissue-specific",liver,cholangiocytes,8,8,4,
+cell type,liver,endothelial cells,10,9,5,Inorganic cation transmembrane transport (1.3e-02)
+"cell type, tissue-specific",liver,endothelial cells,0,0,0,
+cell type,liver,erythroid cells,24,19,13,Mitotic cell cycle process (2.1e-05); Mitotic spindle organization (9.5e-05); Organelle fission (1.4e-04); Nuclear division (1.4e-04); Microtubule cytoskeleton organization involved in mitosis (1.4e-04)
+"cell type, tissue-specific",liver,erythroid cells,0,0,0,
+cell type,liver,fibroblasts,25,18,12,Regulation of small GTPase mediated signal transduction (4.8e-03); Regulation of Ras protein signal transduction (8.8e-03); Positive regulation of substrate adhesion-dependent cell spreading (8.8e-03); Regulation of substrate adhesion-dependent cell spreading (1.0e-02); Substrate adhesion-dependent cell spreading (1.0e-02)
+"cell type, tissue-specific",liver,fibroblasts,1,1,1,
+cell type,liver,hepatocytes,95,50,48,Cholesterol metabolic process (8.0e-07); Secondary alcohol metabolic process (8.0e-07); Sterol metabolic process (8.0e-07); Alcohol metabolic process (2.6e-06); Regulation of sterol biosynthetic process (3.9e-06)
+"cell type, tissue-specific",liver,hepatocytes,19,17,10,Lipid transport (3.8e-04); Sodium-independent organic anion transport (3.8e-04); Lipid localization (3.8e-04); Heme metabolic process (8.1e-04); Porphyrin-containing compound metabolic process (8.1e-04)
+cell type,liver,kupffer cells,74,43,30,Protein-lipid complex subunit organization (7.8e-03); Intermembrane lipid transfer (7.8e-03); Regulation of actin filament length (9.4e-03); Regulation of actin filament polymerization (9.4e-03); Sterol transport (9.4e-03)
+"cell type, tissue-specific",liver,kupffer cells,3,3,1,
+cell type,liver,smooth muscle cells,11,8,5,Actin filament organization (3.7e-03)
+"cell type, tissue-specific",liver,smooth muscle cells,3,3,1,
+cell type,liver,t-cells,28,22,13,Regulation of macroautophagy (2.4e-03); Regulation of autophagy (8.3e-03); Proton transmembrane transport (8.3e-03); Ras protein signal transduction (2.4e-02); Regulation of cell cycle G1/S phase transition (2.4e-02)
+"cell type, tissue-specific",liver,t-cells,4,4,1,
+tissue,blood,,1390,96,561,"RNA splicing (1.6e-52); mRNA processing (1.6e-52); RNA splicing, via transesterification reactions (7.3e-48); mRNA splicing, via spliceosome (1.3e-47); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (1.3e-47)"
+tissue-specific,blood,,26,23,9,Mitotic G2/M transition checkpoint (6.8e-03); Negative regulation of cell cycle G2/M phase transition (6.8e-03); Negative regulation of G2/M transition of mitotic cell cycle (6.8e-03); Protein monoubiquitination (8.1e-03); Regulation of G2/M transition of mitotic cell cycle (1.0e-02)
+cell type,blood,b-cells,19,18,9,Autophagy (1.4e-02); Macroautophagy (1.4e-02); Process utilizing autophagic mechanism (1.4e-02); Microtubule-based movement (1.9e-02); Cell division (3.3e-02)
+"cell type, tissue-specific",blood,b-cells,0,0,0,
+cell type,blood,dendritic cells,48,30,16,Regulation of lipid metabolic process (9.4e-04); Regulation of endocytosis (3.2e-03); Actin filament organization (5.5e-03); Regulation of receptor-mediated endocytosis (5.5e-03); Regulation of histone acetylation (1.5e-02)
+"cell type, tissue-specific",blood,dendritic cells,0,0,0,
+cell type,blood,macrophages,24,19,13,Phospholipid biosynthetic process (4.1e-02); Glycerophospholipid biosynthetic process (4.1e-02); Glycerolipid biosynthetic process (4.1e-02); Nuclear export (4.1e-02); Hemostasis (4.1e-02)
+"cell type, tissue-specific",blood,macrophages,1,1,1,
+cell type,blood,platelets,64,32,34,Regulation of actin polymerization or depolymerization (3.2e-04); Regulation of actin filament length (3.2e-04); Regulation of actin filament depolymerization (8.8e-04); Negative regulation of actin filament polymerization (8.9e-04); Regulation of cellular component size (9.2e-04)
+"cell type, tissue-specific",blood,platelets,9,9,3,
+cell type,blood,t-cells,61,36,30,Actin filament capping (1.0e-02); Negative regulation of actin filament depolymerization (1.0e-02); Regulation of actin filament depolymerization (1.4e-02); Mitotic cell cycle process (1.4e-02); Negative regulation of protein depolymerization (1.4e-02)
+"cell type, tissue-specific",blood,t-cells,4,4,1,
+tissue,brain,,2610,106,1120,"mRNA processing (3.1e-54); RNA splicing (3.0e-53); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (5.1e-50); RNA splicing, via transesterification reactions (5.1e-50); mRNA splicing, via spliceosome (5.1e-50)"
+tissue-specific,brain,,397,83,177,Diacylglycerol metabolic process (1.8e-05); Mitotic cell cycle phase transition (5.8e-05); Inositol phosphate metabolic process (7.5e-05); Cell cycle phase transition (7.5e-05); Glycerolipid metabolic process (1.3e-04)
+cell type,brain,astrocytes,47,29,24,Positive regulation of integrin-mediated signaling pathway (9.8e-03); Regulation of protein depolymerization (9.8e-03); Cell projection assembly (9.8e-03); Integrated stress response signaling (9.8e-03); Neuron projection regeneration (9.8e-03)
+"cell type, tissue-specific",brain,astrocytes,11,8,8,Cell projection assembly (4.4e-03); Plasma membrane bounded cell projection assembly (4.4e-03); Regulation of protein depolymerization (4.4e-03); Regulation of protein-containing complex disassembly (5.6e-03); Cilium assembly (2.4e-02)
+cell type,brain,excitatory neurons,101,50,52,Regulation of trans-synaptic signaling (1.7e-06); Modulation of chemical synaptic transmission (1.7e-06); Lipid phosphorylation (1.2e-05); Diacylglycerol metabolic process (1.7e-05); Regulation of neurotransmitter levels (2.2e-05)
+"cell type, tissue-specific",brain,excitatory neurons,50,33,25,Modulation of chemical synaptic transmission (6.2e-06); Regulation of trans-synaptic signaling (6.2e-06); Regulation of neurotransmitter levels (1.6e-05); Regulation of synaptic plasticity (2.1e-04); Diacylglycerol metabolic process (2.3e-03)
+cell type,brain,inhibitory neurons,77,40,33,Regulation of cyclin-dependent protein serine/threonine kinase activity (3.6e-02); Regulation of cyclin-dependent protein kinase activity (3.6e-02); Positive regulation of muscle tissue development (3.6e-02); Copulation (3.6e-02); Negative regulation of ERBB signaling pathway (3.6e-02)
+"cell type, tissue-specific",brain,inhibitory neurons,33,30,14,Myotube cell development (4.7e-03); Skeletal muscle fiber development (4.7e-03); Myotube differentiation (1.2e-02); Skeletal muscle organ development (2.9e-02); Skeletal muscle tissue development (2.9e-02)
+cell type,brain,microglial cells,81,33,32,Immunological synapse formation (9.1e-04); Regulation of small GTPase mediated signal transduction (9.7e-04); Positive regulation of GTPase activity (3.3e-03); Positive regulation of endocytosis (5.3e-03); Regulation of vesicle-mediated transport (7.1e-03)
+"cell type, tissue-specific",brain,microglial cells,3,3,2,
+cell type,brain,oligodendrocytes,93,43,35,Phosphatidylinositol 3-kinase signaling (1.3e-02); Establishment of cell polarity (1.3e-02); Establishment of spindle localization (1.3e-02); Neuron projection organization (1.3e-02); Establishment of spindle orientation (1.3e-02)
+"cell type, tissue-specific",brain,oligodendrocytes,25,25,10,
+tissue,spleen,,1976,102,833,"RNA splicing (5.5e-60); mRNA processing (1.3e-58); RNA splicing, via transesterification reactions (6.0e-54); RNA splicing, via transesterification reactions with bulged adenosine as nucleophile (6.1e-54); mRNA splicing, via spliceosome (6.1e-54)"
+tissue-specific,spleen,,27,22,14,Sodium-independent organic anion transport (2.7e-04); Lipid transport (2.8e-02); Lipid localization (2.8e-02); Organic anion transport (2.8e-02); Anion transmembrane transport (2.8e-02)
+cell type,spleen,b-cells,43,32,18,Organelle membrane fusion (6.0e-04); Vesicle fusion (6.0e-04); Organelle fusion (6.0e-04); Response to magnesium ion (8.2e-04); Membrane fusion (1.0e-03)
+"cell type, tissue-specific",spleen,b-cells,0,0,0,
+cell type,spleen,macrophages,83,41,41,Protein localization to plasma membrane (3.9e-03); Protein localization to cell periphery (3.9e-03); Substrate adhesion-dependent cell spreading (3.9e-03); Regulation of basement membrane organization (1.3e-02); Axon extension (1.3e-02)
+"cell type, tissue-specific",spleen,macrophages,1,1,1,
+cell type,spleen,plasma cells,20,17,11,Endoplasmic reticulum to Golgi vesicle-mediated transport (5.6e-04); Lipid homeostasis (1.5e-03); Golgi vesicle transport (6.2e-03); Cellular response to glucose starvation (6.6e-03); Positive regulation of establishment of protein localization (6.6e-03)
+"cell type, tissue-specific",spleen,plasma cells,0,0,0,
+cell type,spleen,t-cells,69,34,29,Small GTPase mediated signal transduction (1.7e-02); Regulation of insulin receptor signaling pathway (1.7e-02); Glycerophospholipid metabolic process (2.8e-02); Positive regulation of glucose transmembrane transport (3.1e-02); Positive regulation of lamellipodium assembly (3.1e-02)
+"cell type, tissue-specific",spleen,t-cells,4,4,2,

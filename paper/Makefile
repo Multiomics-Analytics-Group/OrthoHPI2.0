@@ -18,7 +18,7 @@
 # BibLaTeX with "keep updated" ticked makes the file rewrite itself on every
 # edit and `make refs` redundant. The citation keys match either way.
 #
-# The workflow figure is a hand-drawn SVG exported to PNG with Inkscape. Every
+# The workflow figure is an SVG edited in Inkscape and exported to PNG. Every
 # other figure is one rule per build script, which writes the 300-dpi .png the
 # paper includes and, in the same run, an .svg of it.
 
@@ -28,23 +28,37 @@ PYTHON := .venv/bin/python
 INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
-FIGURES := figures/workflow.png figures/funnel.png figures/networks.png \
-	figures/parasite_similarity.png figures/shared_families.png \
+FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
+	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_families.png figures/parasite_go.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
-	figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png \
-	figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
+	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
+	figures/pf_case_study.png figures/web_overview.png \
+	figures/web_network.png
 
 paper.pdf: paper.tex refs.bib tables/parasites.tex $(FIGURES)
 	tectonic --synctex --keep-logs paper.tex
 
-figures/workflow.png: figures/workflow.svg
+# The workflow figure links the BioRender icons in ../biorender/, the logos in
+# ../images/logos/ and the app's body figure, so it is exported from here, where
+# those relative links resolve.
+figures/workflow.png: figures/workflow.svg figures/workflow_body.svg $(wildcard ../biorender/*.png)
 	$(INKSCAPE) $< --export-type=png --export-dpi=300 --export-background=white --export-filename=$@
 
-# The filter funnel: proteins left after each stage of the pipeline on the host and
-# parasite side of each host-parasite pair. Rereads the TISSUES downloads and the
-# EggNOG members file, so it takes a minute.
+# The app's frontal human body figure with the liver shaded, for step 2 of the workflow.
+figures/workflow_body.svg: ../images/tissues/tissues_human.svg ../app/body_figure.py ../scripts/build_workflow_body.py
+	cd .. && $(PYTHON) scripts/build_workflow_body.py
+
+# The proteins left after each stage of the pipeline on the host and parasite side of
+# each host-parasite pair: the counts behind Figure 3 and Supplementary Table S1, and a
+# log-axis funnel the paper does not use. Rereads the TISSUES downloads and the EggNOG
+# members file, so it takes a minute.
 figures/funnel.svg figures/funnel.png tables/funnel.csv tables/funnel_supplementary.csv: ../config.yml ../data/eligible_proteins.parquet ../data/predictions.parquet ../scripts/build_filter_funnel.py
 	cd .. && $(PYTHON) scripts/build_filter_funnel.py
+
+# Figure 3: the share of proteins each stage keeps from the one before, from the
+# funnel's counts, so it reruns without rereading the downloads.
+figures/funnel_shares.svg figures/funnel_shares.png tables/funnel_shares.csv: ../config.yml tables/funnel.csv ../scripts/build_funnel_shares.py ../scripts/build_filter_funnel.py
+	cd .. && $(PYTHON) scripts/build_funnel_shares.py
 
 # The multi-host comparison: links shared between and specific to the hosts of each
 # parasite with several, and why a host lacks a link another host carries.
@@ -55,6 +69,11 @@ figures/multi_host.svg figures/multi_host.png tables/multi_host.csv: ../config.y
 figures/shared_families.svg figures/shared_families.png tables/shared_families.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_families.py
 	cd .. && $(PYTHON) scripts/build_shared_families.py
 
+# The host processes the parasites of human reach: GO enrichment of each parasite's host
+# interactors against its niche's pool, as the app tests it.
+figures/parasite_go.svg figures/parasite_go.png tables/parasite_go.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_go.py
+	cd .. && $(PYTHON) scripts/build_parasite_go.py
+
 # How alike the interactomes of the parasites of human are, pair by pair.
 figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
 	cd .. && $(PYTHON) scripts/build_parasite_similarity.py
@@ -63,10 +82,33 @@ figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_
 figures/case_study.svg figures/case_study.png tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
 	cd .. && $(PYTHON) scripts/build_case_study.py
 
+# The P. falciparum case study: the network narrowed to blood, erythrocytes and blood-only links.
+figures/pf_case_study.svg figures/pf_case_study.png tables/pf_case_study_funnel.csv tables/pf_case_study_go.csv tables/pf_case_study_links.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../scripts/build_pf_case_study.py ../scripts/explore_pf_case_study.py
+	cd .. && $(PYTHON) scripts/build_pf_case_study.py
+
+# The L. braziliensis case study: the app's body figures, its links in human and mouse,
+# and the host families of two parasite families in each. Rereads the TISSUES downloads.
+figures/lb_case_study.svg figures/lb_case_study.png tables/lb_case_study_families.csv tables/lb_case_study_specific.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../data/figure_tissues.parquet ../app/body_figure.py ../scripts/build_lb_case_study.py ../scripts/build_multi_host_figure.py
+	cd .. && $(PYTHON) scripts/build_lb_case_study.py
+
+# AlphaFold 3 Server models of case-study links against host-host references and random
+# controls. Reads the results unpacked in data/alphafold/, which git ignores.
+figures/alphafold.svg figures/alphafold.png tables/alphafold.csv: alphafold/jobs.csv ../scripts/build_alphafold_figure.py ../scripts/alphafold_results.py
+	cd .. && $(PYTHON) scripts/build_alphafold_figure.py
+
+# Links transferred from direct binding against their human reference complexes.
+figures/alphafold_direct.svg figures/alphafold_direct.png tables/alphafold_direct.csv: alphafold/direct.csv ../scripts/build_alphafold_direct_figure.py ../scripts/alphafold_results.py
+	cd .. && $(PYTHON) scripts/build_alphafold_direct_figure.py
+
 # The predicted networks at a glance: interactions per parasite by host and by
 # host-protein location.
 figures/networks.svg figures/networks.png tables/networks.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_networks_figure.py
 	cd .. && $(PYTHON) scripts/build_networks_figure.py
+
+# The web interface figures: screenshots of the app (figures/web/*.png, taken from the
+# running app by scripts/capture_web_screenshots.py) laid out as two figures.
+figures/web_overview.svg figures/web_overview.png figures/web_network.svg figures/web_network.png: $(wildcard figures/web/*.png) ../scripts/build_web_interface_figure.py
+	cd .. && $(PYTHON) scripts/build_web_interface_figure.py
 
 # Supplementary: how many STRING proteins of each host TISSUES annotates to each tissue
 # at score 1. Rereads the TISSUES downloads.
@@ -77,17 +119,12 @@ figures/tissues_coverage.svg figures/tissues_coverage.png tables/tissues_coverag
 figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.yml ../data/predictions.parquet ../scripts/build_confidence_figure.py
 	cd .. && $(PYTHON) scripts/build_confidence_figure.py
 
-# Supplementary: the DeepLoc 2 probabilities the localization filters kept the host and
-# parasite proteins on.
-figures/deeploc_host.svg figures/deeploc_host.png figures/deeploc_parasite.svg figures/deeploc_parasite.png tables/deeploc.csv: ../config.yml ../data/predictions.parquet ../data/deeploc_localisations.parquet ../scripts/build_deeploc_figure.py
-	cd .. && $(PYTHON) scripts/build_deeploc_figure.py
-
 # Supplementary: the DeepLoc 2 probabilities of every protein the localization filters
 # decided on, kept or not. Rereads the TISSUES downloads.
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/funnel.png figures/multi_host.png figures/shared_families.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_host.png figures/deeploc_parasite.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png
+figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_overview.png figures/web_network.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

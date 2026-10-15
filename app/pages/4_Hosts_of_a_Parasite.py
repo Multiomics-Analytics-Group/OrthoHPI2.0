@@ -18,20 +18,13 @@ config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-# opens at the bottom of the range: the multi-host parasites are the small interactomes, and
-# 0.7 leaves two of them on the page
-MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
-# Okabe-Ito without the blues, which say how far a link carried over; the config colours
-# give human the grey of an absent host. A host without an entry falls back to its config
-# colour
-HOST_COLORS = {'Homo sapiens (human)': '#D55E00', 'Sus scrofa (pig)': '#CC79A7',
-               'Mus musculus (mouse)': '#009E73', 'Rattus norvegicus (rat)': '#E69F00'}
-# a link shared by every host, and the shades a link shared by some of three or more hosts
-# is drawn in
-SHARED_COLOR = '#08519c'
-PARTIAL_COLORS = ['#6baed6', '#9ecae1', '#4292c6', '#c6dbef']
-# how far toward white each host after the first sharing a config colour is mixed (rat and
-# mouse share one)
+MIN_SCORE = web_utils.MIN_SCORE
+# a link shared by every host, and the greys a link shared by some of three or more hosts
+# is drawn in, as in the paper's multi-host figure; a link of one host takes the host's
+# config colour
+SHARED_COLOR = '#3b3b3b'
+PARTIAL_COLORS = ['#b4b4b4', '#8c8c8c', '#9f9f9f', '#c4c4c4']
+# how far toward white each host after the first sharing a config colour is mixed
 SPECIES_TINT = 0.45
 # a host the combination does not include; no host is drawn in a grey
 ABSENT_COLOR = '#e0e0e0'
@@ -77,14 +70,7 @@ def host_label(host, config):
 
 
 def host_color(host_label, config):
-    '''
-    The colour this page fixes for the host (HOST_COLORS), falling back to the one the
-    config gives it -- a host added to the config and not to HOST_COLORS still gets
-    drawn in the colour the rest of the app knows it by.
-    '''
-    if host_label in HOST_COLORS:
-        return HOST_COLORS[host_label]
-
+    '''The colour the config gives the host, which the rest of the app knows it by.'''
     for taxid, host in config['hosts'].items():
         if host['label'] == host_label:
             return host['color']
@@ -486,7 +472,8 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     if orthologs is None:
         return None
 
-    expressed = web_utils.infected_tissue_proteins(data_dir, config, parasite_taxid)
+    # before DeepLoc, so a family DeepLoc removes is told apart from one never expressed
+    expressed = web_utils.expressed_infected_tissue_proteins(data_dir, config, parasite_taxid)
     # the niche half of the pool, which homology.get_links applies as it transfers and the
     # pool the rest of the page counts against does not
     in_reach = web_utils.filtered_pool(
@@ -533,11 +520,10 @@ st.markdown("---")
 
 settings, _ = st.columns([1, 1])
 with settings:
-    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, DEFAULT_SCORE,
-                      help='Interactions predicted below this confidence are left out, as '
-                           'on the other pages. These are the smallest interactomes of the '
-                           'set, so this page starts at the bottom of the range: raising it '
-                           'leaves fewer parasites with more than one host.')
+    score = web_utils.score_slider(
+        help='Interactions predicted below this confidence are left out, as '
+             'on the other pages. These are the smallest interactomes of the '
+             'set: raising it leaves fewer parasites with more than one host.')
 
 df_pred = get_multi_host_predictions(data_dir, config, score)
 

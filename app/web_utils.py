@@ -170,6 +170,34 @@ def go_background(data_dir, taxids, niche=None):
     return go_df
 
 
+@st.cache_data(show_spinner=False)
+def load_host_tissues(data_dir):
+    '''
+    Every host protein the TISSUES filter passes with its tissues, before the DeepLoc
+    filter, as scripts/build_host_tissues.py writes it; None when it has not been built.
+    '''
+    tissue_file = os.path.join(data_dir, 'host_tissues.parquet')
+    if not os.path.exists(tissue_file):
+        return None
+
+    return utils.read_parquet_file(input_file=tissue_file)
+
+
+def expressed_infected_tissue_proteins(data_dir, config, parasite_taxid):
+    '''
+    The host proteins annotated to a tissue this parasite infects, whether or not DeepLoc
+    later removes them; the filtered pool's when host_tissues.parquet has not been built.
+    '''
+    tissues = load_host_tissues(data_dir)
+    if tissues is None:
+        return infected_tissue_proteins(data_dir, config, parasite_taxid)
+
+    mapped = config['tissues']
+    infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}
+
+    return set(tissues.loc[tissues['tissue'].isin(infected), 'protein'])
+
+
 def infected_tissue_proteins(data_dir, config, parasite_taxid):
     '''
     The host proteins annotated to a tissue this parasite is known to infect, over every
@@ -208,6 +236,29 @@ def load_protein_annotations(data_dir):
     annotations = utils.read_parquet_file(input_file=input_file)
 
     return dict(annotations[['protein', 'description']].values)
+
+
+@st.cache_data(show_spinner=False)
+def load_protein_sequences(data_dir):
+    '''
+    Protein sequences, keyed by STRING id, written by pipeline/build_protein_sequences.py.
+    '''
+    input_file = os.path.join(data_dir, 'protein_sequences.parquet')
+    if not os.path.exists(input_file):
+        return {}
+    sequences = utils.read_parquet_file(input_file=input_file)
+
+    return dict(sequences[['protein', 'sequence']].values)
+
+
+def to_fasta(records, width=60):
+    '''FASTA text of (header, sequence) records, wrapped at width residues.'''
+    lines = []
+    for header, sequence in records:
+        lines.append(f'>{header}')
+        lines.extend(sequence[i:i + width] for i in range(0, len(sequence), width))
+
+    return '\n'.join(lines) + '\n'
 
 
 @st.cache_data(show_spinner=False)
@@ -282,7 +333,7 @@ def classify_localisation(localisations, classes=HOST_CLASSES, multiple=SEVERAL)
 # where a parasite sits relative to the host cell, i.e. which host proteins it can reach;
 # independent of `multicellular`
 UNKNOWN_NICHE = 'Unknown'
-NICHE_ORDER = ['Extracellular', 'Intracellular']
+NICHE_ORDER = ['Intracellular', 'Extracellular']
 # greys, so the niche is not read as a third categorical split beside the clades and the
 # DeepLoc classes
 NICHE_COLORS = {'Extracellular': '#c7c7c7', 'Intracellular': '#3d3d3d',
@@ -374,6 +425,23 @@ def host_selector(config, predictions, label='Select a host', include_rodents=Fa
     return selected, tuple(groups.get(selected, ()))
 
 
+# the confidence score is shared across pages the same way as the host
+MIN_SCORE, MAX_SCORE, DEFAULT_SCORE = 0.35, 0.9, 0.35
+SCORE_STATE_KEY = 'selected_score'
+SCORE_WIDGET_KEY = 'selected_score_widget'
+
+
+def score_slider(help=None):
+    '''Draws the confidence score slider, shared across pages through SCORE_STATE_KEY.'''
+    if SCORE_WIDGET_KEY not in st.session_state:
+        st.session_state[SCORE_WIDGET_KEY] = st.session_state.get(SCORE_STATE_KEY, DEFAULT_SCORE)
+
+    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, key=SCORE_WIDGET_KEY, help=help)
+    st.session_state[SCORE_STATE_KEY] = score
+
+    return score
+
+
 def filter_tissues(config, df):
     source = df['taxid1'].unique()[0]
     mapped_tissues = config['tissues']
@@ -392,22 +460,22 @@ CELL_TYPE_MAX_CUTOFF = 200
 
 def keep_expressed_cell_types(df, cutoff=CELL_TYPE_CUTOFF):
     '''The rows of a tissue-annotated frame where a host protein counts as expressed.'''
-    return df[df['nTPM'] > cutoff]
+    return df[df['nCPM'] > cutoff]
 
 
 def expression_slider(key, help=None):
-    '''The nTPM a host protein must exceed in a cell type to count as expressed there.'''
-    return st.slider('Cell-type expression (nTPM)', CELL_TYPE_CUTOFF, CELL_TYPE_MAX_CUTOFF,
+    '''The nCPM a host protein must exceed in a cell type to count as expressed there.'''
+    return st.slider('Cell-type expression (nCPM)', CELL_TYPE_CUTOFF, CELL_TYPE_MAX_CUTOFF,
                      CELL_TYPE_CUTOFF, key=key,
                      help=help or 'A host protein counts towards a cell type when its '
-                                  'expression there is above this. 1 nTPM is HPA\'s own '
+                                  'expression there is above this. 1 nCPM is HPA\'s own '
                                   'detection threshold; the mouse and pig atlases are put on '
                                   'the same scale.')
 
 
 def expression_phrase(cutoff):
     '''How the captions say what counts as expressed.'''
-    return f'above {cutoff:g} nTPM'
+    return f'above {cutoff:g} nCPM'
 
 
 def count_ticks(figure, largest, axis='x', **kwargs):

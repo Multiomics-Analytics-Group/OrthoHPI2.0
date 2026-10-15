@@ -6,7 +6,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import streamlit as st
-from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -122,8 +121,8 @@ FILTER_BADGES = {'tissue': 'blue', 'expression': 'green', 'cell type': 'green',
 # names of one kind in a download filename before they are counted instead
 FILENAME_MAX_NAMES = 2
 
-# rows to a page of either table
-TABLE_PAGE_SIZE = 10
+# height in pixels of the box either table scrolls in
+TABLE_HEIGHT = 400
 
 # the two sides of the network, tested separately for enrichment and shown side by side
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
@@ -1314,20 +1313,7 @@ with st.container():
         table = search_table(table, search)
         if search.strip() and table.empty:
             st.info(f"No interaction holds '{search}'.")
-        gb = GridOptionsBuilder.from_dataframe(table)
-        # a page of a known size with the grid grown to fit it, rather than blank rows under
-        # a short page
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=TABLE_PAGE_SIZE)
-        gb.configure_grid_options(domLayout='autoHeight')
-        gb.configure_side_bar()
-        gridOptions = gb.build()
-        grid_response = AgGrid(
-                            table,
-                            gridOptions=gridOptions,
-                            data_return_mode='AS_INPUT',
-                            fit_columns_on_grid_load=False,
-                            enable_enterprise_modules=True
-                        )
+        st.dataframe(table, width='stretch', height=TABLE_HEIGHT, hide_index=True)
         st.download_button(
             label="Download Network Table",
             data=utils.convert_df(name_the_selection(table, selected_parasite,
@@ -1370,21 +1356,12 @@ with st.container():
             per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
             st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
                        'Select rows to highlight GO terms in the network.')
-            gb = GridOptionsBuilder.from_dataframe(enrichment_table)
-            gb.configure_pagination(paginationAutoPageSize=False,
-                                    paginationPageSize=TABLE_PAGE_SIZE)
-            gb.configure_grid_options(domLayout='autoHeight')
-            gb.configure_side_bar()
-            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children")
-            gridOptions = gb.build()
-            grid_response = AgGrid(
-                                enrichment_table,
-                                gridOptions=gridOptions,
-                                data_return_mode='AS_INPUT',
-                                fit_columns_on_grid_load=False,
-                                enable_enterprise_modules=True
-                            )
-            selected_rows = grid_response['selected_rows']
+            grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                hide_index=True, on_select='rerun',
+                                selection_mode='multi-row', key='enrichment_table')
+            # a selection made before the FDR shortened the table can point past its end
+            selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                   if r < len(enrichment_table)]]
             st.download_button(
                 label="Download Enrichment Table",
                 data=utils.convert_df(enrichment_table),

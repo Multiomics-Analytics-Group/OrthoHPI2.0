@@ -84,6 +84,16 @@ def get_config_file():
     return st.session_state.get('config_file', 'config.yml')
 
 
+def load_config(config_file):
+    '''The parsed config, read again only when the file changes.'''
+    return read_config(config_file, os.path.getmtime(config_file))
+
+
+@st.cache_data(show_spinner=False)
+def read_config(config_file, modified_at):
+    return utils.read_config(config_file)
+
+
 @st.cache_data(show_spinner=False)
 def load_predictions(data_dir):
     '''Every predicted interaction, as pipeline/main.py writes them.'''
@@ -198,14 +208,17 @@ def expressed_infected_tissue_proteins(data_dir, config, parasite_taxid):
     return set(tissues.loc[tissues['tissue'].isin(infected), 'protein'])
 
 
+@st.cache_data(show_spinner=False)
 def infected_tissue_proteins(data_dir, config, parasite_taxid):
     '''
     The host proteins annotated to a tissue this parasite is known to infect, over every
     host at once.
     '''
-    tissues = load_tissue_annotation(data_dir)
-    if tissues is None:
+    tissue_file = os.path.join(data_dir, 'tissues_cell_types.parquet')
+    if not os.path.exists(tissue_file):
         return set()
+    # two of the table's columns, rather than load_tissue_annotation's copy of all of it
+    tissues = pd.read_parquet(tissue_file, columns=['Gene', 'Tissue'])
 
     mapped = config['tissues']
     infected = {mapped[t].lower() for t in config['parasites'][int(parasite_taxid)]['tissues']}

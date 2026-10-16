@@ -43,11 +43,11 @@ All the necessary data (predictions and annotations) have been precalculated so 
 $ streamlit run app/OrthoHPI_Home.py
 ```
 
-This will open your browser at http://localhost:8501 with the functionality shown in the video:
+This will open your browser at http://localhost:8501.
 
-
-
+<!-- Old demo video
 https://user-images.githubusercontent.com/1425851/194722960-e42a191f-1cec-4c49-a96e-5a03b351677d.mp4
+-->
 
 
 ### Installation

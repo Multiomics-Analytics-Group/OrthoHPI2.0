@@ -1,4 +1,6 @@
 import sys, os
+import functools
+import io
 import json
 import re
 import textwrap
@@ -6,12 +8,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import streamlit as st
-from st_aggrid import GridOptionsBuilder, AgGrid
 import pandas as pd
 import numpy as np
 import networkx as nx
 from css import style
 from pyvis.network import Network
+from pyvis.edge import Edge
 import plotly.express as px
 import plotly.graph_objects as pgo
 import structure_visualizer as strv
@@ -34,9 +36,6 @@ selected_terms = []
 enrichment_table = None
 enrichment_view = None
 enrichment = None
-path = 'data/tmp'
-# where the network is written for the download buttons; not in the repository
-os.makedirs(path, exist_ok=True)
 # characters per line of a node label
 LABEL_WRAP_WIDTH = 22
 LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
@@ -57,13 +56,12 @@ MUTED_COLOR = '#c8ced6'
 # significance is a magnitude, so a single hue running light to dark
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
 GO_AXIS_COLOR = '#8d97a3'
-# fewer proteins than this and the cell-type matrix says nothing the table does not
-MATRIX_MIN_PROTEINS = 3
-MATRIX_MARK_SIZE = 11
+# fewer proteins than this and the cell-type bars say nothing the table does not
+CELL_TYPE_MIN_PROTEINS = 3
 # the bars do not grow with the host proteins
 BARS_HEIGHT = 420
 # joins tissue and cell type, a cell type name being unique only inside its tissue
-MATRIX_SEPARATOR = ' | '
+CELL_TYPE_SEPARATOR = ' | '
 GO_GRID_COLOR = '#e6eaef'
 # processes the ranked plot shows; beyond this the names stop being readable
 GO_TOP_N = 20
@@ -83,7 +81,7 @@ VIEWER_HEIGHT = 400
 # be assembled from the rest
 TABLE_COLUMNS = ['source_name', 'source_full_name', 'source', 'source_uniprot',
                  'target_name', 'target_full_name', 'target', 'target_uniprot',
-                 'Tissues', 'experimental_evidence_score',
+                 'Tissues', 'cell_types', 'experimental_evidence_score',
                  'databases_evidence_score', 'weight', 'group1', 'group2']
 
 # `source` is the parasite and `target` the host throughout the pipeline; the names here are
@@ -100,6 +98,7 @@ TABLE_COLUMN_NAMES = {
     'target': 'Host STRING id',
     'target_uniprot': 'Host UniProt id',
     'target_surface': 'Host DeepLoc class',
+    'cell_types': 'Host cell types',
     'experimental_evidence_score': 'Experimental evidence',
     'databases_evidence_score': 'Database evidence',
     'weight': 'Confidence score',
@@ -122,8 +121,8 @@ FILTER_BADGES = {'tissue': 'blue', 'expression': 'green', 'cell type': 'green',
 # names of one kind in a download filename before they are counted instead
 FILENAME_MAX_NAMES = 2
 
-# rows to a page of either table
-TABLE_PAGE_SIZE = 10
+# height in pixels of the box either table scrolls in
+TABLE_HEIGHT = 400
 
 # the two sides of the network, tested separately for enrichment and shown side by side
 HOST, PARASITE = 'Host proteins', 'Parasite proteins'
@@ -148,7 +147,9 @@ data_dir = web_utils.get_data_dir()
 load_predictions = web_utils.load_predictions
 
 
-@st.cache_data(show_spinner=False, max_entries=5)
+# shared rather than copied on every rerun, as cache_data would: the caller filters it
+# into a new frame before changing anything
+@st.cache_resource(show_spinner=False, max_entries=5)
 def get_parasite_tissues(data_dir, parasite, host_taxids):
     '''
     Annotates the predictions of one parasite against the selected host with the tissues
@@ -202,6 +203,15 @@ def node_color(color):
             'border': color,
             'highlight': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color},
             'hover': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color}}
+
+
+class GraphNetwork(Network):
+    '''
+    pyvis' Network without the scan for a duplicate that add_edge makes over every edge
+    so far, which is quadratic in the edges; a networkx Graph has no duplicates to find.
+    '''
+    def add_edge(self, source, to, **options):
+        self.edges.append(Edge(source, to, self.directed, **options).options)
 
 
 def style_network(net):
@@ -312,7 +322,7 @@ def generate_node_titles(df, annotations, surface_calls=None):
     return titles
 
 
-def generate_interactions_table(df, score, annotations):
+def generate_interactions_table(df, score, annotations, expression):
     '''Builds the table of predicted interactions above the chosen score.'''
     table = df[df['weight'] >= score]
     if table.empty:
@@ -320,8 +330,16 @@ def generate_interactions_table(df, score, annotations):
 
     tissues = table.groupby(['source', 'target'])['Tissue'].apply(
         lambda t: ', '.join(sorted(t.dropna().unique()))).rename('Tissues').reset_index()
+    # the cell types the host protein is expressed in, a cell type being counted once per
+    # tissue; left empty for a host without cell-type annotation
+    annotated = table[table['Cell type'].notna()]
+    cell_types = (web_utils.keep_expressed_cell_types(annotated, expression)
+                           .drop_duplicates(['target', 'Tissue', 'Cell type'])
+                           .groupby('target').size())
+    cell_types = cell_types.reindex(annotated['target'].unique(), fill_value=0)
     table = pd.merge(table.drop_duplicates(subset=['source', 'target']), tissues,
                      on=['source', 'target'])
+    table = table.assign(cell_types=table['target'].map(cell_types).astype('Int64'))
     # the descriptive protein name, of which the predictions only keep the short version
     table = table.assign(
         source_full_name=table['source'].map(annotations).fillna(''),
@@ -450,19 +468,16 @@ def generate_surface_filters(df, surface_calls, niche):
 def cell_type_marks(df, score, expression):
     '''
     The host proteins of the network against the cell types they are expressed in
-    (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
-    section are drawn from, and the tissues those cell types are grouped into.
+    (web_utils.keep_expressed_cell_types), which the cell type bars are drawn from, and
+    the tissues those cell types are grouped into.
     '''
     annotated = df[(df['weight'] >= score) & df['Cell type'].notna()]
     if annotated.empty:
         return None, None
 
     marks = web_utils.keep_expressed_cell_types(annotated, expression).copy()
-    # the row a protein reaches its maximum in is always kept, so the darkest of a row is
-    # 100%
-    marks['share'] = marks['nCPM'] / marks.groupby(['target', 'Tissue'])['nCPM'].transform('max')
-    marks['column'] = marks['Tissue'] + MATRIX_SEPARATOR + marks['Cell type']
-    if (marks['target_name'].nunique() < MATRIX_MIN_PROTEINS
+    marks['column'] = marks['Tissue'] + CELL_TYPE_SEPARATOR + marks['Cell type']
+    if (marks['target_name'].nunique() < CELL_TYPE_MIN_PROTEINS
             or marks['column'].nunique() < 2):
         return None, None
 
@@ -491,16 +506,15 @@ def label_tissue_blocks(figure, blocks):
 
     figure.update_xaxes(tickmode='array', tickvals=columns, tickangle=-60, title=None,
                         showgrid=False,
-                        ticktext=[column.split(MATRIX_SEPARATOR)[1] for column in columns])
+                        ticktext=[column.split(CELL_TYPE_SEPARATOR)[1] for column in columns])
 
     return figure
 
 
 def style_cell_type_figure(figure, blocks):
     '''
-    The two cell type figures share their axes, their blocks and the room above the plot
-    the names of those blocks need, which style_go_axes leaves only the margin of a
-    plain figure for.
+    The cell type bars need room above the plot for the names of their blocks, which
+    style_go_axes leaves only the margin of a plain figure for.
     '''
     figure = style_go_axes(label_tissue_blocks(figure, blocks))
     figure.update_layout(margin=dict(l=10, r=10, t=34, b=40))
@@ -528,38 +542,6 @@ def generate_cell_type_bars(marks, blocks):
     figure.update_yaxes(title='predicted interactions')
     web_utils.count_ticks(figure, counted['interactions'].max(), axis='y')
     figure.update_layout(height=BARS_HEIGHT)
-
-    return style_cell_type_figure(figure, blocks)
-
-
-def generate_cell_type_matrix(marks, blocks):
-    '''
-    Where inside the tissue the host proteins of the network sit: a mark wherever a
-    protein is expressed in a cell type, the cell types along the bottom in blocks of the
-    tissue they belong to and the host proteins up the side.
-    '''
-    columns = [column for _, block in blocks for column in block]
-    drawn = marks.drop_duplicates(['target_name', 'column'])
-    proteins = list(drawn.groupby('target_name')['column'].nunique()
-                         .sort_values(ascending=False, kind='stable').index)
-
-    figure = px.scatter(drawn, x='column', y='target_name', color='share',
-                        color_continuous_scale=GO_SEQUENTIAL,
-                        range_color=(0, 1),
-                        # plotly express flips category_orders on a y axis
-                        category_orders={'column': columns, 'target_name': proteins},
-                        custom_data=['Tissue', 'Cell type', 'nCPM', 'share'])
-    figure.update_traces(marker=dict(size=MATRIX_MARK_SIZE, symbol='square',
-                                     line=dict(color=NETWORK_BACKGROUND, width=1)),
-                         hovertemplate='<b>%{y}</b><br>%{customdata[1]} (%{customdata[0]})'
-                                       '<br>nCPM: %{customdata[2]:.1f}<br>'
-                                       'Share of its peak in the tissue: '
-                                       '%{customdata[3]:.0%}<extra></extra>')
-    figure.update_yaxes(title=None, ticksuffix='  ')
-    figure.update_coloraxes(colorbar=dict(title='Share of<br>tissue peak', tickformat='.0%',
-                                          thickness=12, outlinewidth=0, len=0.6))
-    # one row per host protein
-    figure.update_layout(height=max(320, 22 * len(proteins) + 200))
 
     return style_cell_type_figure(figure, blocks)
 
@@ -719,7 +701,8 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
     return style_go_axes(fig)
 
 
-@st.cache_data(show_spinner=False)
+# shared rather than copied on every rerun; only ever read
+@st.cache_resource(show_spinner=False)
 def load_ontology_parents(data_dir):
     '''child GO id -> its parent GO ids, the shape the ontology is walked upward in.'''
     ontology = load_ontology(data_dir)
@@ -832,6 +815,14 @@ def get_enrichment_summary(enrichment_df, parents_of):
 
     return fig
 
+@st.cache_data(show_spinner=False, max_entries=20)
+def get_centrality(edges):
+    '''Betweenness centrality of every node, over the edges before the score threshold.'''
+    G = nx.from_pandas_edgelist(edges, 'source', 'target', 'weight')
+
+    return nx.betweenness_centrality(G, weight='weight')
+
+
 def generate_graph(df, score, annotations=None, surface_calls=None):
     if df.empty:
         return nx.Graph()
@@ -849,7 +840,7 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
     if annotations is not None:
         nx.set_node_attributes(G, generate_node_labels(df, annotations), 'label')
         nx.set_node_attributes(G, generate_node_titles(df, annotations, surface_calls), 'title')
-    centrality = nx.betweenness_centrality(G, weight='weight')
+    centrality = get_centrality(df[['source', 'target', 'weight']])
     max_centrality = max(centrality.values(), default=0)
     sizes = {}
     for k,v in centrality.items():
@@ -877,49 +868,54 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
     return G
 
 
-def annotate_edges(edges, df, annotations):
+def title_edges(edges, df):
     '''
-    Writes the two proteins of an interaction onto the edge that draws it, so that a
-    click on the edge carries everything needed to show their structures.
+    Writes the hover text onto each edge, the one thing saying the edges can be clicked;
+    what the click shows is looked up in Python by edge_interaction.
     '''
-    # the species travels with the edge, so the dialog can name it beside each protein
-    cols = ['source', 'source_name', 'source_uniprot', 'taxid1_label',
-            'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight',
-            'group1', 'group2', 'experimental_evidence_score', 'databases_evidence_score']
-    pairs = {}
-    for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
-        pairs[frozenset((row.source, row.target))] = {
-            'parasite': str(row.source_name),
-            'parasite_id': str(row.source),
-            # NaN does not survive the trip to the browser
-            'parasite_uniprot': None if pd.isna(row.source_uniprot) else str(row.source_uniprot),
-            'parasite_full': annotations.get(row.source, ''),
-            'parasite_species': str(row.taxid1_label),
-            'host': str(row.target_name),
-            'host_id': str(row.target),
-            'host_uniprot': None if pd.isna(row.target_uniprot) else str(row.target_uniprot),
-            'host_full': annotations.get(row.target, ''),
-            'host_species': str(row.taxid2_label),
-            'weight': float(row.weight),
-            'parasite_group': str(row.group1),
-            'host_group': str(row.group2),
-            # the two scores the weight is the mean of, kept apart
-            'experimental': float(row.experimental_evidence_score),
-            'databases': float(row.databases_evidence_score)}
+    pairs = {frozenset((row.source, row.target)): row for row in
+             df[['source', 'source_name', 'target', 'target_name', 'weight']]
+             .drop_duplicates(subset=['source', 'target']).itertuples(index=False)}
 
-    annotated = []
+    titled = []
     for edge in edges:
         edge = dict(edge)
-        interaction = pairs.get(frozenset((edge['from'], edge['to'])))
-        if interaction is not None:
-            edge.update(interaction)
-            # nothing else says the edges can be clicked
-            edge['title'] = (f"{interaction['parasite']} -- {interaction['host']}\n"
-                             f"confidence {interaction['weight']:.3f}\n"
+        row = pairs.get(frozenset((edge['from'], edge['to'])))
+        if row is not None:
+            edge['title'] = (f"{row.source_name} -- {row.target_name}\n"
+                             f"confidence {float(row.weight):.3f}\n"
                              'click to see the AlphaFold models')
-        annotated.append(edge)
+        titled.append(edge)
 
-    return annotated
+    return titled
+
+
+def edge_interaction(edge, df, annotations):
+    '''The two proteins of the clicked edge, with everything the structures dialog shows.'''
+    ends = {edge['from'], edge['to']}
+    rows = df[df['source'].isin(ends) & df['target'].isin(ends)]
+    if rows.empty:
+        return None
+
+    row = rows.iloc[0]
+    return {
+        'parasite': str(row['source_name']),
+        'parasite_id': str(row['source']),
+        # NaN does not survive into the dialog's text
+        'parasite_uniprot': None if pd.isna(row['source_uniprot']) else str(row['source_uniprot']),
+        'parasite_full': annotations.get(row['source'], ''),
+        'parasite_species': str(row['taxid1_label']),
+        'host': str(row['target_name']),
+        'host_id': str(row['target']),
+        'host_uniprot': None if pd.isna(row['target_uniprot']) else str(row['target_uniprot']),
+        'host_full': annotations.get(row['target'], ''),
+        'host_species': str(row['taxid2_label']),
+        'weight': float(row['weight']),
+        'parasite_group': str(row['group1']),
+        'host_group': str(row['group2']),
+        # the two scores the weight is the mean of, kept apart
+        'experimental': float(row['experimental_evidence_score']),
+        'databases': float(row['databases_evidence_score'])}
 
 
 def fasta_header(protein, name, species, uniprot):
@@ -943,6 +939,19 @@ def network_fasta(G, df, sequences):
                 records.append((header, sequences[protein]))
 
     return web_utils.to_fasta(records)
+
+
+def graphml_bytes(G):
+    '''The network as GraphML, for its download button.'''
+    out = io.BytesIO()
+    nx.write_graphml_lxml(G, out)
+
+    return out.getvalue()
+
+
+def cytoscape_json(G):
+    '''The network as Cytoscape JSON, for its download button.'''
+    return json.dumps(nx.cytoscape_data(G))
 
 
 def network_options(net):
@@ -1116,7 +1125,7 @@ with col2:
             host_df = host_df.assign(
                 target_color=config['hosts'][int(host_taxid)]['color'])
             G = generate_graph(host_df, score, annotations, surface_calls)
-            net = Network(height=f'{NETWORK_HEIGHT}px', width="100%",
+            net = GraphNetwork(height=f'{NETWORK_HEIGHT}px', width="100%",
                           bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
             net.from_nx(G)
             net.repulsion(node_distance=420, central_gravity=0.33,
@@ -1174,21 +1183,13 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                                    host_df['source_color'].iloc[0],
                                    host_label, host_df['target_color'].iloc[0]),
                     unsafe_allow_html=True)
-        filename = f'{selected_parasite}_{host_taxid}_network'
-        html_data = ""
-        # saved for the download button; the page draws the network through the component so
-        # clicks reach Python
-        net.save_graph(f'{path}/{filename}.html')
-        utils.export_graph(G, filename=f'{filename}.graphml',
-                           format='graphml', output_dir=path)
-        utils.export_graph(G, filename=f'{filename}.json',
-                           format='cytoscape', output_dir=path)
-        with open(f'{path}/{filename}.html','r',encoding='utf-8') as HtmlFile:
-            html_data = HtmlFile.read()
+        # the downloads are written when their button is clicked rather than on every rerun;
+        # the page draws the network through the component so clicks reach Python
+        html_data = functools.partial(net.generate_html)
         nodes, edges = net.get_network_data()[:2]
         selected_edge = ppi_network(
             nodes=nodes,
-            edges=annotate_edges(edges, host_df, web_utils.load_protein_annotations(data_dir)),
+            edges=title_edges(edges, host_df),
             options=network_options(net),
             height=NETWORK_HEIGHT,
             key=f'network_{selected_parasite}_{host_taxid}')
@@ -1199,7 +1200,10 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
         shown_edge_key = f'shown_edge_{host_taxid}'
         if selected_edge is not None and selected_edge['nonce'] != st.session_state.get(shown_edge_key):
             st.session_state[shown_edge_key] = selected_edge['nonce']
-            show_structures_dialog(selected_edge['edge'])
+            interaction = edge_interaction(selected_edge['edge'], host_df,
+                                           web_utils.load_protein_annotations(data_dir))
+            if interaction is not None:
+                show_structures_dialog(interaction)
         with st.container():
             c1, c2, c3, c4 = st.columns(4)
 
@@ -1214,7 +1218,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c2:
                 st.download_button(
                     label="Download Network as GraphML",
-                    data=open(f'{path}/{filename}.graphml','r',encoding='utf-8'),
+                    data=functools.partial(graphml_bytes, G),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.graphml'),
                     mime='text/plain',
@@ -1222,7 +1226,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c3:
                 st.download_button(
                     label="Download Network as Cytoscape",
-                    data=open(f'{path}/{filename}.json','r',encoding='utf-8'),
+                    data=functools.partial(cytoscape_json, G),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.json'),
                     mime='text/plain',
@@ -1230,8 +1234,8 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c4:
                 st.download_button(
                     label="Download Sequences as FASTA",
-                    data=network_fasta(G, host_df,
-                                       web_utils.load_protein_sequences(data_dir)),
+                    data=functools.partial(network_fasta, G, host_df,
+                                           web_utils.load_protein_sequences(data_dir)),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.fasta'),
                     mime='text/plain',
@@ -1277,35 +1281,26 @@ with st.container():
             st.header('Cell types expressing the host proteins')
             show_active_filters(page_filters)
             st.caption('A host protein counts towards a cell type when it is expressed there, '
-                       f'{web_utils.expression_phrase(expression)}. The '
-                       'columns of both tabs are those cell types, grouped into the tissues '
-                       'the parasite infects, and a cell type is written under its block '
-                       'alone, since the same kind of cell is annotated separately in each '
-                       'tissue. Cell-type annotation is available for human (HPA), mouse '
-                       '(Tabula Muris Senis) and pig (Pig Cell Atlas).')
-            # the same columns counted, then opened up per protein
-            per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
-            with per_cell_type_tab:
-                st.caption('Predicted interactions per cell type. An interaction is counted '
-                           'in every cell type where its host protein is expressed, so the '
-                           'bars overlap and are not a partition of the network.')
-                st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
-            with per_protein_tab:
-                st.caption('A mark wherever a host protein is expressed in a cell type, '
-                           'shaded by the share of its expression in that tissue the cell '
-                           'type carries. A row of one mark is a protein the parasite meets '
-                           'in a single kind of cell; a full row one it meets throughout the '
-                           'tissue.')
-                st.plotly_chart(generate_cell_type_matrix(marks, blocks), width='stretch')
+                       f'{web_utils.expression_phrase(expression)}, and an interaction '
+                       'is counted in every cell type where its host protein is expressed, '
+                       'so the bars overlap and are not a partition of the network. The '
+                       'cell types are grouped into the tissues the parasite infects, and a '
+                       'cell type is written under its block alone, since the same kind of '
+                       'cell is annotated separately in each tissue. Cell-type annotation is '
+                       'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
+                       'Cell Atlas).')
+            st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
 
 with st.container():
     if df_select is not None:
         st.header("Table of host-parasite PPIs")
         show_active_filters(page_filters)
         table = generate_interactions_table(df_select, score,
-                                            web_utils.load_protein_annotations(data_dir))
+                                            web_utils.load_protein_annotations(data_dir),
+                                            expression)
         st.caption('One row per predicted interaction, with the tissues the host protein is '
-                   'expressed in and its DeepLoc class.')
+                   'expressed in, the number of cell types it is expressed in '
+                   f'({web_utils.expression_phrase(expression)}) and its DeepLoc class.')
         search = st.text_input(
             "Search the table",
             key='table_search',
@@ -1314,20 +1309,7 @@ with st.container():
         table = search_table(table, search)
         if search.strip() and table.empty:
             st.info(f"No interaction holds '{search}'.")
-        gb = GridOptionsBuilder.from_dataframe(table)
-        # a page of a known size with the grid grown to fit it, rather than blank rows under
-        # a short page
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=TABLE_PAGE_SIZE)
-        gb.configure_grid_options(domLayout='autoHeight')
-        gb.configure_side_bar()
-        gridOptions = gb.build()
-        grid_response = AgGrid(
-                            table,
-                            gridOptions=gridOptions,
-                            data_return_mode='AS_INPUT',
-                            fit_columns_on_grid_load=False,
-                            enable_enterprise_modules=True
-                        )
+        st.dataframe(table, width='stretch', height=TABLE_HEIGHT, hide_index=True)
         st.download_button(
             label="Download Network Table",
             data=utils.convert_df(name_the_selection(table, selected_parasite,
@@ -1370,27 +1352,12 @@ with st.container():
             per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
             st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
                        'Select rows to highlight GO terms in the network.')
-            gb = GridOptionsBuilder.from_dataframe(enrichment_table)
-            gb.configure_pagination(paginationAutoPageSize=False,
-                                    paginationPageSize=TABLE_PAGE_SIZE)
-            gb.configure_grid_options(domLayout='autoHeight')
-            gb.configure_side_bar()
-            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren="Group checkbox select children")
-            gridOptions = gb.build()
-            grid_response = AgGrid(
-                                enrichment_table,
-                                gridOptions=gridOptions,
-                                data_return_mode='AS_INPUT',
-                                fit_columns_on_grid_load=False,
-                                enable_enterprise_modules=True
-                            )
-            selected_rows = grid_response['selected_rows']
-            st.download_button(
-                label="Download Enrichment Table",
-                data=utils.convert_df(enrichment_table),
-                file_name=f'{selected_parasite}_network_enrichment_table.tsv',
-                mime='text/csv',
-            )
+            grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                hide_index=True, on_select='rerun',
+                                selection_mode='multi-row', key='enrichment_table')
+            # a selection made before the FDR shortened the table can point past its end
+            selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                   if r < len(enrichment_table)]]
         else:
             st.subheader("No GO terms were found enriched")
 
@@ -1453,18 +1420,16 @@ with st.container():
                                        surface_calls)
                     nx.set_node_attributes(G, MUTED_COLOR, 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
-                    net = Network(height="450px", width="100%",
+                    net = GraphNetwork(height="450px", width="100%",
                                   bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
                     net.from_nx(G)
                     G = None
                     style_network(net)
-                    net.save_graph(f'{path}/{selected_parasite}2.html')
+                    html_data = net.generate_html()
                     net = None
                     st.subheader("Nodes annotated to the selected biological processes")
                     st.caption('The network with the proteins annotated to the biological '
                                'processes selected above in pink and the remainder in grey.')
-                    with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
-                        html_data = HtmlFile.read()
                     st.iframe(html_data, height=500)
                     st.download_button(
                         label="Download Network as Html",

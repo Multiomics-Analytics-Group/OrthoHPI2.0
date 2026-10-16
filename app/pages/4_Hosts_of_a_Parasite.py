@@ -14,7 +14,7 @@ st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
 web_utils.show_header('Multi-host parasites')
 
-config = utils.read_config(web_utils.get_config_file())
+config = web_utils.load_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
@@ -146,13 +146,21 @@ def combination_palette(links, all_hosts, config):
 
 
 @st.cache_data(show_spinner=False)
-def get_link_combinations(df_pred, parasite):
+def get_link_combinations(data_dir, config, score):
+    '''The orthology-group links of every multi-host parasite, by parasite.'''
+    df_pred = get_multi_host_predictions(data_dir, config, score)
+
+    return {parasite: link_combinations(edges)
+            for parasite, edges in df_pred.groupby('taxid1_label')}
+
+
+def link_combinations(edges):
     '''
     The predicted interactions of one parasite at the level they can be compared between
     hosts: the orthology group of the parasite protein against the orthology group of
     the host protein.
     '''
-    edges = df_pred[df_pred['taxid1_label'] == parasite].copy()
+    edges = edges.copy()
     # The pair is unordered. A protein belonging to both groups of a COG link is drawn
     # from either of them by homology.get_links, so the same transfer can be written with
     # group1 and group2 the other way round; keyed on the ordered pair, those are two
@@ -236,18 +244,20 @@ def order_combinations(links):
 
 
 @st.cache_data(show_spinner=False)
-def generate_overview_bars(df_pred, config):
+def generate_overview_bars(data_dir, config, score):
     '''
     Every multi-host parasite on one figure: its orthology-group links stacked by how far
     they carried over, from shared by every host to found in one host only, in the
     colours the rest of the page reads them in.
     '''
+    df_pred = get_multi_host_predictions(data_dir, config, score)
+    links_of = get_link_combinations(data_dir, config, score)
     parasites = sorted(df_pred['taxid1_label'].unique())
     all_hosts = sorted(df_pred['host'].unique())
     stacks = {'in every host': {}, 'in some hosts': {}}
     stacks.update({f'only in {common_name(host)}': {} for host in all_hosts})
     for parasite in parasites:
-        links = get_link_combinations(df_pred, parasite)
+        links = links_of[parasite]
         n_hosts = len(links['hosts'].iloc[0].union(*links['hosts']))
         stacks['in every host'][parasite] = int((links['n_hosts'] == n_hosts).sum())
         stacks['in some hosts'][parasite] = int(((links['n_hosts'] > 1) & (links['n_hosts'] < n_hosts)).sum())
@@ -439,11 +449,12 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
 
 
 @st.cache_data(show_spinner=False)
-def get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids):
+def get_host_coverage(data_dir, config, score, parasite, hosts_taxids):
     '''
     The size of what was predicted in each host, beside the size of what could have
     been.
     '''
+    df_pred = get_multi_host_predictions(data_dir, config, score)
     edges = df_pred[df_pred['taxid1_label'] == parasite]
     parasite_taxid = edges['taxid1'].iloc[0]
     available = count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids)
@@ -542,7 +553,7 @@ else:
                'not count for more: how many carried over to every host, and how many '
                'are found in one host only. Choose a parasite below to see which links '
                'they are and why a host lacks them.')
-    st.plotly_chart(generate_overview_bars(df_pred, config), width='stretch')
+    st.plotly_chart(generate_overview_bars(data_dir, config, score), width='stretch')
 
     with st.columns(3)[1]:
         parasite = st.selectbox('Select a parasite to compare its hosts', parasites,
@@ -554,7 +565,7 @@ else:
         all_hosts = sorted(edges['host'].unique())
         hosts_taxids = {host: tuple(sorted(set(rows['taxid2'])))
                         for host, rows in edges.groupby('host')}
-        links = get_link_combinations(df_pred, parasite)
+        links = get_link_combinations(data_dir, config, score)[parasite]
 
         # the comparison first, since a host carrying more interactions may only have been
         # annotated more deeply
@@ -567,7 +578,7 @@ else:
                    'this parasite infects. The second pool is what the predictions were '
                    'drawn from, so a host with more predicted interactions than another may '
                    'simply have more of it.')
-        st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
+        st.dataframe(get_host_coverage(data_dir, config, score, parasite, hosts_taxids),
                      width='stretch', hide_index=True)
 
         body_column, sets_column = st.columns([1, 1], gap='large')
@@ -611,7 +622,7 @@ else:
                     lead += ' ' + rest[0].upper() + rest[1:] + '.'
                 st.markdown(lead)
                 with st.expander(f'The {len(reasons)} missing links, one row each'):
-                    st.dataframe(reasons, width='stretch', hide_index=True)
+                    st.dataframe(reasons, width='stretch', height=400, hide_index=True)
             elif reasons is None:
                 st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
                            'of whether a host missing an interaction has a protein of the '

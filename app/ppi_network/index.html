@@ -46,6 +46,25 @@
       #mynetwork canvas {
         cursor: default;
       }
+      /* over the network while vis.js lays it out, which for the largest networks takes
+         several seconds with nothing drawn */
+      #loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Source Sans Pro', -apple-system, 'Segoe UI', sans-serif;
+        font-size: 15px;
+        color: #6b7785;
+        pointer-events: none;
+      }
+      #loading[hidden] {
+        display: none;
+      }
       #unavailable {
         font-family: sans-serif;
         color: #555555;
@@ -55,7 +74,10 @@
   </head>
 
   <body>
-    <div id="mynetwork"></div>
+    <div style="position: relative">
+      <div id="mynetwork"></div>
+      <div id="loading">Loading network…</div>
+    </div>
     <div id="unavailable" hidden>
       The network could not be drawn: vis-network.min.js did not load.
     </div>
@@ -64,6 +86,7 @@
       (function () {
         var container = document.getElementById('mynetwork');
         var unavailable = document.getElementById('unavailable');
+        var loading = document.getElementById('loading');
         var network = null;
         // the graph the network currently shows. Streamlit re-fires the render event on
         // every rerun of the page -- moving the confidence slider, paging the table,
@@ -174,6 +197,27 @@
           setTimeout(fit, 4000);
         }
 
+        // vis.js draws nothing until the physics has settled, so the box says how far it
+        // has got instead of standing empty
+        function showLoading(net, options) {
+          var physics = (options || {}).physics || {};
+          var stabilization = physics.stabilization;
+          if (physics.enabled === false || stabilization === false
+              || (stabilization && stabilization.enabled === false)) {
+            loading.hidden = true;
+            return;
+          }
+          loading.textContent = 'Loading network…';
+          loading.hidden = false;
+          net.on('stabilizationProgress', function (params) {
+            loading.textContent = 'Loading network… '
+              + Math.round(100 * params.iterations / params.total) + '%';
+          });
+          net.once('stabilizationIterationsDone', function () {
+            loading.hidden = true;
+          });
+        }
+
         function onRender(event) {
           if (!event.data || event.data.type !== 'streamlit:render') {
             return;
@@ -184,6 +228,7 @@
           setFrameHeight(height + 4);
 
           if (typeof vis === 'undefined') {
+            loading.hidden = true;
             container.hidden = true;
             unavailable.hidden = false;
             setFrameHeight(80);
@@ -204,6 +249,7 @@
             { nodes: new vis.DataSet(args.nodes), edges: new vis.DataSet(args.edges) },
             args.options
           );
+          showLoading(network, args.options);
           network.on('click', onClick);
           // only the edges open anything, so only they get the pointer
           network.on('hoverEdge', onHover);

@@ -1,4 +1,6 @@
 import sys, os
+import functools
+import io
 import json
 import re
 import textwrap
@@ -11,6 +13,7 @@ import numpy as np
 import networkx as nx
 from css import style
 from pyvis.network import Network
+from pyvis.edge import Edge
 import plotly.express as px
 import plotly.graph_objects as pgo
 import structure_visualizer as strv
@@ -33,9 +36,6 @@ selected_terms = []
 enrichment_table = None
 enrichment_view = None
 enrichment = None
-path = 'data/tmp'
-# where the network is written for the download buttons; not in the repository
-os.makedirs(path, exist_ok=True)
 # characters per line of a node label
 LABEL_WRAP_WIDTH = 22
 LABEL_FONT_SIZE = 22  # vis.js defaults to 14, too small to read the protein names
@@ -203,6 +203,15 @@ def node_color(color):
             'border': color,
             'highlight': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color},
             'hover': {'background': tint(color, NODE_HIGHLIGHT_TINT), 'border': color}}
+
+
+class GraphNetwork(Network):
+    '''
+    pyvis' Network without the scan for a duplicate that add_edge makes over every edge
+    so far, which is quadratic in the edges; a networkx Graph has no duplicates to find.
+    '''
+    def add_edge(self, source, to, **options):
+        self.edges.append(Edge(source, to, self.directed, **options).options)
 
 
 def style_network(net):
@@ -932,6 +941,19 @@ def network_fasta(G, df, sequences):
     return web_utils.to_fasta(records)
 
 
+def graphml_bytes(G):
+    '''The network as GraphML, for its download button.'''
+    out = io.BytesIO()
+    nx.write_graphml_lxml(G, out)
+
+    return out.getvalue()
+
+
+def cytoscape_json(G):
+    '''The network as Cytoscape JSON, for its download button.'''
+    return json.dumps(nx.cytoscape_data(G))
+
+
 def network_options(net):
     '''The vis.js options pyvis built, which style_network has already filled in.'''
     return json.loads(net.get_network_data()[5])
@@ -1103,7 +1125,7 @@ with col2:
             host_df = host_df.assign(
                 target_color=config['hosts'][int(host_taxid)]['color'])
             G = generate_graph(host_df, score, annotations, surface_calls)
-            net = Network(height=f'{NETWORK_HEIGHT}px', width="100%",
+            net = GraphNetwork(height=f'{NETWORK_HEIGHT}px', width="100%",
                           bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
             net.from_nx(G)
             net.repulsion(node_distance=420, central_gravity=0.33,
@@ -1161,17 +1183,9 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                                    host_df['source_color'].iloc[0],
                                    host_label, host_df['target_color'].iloc[0]),
                     unsafe_allow_html=True)
-        filename = f'{selected_parasite}_{host_taxid}_network'
-        html_data = ""
-        # saved for the download button; the page draws the network through the component so
-        # clicks reach Python
-        net.save_graph(f'{path}/{filename}.html')
-        utils.export_graph(G, filename=f'{filename}.graphml',
-                           format='graphml', output_dir=path)
-        utils.export_graph(G, filename=f'{filename}.json',
-                           format='cytoscape', output_dir=path)
-        with open(f'{path}/{filename}.html','r',encoding='utf-8') as HtmlFile:
-            html_data = HtmlFile.read()
+        # the downloads are written when their button is clicked rather than on every rerun;
+        # the page draws the network through the component so clicks reach Python
+        html_data = functools.partial(net.generate_html)
         nodes, edges = net.get_network_data()[:2]
         selected_edge = ppi_network(
             nodes=nodes,
@@ -1204,7 +1218,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c2:
                 st.download_button(
                     label="Download Network as GraphML",
-                    data=open(f'{path}/{filename}.graphml','r',encoding='utf-8'),
+                    data=functools.partial(graphml_bytes, G),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.graphml'),
                     mime='text/plain',
@@ -1212,7 +1226,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c3:
                 st.download_button(
                     label="Download Network as Cytoscape",
-                    data=open(f'{path}/{filename}.json','r',encoding='utf-8'),
+                    data=functools.partial(cytoscape_json, G),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.json'),
                     mime='text/plain',
@@ -1220,8 +1234,8 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             with c4:
                 st.download_button(
                     label="Download Sequences as FASTA",
-                    data=network_fasta(G, host_df,
-                                       web_utils.load_protein_sequences(data_dir)),
+                    data=functools.partial(network_fasta, G, host_df,
+                                           web_utils.load_protein_sequences(data_dir)),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.fasta'),
                     mime='text/plain',
@@ -1406,18 +1420,16 @@ with st.container():
                                        surface_calls)
                     nx.set_node_attributes(G, MUTED_COLOR, 'color')
                     nx.set_node_attributes(G, highlight_color, 'color')
-                    net = Network(height="450px", width="100%",
+                    net = GraphNetwork(height="450px", width="100%",
                                   bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
                     net.from_nx(G)
                     G = None
                     style_network(net)
-                    net.save_graph(f'{path}/{selected_parasite}2.html')
+                    html_data = net.generate_html()
                     net = None
                     st.subheader("Nodes annotated to the selected biological processes")
                     st.caption('The network with the proteins annotated to the biological '
                                'processes selected above in pink and the remainder in grey.')
-                    with open(f'{path}/{selected_parasite}2.html','r',encoding='utf-8') as HtmlFile:
-                        html_data = HtmlFile.read()
                     st.iframe(html_data, height=500)
                     st.download_button(
                         label="Download Network as Html",

@@ -9,6 +9,7 @@ import obonet
 import networkx as nx
 from Bio import SeqIO
 import pandas as pd
+import numpy as np
 import scipy.stats as stats
 from statsmodels.stats.multitest import multipletests
 
@@ -39,10 +40,29 @@ def export_graph(G, filename, format='graphml', output_dir='tmp'):
         with open(file_path, 'w') as out:
             out.write(json.dumps(cytoscape_data))
 
+def prepare_go_background(go_df):
+    '''
+    What calculate_enrichment reads from a background, worked out once so a background
+    tested against many protein sets is not regrouped for each of them.
+    '''
+    pairs = go_df[['term', '#string_protein_id']].drop_duplicates()
+
+    return {'pairs': pairs,
+            'annotated': set(pairs['#string_protein_id']),
+            'names': dict(go_df[['term', 'description']].drop_duplicates().values),
+            'sizes': pairs.groupby('term').size()}
+
+
 def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
-                         min_in_set=2):
-    '''Fisher's exact test of every Gene Ontology term against one set of proteins.'''
-    annotated = set(go_df['#string_protein_id'])
+                         min_in_set=2, background=None):
+    '''
+    Fisher's exact test (one-sided, greater) of every Gene Ontology term against one set
+    of proteins; `background` is prepare_go_background(go_df), when already worked out.
+    '''
+    if background is None:
+        background = prepare_go_background(go_df)
+    pairs, annotated = background['pairs'], background['annotated']
+    sizes = background['sizes']
     # the universe is what is annotated
     tested = set(proteins) & annotated
     total_nodes = len(tested)
@@ -50,38 +70,41 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0
 
     max_term = min(max_term, round(max_share * total_prots))
 
-    names = dict(go_df[['term', 'description']].drop_duplicates().values)
-    sizes = go_df.groupby('term')['#string_protein_id'].nunique()
-    in_set = (go_df[go_df['#string_protein_id'].isin(tested)]
-              .groupby('term')['#string_protein_id'].nunique())
+    hits = pairs[pairs['#string_protein_id'].isin(tested)]
+    in_set = hits.groupby('term').size()
     terms = sizes[(sizes > min_term) & (sizes < max_term)].index.intersection(
-        in_set[in_set >= min_in_set].index)
+        in_set[in_set >= min_in_set].index).sort_values()
 
-    enrichment = []
-    for term, ids in go_df[go_df['term'].isin(terms)].groupby(
-            'term')['#string_protein_id']:
-        members = set(ids)
-        net_members = members & tested
+    columns = ['go_id', 'go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes']
+    if len(terms) == 0:
+        return pd.DataFrame(columns=columns)
 
-        # 2x2 table: set proteins annotated to the term (A), rest of the set (B), outside
-        # the set annotated (C), everything else (D)
-        a = len(net_members)
-        b = total_nodes - a
-        c = len(members) - a
-        d = total_prots - len(members) - total_nodes + a
-        odd_ratio, p_value = stats.fisher_exact([[a, b], [c, d]], alternative='greater')
-        enrichment.append([term, names.get(term, term), a, b, c, d, p_value, odd_ratio,
-                           ','.join(sorted(net_members))])
+    # 2x2 table: set proteins annotated to the term (A), rest of the set (B), outside
+    # the set annotated (C), everything else (D)
+    a = in_set[terms].to_numpy(dtype=np.int64)
+    b = total_nodes - a
+    c = sizes[terms].to_numpy(dtype=np.int64) - a
+    d = total_prots - (a + c) - total_nodes + a
+    # what scipy.stats.fisher_exact(alternative='greater') computes, over every term at once
+    p_value = np.minimum(stats.hypergeom.cdf(b, a + b + c + d, a + b, b + d), 1.0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        odds_ratio = np.where((c > 0) & (b > 0), a * d / (c * b), np.inf)
+    empty = ((a + c) == 0) | ((b + d) == 0) | ((a + b) == 0) | ((c + d) == 0)
+    p_value = np.where(empty, 1.0, p_value)
+    odds_ratio = np.where(empty, np.nan, odds_ratio)
 
-    enrichment = pd.DataFrame(enrichment, columns=['go_id', 'go_term', 'A', 'B', 'C', 'D',
-                                                   'p_value', 'odds_ratio', 'nodes'])
-    if not enrichment.empty:
-        # only the corrected p-values are used; the threshold is chosen in the app
-        enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(),
-                                             method='fdr_bh')[1]
-        enrichment = enrichment.sort_values(by='fdr_bh', ascending=True)
+    members = (hits[hits['term'].isin(terms)].groupby('term')['#string_protein_id']
+               .agg(lambda ids: ','.join(sorted(ids))))
+    names = background['names']
+    enrichment = pd.DataFrame({'go_id': terms,
+                               'go_term': [names.get(t, t) for t in terms],
+                               'A': a, 'B': b, 'C': c, 'D': d,
+                               'p_value': p_value, 'odds_ratio': odds_ratio,
+                               'nodes': members[terms].to_numpy()})
+    # only the corrected p-values are used; the threshold is chosen in the app
+    enrichment['fdr_bh'] = multipletests(enrichment['p_value'].tolist(), method='fdr_bh')[1]
 
-    return enrichment
+    return enrichment.sort_values(by='fdr_bh', ascending=True)
 
 def save_to_parquet(df, output_file):
     df.to_parquet(output_file, compression='gzip', index=False)

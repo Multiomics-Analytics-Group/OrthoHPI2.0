@@ -70,6 +70,43 @@ DEEPLOC_LABELS = {'surface': 'DeepLoc', 'localizations': 'localizations',
                      for name, column in web_utils.DEEPLOC_SCORES.items()}}
 
 
+@st.cache_resource(show_spinner=False)
+def load_tissue_expression(data_dir):
+    '''
+    The tissue and cell-type table keyed by host protein, shared rather than copied on
+    every call; only ever read.
+    '''
+    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+
+    return tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
+                                                       'nCPM']]
+
+
+def infected_tissues(config):
+    '''The tissues each parasite is known to infect (config['parasites']).'''
+    mapped_tissues = config['tissues']
+
+    return pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
+                         for taxid, parasite in config['parasites'].items()
+                         for t in parasite['tissues']],
+                        columns=['taxid1', 'Tissue'])
+
+
+@st.cache_resource(show_spinner=False, max_entries=4)
+def get_infected_tissue_expression(data_dir, config, host_taxids):
+    '''
+    Every prediction against the host, with the cell types its host protein is expressed
+    in within the tissues its parasite infects. Joined once a host, at every score, so a
+    new threshold only filters it; shared rather than copied, and only ever read.
+    '''
+    predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
+        ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
+    aux = predictions.drop_duplicates().astype({'taxid1': str})
+    aux = pd.merge(aux, load_tissue_expression(data_dir), on='target')
+
+    return pd.merge(aux, infected_tissues(config), on=['taxid1', 'Tissue'])
+
+
 @st.cache_data(show_spinner=False)
 def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE,
                                   expression=web_utils.CELL_TYPE_CUTOFF):
@@ -78,22 +115,8 @@ def count_interactions_per_tissue(data_dir, config, host_taxids, score=MIN_SCORE
     type, keeping only the tissues each parasite is known to infect
     (config['parasites']).
     '''
-    predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
-        ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
-    predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    tissues = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
-                                                         'nCPM']]
-
-    mapped_tissues = config['tissues']
-    infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
-                                     for taxid, parasite in config['parasites'].items()
-                                     for t in parasite['tissues']],
-                                    columns=['taxid1', 'Tissue'])
-
-    aux = predictions.drop_duplicates().astype({'taxid1': str})
-    aux = pd.merge(aux, tissues, on='target')
-    aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
+    aux = get_infected_tissue_expression(data_dir, config, host_taxids)
+    aux = aux[aux['weight'] >= score]
 
     # keyed by display gene name so aliases of the same host gene do not inflate the counts
     def pairs(frame, *level):
@@ -121,6 +144,20 @@ def dot_size(parasites, labels, column):
     by `labels`, drawn in a column `column` pixels wide.
     '''
     return min(15, max(5, plot_room(labels, column) / len(parasites)))
+
+
+def slant_overhang(names, font, width):
+    '''
+    Pixels the names of the last columns, slanted at 60 degrees, reach past the right
+    edge of a plot `width` pixels wide.
+    '''
+    column = width / len(names)
+    # ~0.6 of the font size a character, half of it across at 60 degrees, and the height
+    # of the letters
+    reach = [0.3 * font * len(name) + font - column * (len(names) - 0.5 - i)
+             for i, name in enumerate(names)]
+
+    return max(0, round(max(reach)))
 
 
 @st.cache_data(show_spinner=False)
@@ -155,30 +192,37 @@ def generate_tissue_dots(per_tissue, groups, group_order, niches, palette, colum
             x=rows['x'], y=rows['y'], mode='markers', name=group,
             marker=dict(color=palette.get(group, UNKNOWN_COLOR), size=rows['interactions'],
                         sizemode='area', sizeref=sizeref, sizemin=4, line=dict(width=0)),
+            # a dot wider than its column is not cut at either end of the axis
+            cliponaxis=False,
             customdata=rows[['Tissue', 'parasite', 'interactions']].to_numpy(),
             hovertemplate='%{customdata[0]}<br>%{customdata[1]}<br>predicted interactions: '
                           '%{customdata[2]}<extra></extra>'))
 
     groups_shown, niches_shown = add_parasite_strips(figure, dots, parasites, palette)
+    font = max(SMALLEST_LABEL, min(11, round(size / 1.1)))
+    # the slanted names of the last columns run past the plot, so the right margin holds them
+    right = slant_overhang(parasites, font, plot_room(tissues, column))
     height = max(420, 19 * len(tissues) + 240)
     room = add_dot_legend(figure, groups_shown, [], niches_shown, palette,
-                          column - (6.2 * max(len(str(t)) for t in tissues) + 30), height)
+                          plot_room(tissues, column) - right, height)
 
     figure.update_layout(height=height, plot_bgcolor='white',
                          # the legends are placed against the foot of the figure, under the
-                         # plot
-                         margin=dict(l=0, r=0, t=10, b=room),
+                         # plot; no pad, so the names sit against the strips
+                         margin=dict(l=0, r=right, t=10, b=room, pad=0),
                          xaxis_title=None, yaxis_title='tissue the parasite infects')
     # every parasite is named (plotly thins labels that no longer fit); the range runs back
     # past the two strips
     figure.update_xaxes(range=[-0.5, len(parasites) - 0.5], side='top', tickmode='array',
                         tickvals=list(range(len(parasites))), ticktext=parasites,
                         tickangle=-60, automargin=True, ticks='',
-                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        tickfont=dict(size=font),
                         showgrid=True, gridcolor='#f0f0f0', zeroline=False)
     # reversed, so the tissue the most parasites reach is the top row
+    # held off the axis by half the largest dot, which may reach past it
     figure.update_yaxes(range=[len(tissues) - 0.5, -3], tickmode='array',
                         tickvals=list(range(len(tissues))), ticktext=tissues, ticks='',
+                        ticklabelstandoff=round(size / 2),
                         automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
 
     return figure
@@ -227,18 +271,11 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'source',
                                                                'target', 'target_name', 'weight']]
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
-    expressed = tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue']].drop_duplicates()
-
-    mapped_tissues = config['tissues']
-    infected_tissues = pd.DataFrame([(str(taxid), mapped_tissues[t].lower())
-                                     for taxid, parasite in config['parasites'].items()
-                                     for t in parasite['tissues']],
-                                    columns=['taxid1', 'Tissue'])
+    expressed = load_tissue_expression(data_dir)[['target', 'Tissue']].drop_duplicates()
 
     aux = predictions.drop_duplicates().astype({'taxid1': str})
     aux = pd.merge(aux, expressed, on='target')
-    aux = pd.merge(aux, infected_tissues, on=['taxid1', 'Tissue'])
+    aux = pd.merge(aux, infected_tissues(config), on=['taxid1', 'Tissue'])
     if tissue is not None:
         aux = aux[aux['Tissue'] == tissue]
 
@@ -445,7 +482,8 @@ def generate_shared_interactor_heatmap(similarity, shared, clades, niches, palet
                    itemdoubleclick=False, font=dict(size=11), title_font=dict(size=11))
     figure.update_layout(width=left + side + right, height=side + top + bottom,
                          plot_bgcolor='white',
-                         margin=dict(l=left, r=right, t=top, b=bottom),
+                         # no pad, so the names sit against the strips
+                         margin=dict(l=left, r=right, t=top, b=bottom, pad=0),
                          legend=dict(y=-0.01, **entries),
                          legend2=dict(y=-0.01 - LEGEND_ROW * clade_rows / side, **entries))
 
@@ -739,9 +777,12 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
             hovertemplate='<br>'.join(hover_lines) + '<extra></extra>'))
 
     groups_shown, niches = add_parasite_strips(figure, dots, parasites, palette)
+    font = max(SMALLEST_LABEL, min(11, round(size / 1.1)))
+    # the slanted names of the last columns run past the plot, so the right margin holds them
+    right = slant_overhang(parasites, font, plot_room(proteins, column))
     # the legends wrap inside what the row labels leave of the column
     height = max(420, DOT_ROW * len(proteins) + DOT_CHROME)
-    room = plot_room(proteins, column)
+    room = plot_room(proteins, column) - right
     band = strip_width(len(parasites), len(proteins), height, room) if localised else 0
     localisations = add_localisation_strip(figure, dots, proteins, band) if localised else []
     legends = add_dot_legend(figure, groups_shown, localisations, niches, palette, room,
@@ -749,15 +790,15 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
 
     figure.update_layout(height=height, plot_bgcolor='white',
                          # the legends are placed against the foot of the figure, under the
-                         # plot
-                         margin=dict(l=0, r=0, t=10, b=legends),
+                         # plot; no pad, so the names sit against the strips
+                         margin=dict(l=0, r=right, t=10, b=legends, pad=0),
                          xaxis_title=None, yaxis_title='host protein')
     # every parasite is named at the size a column has room for; the range runs back past
     # the band beside the rows
     figure.update_xaxes(range=[-0.5 - 1.5 * band, len(parasites) - 0.5],
                         side='top', tickmode='array', tickvals=list(range(len(parasites))),
                         ticktext=parasites, tickangle=-60, automargin=True, ticks='',
-                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        tickfont=dict(size=font),
                         showgrid=True, gridcolor='#f0f0f0', zeroline=False)
     # reversed, so the most-shared protein is the top row
     figure.update_yaxes(range=[len(proteins) - 0.5, -3], tickmode='array',
@@ -779,6 +820,17 @@ GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a
 GO_LABEL_WIDTH = 48
 
 
+@st.cache_resource(show_spinner=False, max_entries=8)
+def get_go_background(data_dir, host_taxids, niche):
+    '''
+    The GO background of a niche, with what the enrichment reads from it worked out; the
+    same at every threshold, and only ever read.
+    '''
+    go_df = web_utils.go_background(data_dir, host_taxids, niche)
+
+    return go_df, utils.prepare_go_background(go_df)
+
+
 @st.cache_data(show_spinner=False)
 def get_parasite_enrichments(df_pred, data_dir, host_taxids, niches):
     '''
@@ -786,13 +838,11 @@ def get_parasite_enrichments(df_pred, data_dir, host_taxids, niches):
     each tested against the host proteins of that parasite's niche, as the network page
     tests one.
     '''
-    backgrounds = {}
     enrichments = []
     for parasite, rows in df_pred.groupby('taxid1_label'):
-        niche = niches.get(parasite)
-        if niche not in backgrounds:
-            backgrounds[niche] = web_utils.go_background(data_dir, host_taxids, niche)
-        enrichment = utils.calculate_enrichment(set(rows['target']), backgrounds[niche])
+        go_df, background = get_go_background(data_dir, host_taxids, niches.get(parasite))
+        enrichment = utils.calculate_enrichment(set(rows['target']), go_df,
+                                                background=background)
         if not enrichment.empty:
             enrichments.append(enrichment.drop(columns=['B', 'C', 'D'])
                                .rename(columns={'A': 'n_proteins'})
@@ -865,17 +915,21 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
                            'niche': [niches.get(p, web_utils.UNKNOWN_NICHE)
                                      for p in parasites]})
     groups_shown, niches_shown = add_parasite_strips(figure, strips, columns, palette)
+    font = max(SMALLEST_LABEL, min(11, round(size / 1.1)))
+    # the slanted names of the last columns run past the plot, so the right margin holds them
+    right = slant_overhang(columns, font, plot_room(labels, width))
     height = max(420, DOT_ROW * len(terms) + DOT_CHROME)
     legends = add_dot_legend(figure, groups_shown, [], niches_shown, palette,
-                             plot_room(labels, width), height)
+                             plot_room(labels, width) - right, height)
 
     figure.update_layout(height=height, plot_bgcolor='white',
-                         margin=dict(l=0, r=0, t=10, b=legends),
+                         # no pad, so the names sit against the strips
+                         margin=dict(l=0, r=right, t=10, b=legends, pad=0),
                          xaxis_title=None, yaxis_title='biological process')
     figure.update_xaxes(range=[-0.5, len(columns) - 0.5], side='top', tickmode='array',
                         tickvals=list(range(len(columns))), ticktext=columns,
                         tickangle=-60, automargin=True, ticks='',
-                        tickfont=dict(size=max(SMALLEST_LABEL, min(11, round(size / 1.1)))),
+                        tickfont=dict(size=font),
                         showgrid=True, gridcolor='#f0f0f0', zeroline=False)
     # reversed, so the most widely enriched process is the top row
     figure.update_yaxes(range=[len(terms) - 0.5, -3], tickmode='array',

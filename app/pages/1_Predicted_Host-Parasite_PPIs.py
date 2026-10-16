@@ -20,6 +20,7 @@ import structure_visualizer as strv
 import body_figure
 from ppi_network import ppi_network
 
+st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
 style.load_css()
 web_utils.show_header('Host-parasite network')
 

@@ -568,7 +568,7 @@ else:
                    'drawn from, so a host with more predicted interactions than another may '
                    'simply have more of it.')
         st.dataframe(get_host_coverage(df_pred, parasite, data_dir, config, hosts_taxids),
-                     width='stretch', hide_index=True)
+                     width='stretch', height=400, hide_index=True)
 
         body_column, sets_column = st.columns([1, 1], gap='large')
         with body_column:
@@ -611,7 +611,7 @@ else:
                     lead += ' ' + rest[0].upper() + rest[1:] + '.'
                 st.markdown(lead)
                 with st.expander(f'The {len(reasons)} missing links, one row each'):
-                    st.dataframe(reasons, width='stretch', hide_index=True)
+                    st.dataframe(reasons, width='stretch', height=400, hide_index=True)
             elif reasons is None:
                 st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
                            'of whether a host missing an interaction has a protein of the '

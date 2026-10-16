@@ -1362,12 +1362,6 @@ with st.container():
             # a selection made before the FDR shortened the table can point past its end
             selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
                                                    if r < len(enrichment_table)]]
-            st.download_button(
-                label="Download Enrichment Table",
-                data=utils.convert_df(enrichment_table),
-                file_name=f'{selected_parasite}_network_enrichment_table.tsv',
-                mime='text/csv',
-            )
         else:
             st.subheader("No GO terms were found enriched")
 

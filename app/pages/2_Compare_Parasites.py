@@ -544,9 +544,6 @@ def show_shared_interactors_dialog(first, second, df_pred, annotations, localisa
         ['_reach', 'Host protein'], ascending=[False, True], kind='stable').drop(columns='_reach')
 
     st.dataframe(table, width='stretch', height=400, hide_index=True)
-    st.download_button('Download table', table.to_csv(index=False).encode('utf-8'),
-                       file_name=f'shared_interactors_{first}_{second}.csv'.replace(' ', '_'),
-                       mime='text/csv')
 
 
 @st.cache_data(show_spinner=False)

@@ -1,5 +1,6 @@
 import math
 import sys, os
+import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import web_utils
@@ -104,6 +105,8 @@ LEGEND_ROW = 46
 TISSUE_ROW = 19
 TISSUE_CHROME = 150
 TILE_SHARE = 0.72
+# the five numbers a box is drawn from
+BOX_QUANTILES = [0, 0.25, 0.5, 0.75, 1]
 
 
 def score_floor(*values):
@@ -234,7 +237,7 @@ def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
     the colour the palette gives that value.
     '''
     for column, (host, host_df, names) in enumerate(hosts, start=1):
-        segments = dict(tuple(host_df.groupby(field, observed=True)))
+        segments = dict(tuple(host_df.drop_duplicates('name').groupby(field, observed=True)))
         # the palette declares the order the values are read in; anything it does not name
         # follows behind
         ordered = ([v for v in palette if v in segments]
@@ -790,8 +793,15 @@ def generate_confidence_per_parasite(df, palette, width, score):
     labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         for group, rows in host_df.groupby('group', observed=True):
+            # the box statistics rather than every score, which would send each prediction
+            # to the browser; hazen is the quartile plotly computes, and without points the
+            # whiskers run to the extremes
+            stats = rows.groupby('name', observed=True)['weight'].apply(
+                lambda w: pd.Series(np.quantile(w, BOX_QUANTILES, method='hazen'),
+                                    index=BOX_QUANTILES)).unstack()
             figure.add_trace(
-                go.Box(x=rows['name'], y=rows['weight'], name=group,
+                go.Box(x=stats.index, lowerfence=stats[0], q1=stats[0.25],
+                       median=stats[0.5], q3=stats[0.75], upperfence=stats[1], name=group,
                        marker_color=palette.get(group, UNKNOWN_COLOR),
                        line_width=1, boxpoints=False,
                        legendgroup=group, showlegend=group not in labelled,

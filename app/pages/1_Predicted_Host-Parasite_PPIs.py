@@ -147,7 +147,9 @@ data_dir = web_utils.get_data_dir()
 load_predictions = web_utils.load_predictions
 
 
-@st.cache_data(show_spinner=False, max_entries=5)
+# shared rather than copied on every rerun, as cache_data would: the caller filters it
+# into a new frame before changing anything
+@st.cache_resource(show_spinner=False, max_entries=5)
 def get_parasite_tissues(data_dir, parasite, host_taxids):
     '''
     Annotates the predictions of one parasite against the selected host with the tissues
@@ -690,7 +692,8 @@ def get_enrichment_volcano(enrichment_df, fdr, selected_terms=None, label_n=5):
     return style_go_axes(fig)
 
 
-@st.cache_data(show_spinner=False)
+# shared rather than copied on every rerun; only ever read
+@st.cache_resource(show_spinner=False)
 def load_ontology_parents(data_dir):
     '''child GO id -> its parent GO ids, the shape the ontology is walked upward in.'''
     ontology = load_ontology(data_dir)
@@ -803,6 +806,14 @@ def get_enrichment_summary(enrichment_df, parents_of):
 
     return fig
 
+@st.cache_data(show_spinner=False, max_entries=20)
+def get_centrality(edges):
+    '''Betweenness centrality of every node, over the edges before the score threshold.'''
+    G = nx.from_pandas_edgelist(edges, 'source', 'target', 'weight')
+
+    return nx.betweenness_centrality(G, weight='weight')
+
+
 def generate_graph(df, score, annotations=None, surface_calls=None):
     if df.empty:
         return nx.Graph()
@@ -820,7 +831,7 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
     if annotations is not None:
         nx.set_node_attributes(G, generate_node_labels(df, annotations), 'label')
         nx.set_node_attributes(G, generate_node_titles(df, annotations, surface_calls), 'title')
-    centrality = nx.betweenness_centrality(G, weight='weight')
+    centrality = get_centrality(df[['source', 'target', 'weight']])
     max_centrality = max(centrality.values(), default=0)
     sizes = {}
     for k,v in centrality.items():
@@ -848,49 +859,54 @@ def generate_graph(df, score, annotations=None, surface_calls=None):
     return G
 
 
-def annotate_edges(edges, df, annotations):
+def title_edges(edges, df):
     '''
-    Writes the two proteins of an interaction onto the edge that draws it, so that a
-    click on the edge carries everything needed to show their structures.
+    Writes the hover text onto each edge, the one thing saying the edges can be clicked;
+    what the click shows is looked up in Python by edge_interaction.
     '''
-    # the species travels with the edge, so the dialog can name it beside each protein
-    cols = ['source', 'source_name', 'source_uniprot', 'taxid1_label',
-            'target', 'target_name', 'target_uniprot', 'taxid2_label', 'weight',
-            'group1', 'group2', 'experimental_evidence_score', 'databases_evidence_score']
-    pairs = {}
-    for row in df[cols].drop_duplicates(subset=['source', 'target']).itertuples(index=False):
-        pairs[frozenset((row.source, row.target))] = {
-            'parasite': str(row.source_name),
-            'parasite_id': str(row.source),
-            # NaN does not survive the trip to the browser
-            'parasite_uniprot': None if pd.isna(row.source_uniprot) else str(row.source_uniprot),
-            'parasite_full': annotations.get(row.source, ''),
-            'parasite_species': str(row.taxid1_label),
-            'host': str(row.target_name),
-            'host_id': str(row.target),
-            'host_uniprot': None if pd.isna(row.target_uniprot) else str(row.target_uniprot),
-            'host_full': annotations.get(row.target, ''),
-            'host_species': str(row.taxid2_label),
-            'weight': float(row.weight),
-            'parasite_group': str(row.group1),
-            'host_group': str(row.group2),
-            # the two scores the weight is the mean of, kept apart
-            'experimental': float(row.experimental_evidence_score),
-            'databases': float(row.databases_evidence_score)}
+    pairs = {frozenset((row.source, row.target)): row for row in
+             df[['source', 'source_name', 'target', 'target_name', 'weight']]
+             .drop_duplicates(subset=['source', 'target']).itertuples(index=False)}
 
-    annotated = []
+    titled = []
     for edge in edges:
         edge = dict(edge)
-        interaction = pairs.get(frozenset((edge['from'], edge['to'])))
-        if interaction is not None:
-            edge.update(interaction)
-            # nothing else says the edges can be clicked
-            edge['title'] = (f"{interaction['parasite']} -- {interaction['host']}\n"
-                             f"confidence {interaction['weight']:.3f}\n"
+        row = pairs.get(frozenset((edge['from'], edge['to'])))
+        if row is not None:
+            edge['title'] = (f"{row.source_name} -- {row.target_name}\n"
+                             f"confidence {float(row.weight):.3f}\n"
                              'click to see the AlphaFold models')
-        annotated.append(edge)
+        titled.append(edge)
 
-    return annotated
+    return titled
+
+
+def edge_interaction(edge, df, annotations):
+    '''The two proteins of the clicked edge, with everything the structures dialog shows.'''
+    ends = {edge['from'], edge['to']}
+    rows = df[df['source'].isin(ends) & df['target'].isin(ends)]
+    if rows.empty:
+        return None
+
+    row = rows.iloc[0]
+    return {
+        'parasite': str(row['source_name']),
+        'parasite_id': str(row['source']),
+        # NaN does not survive into the dialog's text
+        'parasite_uniprot': None if pd.isna(row['source_uniprot']) else str(row['source_uniprot']),
+        'parasite_full': annotations.get(row['source'], ''),
+        'parasite_species': str(row['taxid1_label']),
+        'host': str(row['target_name']),
+        'host_id': str(row['target']),
+        'host_uniprot': None if pd.isna(row['target_uniprot']) else str(row['target_uniprot']),
+        'host_full': annotations.get(row['target'], ''),
+        'host_species': str(row['taxid2_label']),
+        'weight': float(row['weight']),
+        'parasite_group': str(row['group1']),
+        'host_group': str(row['group2']),
+        # the two scores the weight is the mean of, kept apart
+        'experimental': float(row['experimental_evidence_score']),
+        'databases': float(row['databases_evidence_score'])}
 
 
 def fasta_header(protein, name, species, uniprot):
@@ -1159,7 +1175,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
         nodes, edges = net.get_network_data()[:2]
         selected_edge = ppi_network(
             nodes=nodes,
-            edges=annotate_edges(edges, host_df, web_utils.load_protein_annotations(data_dir)),
+            edges=title_edges(edges, host_df),
             options=network_options(net),
             height=NETWORK_HEIGHT,
             key=f'network_{selected_parasite}_{host_taxid}')
@@ -1170,7 +1186,10 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
         shown_edge_key = f'shown_edge_{host_taxid}'
         if selected_edge is not None and selected_edge['nonce'] != st.session_state.get(shown_edge_key):
             st.session_state[shown_edge_key] = selected_edge['nonce']
-            show_structures_dialog(selected_edge['edge'])
+            interaction = edge_interaction(selected_edge['edge'], host_df,
+                                           web_utils.load_protein_annotations(data_dir))
+            if interaction is not None:
+                show_structures_dialog(interaction)
         with st.container():
             c1, c2, c3, c4 = st.columns(4)
 

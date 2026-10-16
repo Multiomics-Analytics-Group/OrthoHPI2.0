@@ -56,13 +56,12 @@ MUTED_COLOR = '#c8ced6'
 # significance is a magnitude, so a single hue running light to dark
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
 GO_AXIS_COLOR = '#8d97a3'
-# fewer proteins than this and the cell-type matrix says nothing the table does not
-MATRIX_MIN_PROTEINS = 3
-MATRIX_MARK_SIZE = 11
+# fewer proteins than this and the cell-type bars say nothing the table does not
+CELL_TYPE_MIN_PROTEINS = 3
 # the bars do not grow with the host proteins
 BARS_HEIGHT = 420
 # joins tissue and cell type, a cell type name being unique only inside its tissue
-MATRIX_SEPARATOR = ' | '
+CELL_TYPE_SEPARATOR = ' | '
 GO_GRID_COLOR = '#e6eaef'
 # processes the ranked plot shows; beyond this the names stop being readable
 GO_TOP_N = 20
@@ -82,7 +81,7 @@ VIEWER_HEIGHT = 400
 # be assembled from the rest
 TABLE_COLUMNS = ['source_name', 'source_full_name', 'source', 'source_uniprot',
                  'target_name', 'target_full_name', 'target', 'target_uniprot',
-                 'Tissues', 'experimental_evidence_score',
+                 'Tissues', 'cell_types', 'experimental_evidence_score',
                  'databases_evidence_score', 'weight', 'group1', 'group2']
 
 # `source` is the parasite and `target` the host throughout the pipeline; the names here are
@@ -99,6 +98,7 @@ TABLE_COLUMN_NAMES = {
     'target': 'Host STRING id',
     'target_uniprot': 'Host UniProt id',
     'target_surface': 'Host DeepLoc class',
+    'cell_types': 'Host cell types',
     'experimental_evidence_score': 'Experimental evidence',
     'databases_evidence_score': 'Database evidence',
     'weight': 'Confidence score',
@@ -311,7 +311,7 @@ def generate_node_titles(df, annotations, surface_calls=None):
     return titles
 
 
-def generate_interactions_table(df, score, annotations):
+def generate_interactions_table(df, score, annotations, expression):
     '''Builds the table of predicted interactions above the chosen score.'''
     table = df[df['weight'] >= score]
     if table.empty:
@@ -319,8 +319,16 @@ def generate_interactions_table(df, score, annotations):
 
     tissues = table.groupby(['source', 'target'])['Tissue'].apply(
         lambda t: ', '.join(sorted(t.dropna().unique()))).rename('Tissues').reset_index()
+    # the cell types the host protein is expressed in, a cell type being counted once per
+    # tissue; left empty for a host without cell-type annotation
+    annotated = table[table['Cell type'].notna()]
+    cell_types = (web_utils.keep_expressed_cell_types(annotated, expression)
+                           .drop_duplicates(['target', 'Tissue', 'Cell type'])
+                           .groupby('target').size())
+    cell_types = cell_types.reindex(annotated['target'].unique(), fill_value=0)
     table = pd.merge(table.drop_duplicates(subset=['source', 'target']), tissues,
                      on=['source', 'target'])
+    table = table.assign(cell_types=table['target'].map(cell_types).astype('Int64'))
     # the descriptive protein name, of which the predictions only keep the short version
     table = table.assign(
         source_full_name=table['source'].map(annotations).fillna(''),
@@ -449,19 +457,16 @@ def generate_surface_filters(df, surface_calls, niche):
 def cell_type_marks(df, score, expression):
     '''
     The host proteins of the network against the cell types they are expressed in
-    (web_utils.keep_expressed_cell_types), which is what both figures of the cell type
-    section are drawn from, and the tissues those cell types are grouped into.
+    (web_utils.keep_expressed_cell_types), which the cell type bars are drawn from, and
+    the tissues those cell types are grouped into.
     '''
     annotated = df[(df['weight'] >= score) & df['Cell type'].notna()]
     if annotated.empty:
         return None, None
 
     marks = web_utils.keep_expressed_cell_types(annotated, expression).copy()
-    # the row a protein reaches its maximum in is always kept, so the darkest of a row is
-    # 100%
-    marks['share'] = marks['nCPM'] / marks.groupby(['target', 'Tissue'])['nCPM'].transform('max')
-    marks['column'] = marks['Tissue'] + MATRIX_SEPARATOR + marks['Cell type']
-    if (marks['target_name'].nunique() < MATRIX_MIN_PROTEINS
+    marks['column'] = marks['Tissue'] + CELL_TYPE_SEPARATOR + marks['Cell type']
+    if (marks['target_name'].nunique() < CELL_TYPE_MIN_PROTEINS
             or marks['column'].nunique() < 2):
         return None, None
 
@@ -490,16 +495,15 @@ def label_tissue_blocks(figure, blocks):
 
     figure.update_xaxes(tickmode='array', tickvals=columns, tickangle=-60, title=None,
                         showgrid=False,
-                        ticktext=[column.split(MATRIX_SEPARATOR)[1] for column in columns])
+                        ticktext=[column.split(CELL_TYPE_SEPARATOR)[1] for column in columns])
 
     return figure
 
 
 def style_cell_type_figure(figure, blocks):
     '''
-    The two cell type figures share their axes, their blocks and the room above the plot
-    the names of those blocks need, which style_go_axes leaves only the margin of a
-    plain figure for.
+    The cell type bars need room above the plot for the names of their blocks, which
+    style_go_axes leaves only the margin of a plain figure for.
     '''
     figure = style_go_axes(label_tissue_blocks(figure, blocks))
     figure.update_layout(margin=dict(l=10, r=10, t=34, b=40))
@@ -527,38 +531,6 @@ def generate_cell_type_bars(marks, blocks):
     figure.update_yaxes(title='predicted interactions')
     web_utils.count_ticks(figure, counted['interactions'].max(), axis='y')
     figure.update_layout(height=BARS_HEIGHT)
-
-    return style_cell_type_figure(figure, blocks)
-
-
-def generate_cell_type_matrix(marks, blocks):
-    '''
-    Where inside the tissue the host proteins of the network sit: a mark wherever a
-    protein is expressed in a cell type, the cell types along the bottom in blocks of the
-    tissue they belong to and the host proteins up the side.
-    '''
-    columns = [column for _, block in blocks for column in block]
-    drawn = marks.drop_duplicates(['target_name', 'column'])
-    proteins = list(drawn.groupby('target_name')['column'].nunique()
-                         .sort_values(ascending=False, kind='stable').index)
-
-    figure = px.scatter(drawn, x='column', y='target_name', color='share',
-                        color_continuous_scale=GO_SEQUENTIAL,
-                        range_color=(0, 1),
-                        # plotly express flips category_orders on a y axis
-                        category_orders={'column': columns, 'target_name': proteins},
-                        custom_data=['Tissue', 'Cell type', 'nCPM', 'share'])
-    figure.update_traces(marker=dict(size=MATRIX_MARK_SIZE, symbol='square',
-                                     line=dict(color=NETWORK_BACKGROUND, width=1)),
-                         hovertemplate='<b>%{y}</b><br>%{customdata[1]} (%{customdata[0]})'
-                                       '<br>nCPM: %{customdata[2]:.1f}<br>'
-                                       'Share of its peak in the tissue: '
-                                       '%{customdata[3]:.0%}<extra></extra>')
-    figure.update_yaxes(title=None, ticksuffix='  ')
-    figure.update_coloraxes(colorbar=dict(title='Share of<br>tissue peak', tickformat='.0%',
-                                          thickness=12, outlinewidth=0, len=0.6))
-    # one row per host protein
-    figure.update_layout(height=max(320, 22 * len(proteins) + 200))
 
     return style_cell_type_figure(figure, blocks)
 
@@ -1276,35 +1248,26 @@ with st.container():
             st.header('Cell types expressing the host proteins')
             show_active_filters(page_filters)
             st.caption('A host protein counts towards a cell type when it is expressed there, '
-                       f'{web_utils.expression_phrase(expression)}. The '
-                       'columns of both tabs are those cell types, grouped into the tissues '
-                       'the parasite infects, and a cell type is written under its block '
-                       'alone, since the same kind of cell is annotated separately in each '
-                       'tissue. Cell-type annotation is available for human (HPA), mouse '
-                       '(Tabula Muris Senis) and pig (Pig Cell Atlas).')
-            # the same columns counted, then opened up per protein
-            per_cell_type_tab, per_protein_tab = st.tabs(['Per cell type', 'Per protein'])
-            with per_cell_type_tab:
-                st.caption('Predicted interactions per cell type. An interaction is counted '
-                           'in every cell type where its host protein is expressed, so the '
-                           'bars overlap and are not a partition of the network.')
-                st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
-            with per_protein_tab:
-                st.caption('A mark wherever a host protein is expressed in a cell type, '
-                           'shaded by the share of its expression in that tissue the cell '
-                           'type carries. A row of one mark is a protein the parasite meets '
-                           'in a single kind of cell; a full row one it meets throughout the '
-                           'tissue.')
-                st.plotly_chart(generate_cell_type_matrix(marks, blocks), width='stretch')
+                       f'{web_utils.expression_phrase(expression)}, and an interaction '
+                       'is counted in every cell type where its host protein is expressed, '
+                       'so the bars overlap and are not a partition of the network. The '
+                       'cell types are grouped into the tissues the parasite infects, and a '
+                       'cell type is written under its block alone, since the same kind of '
+                       'cell is annotated separately in each tissue. Cell-type annotation is '
+                       'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
+                       'Cell Atlas).')
+            st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
 
 with st.container():
     if df_select is not None:
         st.header("Table of host-parasite PPIs")
         show_active_filters(page_filters)
         table = generate_interactions_table(df_select, score,
-                                            web_utils.load_protein_annotations(data_dir))
+                                            web_utils.load_protein_annotations(data_dir),
+                                            expression)
         st.caption('One row per predicted interaction, with the tissues the host protein is '
-                   'expressed in and its DeepLoc class.')
+                   'expressed in, the number of cell types it is expressed in '
+                   f'({web_utils.expression_phrase(expression)}) and its DeepLoc class.')
         search = st.text_input(
             "Search the table",
             key='table_search',

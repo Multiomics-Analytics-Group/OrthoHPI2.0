@@ -596,41 +596,26 @@ a specific pair of parasites.}
 different hosts. Get a table of the reasons why some interactions are missing
 from one host.}
 
-% paper/figures/web_overview.png is built from screenshots of the app: `make figures`.
+% paper/figures/web_interface.png is built from screenshots of the app: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_overview}
-  \caption{The web resource: overview, multi-host and parasites-of-a-host
-  pages. \textbf{(A)} The home page: the four hosts with the number of parasites
-  predicted against each, and the parasites by taxonomic group, each marked
-  with its hosts. \textbf{(B)} The multi-host parasites page, for
-  \textit{Trichinella spiralis} in human and pig: the infected organs of each host, and the
-  interactions shared between its hosts and specific to each. \textbf{(C)} The
-  parasites-of-a-host page, for \textit{Homo sapiens}: the Jaccard similarity
-  of Figure~\ref{fig:similarity} as the app draws it, with the parasites
-  ordered by niche, and the shared host proteins listed on clicking the \textit{P.~falciparum}--%
-  \textit{P.~vivax} cell.}
-  \label{fig:web_overview}
-\end{figure}
-
-% paper/figures/web_network.png is built from screenshots of the app: `make figures`.
-\begin{figure}[p]
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_network}
-  \caption{The web resource: network page,
-  for \textit{Plasmodium falciparum} in \textit{Homo sapiens} at a confidence
-  score of at least 0.7, restricted to the liver. \textbf{(A)} The host,
-  parasite, confidence score, tissues and cell-type expression cutoff are
-  chosen beside a body map of the predicted interactions per infected organ;
-  above the network, the host proteins can be restricted by DeepLoc
-  localisation. \textbf{(B)} Clicking a link opens the AlphaFold models of its
-  parasite and host protein, coloured by pLDDT, with the STRING link between
-  orthologous groups it was transferred from. \textbf{(C)} Predicted
-  interactions per liver cell type, counting a host protein expressed above
-  20 nCPM in the Human Protein Atlas. \textbf{(D)} Gene Ontology biological
-  processes enriched among the host proteins of the network. The network,
-  interaction table and enrichment results can each be downloaded.}
-  \label{fig:web_network}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_interface}
+  \caption{The web resource: network page, for \textit{Trypanosoma cruzi} in
+  \textit{Homo sapiens} at a confidence score of at least 0.7, restricted to the
+  heart. \textbf{(A)} The host, parasite, confidence score, tissues and
+  cell-type expression are chosen beside a body map of the predicted
+  interactions per infected organ. \textbf{(B)} The network, whose host
+  proteins can be restricted by DeepLoc localisation; hovering over a link
+  names its proteins and confidence score. \textbf{(C)} Clicking a link opens
+  the AlphaFold models of its parasite and host protein, coloured by pLDDT,
+  with the STRING link between orthologous groups it was transferred from;
+  shown for Q4D3L1--DR1, the link with the highest ipSAE in
+  Figure~\ref{fig:alphafold_direct}. \textbf{(D)} Gene Ontology biological
+  processes enriched among the host proteins of the network; the page also
+  tests the parasite proteins, and lists every tested process and its place in
+  the GO hierarchy. The network, interaction table and enrichment results can
+  each be downloaded.}
+  \label{fig:web_interface}
 \end{figure}
 
 \section{Discussion}

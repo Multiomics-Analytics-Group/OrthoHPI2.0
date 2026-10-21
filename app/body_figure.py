@@ -250,8 +250,11 @@ def link_organs(svg, clickable, selected, config):
     '''
     root = ET.fromstring(svg)
     style = ET.Element(f'{{{SVG_NS}}}style')
+    # an organ drawn as a group carries its fill on the group and its outline on each
+    # shape, which would override a stroke inherited from the group
     style.text = (f'a {{ cursor: pointer; }} '
-                  f'a:hover [fill] {{ stroke: {HOVER_OUTLINE}; stroke-width: 2; }}')
+                  f'a:hover [fill], a:hover [stroke] '
+                  f'{{ stroke: {HOVER_OUTLINE}; stroke-width: 2; }}')
     root.insert(0, style)
 
     # the tree must not be rearranged while it is being walked
@@ -264,7 +267,7 @@ def link_organs(svg, clickable, selected, config):
 
         if organ in selected:
             for shape in element.iter():
-                if shape.get('fill') is not None:
+                if shape.get('fill') is not None or shape.get('stroke') is not None:
                     shape.set('stroke', SELECTED_OUTLINE)
                     shape.set('stroke-width', '2')
             hint = 'click to clear the tissue filter'
@@ -451,7 +454,7 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     if not infected:
         if title_as_subheader:
             st.subheader('Predicted interactions per infected organ')
-        else:
+        elif not clickable:
             st.markdown('##### Predicted interactions per infected organ')
         st.caption('The figure draws none of the tissues this parasite is recorded as '
                    'infecting, so there is nothing to shade.')
@@ -462,17 +465,18 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     filtered_organs = tissue_organs(config, selected_tissues) if selected_tissues else set()
     shown_organs = infected & (filtered_organs or infected)
 
-    if title_as_subheader:
-        st.subheader('Predicted interactions per infected organ')
+    if clickable:
+        # drawn among the filters, above the tissue filter it sets
+        st.markdown('<p style="font-size: 0.875rem;">Click a tissue to filter on, or select '
+                    'from the list below.</p>', unsafe_allow_html=True)
     else:
-        st.markdown('##### Predicted interactions per infected organ')
-    st.caption('Predicted interactions whose host protein is expressed in each organ, '
-               'after the confidence score and the tissue filters, and only in the organs '
-               'this parasite is recorded as infecting. TISSUES annotates a host protein '
-               'to every organ it is detected in, so an interaction is counted in each of '
-               'the ones shown and the organs can add up to more than the network.'
-               + (' Click an organ to filter the predictions on the tissues it stands for, '
-                  'and click it again to clear them.' if clickable else ''))
+        if title_as_subheader:
+            st.subheader('Predicted interactions per infected organ')
+        else:
+            st.markdown('##### Predicted interactions per infected organ')
+        st.caption('Predicted interactions whose host protein is expressed in each organ, '
+                   'after the confidence score and the tissue filters. An interaction is '
+                   'counted in all of the organs, in which the host protein is expressed.')
     figures = []
     for taxid, species in drawn:
         svg, organs = load_figure(species)
@@ -520,6 +524,7 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                 st.markdown(figure, unsafe_allow_html=True)
             if highest and not shared_color_scale:
                 st.markdown(legend_html(bounds), unsafe_allow_html=True)
+                st.caption('Predicted interactions in the tissue')
             else:
                 if not highest:
                     st.caption('None of the host proteins of this network are annotated to '

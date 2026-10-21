@@ -1036,21 +1036,15 @@ def show_structures_dialog(edge):
                                        on_click='ignore', key=f'fasta_{i}')
 
 
-st.caption('The predicted interactions of one host and one parasite as a network, with '
-           'the AlphaFold model of the two proteins of an interaction and the biological '
-           'processes over-represented among the host proteins of the network.')
+st.caption('Investigate the predicted interaction network for a host-parasite pair.')
 
 
-col1, col2 = st.columns([1, 1], gap='large')
-
-with col2:
-
+with st.columns(3)[1]:
     # the host carries over from whichever page it was last chosen on
     selected_host, selected_taxids = web_utils.host_selector(
         config, load_predictions(data_dir), 'Select a host', include_rodents=True)
 
     if selected_host == web_utils.NO_HOST:
-        st.text('Choose 1 host to explore the predicted host-parasite interactions')
         selected_parasite = "<select>"
     else:
         # only parasites that infect the selected host
@@ -1058,8 +1052,11 @@ with col2:
         # switching host can leave a parasite selected that the new host does not have
         if st.session_state.get('net_par') not in parasite_list:
             st.session_state.pop('net_par', None)
-        selected_parasite = st.selectbox('Select a parasite to visualize the predicted PPI', parasite_list, key="net_par")
+        selected_parasite = st.selectbox('Select a parasite', parasite_list, key="net_par")
 
+filter_col, network_col = st.columns([1, 2], gap='large')
+
+with filter_col:
     if selected_parasite != "<select>":
         df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
         df_select = web_utils.filter_tissues(config, df_select)
@@ -1070,12 +1067,17 @@ with col2:
             df_select = df_select.assign(
                 source_surface=df_select['source'].map(surface_calls['surface']),
                 target_surface=df_select['target'].map(surface_calls['surface']))
+        st.header('Filters')
         score = web_utils.score_slider()
+
+        # the body figure sits above the tissue filter its organs set, but counts what the
+        # filters below leave, so it is drawn once they have run
+        body_slot = st.container()
 
         tissues_options = generate_tissue_filters(df_select)
         if len(tissues_options) > 0:
-            # a click on the body figure drawn below is read here, on the run after it,
-            # before the filter is created
+            # a click on the body figure is read here, on the run after it, before the
+            # filter is created
             body_figure.apply_organ_click(config, selected_taxids, tissues_options,
                                           TISSUE_FILTER_KEY)
             selected_tissues = st.multiselect('Select tissues to filter the predicted PPI',
@@ -1104,13 +1106,20 @@ with col2:
                     df_select[df_select['Cell type'].notna()], expression)
                 df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
-        # the tickboxes are drawn above the network; Streamlit hands their state over before
-        # they are drawn again
         surface_options = generate_surface_filters(
             df_select, surface_calls,
             web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE))
-        ticked = [c for c in surface_options
-                  if st.session_state.get(SURFACE_FILTER_KEYS[c])]
+        if len(surface_options) > 0:
+            # sized as the labels of the widgets around it
+            st.markdown('<p style="font-size: 0.875rem;">Select host protein localizations '
+                        'to filter the predicted PPI</p>', unsafe_allow_html=True,
+                        help='Localization of the host protein as predicted by DeepLoc 2. '
+                             'A protein predicted in several classes stays if any of them '
+                             'is ticked.')
+        # in a row that wraps when the column is too narrow for all of them
+        with st.container(horizontal=True, key='surface_filters'):
+            ticked = [c for c in surface_options
+                      if st.checkbox(c, key=SURFACE_FILTER_KEYS[c])]
         # ticking every class leaves every host protein in, as ticking none does
         selected_surface = ticked if 0 < len(ticked) < len(surface_options) else []
         if selected_surface:
@@ -1142,9 +1151,8 @@ with col2:
 page_filters = active_filters(score, selected_tissues, expression, selected_cell_types,
                               selected_surface) if df_select is not None else []
 
-# drawn after the column that holds the selectors, where the predictions are filtered
-with col1:
-    if df_select is not None:
+if df_select is not None:
+    with body_slot:
         body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
                                      selected_taxids, selected_tissues, clickable=True)
 
@@ -1243,35 +1251,19 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                 )
 
 
-if networks:
-    st.header('Network of host-parasite PPIs')
-    st.caption('Predicted interactions between parasite and host proteins above the '
-               'selected confidence score. Nodes are proteins, diamonds parasite and '
-               'circles host, coloured by organism and sized by centrality in the '
-               'network. Edge width is the confidence score. Hover a node for its full '
-               'name and identifiers; click an edge for the AlphaFold model and '
-               'sequence of both proteins.')
-    if selected_host == 'Rodent':
-        st.caption('Rat and Mouse networks are shown separately; their host nodes use '
-                   'their species-specific colors.')
-    if len(surface_options) > 0:
-        st.caption('The host proteins are in the predictions because DeepLoc called them '
-                   'where DeepLoc puts them: on the membrane of the host cell, '
-                   'extracellular -- in the matrix and the fluid around it -- or, for a '
-                   'parasite with an intracellular stage, in the cytosol or the nucleus. '
-                   'Ticking a class leaves the interactions that can take place there, and '
-                   'drops any parasite protein left with nothing to bind; a protein DeepLoc '
-                   'places in several classes stays whichever of them is ticked.')
-        # one column more than there are boxes so they are not spread across the page
-        boxes = st.columns(len(surface_options) + 2)
-        for box, surface in zip(boxes, surface_options):
-            with box:
-                st.checkbox(surface, key=SURFACE_FILTER_KEYS[surface])
-    # under the tickboxes, whose classes it lists, and right above the network it describes
-    show_active_filters(page_filters)
-    columns = st.columns(len(networks))
-    for column, network in zip(columns, networks):
-        with column:
+with network_col:
+    if networks:
+        st.header('Network of host-parasite PPIs')
+        st.caption('Nodes are proteins, coloured by organism and sized by centrality in the '
+                   'network. Edge width is the confidence score. Click an edge for the AlphaFold model and '
+                   'sequence of the proteins.')
+        if selected_host == 'Rodent':
+            st.caption('Rat and Mouse networks are shown separately; their host nodes use '
+                       'their species-specific colors.')
+        # right above the network it describes
+        show_active_filters(page_filters)
+        # the rat and mouse networks are stacked; the column is too narrow to share
+        for network in networks:
             render_network_panel(*network)
 
 

@@ -21,3 +21,9 @@ section[data-testid="stSidebar"][aria-expanded="true"]{
 }
 
 
+
+/* Streamlit pushes the first checkbox of a block down to sit under a label, which in a
+   row of checkboxes leaves it lower than the rest */
+.st-key-surface_filters .stElementContainer > .row-widget.stCheckbox {
+    margin-top: 0;
+}

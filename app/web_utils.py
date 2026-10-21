@@ -9,9 +9,9 @@ import utils
 # menu entries as (label, bootstrap icon, path relative to the app root); the page file
 # numbers no longer match this order
 PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
+         ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
          ('Parasites of a host', 'bug', 'pages/2_Compare_Parasites.py'),
          ('Multi-host parasites', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
-         ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
          ('About', 'info-circle', 'pages/3_About.py')]
 
 TITLE = 'OrthoHPI 2.0'

@@ -135,6 +135,10 @@ SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
                        web_utils.CYTOPLASM: 'net_surface_cytoplasm',
                        web_utils.NUCLEUS: 'net_surface_nucleus'}
 
+# mature red cells and platelets have no nucleus, so Nucleus is not offered when only these
+# are selected; the erythroid precursors keep theirs
+ANUCLEATE_CELL_TYPES = {'erythrocyte', 'erythrocytes', 'platelets'}
+
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
@@ -445,18 +449,21 @@ def generate_cell_type_filters(df, score, expression):
                      .groupby('Cell type')['target_name'].nunique()
                      .sort_values(ascending=False, kind='stable'))
 
-def generate_surface_filters(df, surface_calls, niche):
+def generate_surface_filters(df, surface_calls, niche, cell_types=()):
     '''
     The DeepLoc classes offered as tickboxes: the surface of the host cell and the space
     around it, and for a parasite with an intracellular stage the cytosol and the
     nucleus as well, those being the classes its niche let the filter keep a host
-    protein for.
+    protein for. Nucleus is left out when every selected cell type is anucleate.
     '''
     if surface_calls is None or surface_calls.empty or 'target' not in df.columns:
         return []
     called = surface_calls.reindex(df['target'].dropna().unique())
+    classes = web_utils.niche_classes(niche)
+    if cell_types and set(cell_types) <= ANUCLEATE_CELL_TYPES:
+        classes = [c for c in classes if c != web_utils.NUCLEUS]
 
-    return [c for c in web_utils.niche_classes(niche)
+    return [c for c in classes
             if web_utils.DEEPLOC_SCORES[c] in called
             and (called[web_utils.DEEPLOC_SCORES[c]] > web_utils.DEEPLOC_CUTOFFS[c]).any()]
 
@@ -1103,7 +1110,8 @@ with filter_col:
 
         surface_options = generate_surface_filters(
             df_select, surface_calls,
-            web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE))
+            web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE),
+            selected_cell_types)
         if len(surface_options) > 0:
             # sized as the labels of the widgets around it
             st.markdown('<p style="font-size: 0.875rem;">Select host protein localizations '

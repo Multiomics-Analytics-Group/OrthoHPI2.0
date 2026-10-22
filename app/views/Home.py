@@ -85,10 +85,8 @@ SCALE_MARGIN = 0.05
 TOP_OGS = 40
 DOT_ROW = 19
 DOT_CHROME = 230
-# most gene symbols an orthologous group is named by before the rest are left to the
-# hover, and the most characters
-SYMBOLS_IN_LABEL = 3
-LABEL_CHARS = 24
+# characters a line of an orthologous group name is wrapped at
+LABEL_CHARS = 30
 # room a group name takes left of the dots: ~6.2 px a character, plus the axis title
 LABEL_CHAR = 6.2
 LABEL_PADDING = 40
@@ -823,17 +821,8 @@ def og_label(names):
     since the group id names nothing to read. The symbols are upper-cased so the same
     group reads the same way whichever hosts it is reached in.
     '''
-    names = sorted(set(str(n).upper() for n in names))
-    named = []
-    for name in names[:SYMBOLS_IN_LABEL]:
-        # the first name goes in whatever its length, so a group is never drawn under an
-        # ellipsis alone
-        if named and len(', '.join(named + [name])) > LABEL_CHARS:
-            break
-        named.append(name)
-    label = ', '.join(named)
-
-    return f'{label}…' if len(named) < len(names) else label
+    return web_utils.wrap_label(', '.join(sorted(set(str(n).upper() for n in names))),
+                                LABEL_CHARS)
 
 
 @st.cache_data(show_spinner=False)
@@ -882,16 +871,18 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     orthologous groups, in the columns the figures above use, the groups ordered by how
     many parasites reach them so the most widely reached is the top row.
     '''
-    height = DOT_ROW * len(ogs) + DOT_CHROME
+    # a wrapped name opens its row up
+    ys = web_utils.row_positions(ogs, DOT_ROW)
+    height = round(DOT_ROW * (ys[-1] + 1)) + DOT_CHROME
     # the strips keep the height they have under the other figures
     figure, hosts = host_columns(df, width, bands=2,
                                  band_height=BAND_HEIGHT * 470 / height)
-    rows_of = {f: i for i, f in enumerate(ogs)}
+    rows_of = dict(zip(ogs, ys))
     dots = dots.assign(y=dots['og'].map(rows_of))
     # the largest dot is as wide as a column has room for, its area standing for the
     # largest degree
     columns = sum(max(len(names), MIN_COLUMN) for _, _, names in hosts)
-    room = width - (LABEL_CHAR * max(len(f) for f in ogs) + LABEL_PADDING)
+    room = width - (LABEL_CHAR * web_utils.label_width(ogs) + LABEL_PADDING)
     size = min(15, max(5, room / columns))
     sizeref = max(1, dots['degree'].max()) / size ** 2
 
@@ -933,8 +924,8 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     stack_bands(figure)
     # reversed, so the most-shared group is the top row; the ticks are set on every
     # column so the grids line up
-    figure.update_yaxes(range=[len(ogs) - 0.5, -0.5], tickmode='array',
-                        tickvals=list(range(len(ogs))), ticktext=ogs,
+    figure.update_yaxes(range=[ys[-1] + 0.5, -0.5], tickmode='array',
+                        tickvals=ys, ticktext=ogs,
                         zeroline=False, row=1)
     # the names are longer than the counts the margin was set for
     figure.update_yaxes(automargin=True, row=1, col=1)

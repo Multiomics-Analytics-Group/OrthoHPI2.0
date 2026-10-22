@@ -130,7 +130,7 @@ def plot_room(labels, column):
     `labels` have taken the room their names need.
     '''
     # 6.2 px a character of the default axis font, 30 px free at either end of the axis
-    return column - (6.2 * max(len(str(l)) for l in labels) + 30)
+    return column - (6.2 * web_utils.label_width(labels) + 30)
 
 
 def dot_size(parasites, labels, column):
@@ -485,12 +485,11 @@ def generate_shared_interactor_heatmap(similarity, shared, clades, niches, palet
     return figure, click_layer
 
 
-# longest description written beside a gene symbol on the dot matrix; the whole of it is in
-# the hover
-DESCRIPTION_WIDTH = 26
+# characters a line of a host protein name on the dot matrix is wrapped at
+LABEL_WRAP = 30
 
 
-def label_proteins(df_pred, annotations, truncate=None):
+def label_proteins(df_pred, annotations):
     '''
     Names each host protein by its gene symbol and its descriptive protein name, since
     the symbol on its own identifies the protein only for someone who already knows it.
@@ -504,8 +503,6 @@ def label_proteins(df_pred, annotations, truncate=None):
     labels = {}
     for name in df_pred['target_name'].unique():
         description = described.get(name)
-        if truncate and description and len(description) > truncate:
-            description = description[:truncate - 1].rstrip() + '…'
         labels[name] = f'{name} · {description}' if description else str(name)
 
     return labels
@@ -598,9 +595,10 @@ def get_top_shared_proteins(df_pred, groups, group_order, niches, order_by,
     dots['parasites'] = dots['target_name'].map(counts)
     dots['degree'] = pd.MultiIndex.from_frame(dots[['taxid1_label', 'target_name']]).map(degree)
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
-    labels = label_proteins(df_pred, annotations, DESCRIPTION_WIDTH)
-    dots['protein'] = dots['target_name'].map(labels)
     full_labels = label_proteins(df_pred, annotations)
+    labels = {name: web_utils.wrap_label(label, LABEL_WRAP)
+              for name, label in full_labels.items()}
+    dots['protein'] = dots['target_name'].map(labels)
     dots['protein_full'] = dots['target_name'].map(full_labels)
     surface = summarise_localisations(df_pred, localisations)
     if surface is not None:
@@ -656,18 +654,18 @@ def add_parasite_strips(figure, dots, parasites, palette):
     return groups_shown, niches_shown
 
 
-def strip_width(parasites, proteins, height, room):
+def strip_width(parasites, rows, height, room):
     '''
     Width in x units of the band beside the rows of the dot plot, at which its cells
-    come out as wide as they are high.
+    come out as wide as they are high; `rows` is the span of the rows in y units.
     '''
     # the y axis is opened up past the top row to hold the two strips
-    row = (height - DOT_CHROME) / (proteins + 2.5)
+    row = (height - DOT_CHROME) / (rows + 2.5)
     # room = row * (parasites + 1.5 * width) / width, solved for the width
     return row * parasites / max(room - 1.5 * row, row)
 
 
-def add_localisation_strip(figure, dots, proteins, width):
+def add_localisation_strip(figure, dots, proteins, ys, width):
     '''Where DeepLoc puts each host protein, as a band beside its row.'''
     surface_of = dict(zip(dots['protein'], dots['surface']))
     localisations = [surface_of.get(p, NO_LOCALISATION) for p in proteins]
@@ -676,7 +674,7 @@ def add_localisation_strip(figure, dots, proteins, width):
                                      {c: LOCALISATION_COLORS[c] for c in shown})
     # the band is `width` x units across, an x unit being a parasite
     figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-0.5 - width, dx=width,
-                                y=list(range(len(proteins))),
+                                y=ys,
                                 text=[[label] for label in
                                       localisation_labels(dots, proteins)],
                                 ygap=1, **scale))
@@ -738,8 +736,10 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
     and the proteins ordered by how many parasites reach them.
     '''
     localised = 'surface' in dots.columns
+    # a wrapped name opens its row up
+    ys = web_utils.row_positions(proteins, DOT_ROW)
     cells = {'x': {p: i for i, p in enumerate(parasites)},
-             'y': {p: i for i, p in enumerate(proteins)}}
+             'y': dict(zip(proteins, ys))}
     dots = dots.assign(x=dots['parasite'].map(cells['x']),
                        y=dots['protein'].map(cells['y'])).dropna(subset=['x', 'y'])
 
@@ -776,10 +776,11 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
     # the slanted names of the last columns run past the plot, so the right margin holds them
     right = slant_overhang(parasites, font, plot_room(proteins, column))
     # the legends wrap inside what the row labels leave of the column
-    height = max(420, DOT_ROW * len(proteins) + DOT_CHROME)
+    height = max(420, round(DOT_ROW * (ys[-1] + 1)) + DOT_CHROME)
     room = plot_room(proteins, column) - right
-    band = strip_width(len(parasites), len(proteins), height, room) if localised else 0
-    localisations = add_localisation_strip(figure, dots, proteins, band) if localised else []
+    band = strip_width(len(parasites), ys[-1] + 1, height, room) if localised else 0
+    localisations = (add_localisation_strip(figure, dots, proteins, ys, band) if localised
+                     else [])
     legends = add_dot_legend(figure, groups_shown, localisations, niches, palette, room,
                              height)
 
@@ -796,8 +797,8 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
                         tickfont=dict(size=font),
                         showgrid=True, gridcolor='#f0f0f0', zeroline=False)
     # reversed, so the most-shared protein is the top row
-    figure.update_yaxes(range=[len(proteins) - 0.5, -3], tickmode='array',
-                        tickvals=list(range(len(proteins))), ticktext=proteins, ticks='',
+    figure.update_yaxes(range=[ys[-1] + 0.5, -3], tickmode='array',
+                        tickvals=ys, ticktext=proteins, ticks='',
                         automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
 
     return figure

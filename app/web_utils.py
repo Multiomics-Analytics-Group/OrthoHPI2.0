@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
+import textwrap
 import utils
 
 # menu entries as (label, material icon, path relative to the app root); the page file
@@ -12,6 +13,43 @@ PAGES = [('Home', ':material/home:', 'views/Home.py'),
          ('Parasites of a host', ':material/bug_report:', 'views/2_Compare_Parasites.py'),
          ('Multi-host parasites', ':material/person:', 'views/4_Hosts_of_a_Parasite.py'),
          ('About', ':material/info:', 'views/3_About.py')]
+
+# pixels one line of a wrapped axis name takes, at plotly's default font
+LABEL_LINE = 15
+
+
+def wrap_label(label, width, lines=4):
+    '''
+    An axis name broken onto lines of at most `width` characters, as the paper figures
+    write them; past `lines` the rest is cut.
+    '''
+    wrapped = textwrap.wrap(str(label), width) or [str(label)]
+    if len(wrapped) > lines:
+        wrapped = wrapped[:lines]
+        wrapped[-1] = wrapped[-1][:width - 1].rstrip() + '…'
+
+    return '<br>'.join(wrapped)
+
+
+def label_width(labels):
+    '''Characters of the longest line of the wrapped names.'''
+    return max(len(line) for label in labels for line in str(label).split('<br>'))
+
+
+def row_positions(labels, row):
+    '''
+    The y of each row, in rows of `row` pixels: a row is one row from the next unless
+    their wrapped names need more room, and then the names are as far apart as those of
+    two single-line rows, so that a wrapped name reads as one row.
+    '''
+    line = LABEL_LINE / row
+    halves = [line * (str(label).count('<br>') + 1) / 2 for label in labels]
+    ys = [0.0]
+    for above, below in zip(halves, halves[1:]):
+        ys.append(ys[-1] + max(1, above + below + 1 - line))
+
+    return ys
+
 
 TITLE = 'OrthoHPI 2.0'
 SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'

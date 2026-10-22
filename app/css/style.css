@@ -16,14 +16,40 @@ footer {
     visibility: hidden;
 }
 
-section[data-testid="stSidebar"][aria-expanded="true"]{
-    display: none;
-}
-
 
 
 /* Streamlit pushes the first checkbox of a block down to sit under a label, which in a
    row of checkboxes leaves it lower than the rest */
 .st-key-surface_filters .stElementContainer > .row-widget.stCheckbox {
     margin-top: 0;
+}
+
+/* the menu sits in the bar above, so the page needs no more room under it than that */
+div[data-testid="stMainBlockContainer"] {
+    padding-top: 4.5rem;
+}
+
+/* the bar across the top, in the dark blue of the title, holding the logo and the menu */
+header[data-testid="stHeader"] {
+    background-color: #023858;
+}
+
+header[data-testid="stHeader"] [data-testid="stTopNavLink"],
+header[data-testid="stHeader"] [data-testid="stTopNavLink"] p,
+header[data-testid="stHeader"] [data-testid="stIconMaterial"],
+header[data-testid="stHeader"] button {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+header[data-testid="stHeader"] [data-testid="stTopNavLink"]:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"] {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"] p,
+header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"] [data-testid="stIconMaterial"] {
+    color: #ffffff;
 }

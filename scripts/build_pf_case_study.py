@@ -28,7 +28,7 @@ from scripts import figure_style
 from scripts.build_case_study import HEAT_SCALE, family_name
 from scripts.explore_pf_case_study import enhanced, load, tissue_proteins
 
-# the network as the app draws it (app/pages/1_Predicted_Host-Parasite_PPIs.py): a node
+# the network as the app draws it (app/views/1_Predicted_Host-Parasite_PPIs.py): a node
 # filled with a wash of its species colour inside a border of the colour itself, and
 # neutral edges
 NODE_FILL_TINT = 0.74

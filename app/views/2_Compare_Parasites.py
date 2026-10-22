@@ -8,11 +8,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from css import style
-
-st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={})
-style.load_css()
-web_utils.show_header('Parasites of a host')
 
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()

@@ -3,50 +3,37 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-from streamlit_option_menu import option_menu
 import utils
 
-# menu entries as (label, bootstrap icon, path relative to the app root); the page file
+# menu entries as (label, material icon, path relative to the app root); the page file
 # numbers no longer match this order
-PAGES = [('Home', 'house', 'OrthoHPI_Home.py'),
-         ('Host-parasite network', 'share', 'pages/1_Predicted_Host-Parasite_PPIs.py'),
-         ('Parasites of a host', 'bug', 'pages/2_Compare_Parasites.py'),
-         ('Multi-host parasites', 'person', 'pages/4_Hosts_of_a_Parasite.py'),
-         ('About', 'info-circle', 'pages/3_About.py')]
+PAGES = [('Home', ':material/home:', 'views/Home.py'),
+         ('Host-parasite network', ':material/share:', 'views/1_Predicted_Host-Parasite_PPIs.py'),
+         ('Parasites of a host', ':material/bug_report:', 'views/2_Compare_Parasites.py'),
+         ('Multi-host parasites', ':material/person:', 'views/4_Hosts_of_a_Parasite.py'),
+         ('About', ':material/info:', 'views/3_About.py')]
 
 TITLE = 'OrthoHPI 2.0'
 SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'
 
 
-def show_header(current=None, index=None):
+def navigation():
     '''
-    Draws the chrome every page opens with -- the name of the app, what it does, and the
-    menu across the top -- and switches to whichever entry is picked, so that a page
-    only has to say which one it is.
+    The menu across the top, holding every page; the first one is opened when the
+    address names none.
     '''
+    pages = [st.Page(path, title=label, icon=icon, default=i == 0)
+             for i, (label, icon, path) in enumerate(PAGES)]
+
+    return st.navigation(pages, position='top')
+
+
+def show_header():
+    '''The name of the app and what it does, which the home page opens with.'''
     st.markdown(f"<h1 style='text-align: center; color: #023858;'>{TITLE}</h1>",
                 unsafe_allow_html=True)
     st.markdown(f"<h3 style='text-align: center; color: #2b8cbe;'>{SUBTITLE}</h3>",
                 unsafe_allow_html=True)
-
-    labels = [label for label, _, _ in PAGES]
-    if index is None:
-        index = labels.index(current) if current in labels else 0
-
-    selected = option_menu(
-        menu_title=None,
-        options=labels,
-        icons=[icon for _, icon, _ in PAGES],
-        menu_icon="cast",
-        default_index=index,
-        orientation="horizontal",
-    )
-
-    for label, _, path in PAGES:
-        if selected == label and selected != labels[index]:
-            st.switch_page(path)
-
-    return selected
 
 # width figures are drawn at until the browser has reported the real page width
 DEFAULT_PAGE_WIDTH = 1000

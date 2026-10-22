@@ -969,7 +969,7 @@ if selected_host != web_utils.NO_HOST:
 
     # one slider for the four figures below; the tissue dots at the foot keep every
     # prediction
-    slider_column, order_column = st.columns([2, 1])
+    slider_column, order_column, _ = st.columns(3)
     with slider_column:
         score = web_utils.score_slider(
             help='Interactions predicted below this confidence are left out of '

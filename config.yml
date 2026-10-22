@@ -684,3 +684,30 @@ parasites:
         hosts:
             - 10116
             - 10090
+    5823:
+        label: Plasmodium berghei
+        group: Apicomplexa
+        niche: intracellular
+        color: "#4a1486"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000759"
+            - "BTO:0000089"
+            - "BTO:0000142"
+            - "BTO:0001281"
+        hosts:
+            - 10116
+            - 10090
+    73239:
+        label: Plasmodium yoelii
+        group: Apicomplexa
+        niche: intracellular
+        color: "#fe9929"
+        tissues:
+            - "BTO:0001253"
+            - "BTO:0000759"
+            - "BTO:0000089"
+            - "BTO:0001281"
+        hosts:
+            - 10116
+            - 10090

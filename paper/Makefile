@@ -29,7 +29,7 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
-	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_families.png figures/parasite_go.png \
+	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/parasite_go.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/web_interface.png
@@ -64,9 +64,9 @@ figures/funnel_shares.svg figures/funnel_shares.png tables/funnel_shares.csv: ..
 figures/multi_host.svg figures/multi_host.png tables/multi_host.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../scripts/build_multi_host_figure.py
 	cd .. && $(PYTHON) scripts/build_multi_host_figure.py
 
-# The host families the most parasites converge on, over the parasites of human.
-figures/shared_families.svg figures/shared_families.png tables/shared_families.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_families.py
-	cd .. && $(PYTHON) scripts/build_shared_families.py
+# The host orthologous groups the most parasites converge on, over the parasites of human.
+figures/shared_ogs.svg figures/shared_ogs.png tables/shared_ogs.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_ogs.py
+	cd .. && $(PYTHON) scripts/build_shared_ogs.py
 
 # The host processes the parasites of human reach: GO enrichment of each parasite's host
 # interactors against its niche's pool, as the app tests it.
@@ -77,7 +77,7 @@ figures/parasite_go.svg figures/parasite_go.png tables/parasite_go.csv: ../confi
 figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
 	cd .. && $(PYTHON) scripts/build_parasite_similarity.py
 
-# The case study: one host-parasite pair from parasite family to host cell type.
+# The case study: one host-parasite pair from parasite orthologous group to host cell type.
 figures/case_study.svg figures/case_study.png tables/case_study_links.csv tables/case_study_cell_types.csv: ../config.yml ../data/predictions.parquet ../data/tissues_cell_types.parquet ../scripts/build_case_study.py
 	cd .. && $(PYTHON) scripts/build_case_study.py
 
@@ -86,8 +86,8 @@ figures/pf_case_study.svg figures/pf_case_study.png tables/pf_case_study_funnel.
 	cd .. && $(PYTHON) scripts/build_pf_case_study.py
 
 # The L. braziliensis case study: the app's body figures, its links in human and mouse,
-# and the host families of two parasite families in each. Rereads the TISSUES downloads.
-figures/lb_case_study.svg figures/lb_case_study.png tables/lb_case_study_families.csv tables/lb_case_study_specific.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../data/figure_tissues.parquet ../app/body_figure.py ../scripts/build_lb_case_study.py ../scripts/build_multi_host_figure.py
+# and the host orthologous groups of two parasite groups in each. Rereads the TISSUES downloads.
+figures/lb_case_study.svg figures/lb_case_study.png tables/lb_case_study_ogs.csv tables/lb_case_study_specific.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../data/figure_tissues.parquet ../app/body_figure.py ../scripts/build_lb_case_study.py ../scripts/build_multi_host_figure.py
 	cd .. && $(PYTHON) scripts/build_lb_case_study.py
 
 # AlphaFold 3 Server models of case-study links against host-host references and random
@@ -123,7 +123,7 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_families.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
+figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

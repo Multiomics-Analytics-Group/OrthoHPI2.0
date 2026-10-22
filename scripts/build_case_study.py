@@ -1,11 +1,11 @@
 '''
 One host-parasite pair from parasite protein to host cell: the predicted interactions of
-a parasite with a host as a matrix of parasite protein families against host proteins,
+a parasite with a host as a matrix of parasite orthologous groups against host proteins,
 and under it, sharing the columns, the cell types of the infected tissues expressing
-each host protein. A parasite family is the orthology group of the parasite proteins,
-which the predictions are made at the level of, named by the most common description
-of its members. Writes paper/figures/case_study.svg/.png and the two matrices to
-paper/tables/case_study_links.csv and paper/tables/case_study_cell_types.csv.
+each host protein. The parasite orthologous groups, the level the predictions are made
+at, are named by the most common description of their members. Writes
+paper/figures/case_study.svg/.png and the two matrices to paper/tables/case_study_links.csv
+and paper/tables/case_study_cell_types.csv.
 '''
 import argparse
 import os
@@ -30,14 +30,14 @@ HEAT_SCALE = ['#ffffff', '#fee6ce', '#fdae6b', '#e6550d', '#a63603']
 TISSUE_COLORS = ['#0072B2', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#D55E00']
 # what STRING's descriptions say when they say nothing
 UNNAMED = {'uncharacterized protein', 'hypothetical protein', ''}
-# most characters of a family name before it is cut to an ellipsis
+# most characters of a group name before it is cut to an ellipsis
 NAME_CHARS = 36
 # a cell type expressing a smaller share of the host proteins is an empty row
 MIN_EXPRESSED = 0.1
 
 
-def family_name(descriptions):
-    '''The description most of the family's proteins carry, trimmed to what it names.'''
+def og_name(descriptions):
+    '''The description most of the group's proteins carry, trimmed to what it names.'''
     counts = Counter(re.sub(r'[.\s]+$', '', str(d)).strip() for d in descriptions)
     named = [(n, d) for d, n in counts.most_common() if d.lower() not in UNNAMED]
     if not named:
@@ -51,8 +51,8 @@ def family_name(descriptions):
 
 
 def build(config, data_dir, parasite, host, min_targets, cells_per_tissue):
-    '''The link matrix (families x host proteins) and the cell-type matrix (cell types x
-    host proteins) of one pair, both keyed by host protein id. Families reaching fewer
+    '''The link matrix (orthologous groups x host proteins) and the cell-type matrix (cell types x
+    host proteins) of one pair, both keyed by host protein id. Groups reaching fewer
     than min_targets host proteins are left out, and each tissue keeps the
     cells_per_tissue cell types expressing the most of the host proteins.'''
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
@@ -65,21 +65,21 @@ def build(config, data_dir, parasite, host, min_targets, cells_per_tissue):
         raise SystemExit(f'no predictions for parasite {parasite} in host {host}')
 
     edges['description'] = edges['source'].map(descriptions)
-    families = edges.groupby('group1').agg(
+    ogs = edges.groupby('group1').agg(
         proteins=('source', 'nunique'), targets=('target', 'nunique'),
-        name=('description', family_name)).sort_values(['targets', 'proteins'], ascending=False)
-    families = families[families['targets'] >= min_targets]
-    # an unnamed family keeps its group id, so two of them are told apart
-    families['label'] = [(f'{row.name} ({row.proteins})' if row.proteins > 1 else row.name)
+        name=('description', og_name)).sort_values(['targets', 'proteins'], ascending=False)
+    ogs = ogs[ogs['targets'] >= min_targets]
+    # an unnamed group keeps its id, so two of them are told apart
+    ogs['label'] = [(f'{row.name} ({row.proteins})' if row.proteins > 1 else row.name)
                          + (f' {row.Index}' if row.name == 'uncharacterized' else '')
-                         for row in families.itertuples()]
-    edges = edges[edges['group1'].isin(families.index)]
+                         for row in ogs.itertuples()]
+    edges = edges[edges['group1'].isin(ogs.index)]
     links = edges.groupby(['group1', 'target'])['weight'].max().unstack()
-    # columns by host family, so paralogues sit together, families by their reach
+    # columns by host orthologous group, so paralogues sit together, rows by their reach
     symbols = edges.drop_duplicates('target').set_index('target')['target_name'].astype(str).str.upper()
     host_groups = edges.drop_duplicates('target').set_index('target')['group2']
     column_order = sorted(links.columns, key=lambda t: (-int(links[t].notna().sum()), host_groups[t], symbols[t]))
-    links = links.reindex(index=families.index, columns=column_order)
+    links = links.reindex(index=ogs.index, columns=column_order)
 
     tissue_labels = [config['tissues'][t] for t in config['parasites'][int(parasite)]['tissues']]
     cells = pd.read_parquet(os.path.join(data_dir, 'tissues_cell_types.parquet'))
@@ -94,16 +94,16 @@ def build(config, data_dir, parasite, host, min_targets, cells_per_tissue):
                                        key=lambda i: (tissue_labels.index(i[0]), -expressed[i], i[1]))]
     expression = expression.groupby(level=0, sort=False).head(cells_per_tissue)
 
-    return links, families, symbols, expression, tissue_labels
+    return links, ogs, symbols, expression, tissue_labels
 
 
-def draw(links, families, symbols, expression, tissue_labels, title, output_stem):
+def draw(links, ogs, symbols, expression, tissue_labels, title, output_stem):
     figure_style.apply()
-    n_fam, n_cols, n_cells = len(links), links.shape[1], len(expression)
-    fig_height = 0.15 * (n_fam + n_cells) + 2.3
+    n_ogs, n_cols, n_cells = len(links), links.shape[1], len(expression)
+    fig_height = 0.15 * (n_ogs + n_cells) + 2.3
     fig, (top, bottom) = plt.subplots(
         2, 1, figsize=(figure_style.WIDTH, fig_height), sharex=True,
-        gridspec_kw={'height_ratios': [n_fam, n_cells], 'hspace': 0.04})
+        gridspec_kw={'height_ratios': [n_ogs, n_cells], 'hspace': 0.04})
 
     # A: a dot per predicted link, shaded by confidence
     rows, cols = np.where(links.notna().to_numpy())
@@ -111,10 +111,10 @@ def draw(links, families, symbols, expression, tissue_labels, title, output_stem
     cmap = LinearSegmentedColormap.from_list('score', DOT_SCALE)
     dots = top.scatter(cols, rows, c=scores, cmap=cmap, vmin=0.35, vmax=1.0, s=22,
                        linewidths=0, zorder=3)
-    top.set_yticks(range(n_fam))
-    top.set_yticklabels(families['label'])
-    top.set_ylim(n_fam - 0.5, -0.5)
-    top.set_title('A  Parasite families and the host proteins they are predicted to bind',
+    top.set_yticks(range(n_ogs))
+    top.set_yticklabels(ogs['label'])
+    top.set_ylim(n_ogs - 0.5, -0.5)
+    top.set_title('A  Parasite orthologous groups and the host proteins they are predicted to bind',
                   loc='left', pad=3)
 
     # B: the cell types of the infected tissues expressing each host protein
@@ -177,7 +177,7 @@ if __name__ == '__main__':
                         help='parasite taxid (default: Necator americanus)')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
     parser.add_argument('--min-targets', type=int, default=3,
-                        help='families reaching fewer host proteins are left out')
+                        help='orthologous groups reaching fewer host proteins are left out')
     parser.add_argument('--cells-per-tissue', type=int, default=8,
                         help='the cell types of each tissue kept: those expressing the most host proteins')
     parser.add_argument('--links', default='paper/tables/case_study_links.csv')
@@ -187,14 +187,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = utils.read_config(filepath=args.config)
-    links, families, symbols, expression, tissues = build(
+    links, ogs, symbols, expression, tissues = build(
         config, args.data_dir, args.parasite, args.host, args.min_targets, args.cells_per_tissue)
-    (links.set_axis(families['label'], axis=0).set_axis([symbols[t] for t in links.columns], axis=1)
+    (links.set_axis(ogs['label'], axis=0).set_axis([symbols[t] for t in links.columns], axis=1)
      .to_csv(args.links))
     expression.set_axis([symbols[t] for t in expression.columns], axis=1).to_csv(args.cell_types)
-    print(f"{len(families)} parasite families, {links.shape[1]} host proteins, "
+    print(f"{len(ogs)} parasite orthologous groups, {links.shape[1]} host proteins, "
           f"{len(expression)} cell types; wrote {args.links} and {args.cell_types}")
     title = (f"{config['parasites'][args.parasite]['label']} in "
              f"{config['hosts'][args.host]['label'].split(' (')[0]}")
-    draw(links, families, symbols, expression, tissues, title, args.figure)
+    draw(links, ogs, symbols, expression, tissues, title, args.figure)
     print(f"Wrote {args.figure}.svg and .png")

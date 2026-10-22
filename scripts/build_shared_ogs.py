@@ -1,13 +1,12 @@
 '''
-Which host protein families the parasites of one host converge on. A family is the
-orthology group of the host protein, and a family is reached by a parasite when any of
-its proteins is predicted to interact with any protein of the family. Beside the count
-of parasites, the figure that says whether the convergence is real: how many distinct
-parasite orthology groups reach the family (one means a single conserved parasite
-protein transferred many times).
-Writes paper/tables/shared_families.csv (every family reached by two or more parasites,
-with how many helminths and protozoa reach it) and paper/figures/shared_families.svg/.png
-(the families reached by at least --min-parasites, as a dot matrix over the parasites).
+Which host orthologous groups the parasites of one host converge on. A group is
+reached by a parasite when any of its proteins is predicted to interact with any protein
+of the group. Beside the count of parasites, the figure that says whether the
+convergence is real: how many distinct parasite orthologous groups reach the group (one
+means a single conserved parasite protein transferred many times).
+Writes paper/tables/shared_ogs.csv (every group reached by two or more parasites, with
+how many helminths and protozoa reach it) and paper/figures/shared_ogs.svg/.png (the
+groups reached by at least --min-parasites, as a dot matrix over the parasites).
 '''
 import argparse
 import os
@@ -28,20 +27,20 @@ from scripts import figure_style
 HELMINTHS = {'Nematoda', 'Trematoda', 'Cestoda'}
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 DOT_COLOR = '#2a62ab'
-# family labels wrap onto lines of at most this many characters
+# group labels wrap onto lines of at most this many characters
 LABEL_CHARS = 34
 # the left margin, a figure fraction, that the wrapped labels take
 LEFT = 0.32
 
 
-def count_families(config, predictions, host):
-    '''One row per host family reached by two or more parasites of the host.'''
+def count_ogs(config, predictions, host):
+    '''One row per host orthologous group reached by two or more parasites of the host.'''
     parasites = config['parasites']
     edges = predictions[predictions['taxid2'] == str(host)].copy()
     edges['taxon'] = edges['taxid1'].map(lambda t: parasites[int(t)]['group'])
     edges['clade'] = edges['taxon'].map(lambda g: 'helminth' if g in HELMINTHS else 'protozoan')
 
-    families = edges.groupby('group2').agg(
+    ogs = edges.groupby('group2').agg(
         parasites=('taxid1', 'nunique'),
         helminths=('taxid1', lambda t: t[edges.loc[t.index, 'clade'] == 'helminth'].nunique()),
         protozoa=('taxid1', lambda t: t[edges.loc[t.index, 'clade'] == 'protozoan'].nunique()),
@@ -49,14 +48,14 @@ def count_families(config, predictions, host):
         host_proteins=('target', 'nunique'),
         interactions=('target', 'size'),
         symbols=('target_name', lambda n: ', '.join(sorted(set(str(x).upper() for x in n)))))
-    families = families[families['parasites'] > 1].sort_values(
+    ogs = ogs[ogs['parasites'] > 1].sort_values(
         ['parasites', 'parasite_groups', 'interactions'], ascending=False, kind='stable')
-    families.index.name = 'family'
+    ogs.index.name = 'orthologous_group'
 
-    return families.reset_index(), edges
+    return ogs.reset_index(), edges
 
 
-def draw(config, families, edges, output_stem):
+def draw(config, ogs, edges, output_stem):
     figure_style.apply()
     parasites = config['parasites']
     taxon_order = list(config['parasite_groups'])
@@ -66,17 +65,17 @@ def draw(config, families, edges, output_stem):
                                     taxon_order.index(parasites[int(t)]['group']),
                                     parasites[int(t)]['label']))
     col_of = {t: i for i, t in enumerate(columns)}
-    labels = [textwrap.fill(s, LABEL_CHARS) for s in families['symbols']]
+    labels = [textwrap.fill(s, LABEL_CHARS) for s in ogs['symbols']]
     ys = figure_style.row_positions(labels, figure_style.DENSE_ROW)
-    row_of = dict(zip(families['family'], ys))
+    row_of = dict(zip(ogs['orthologous_group'], ys))
 
-    # a dot per (family, parasite), its area the parasite proteins reaching the family
+    # a dot per (group, parasite), its area the parasite proteins reaching the group
     dots = (edges[edges['group2'].isin(row_of)]
             .groupby(['group2', 'taxid1'])['source'].nunique().reset_index())
     n_cols = len(columns)
     fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.DENSE_ROW * (ys[-1] + 1) + 2.35))
     size = lambda n: 6 + 3 * min(n, 20)
-    ax.scatter([col_of[t] for t in dots['taxid1']], [row_of[f] for f in dots['group2']],
+    ax.scatter([col_of[t] for t in dots['taxid1']], [row_of[g] for g in dots['group2']],
                s=dots['source'].map(size), color=DOT_COLOR, linewidths=0, zorder=3)
     ax.set_xlim(-0.6, n_cols - 0.4)
     ax.set_ylim(ys[-1] + 0.6, -0.6)
@@ -111,8 +110,8 @@ def draw(config, families, edges, output_stem):
         # the headers stand like the parasite names, from the top of the strips up
         ax.text(x, -0.6 - 2 * strip - 0.3, header, ha='center', va='bottom',
                 rotation=90, color='#555555', clip_on=False)
-        for row in families.itertuples():
-            y = row_of[row.family]
+        for row in ogs.itertuples():
+            y = row_of[row.orthologous_group]
             ax.text(x, y, f'{getattr(row, column)}', ha='center', va='center', color='#555555', clip_on=False)
 
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
@@ -143,17 +142,17 @@ if __name__ == '__main__':
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--host', type=int, default=9606, help='host taxid (default: human)')
     parser.add_argument('--min-parasites', type=int, default=24,
-                        help='families reached by fewer parasites stay out of the figure')
-    parser.add_argument('--table', default='paper/tables/shared_families.csv')
-    parser.add_argument('--figure', default='paper/figures/shared_families',
+                        help='groups reached by fewer parasites stay out of the figure')
+    parser.add_argument('--table', default='paper/tables/shared_ogs.csv')
+    parser.add_argument('--figure', default='paper/figures/shared_ogs',
                         help='output path without extension')
     args = parser.parse_args()
 
     config = utils.read_config(filepath=args.config)
     predictions = pd.read_parquet(os.path.join(args.data_dir, 'predictions.parquet'))
-    families, edges = count_families(config, predictions, args.host)
-    families.to_csv(args.table, index=False)
-    print(f"Wrote {args.table}: {len(families)} families reached by two or more parasites, "
-          f"{(families['parasites'] >= args.min_parasites).sum()} by {args.min_parasites} or more")
-    draw(config, families[families['parasites'] >= args.min_parasites], edges, args.figure)
+    ogs, edges = count_ogs(config, predictions, args.host)
+    ogs.to_csv(args.table, index=False)
+    print(f"Wrote {args.table}: {len(ogs)} host orthologous groups reached by two or more parasites, "
+          f"{(ogs['parasites'] >= args.min_parasites).sum()} by {args.min_parasites} or more")
+    draw(config, ogs[ogs['parasites'] >= args.min_parasites], edges, args.figure)
     print(f"Wrote {args.figure}.svg and .png")

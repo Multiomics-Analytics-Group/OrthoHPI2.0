@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import utils
 from scripts import figure_style
-from scripts.build_case_study import HEAT_SCALE, family_name
+from scripts.build_case_study import HEAT_SCALE, og_name
 from scripts.explore_pf_case_study import enhanced, load, tissue_proteins
 
 # the network as the app draws it (app/views/1_Predicted_Host-Parasite_PPIs.py): a node
@@ -168,7 +168,7 @@ def node_labels(edges, descriptions):
     '''
     labels = dict(zip(edges['target'], edges['target_name']))
     for protein, name in zip(edges['source'], edges['source_name']):
-        description = family_name([descriptions.get(protein, '')])
+        description = og_name([descriptions.get(protein, '')])
         description = description.replace(', putative', '')
         labels[protein] = name if description == 'uncharacterized' else (
             textwrap.fill(description if len(description) <= NODE_LABEL_CHARS

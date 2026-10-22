@@ -3,7 +3,7 @@ Compare the hosts of every parasite predicted against more than one. An interact
 compared between hosts as the pair of orthologous groups it was transferred from, so a
 link counts as shared when both hosts carry a protein of the host group interacting with
 the parasite's. A link missing from a host is explained with the first filter its host
-family fails there: the family is absent from the host proteome, the TISSUES filter
+group fails there: the group is absent from the host proteome, the TISSUES filter
 keeps no member in a tissue the parasite infects, the DeepLoc filter keeps no remaining
 member in a location the parasite reaches, or it is available and STRING transferred
 nothing -- a fourth case the comparison counts but which no link has fallen into. Writes
@@ -27,7 +27,7 @@ from scripts import figure_style
 
 REASONS = ['absent', 'not expressed', 'out of reach', 'not transferred']
 REASON_LABELS = {
-    'absent': 'family absent from the host',
+    'absent': 'orthologous group absent from the host',
     'not expressed': 'removed by the TISSUES filter',
     'out of reach': 'removed by the DeepLoc filter',
     'not transferred': 'available, not transferred',
@@ -58,7 +58,7 @@ def host_pools(config_file, data_dir):
     return tissues, reachable
 
 
-def family_members(data_dir):
+def group_members(data_dir):
     '''{(host group, host taxid): its proteins in that host}.'''
     orthologs = pd.read_parquet(os.path.join(data_dir, 'host_orthologs.parquet'))
     members = {}
@@ -79,10 +79,10 @@ def group_links(edges):
 
 
 def why_missing(link, host, parasite, members, tissues, reachable):
-    family = members.get((link.host_group, host), set())
-    if not family:
+    proteins = members.get((link.host_group, host), set())
+    if not proteins:
         return 'absent'
-    expressed = {p for p in family if parasite['tissue_labels'] & set(tissues.get(p, []))}
+    expressed = {p for p in proteins if parasite['tissue_labels'] & set(tissues.get(p, []))}
     if not expressed:
         return 'not expressed'
     if not expressed & reachable[parasite['niche']]:
@@ -96,7 +96,7 @@ def compare(config_file, data_dir):
     hosts = {str(t): h['label'].split('(')[1].rstrip(')') for t, h in config['hosts'].items()}
     predictions = pd.read_parquet(os.path.join(data_dir, 'predictions.parquet'))
     tissues, reachable = host_pools(config_file, data_dir)
-    members = family_members(data_dir)
+    members = group_members(data_dir)
 
     rows = []
     for taxid, parasite in config['parasites'].items():

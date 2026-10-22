@@ -1,4 +1,4 @@
-only in,missing from the other host,host family,parasite proteins,host proteins,score
+only in,missing from the other host,host group,parasite proteins,host proteins,score
 human,not expressed,KOG3642,"ATG8C.1,ATG8C.3","GABRA2,GABRA4,GABRE",0.884
 human,not expressed,KOG0597,"LBRM_20_1300,LBRM_35_3570","STK36,ULK4",0.45
 human,not expressed,KOG3576,"ATG8C.1,ATG8C.3","OVOL1,OVOL3",0.442

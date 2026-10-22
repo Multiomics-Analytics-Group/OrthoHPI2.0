@@ -1,5 +1,5 @@
 '''
-Which orthology groups each host proteome has a protein in, for the host groups that carry a
+Which orthologous groups each host proteome has a protein in, for the host groups that carry a
 predicted interaction.
 '''
 
@@ -18,7 +18,7 @@ GROUP_COLUMN, PROTEINS_COLUMN, SPECIES_COLUMN = 1, 4, 5
 
 def get_host_groups(predictions_file):
     '''
-    The orthology groups of the host side of the predictions, and the hosts to look for
+    The orthologous groups of the host side of the predictions, and the hosts to look for
     in them.
     '''
     predictions = utils.read_parquet_file(input_file=predictions_file)
@@ -61,7 +61,7 @@ def main(data_dir):
     output_file = os.path.join(data_dir, "host_orthologs.parquet")
 
     groups, taxids = get_host_groups(predictions_file)
-    print(f"{len(groups)} host orthology groups to look up, {len(taxids)} hosts")
+    print(f"{len(groups)} host orthologous groups to look up, {len(taxids)} hosts")
 
     counts = count_members(members_file, groups, taxids)
     orthologs = pd.DataFrame(counts, columns=["group", "taxid", "n_proteins", "proteins"])

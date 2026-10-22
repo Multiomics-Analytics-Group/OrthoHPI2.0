@@ -113,7 +113,7 @@ def build(config, data_dir, parasite, host, min_host_proteins):
 
 
 def known_pairs(data_dir, parasite, edges):
-    '''Where each characterized pair stands: filters passed, orthology group, prediction.'''
+    '''Where each characterized pair stands: filters passed, orthologous group, prediction.'''
     eligible = pd.read_parquet(os.path.join(data_dir, 'eligible_proteins.parquet'))
     uniprot = pd.concat([edges[['source', 'source_uniprot']].set_axis(['id', 'uniprot'], axis=1),
                          edges[['target', 'target_uniprot']].set_axis(['id', 'uniprot'], axis=1)])

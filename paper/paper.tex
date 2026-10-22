@@ -433,35 +433,36 @@ same host proteins (Jaccard similarity 0.65--0.81).
   \label{fig:similarity}
 \end{figure}
 
-Next, we investigated which human protein families most parasites are
-predicted to interact with. In Figure~\ref{fig:shared_families} we show the
-human protein families reached by at least 24 parasites. Of the 909 families
+Next, we investigated which human orthologous groups most parasites are
+predicted to interact with. Each is the EggNOG orthologous group of a host
+protein, and can hold several paralogues. In Figure~\ref{fig:shared_ogs} we show
+the human orthologous groups reached by at least 24 parasites. Of the 909 groups
 reached by at least two parasites, 31 are reached by 24 or more of the 43
 human parasites. The most widely reached are the laminins (37 parasites), the
 integrin beta subunits (36) and the amyloid precursor proteins (36), followed
-by the lipid-handling families such as LCAT and PLA2G15 (33), the sphingomyelin
+by the group of the lipid-handling enzymes LCAT and PLA2G15 (33), the sphingomyelin
 synthases (32), the BPI/LBP/CETP lipid-transfer proteins (32) and
 apolipoprotein (31). These proteins are cell membrane or extracellular
 proteins, which is why they can be reached by both the intracellular and
-extracellular parasites. Most families are shared by helminths and protozoa,
+extracellular parasites. Most groups are shared by helminths and protozoa,
 but a few are helminth-specific: the netrin receptors DCC/neogenin, the
 sortilins, SPARC and CHID1 are reached by 24 to 26 helminths and at most one
-protozoan. \todo{How many host families are reached in total?}
+protozoan. \todo{How many host orthologous groups are reached in total?}
 
-% paper/figures/shared_families.pdf is generated: `make figures`.
+% paper/figures/shared_ogs.png is generated: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_families}
-  \caption{Human protein families reached by at least 24 parasites. Rows are
-  the human orthologous-group families with a predicted interaction from at
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs}
+  \caption{Human orthologous groups reached by at least 24 parasites. Rows are
+  the human orthologous groups with a predicted interaction from at
   least 24 of the 41 human parasites, ordered by count; columns are the
   parasites, grouped by taxon (lower strip) with their niche (upper strip). Dot
   area is the number of proteins of the parasite predicted to interact with the
-  family. The right-hand columns give the number of parasites and the number of
-  distinct parasite orthologous groups from which the family is reached (one
+  group. The right-hand columns give the number of parasites and the number of
+  distinct parasite orthologous groups from which the group is reached (one
   would mean a single conserved parasite protein transferred many times).
-  Families are named by the members reached.}
-  \label{fig:shared_families}
+  Groups are named by the members reached.}
+  \label{fig:shared_ogs}
 \end{figure}
 
 The host Gene Ontology processes reached split by niche rather than by
@@ -531,7 +532,7 @@ the other host carries (Figure~\ref{fig:multi_host}B).
 
 Of the 510 links missing from a host, 362 (71\%) are lost at the TISSUES
 filter, 127 (25\%) at the DeepLoc filter, and only 21 (4\%) because the host
-proteome has no member of the family. The TISSUES losses follow how well each
+proteome has no member of the orthologous group. The TISSUES losses follow how well each
 host's infected tissues are annotated (Supplementary
 Figure~\ref{fig:tissues_coverage}). Rat has no annotation for blood, skin or
 stomach, and its small intestine has only 1{,}304 annotated proteins against
@@ -592,7 +593,7 @@ FASTA files.}
 interactors for pairs of parasites -- get a list of shared host interactors for
 a specific pair of parasites.}
 
-\todo{Multi-host page: investigate the shared host protein families for the
+\todo{Multi-host page: investigate the shared host orthologous groups for the
 different hosts. Get a table of the reasons why some interactions are missing
 from one host.}
 
@@ -650,8 +651,8 @@ host and parasite proteins surviving each stage of the pipeline, and the number
 of predicted interactions of the pair. Supplied as a comma-separated file
 rather than typeset, since the rows are meant to be sorted and filtered.
 
-\textbf{Supplementary Table S2} (\texttt{shared\_families.csv}). The data for
-the common host interactors plot (Figure~\ref{fig:shared_families}).
+\textbf{Supplementary Table S2} (\texttt{shared\_ogs.csv}). The data for
+the common host interactors plot (Figure~\ref{fig:shared_ogs}).
 
 \textbf{Supplementary Table S3} (\texttt{pf\_case\_study\_links.csv}). The
 predicted interactions of stages C and D of Figure~\ref{fig:pf_case_study}, one

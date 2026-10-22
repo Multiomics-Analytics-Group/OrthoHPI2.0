@@ -1,11 +1,11 @@
 '''
 One parasite in its two hosts. An interaction is compared between the hosts as the pair
 of orthologous groups it was transferred from, as in scripts/build_multi_host_figure.py,
-and a link one host lacks is explained by the first filter its host family fails there.
+and a link one host lacks is explained by the first filter its host group fails there.
 Draws (A) the app's body figure of each host, its infected organs shaded by the
 interactions reaching them, (B) the links of each host, shared or found only there, the
-latter by why the other host lacks them, and (C, D) for chosen parasite families, the
-host families each host links them to, coloured by confidence score, with the cause
+latter by why the other host lacks them, and (C, D) for chosen parasite orthologous groups,
+the host groups each host links them to, coloured by confidence score, with the cause
 marked where a host lacks the link. The body figures are rendered with Inkscape. Writes paper/figures/lb_case_study.svg/.png and the panels' data to
 paper/tables/lb_case_study_*.csv.
 '''
@@ -28,16 +28,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import body_figure
 import utils
 from scripts import figure_style
-from scripts.build_case_study import HEAT_SCALE, family_name
+from scripts.build_case_study import HEAT_SCALE, og_name
 from scripts.build_multi_host_figure import (REASON_COLORS, REASON_EDGE, REASON_LABELS,
-                                             family_members, group_links, host_pools,
+                                             group_members, group_links, host_pools,
                                              why_missing)
 
 SHARED_COLOR = '#3b3b3b'
 # the mark in a matrix cell a host lacks, by cause
 REASON_MARKS = {'absent': '–', 'not expressed': 'T', 'out of reach': 'L',
                 'not transferred': '?'}
-REASON_SHORT = {'absent': 'family absent', 'not expressed': 'TISSUES filter',
+REASON_SHORT = {'absent': 'group absent', 'not expressed': 'TISSUES filter',
                 'out of reach': 'DeepLoc filter', 'not transferred': 'not transferred'}
 INKSCAPE = '/Applications/Inkscape.app/Contents/MacOS/inkscape'
 # host gene names listed on a column before the rest are counted
@@ -65,7 +65,7 @@ def compare(config_file, config, data_dir, parasite_taxid):
     edges['weight'] = edges['weight'].astype(float)
     links = group_links(edges)
     tissues, reachable = host_pools(config_file, data_dir)
-    members = family_members(data_dir)
+    members = group_members(data_dir)
     links['missing'] = [None if len(link.hosts) == 2 else
                         why_missing(link, next(h for h in hosts if h not in link.hosts),
                                     parasite, members, tissues, reachable)
@@ -90,20 +90,20 @@ def short_names(names):
     return ', '.join(parts)
 
 
-def family_matrix(edges, links, hosts, group, max_columns):
+def og_matrix(edges, links, hosts, group, max_columns):
     '''
-    The host families a parasite family links to, hosts by host families: the best
-    confidence score of the link in each host, and the cause where a host lacks it. The
-    max_columns families with the best score are kept.
+    The host orthologous groups a parasite group links to, hosts by host groups: the
+    best confidence score of the link in each host, and the cause where a host lacks it.
+    The max_columns groups with the best score are kept.
     '''
-    family = edges[(edges['group1'] == group) | (edges['group2'] == group)]
-    host_group = np.where(family['group1'] == group, family['group2'], family['group1'])
-    family = family.assign(host_group=host_group)
-    scores = family.pivot_table(index='taxid2', columns='host_group', values='weight',
+    linked = edges[(edges['group1'] == group) | (edges['group2'] == group)]
+    host_group = np.where(linked['group1'] == group, linked['group2'], linked['group1'])
+    linked = linked.assign(host_group=host_group)
+    scores = linked.pivot_table(index='taxid2', columns='host_group', values='weight',
                                 aggfunc='max').reindex(hosts)
     order = scores.max().sort_values(ascending=False, kind='stable').index[:max_columns]
     scores = scores[order]
-    names = family.groupby('host_group')['target_name'].agg(
+    names = linked.groupby('host_group')['target_name'].agg(
         lambda n: short_names(n.str.upper()))[order]
     pair = {h: tuple(sorted((group, h))) for h in order}
     causes = pd.DataFrame({h: [None if not np.isnan(scores.at[t, h]) else
@@ -198,7 +198,7 @@ def draw_counts(ax, links, hosts, names):
 
 
 def draw_matrix(ax, scores, causes, names, hosts, host_names, title, cmap, vmin):
-    '''A parasite family's host families: hosts as rows, confidence score as colour.'''
+    '''A parasite orthologous group's host groups: hosts as rows, confidence score as colour.'''
     values = scores.to_numpy(dtype=float)
     image = ax.imshow(np.ma.masked_invalid(values), cmap=cmap, vmin=vmin, vmax=1,
                       aspect='auto')
@@ -281,10 +281,10 @@ if __name__ == '__main__':
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--parasite', type=int, default=5660,
                         help='parasite taxid (default: Leishmania braziliensis)')
-    parser.add_argument('--families', nargs='+', default=['KOG1654', 'KOG2556'],
+    parser.add_argument('--groups', nargs='+', default=['KOG1654', 'KOG2556'],
                         help='parasite orthologous groups drawn in C, D (default: ATG8, GP63)')
     parser.add_argument('--max-columns', type=int, default=22,
-                        help='most host families drawn per parasite family, the best-scoring')
+                        help='most host groups drawn per parasite group, the best-scoring')
     parser.add_argument('--inkscape', default=INKSCAPE, help='renders the body figures')
     parser.add_argument('--tables', default='paper/tables/lb_case_study',
                         help='stem of the tables written')
@@ -297,19 +297,19 @@ if __name__ == '__main__':
     descriptions = pd.read_parquet(os.path.join(args.data_dir, 'protein_annotations.parquet')
                                    ).set_index('protein')['description']
     matrices, rows = [], []
-    for group in args.families:
+    for group in args.groups:
         proteins = edges.loc[edges['group1'] == group, 'source'].unique()
         if not len(proteins):
             sys.exit(f'{group} has no predictions for parasite {args.parasite}')
-        name = family_name([descriptions.get(p, '') for p in proteins])
-        scores, causes, column_names = family_matrix(edges, links, hosts, group, args.max_columns)
+        name = og_name([descriptions.get(p, '') for p in proteins])
+        scores, causes, column_names = og_matrix(edges, links, hosts, group, args.max_columns)
         n = len(proteins)
         matrices.append((f'{name}\n{n} parasite protein{"s" * (n > 1)}, {group}',
                          scores, causes, column_names))
         for host in hosts:
             for column in scores.columns:
-                rows.append({'parasite family': group, 'parasite family name': name,
-                             'host family': column, 'host genes': column_names[column],
+                rows.append({'parasite group': group, 'parasite group name': name,
+                             'host group': column, 'host genes': column_names[column],
                              'host': host_name(config, host), 'score': scores.at[host, column],
                              'missing': causes.at[host, column]})
     title = (f"{config['parasites'][args.parasite]['label']} in "
@@ -317,7 +317,7 @@ if __name__ == '__main__':
     bodies = body_images(config, args.data_dir, edges, hosts, args.inkscape)
     draw(config, edges, links, hosts, matrices, bodies, title, args.figure)
 
-    pd.DataFrame(rows).to_csv(f'{args.tables}_families.csv', index=False)
+    pd.DataFrame(rows).to_csv(f'{args.tables}_ogs.csv', index=False)
     only = links[links['hosts'].map(len) == 1].reset_index()
     host_genes = edges.groupby(['group1', 'group2', 'taxid2'])['target_name'].agg(
         lambda n: ','.join(sorted(set(n))))
@@ -326,7 +326,7 @@ if __name__ == '__main__':
     specific = pd.DataFrame([{
         'only in': host_name(config, next(iter(row.hosts))),
         'missing from the other host': row.missing,
-        'host family': row.host_group,
+        'host group': row.host_group,
         'parasite proteins': next(parasite_genes.get(k) for k in (row.pair, row.pair[::-1])
                                   if k in parasite_genes.index),
         'host proteins': next(host_genes.get(k + (next(iter(row.hosts)),))

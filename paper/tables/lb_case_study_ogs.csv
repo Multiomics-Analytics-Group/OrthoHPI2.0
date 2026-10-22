@@ -1,4 +1,4 @@
-parasite family,parasite family name,host family,host genes,host,score,missing
+parasite group,parasite group name,host group,host genes,host,score,missing
 KOG1654,Autophagy-related,KOG4582,"GSAP, MIB2, +1",human,0.93,
 KOG1654,Autophagy-related,KOG2674,ATG4A/B/C/D,human,0.925,
 KOG1654,Autophagy-related,KOG2981,ATG3,human,0.895,

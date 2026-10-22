@@ -1,7 +1,7 @@
 '''
 Write host_tissues.parquet: every host protein the TISSUES filter passes, with the
 tissues it is annotated to, before the DeepLoc filter narrows them. The hosts-of-a-parasite
-page reads it to tell a family that is not expressed in an infected tissue from one that
+page reads it to tell a group that is not expressed in an infected tissue from one that
 DeepLoc puts out of reach; tissues_cell_types.parquet holds only proteins past both.
 '''
 import argparse

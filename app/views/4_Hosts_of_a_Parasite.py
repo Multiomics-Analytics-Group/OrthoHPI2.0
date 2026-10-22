@@ -25,11 +25,11 @@ SPECIES_TINT = 0.45
 ABSENT_COLOR = '#e0e0e0'
 # why a host missed a link, in the order explain_host_specific tests them; the paragraph
 # under the bars counts the rows of each
-ABSENT_FAMILY = 'family absent from this host'
+ABSENT_GROUP = 'orthologous group absent from this host'
 NOT_EXPRESSED = 'not expressed in an infected tissue'
 OUT_OF_REACH = 'not in a reachable subcellular location'
 NOT_TRANSFERRED = 'available, but not transferred'
-# most gene symbols in an orthology group label before the rest are left to the hover
+# most gene symbols in an orthologous group label before the rest are left to the hover
 SYMBOLS_IN_LABEL = 3
 # the label is cut here whatever the count, since parasite proteins without a symbol are
 # drawn under their locus
@@ -49,7 +49,7 @@ def common_name(host):
 @st.cache_data(show_spinner=False)
 def load_host_orthologs(data_dir):
     '''
-    Which proteins of each host belong to each of the orthology groups the predictions
+    Which proteins of each host belong to each of the orthologous groups the predictions
     reach, written by scripts/build_host_orthologs.py.
     '''
     input_file = os.path.join(data_dir, 'host_orthologs.parquet')
@@ -152,7 +152,7 @@ def get_link_combinations(data_dir, config, score):
 def link_combinations(edges):
     '''
     The predicted interactions of one parasite at the level they can be compared between
-    hosts: the orthology group of the parasite protein against the orthology group of
+    hosts: the orthologous group of the parasite protein against the orthologous group of
     the host protein.
     '''
     edges = edges.copy()
@@ -196,7 +196,7 @@ def dominant_group(groups):
 
 def group_label(proteins, group):
     '''
-    The name an orthology group is drawn under, on either axis of the matrix: the names
+    The name an orthologous group is drawn under, on either axis of the matrix: the names
     its proteins carry, since the group id names nothing to read.
     '''
     if not proteins:
@@ -341,20 +341,20 @@ def generate_combination_bars(links, all_hosts, config):
 def generate_link_matrix(links, all_hosts, config):
     '''
     A tile matrix of every transferred interaction: parasite proteins run across, host
-    orthology groups run down, and a tile's colour says which hosts received that link.
+    orthologous groups run down, and a tile's colour says which hosts received that link.
     '''
     squares = links.copy()
-    squares['family'] = [group_label(p, g) for p, g in
-                         zip(squares['host_proteins'], squares['group2'])]
-    squares['parasite family'] = [group_label(p, g) for p, g in
-                                  zip(squares['parasite_proteins'], squares['group1'])]
-    # the same gene symbol can occur in separate orthology groups, so the group id is the
+    squares['host group'] = [group_label(p, g) for p, g in
+                             zip(squares['host_proteins'], squares['group2'])]
+    squares['parasite group'] = [group_label(p, g) for p, g in
+                                 zip(squares['parasite_proteins'], squares['group1'])]
+    # the same gene symbol can occur in separate orthologous groups, so the group id is the
     # categorical coordinate on both axes
-    squares['family_id'] = squares['group2']
+    squares['host_id'] = squares['group2']
     squares['parasite_id'] = squares['group1']
     squares['host proteins'] = squares['host_proteins'].map(', '.join)
     squares['parasite proteins'] = squares['parasite_proteins'].map(', '.join)
-    squares['orthology groups'] = squares['group1'] + ' → ' + squares['group2']
+    squares['orthologous groups'] = squares['group1'] + ' → ' + squares['group2']
     squares['predicted in'] = squares['hosts'].map(
         lambda hosts: ', '.join(sorted(hosts)))
 
@@ -362,10 +362,10 @@ def generate_link_matrix(links, all_hosts, config):
         host_label(taxid, config): index
         for index, taxid in enumerate(config['hosts'])
     }
-    rows = squares.groupby('family_id').agg(
-        family=('family', 'first'),
+    rows = squares.groupby('host_id').agg(
+        label=('host group', 'first'),
         hosts=('hosts', lambda values: frozenset().union(*values)),
-        links=('family_id', 'size'),
+        links=('host_id', 'size'),
     )
     rows['n_hosts'] = rows['hosts'].map(len)
     rows['host_order'] = rows['hosts'].map(
@@ -373,7 +373,7 @@ def generate_link_matrix(links, all_hosts, config):
     rows = rows.sort_values(['n_hosts', 'host_order', 'links'],
                             ascending=[False, True, False], kind='stable')
     columns = squares.groupby('parasite_id').agg(
-        family=('parasite family', 'first'),
+        label=('parasite group', 'first'),
         hosts=('n_hosts', 'max'),
         links=('parasite_id', 'size'),
     ).sort_values(['hosts', 'links'], ascending=False, kind='stable')
@@ -381,17 +381,17 @@ def generate_link_matrix(links, all_hosts, config):
     order = order_combinations(links)
     palette = combination_palette(links, all_hosts, config)
 
-    figure = px.scatter(squares, x='parasite_id', y='family_id', color='combination',
+    figure = px.scatter(squares, x='parasite_id', y='host_id', color='combination',
                         color_discrete_map=palette,
                         # plotly express flips category_orders on a y axis, so the most
-                        # shared families come out on top
+                        # shared groups come out on top
                         category_orders={'parasite_id': list(columns.index),
-                                         'family_id': list(rows.index),
+                                         'host_id': list(rows.index),
                                          'combination': order},
-                        hover_data={'family_id': False, 'parasite_id': False,
-                                    'family': True, 'parasite family': False,
+                        hover_data={'host_id': False, 'parasite_id': False,
+                                    'host group': True, 'parasite group': False,
                                     'host proteins': True, 'parasite proteins': True,
-                                    'orthology groups': True,
+                                    'orthologous groups': True,
                                     'interactions': True, 'combination': False,
                                     'predicted in': True})
     figure.update_traces(marker=dict(symbol='square', size=14,
@@ -399,10 +399,10 @@ def generate_link_matrix(links, all_hosts, config):
     figure.update_layout(height=max(420, 17 * len(rows) + 260), plot_bgcolor='white',
                          # the names are long enough that plotly cuts them off if the
                          # margins are left to it
-                         margin=dict(l=190, r=10, t=10, b=label_margin(columns['family'])),
+                         margin=dict(l=190, r=10, t=10, b=label_margin(columns['label'])),
                          legend=dict(orientation='h', yanchor='bottom', y=1.01, x=0),
-                         xaxis_title='parasite protein family',
-                         yaxis_title='host protein family',
+                         xaxis_title='parasite orthologous group',
+                         yaxis_title='host orthologous group',
                          legend_title_text='predicted in host(s)')
     # tickmode='array': plotly thins the labels of an axis this long. The ranges are
     # explicit because autorange pads a scatter by more than a marker on every side,
@@ -410,11 +410,11 @@ def generate_link_matrix(links, all_hosts, config):
     figure.update_xaxes(tickangle=-60, showgrid=True, gridcolor='#eef1f4',
                          gridwidth=1, zeroline=False, tickfont_size=9,
                          tickmode='array', range=[-0.5, len(columns) - 0.5],
-                         tickvals=list(columns.index), ticktext=list(columns['family']))
+                         tickvals=list(columns.index), ticktext=list(columns['label']))
     figure.update_yaxes(showgrid=True, gridcolor='#eef1f4', gridwidth=1, zeroline=False,
                          tickfont_size=9, tickmode='array',
                          range=[-0.5, len(rows) - 0.5],
-                         tickvals=list(rows.index), ticktext=list(rows['family']))
+                         tickvals=list(rows.index), ticktext=list(rows['label']))
 
     return figure
 
@@ -458,7 +458,7 @@ def get_host_coverage(data_dir, config, score, parasite, hosts_taxids):
         'predicted interactions': ('target', 'size'),
         'parasite proteins': ('source', 'nunique'),
         'host proteins reached': ('target', 'nunique'),
-        'host families reached': ('group2', 'nunique')}).reset_index()
+        'host orthologous groups reached': ('group2', 'nunique')}).reset_index()
     coverage['host proteins this parasite could reach'] = coverage['host'].map(
         lambda h: available[h][0])
     coverage['of those, in a tissue it infects'] = coverage['host'].map(
@@ -478,7 +478,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     if orthologs is None:
         return None
 
-    # before DeepLoc, so a family DeepLoc removes is told apart from one never expressed
+    # before DeepLoc, so a group DeepLoc removes is told apart from one never expressed
     expressed = web_utils.expressed_infected_tissue_proteins(data_dir, config, parasite_taxid)
     # the niche half of the pool, which homology.get_links applies as it transfers and the
     # pool the rest of the page counts against does not
@@ -502,9 +502,8 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
         for host in all_hosts:
             if host in link.hosts:
                 continue
-            family = members[host].get(link.group2, set())
-            if not family:
-                reason = ABSENT_FAMILY
+            if not members[host].get(link.group2):
+                reason = ABSENT_GROUP
             elif not expressed_of[host].get(link.group2):
                 reason = NOT_EXPRESSED
             elif not reachable[host].get(link.group2):
@@ -515,7 +514,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
                             ', '.join(link.parasite_proteins), link.combination,
                             short_name(host), reason])
 
-    return pd.DataFrame(missing, columns=['Host protein family', 'Parasite proteins',
+    return pd.DataFrame(missing, columns=['Host orthologous group', 'Parasite proteins',
                                           'Predicted in', 'Missing from', 'Why'])
 
 
@@ -586,7 +585,7 @@ else:
             st.subheader(f'Shared and host-specific interactions of *{parasite}*')
             st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
                        'the matrix below the bars. Interactions are counted as pairs of '
-                       'orthology groups rather than pairs of proteins, since the '
+                       'orthologous groups rather than pairs of proteins, since the '
                        'orthologous proteins of two hosts are distinct proteins.')
             st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
@@ -597,12 +596,12 @@ else:
                 counts = reasons['Why'].value_counts()
                 # `none` rather than `0`: a nought in bold reads as a value the page failed
                 # to fill in
-                absent = counts.get(ABSENT_FAMILY, 0) or 'none'
+                absent = counts.get(ABSENT_GROUP, 0) or 'none'
                 lead = (f'**Of the {len(reasons)} host–link combinations missing from a '
-                        f'host, {absent} are missing because the host lacks the family.**')
+                        f'host, {absent} are missing because the host lacks the orthologous group.**')
                 clauses = []
                 if counts.get(NOT_EXPRESSED):
-                    clauses.append(f'in {counts[NOT_EXPRESSED]} the family is not annotated '
+                    clauses.append(f'in {counts[NOT_EXPRESSED]} the group is not annotated '
                                    'to a tissue the parasite infects')
                 if counts.get(OUT_OF_REACH):
                     clauses.append(f'in {counts[OUT_OF_REACH]} it is expressed there, but '
@@ -621,13 +620,13 @@ else:
             elif reasons is None:
                 st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
                            'of whether a host missing an interaction has a protein of the '
-                           'family at all.')
+                           'orthologous group at all.')
 
-        st.subheader('Interactions per parasite protein family and host protein family')
-        st.caption('One tile per transferred interaction: families of parasite proteins on '
-                   'the x axis, families of host proteins on the y axis, coloured by the '
-                   'host or host set that received the interaction. Both axes are distinct '
-                   'orthology groups, labelled with the proteins they hold and with the '
+        st.subheader('Interactions per parasite and host orthologous group')
+        st.caption('One tile per transferred interaction: parasite orthologous groups on '
+                   'the x axis, host orthologous groups on the y axis, coloured by the '
+                   'host or host set that received the interaction. The groups are '
+                   'labelled with the proteins they hold, with the '
                    'group ID and the full membership on hover, ordered so shared '
                    'interactions gather in the upper left. The links found in every host '
                    'are left out unless switched on below, since they are most of the '

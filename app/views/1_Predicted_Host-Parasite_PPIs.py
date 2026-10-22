@@ -98,8 +98,8 @@ TABLE_COLUMN_NAMES = {
     'experimental_evidence_score': 'Experimental evidence',
     'databases_evidence_score': 'Database evidence',
     'weight': 'Confidence score',
-    'group1': 'Parasite orthology group',
-    'group2': 'Host orthology group'}
+    'group1': 'Parasite orthologous group',
+    'group2': 'Host orthologous group'}
 
 # GO_TERM_COLUMN is read back out of the grid when rows are picked
 ENRICHMENT_COLUMN_NAMES = {
@@ -971,13 +971,13 @@ def show_structure(pdb_file):
 def show_structures_dialog(edge):
     '''
     Shows the AlphaFold model of each of the two proteins of the interaction that was
-    clicked in the network, over the orthology groups the interaction was transferred
+    clicked in the network, over the orthologous groups the interaction was transferred
     from.
     '''
     st.markdown(f"**{edge['parasite']}** ({edge['parasite_species']}) &ndash; "
                 f"**{edge['host']}** ({edge['host_species']}) &nbsp;·&nbsp; "
                 f"interaction confidence score {edge['weight']:.2f}", unsafe_allow_html=True)
-    st.caption(f"Transferred from the STRING link between orthology groups "
+    st.caption(f"Transferred from the STRING link between orthologous groups "
                f"**{edge['parasite_group']}** (parasite) and **{edge['host_group']}** "
                f"(host), scored on experimental evidence {edge['experimental']:.2f} and "
                f"database evidence {edge['databases']:.2f}.")

@@ -80,16 +80,16 @@ FUNNEL_SCALES = ('Logarithmic', 'Linear')
 FUNNEL_GAP = 0.03
 # how far under the lowest cut-off or point a probability scale starts
 SCALE_MARGIN = 0.05
-# rows of the shared-family dot plot, pixels a row takes, and what the strip, the names
-# and the legends take besides
-TOP_FAMILIES = 40
+# rows of the shared orthologous group dot plot, pixels a row takes, and what the strip,
+# the names and the legends take besides
+TOP_OGS = 40
 DOT_ROW = 19
 DOT_CHROME = 230
-# most gene symbols a family is named by before the rest are left to the hover, and the
-# most characters
+# most gene symbols an orthologous group is named by before the rest are left to the
+# hover, and the most characters
 SYMBOLS_IN_LABEL = 3
 LABEL_CHARS = 24
-# room a family name takes left of the dots: ~6.2 px a character, plus the axis title
+# room a group name takes left of the dots: ~6.2 px a character, plus the axis title
 LABEL_CHAR = 6.2
 LABEL_PADDING = 40
 # height of one horizontal legend row, in pixels
@@ -817,16 +817,16 @@ def generate_confidence_per_parasite(df, palette, width, score):
     return figure
 
 
-def family_label(names):
+def og_label(names):
     '''
-    The name a host family is drawn under: the gene symbols of its proteins, since the
-    orthology group id names nothing to read. The symbols are upper-cased so the same
-    family reads the same way whichever hosts it is reached in.
+    The name a host orthologous group is drawn under: the gene symbols of its proteins,
+    since the group id names nothing to read. The symbols are upper-cased so the same
+    group reads the same way whichever hosts it is reached in.
     '''
     names = sorted(set(str(n).upper() for n in names))
     named = []
     for name in names[:SYMBOLS_IN_LABEL]:
-        # the first name goes in whatever its length, so a family is never drawn under an
+        # the first name goes in whatever its length, so a group is never drawn under an
         # ellipsis alone
         if named and len(', '.join(named + [name])) > LABEL_CHARS:
             break
@@ -837,11 +837,11 @@ def family_label(names):
 
 
 @st.cache_data(show_spinner=False)
-def get_top_shared_families(df, score, top=TOP_FAMILIES):
+def get_top_shared_ogs(df, score, top=TOP_OGS):
     '''
-    The host protein families the most parasites are predicted to interact with, across
-    every host: a family is the orthology group of the host protein, which is what the
-    same protein of two hosts has in common. One row per parasite, host and family.
+    The host orthologous groups the most parasites are predicted to interact with, across
+    every host: the orthologous group is what the same protein of two hosts has in
+    common. One row per parasite, host and orthologous group.
     '''
     kept = df[df['weight'] >= score]
     dots = kept.groupby(['host', 'taxid1_label', 'group2'], observed=True).agg(
@@ -857,41 +857,41 @@ def get_top_shared_families(df, score, top=TOP_FAMILIES):
     if ranked.empty:
         return None
 
-    families = list(ranked.head(top).index)
-    dots = dots[dots['group2'].isin(families)].copy()
+    ogs = list(ranked.head(top).index)
+    dots = dots[dots['group2'].isin(ogs)].copy()
     dots['parasites'] = dots['group2'].map(ranked['parasites'])
     dots['pairs'] = dots['group2'].map(ranked['pairs'])
     dots['host proteins'] = dots['targets'].map(', '.join)
-    # named by every symbol the family carries in any host, not only the ones this dot
+    # named by every symbol the group carries in any host, not only the ones this dot
     # reaches
-    labels = {family: family_label(n for names in rows['targets'] for n in names)
-              for family, rows in dots.groupby('group2')}
-    dots['family'] = dots['group2'].map(labels)
+    labels = {og: og_label(n for names in rows['targets'] for n in names)
+              for og, rows in dots.groupby('group2')}
+    dots['og'] = dots['group2'].map(labels)
     # the columns of the skeleton: the same parasite annotations the other figures carry
     parasite_rows = kept[['host', 'taxid1_label', 'name', 'group', 'group_rank',
                           'niche']].drop_duplicates()
     dots = dots.merge(parasite_rows, on=['host', 'taxid1_label'])
 
-    return dots, [labels[f] for f in families], len(ranked)
+    return dots, [labels[f] for f in ogs], len(ranked)
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_family_dots(df, dots, families, palette, width):
+def generate_shared_og_dots(df, dots, ogs, palette, width):
     '''
     A dot wherever a parasite is predicted to interact with a protein of one of the
-    families, in the columns the figures above use, the families ordered by how many
-    parasites reach them so the most widely reached is the top row.
+    orthologous groups, in the columns the figures above use, the groups ordered by how
+    many parasites reach them so the most widely reached is the top row.
     '''
-    height = DOT_ROW * len(families) + DOT_CHROME
+    height = DOT_ROW * len(ogs) + DOT_CHROME
     # the strips keep the height they have under the other figures
     figure, hosts = host_columns(df, width, bands=2,
                                  band_height=BAND_HEIGHT * 470 / height)
-    rows_of = {f: i for i, f in enumerate(families)}
-    dots = dots.assign(y=dots['family'].map(rows_of))
+    rows_of = {f: i for i, f in enumerate(ogs)}
+    dots = dots.assign(y=dots['og'].map(rows_of))
     # the largest dot is as wide as a column has room for, its area standing for the
     # largest degree
     columns = sum(max(len(names), MIN_COLUMN) for _, _, names in hosts)
-    room = width - (LABEL_CHAR * max(len(f) for f in families) + LABEL_PADDING)
+    room = width - (LABEL_CHAR * max(len(f) for f in ogs) + LABEL_PADDING)
     size = min(15, max(5, room / columns))
     sizeref = max(1, dots['degree'].max()) / size ** 2
 
@@ -908,7 +908,7 @@ def generate_shared_family_dots(df, dots, families, palette, width):
                                        size=rows['degree'], sizemode='area',
                                        sizeref=sizeref, sizemin=4, line=dict(width=0)),
                            legendgroup=group, showlegend=group not in labelled,
-                           customdata=rows[['family', 'parasites', 'pairs', 'degree',
+                           customdata=rows[['og', 'parasites', 'pairs', 'degree',
                                             'host proteins', 'group2']].to_numpy(),
                            hovertemplate='%{customdata[0]} (%{customdata[5]})<br>'
                                          'parasites reaching it: %{customdata[1]}, in '
@@ -923,7 +923,7 @@ def generate_shared_family_dots(df, dots, families, palette, width):
         figure.update_xaxes(categoryorder='array', categoryarray=names,
                             range=[-0.5, len(names) - 0.5], row=1, col=column)
 
-    figure = style_host_columns(figure, 'host protein family')
+    figure = style_host_columns(figure, 'host orthologous group')
     # the dots are the legend of the groups already, so the group strip adds no entry;
     # the two share a legendgroup, and toggle together
     add_band(figure, hosts, 'group', palette, set(palette) | {UNKNOWN_GROUP},
@@ -931,10 +931,10 @@ def generate_shared_family_dots(df, dots, families, palette, width):
     add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=3,
              legend='legend3', unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
     stack_bands(figure)
-    # reversed, so the most-shared family is the top row; the ticks are set on every
+    # reversed, so the most-shared group is the top row; the ticks are set on every
     # column so the grids line up
-    figure.update_yaxes(range=[len(families) - 0.5, -0.5], tickmode='array',
-                        tickvals=list(range(len(families))), ticktext=families,
+    figure.update_yaxes(range=[len(ogs) - 0.5, -0.5], tickmode='array',
+                        tickvals=list(range(len(ogs))), ticktext=ogs,
                         zeroline=False, row=1)
     # the names are longer than the counts the margin was set for
     figure.update_yaxes(automargin=True, row=1, col=1)
@@ -1060,23 +1060,24 @@ st.caption('A tile wherever a parasite is known to infect a tissue of its host, 
            'the BRENDA Tissue Ontology. ' + BANDS_STRIP)
 st.plotly_chart(generate_tissue_matrix(config, parasite_palette, page), width='stretch')
 
-st.subheader("Host protein families common to several parasites")
-shared_families = get_top_shared_families(overview, score)
-if shared_families is None:
-    st.info('No host protein family is reached by more than one parasite at this confidence.')
+st.subheader("Host orthologous groups common to several parasites")
+shared_ogs = get_top_shared_ogs(overview, score)
+if shared_ogs is None:
+    st.info('No host orthologous group is reached by more than one parasite at this confidence.')
 else:
-    family_dots, families, shareable = shared_families
-    shown = len(families)
-    selection = (f'The {shown} host protein families reached by the most parasites, of the '
+    og_dots, ogs, shareable = shared_ogs
+    shown = len(ogs)
+    selection = (f'The {shown} host orthologous groups reached by the most parasites, of the '
                  f'{shareable} reached by more than one, ' if shareable > shown else
-                 f'The {shown} host protein families reached by more than one parasite, ')
-    st.caption(selection + 'at or above the confidence set above. A family is the '
-               'orthology group of the host protein, and is named by the gene symbols of its proteins. A dot '
-               'wherever a parasite is predicted to interact with a protein of the family, '
+                 f'The {shown} host orthologous groups reached by more than one parasite, ')
+    st.caption(selection + 'at or above the confidence set above. Each is the EggNOG '
+               'orthologous group of the host protein, which can hold several paralogous genes, '
+               'and is named by the gene symbols of its proteins. A dot '
+               'wherever a parasite is predicted to interact with a protein of the group, '
                "sized by the number of that parasite's proteins reaching it; hover a dot for the host proteins behind it. "
                + BANDS_STRIP)
-    st.plotly_chart(generate_shared_family_dots(overview, family_dots, families,
-                                                parasite_palette, page),
+    st.plotly_chart(generate_shared_og_dots(overview, og_dots, ogs,
+                                            parasite_palette, page),
                     width='stretch')
 
 st.subheader("Interaction confidence scores")

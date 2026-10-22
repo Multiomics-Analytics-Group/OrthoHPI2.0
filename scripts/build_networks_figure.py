@@ -24,9 +24,9 @@ from scripts import figure_style
 
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 PLACES = ['surface', 'both', 'interior']
-PLACE_LABELS = {'surface': 'surface (extracellular, cell membrane)',
-                'both': 'surface and interior', 'interior': 'interior (cytoplasm, nucleus)'}
-PLACE_COLORS = {'surface': '#9ecae1', 'both': '#4292c6', 'interior': '#08519c'}
+PLACE_LABELS = {'surface': 'extracellular / cell membrane',
+                'both': 'both', 'interior': 'cytoplasm / nucleus'}
+PLACE_COLORS = {'surface': '#9ecae1', 'both': '#9e7cc1', 'interior': '#08306b'}
 # how DeepLoc's class names are spelt in the localisations table
 COLUMN_OF = {'Extracellular': 'extracellular', 'Cell membrane': 'cell_membrane',
              'Cytoplasm': 'cytoplasm', 'Nucleus': 'nucleus'}
@@ -89,7 +89,7 @@ def draw(config, table, output_stem):
     n_rows = max(sizes[first], sum(sizes[h] for h in others) + gap * (len(others) - 1))
     # the legends take this much under the axes; the rows shrink only when a page would
     # not hold them at the shared row height
-    foot = 1.95
+    foot = 1.8
     row = min(figure_style.ROW, (figure_style.MAX_HEIGHT - foot - 0.35) / n_rows)
     fig = plt.figure(figsize=(figure_style.WIDTH, row * n_rows + foot + 0.35))
     grid = fig.add_gridspec(n_rows, 2, wspace=1.45,
@@ -107,7 +107,8 @@ def draw(config, table, output_stem):
         # a bar per parasite, split by where the host protein is
         left = pd.Series(0.0, index=rows.index)
         for place in PLACES:
-            ax.barh(y, rows[place], left=left, color=PLACE_COLORS[place], height=0.72)
+            ax.barh(y, rows[place], left=left, color=PLACE_COLORS[place], height=0.72,
+                    edgecolor='white', linewidth=0.4)
             left += rows[place]
         for i, row in rows.iterrows():
             ax.text(row['interactions'] + 20, i, f"{row['interactions']:,}",
@@ -132,7 +133,7 @@ def draw(config, table, output_stem):
         axes[host].set_xlabel('Predicted interactions')
 
     figure_style.stack_legends(fig, left=0.19, blocks=[
-        ('Host-protein location', [Patch(color=PLACE_COLORS[p], label=PLACE_LABELS[p]) for p in PLACES], 2),
+        ('Host-protein location', [Patch(color=PLACE_COLORS[p], label=PLACE_LABELS[p]) for p in PLACES], 3),
         ('Taxonomic group', [Patch(color=c, label=g) for g, c in taxon_colors.items()
                              if g in set(table['group'])]),
         ('Niche', [Patch(color=c, label=niche) for niche, c in NICHE_COLORS.items()])])

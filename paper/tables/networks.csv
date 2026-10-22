@@ -43,11 +43,15 @@ human,Giardia lamblia,Metamonada,extracellular,265,38,56,256,9,0
 human,Trichomonas vaginalis,Metamonada,extracellular,859,145,104,604,255,0
 human,Entamoeba histolytica,Amoebozoa,extracellular,565,48,132,480,85,0
 rat,Cryptosporidium muris,Apicomplexa,intracellular,155,15,125,32,4,119
+rat,Plasmodium berghei,Apicomplexa,intracellular,0,0,0,0,0,0
+rat,Plasmodium yoelii,Apicomplexa,intracellular,0,0,0,0,0,0
 rat,Angiostrongylus cantonensis,Nematoda,extracellular,554,99,158,500,54,0
 rat,Angiostrongylus costaricensis,Nematoda,extracellular,208,83,55,178,30,0
 rat,Nippostrongylus brasiliensis,Nematoda,extracellular,901,191,165,787,114,0
 rat,Hymenolepis diminuta,Cestoda,extracellular,74,21,33,61,13,0
 mouse,Cryptosporidium muris,Apicomplexa,intracellular,293,21,237,70,5,218
+mouse,Plasmodium berghei,Apicomplexa,intracellular,0,0,0,0,0,0
+mouse,Plasmodium yoelii,Apicomplexa,intracellular,0,0,0,0,0,0
 mouse,Leishmania braziliensis,Kinetoplastida,intracellular,895,39,344,69,59,767
 mouse,Angiostrongylus cantonensis,Nematoda,extracellular,615,104,191,553,62,0
 mouse,Angiostrongylus costaricensis,Nematoda,extracellular,520,107,148,451,69,0

@@ -742,7 +742,7 @@ st.markdown("---")
 
 st.subheader('Hosts and parasites')
 overview = get_overview_predictions(data_dir, config)
-hosts_parasites.show(config, interactions=len(overview))
+hosts_parasites.show(config)
 st.markdown("---")
 
 # measured once here so the column titles can be fitted; page_width answers with a default

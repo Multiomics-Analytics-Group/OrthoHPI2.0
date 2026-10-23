@@ -57,12 +57,11 @@ SURFACE_LINE_COLORS = {'Extracellular': '#3690c0', 'Cell membrane': '#045a8d',
 # pair the secretome filter selected on
 HOST_SPLIT_CLASSES = web_utils.HOST_CLASSES + (web_utils.SEVERAL,)
 PARASITE_SPLIT_CLASSES = web_utils.SURFACE_CLASSES + (web_utils.BOTH_SURFACE,)
-# which end of an interaction the counts figure is split by; host side first
-SPLIT_SIDES = {'Host proteins': ('target', HOST_SPLIT_CLASSES),
+# what the counts figure is coloured by: the taxonomic group, or the localization of one end
+# of each interaction
+SPLIT_SIDES = {'Taxonomic group': (None, None),
+               'Host proteins': ('target', HOST_SPLIT_CLASSES),
                'Parasite proteins': ('source', PARASITE_SPLIT_CLASSES)}
-# the counts run from 39 to two and a half thousand, so the split of the small parasites is
-# only legible in shares
-BAR_SCALES = ('Counts', 'Share')
 # the stages of the filter funnel on either side, in the order the pipeline applies them,
 # named after the boxes of the workflow figure and coloured as in the paper's funnel, a
 # later stage darker
@@ -477,7 +476,7 @@ def generate_host_score_boxes(proteins, width, point_size=3):
 
 
 @st.cache_data(show_spinner=False)
-def generate_interactions_per_parasite(df, palette, width, score, classes=None, share=False):
+def generate_interactions_per_parasite(df, palette, width, score, classes=None):
     '''
     How many interactions are predicted for each parasite at or above a confidence, in
     one column per host, split by where DeepLoc puts the protein on one side of each of
@@ -503,8 +502,7 @@ def generate_interactions_per_parasite(df, palette, width, score, classes=None, 
         total = counts.sum(axis=1).replace(0, pd.NA)
         for surface_class in classes:
             figure.add_trace(
-                go.Bar(x=counts.index, y=counts[surface_class] / total if share
-                                         else counts[surface_class],
+                go.Bar(x=counts.index, y=counts[surface_class],
                        name=surface_class, marker_color=SURFACE_COLORS[surface_class],
                        customdata=pd.DataFrame({'n': counts[surface_class],
                                                 'share': counts[surface_class] / total}),
@@ -516,11 +514,8 @@ def generate_interactions_per_parasite(df, palette, width, score, classes=None, 
             labelled.add(surface_class)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
 
-    figure = style_host_columns(figure, 'share of predicted interactions' if share
-                                        else 'predicted interactions')
+    figure = style_host_columns(figure, 'predicted interactions')
     figure.update_layout(barmode='stack', bargap=0.2)
-    if share:
-        figure.update_yaxes(range=[0, 1], tickformat='.0%', row=1)
     add_group_and_niche_bands(figure, hosts, palette)
 
     return figure
@@ -968,21 +963,15 @@ with st.columns(3)[1]:
 heading = st.empty()
 st.caption('How many interactions are predicted for each parasite, in each of its hosts.')
 # narrow columns: a segmented control left to itself is stretched over the page
-controls = st.columns([1.4, 1, 1.6])
-with controls[0]:
+with st.columns([1.4, 1, 1.6])[0]:
     split_side = st.segmented_control(
-        'Colour by the localization of', list(SPLIT_SIDES), default=list(SPLIT_SIDES)[0],
+        'Colour by', list(SPLIT_SIDES), default=list(SPLIT_SIDES)[0],
         key='split_side',
-        help='Every prediction is between one parasite protein and one host protein, and '
-             'the bars can be split by where DeepLoc 2 puts either of them.')
-with controls[1]:
-    bar_scale = st.segmented_control(
-        'Bars show', BAR_SCALES, default=BAR_SCALES[0], key='bar_scale',
-        help='Counts are the predicted interactions themselves; shares divide each column '
-             'by its own total, which is how the split of a parasite with few interactions '
-             'is compared with one that has thousands.')
+        help='The taxonomic group of the parasite, or the localization DeepLoc 2 assigns '
+             'the host or the parasite protein of each interaction, which splits the bars.')
 side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
-interactions = get_interaction_localisations(overview, data_dir, side)
+interactions = None if side is None else get_interaction_localisations(overview, data_dir,
+                                                                       side)
 
 if interactions is None:
     description = ('Predicted interactions per parasite at or above the confidence set above, '
@@ -1000,8 +989,7 @@ heading.subheader("Number of predicted interactions per parasite", help=descript
 st.plotly_chart(
     generate_interactions_per_parasite(overview if interactions is None else interactions,
                                        parasite_palette, page, score,
-                                       classes=None if interactions is None else split_classes,
-                                       share=bar_scale == BAR_SCALES[1]),
+                                       classes=None if interactions is None else split_classes),
     width='stretch')
 
 filter_stages = web_utils.load_filter_stages(data_dir)

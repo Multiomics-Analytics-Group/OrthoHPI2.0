@@ -723,6 +723,35 @@ def get_top_shared_ogs(df, score, top=TOP_OGS):
 
 
 @st.cache_data(show_spinner=False)
+def get_shared_og_table(df, score):
+    '''
+    Every host orthologous group more than one parasite is predicted to interact with,
+    for download, since the dot plot shows only the top of it. One row per group.
+    '''
+    kept = df[df['weight'] >= score]
+    pairs = kept.groupby(['group2', 'host', 'taxid1_label'], observed=True)['target_name'].agg(
+        lambda n: ', '.join(sorted(set(str(x) for x in n)))).reset_index()
+    rows = []
+    for og, reached in pairs.groupby('group2', observed=True):
+        parasites = reached['taxid1_label'].nunique()
+        if parasites < 2:
+            continue
+        symbols = sorted(set(s.upper() for names in reached['target_name']
+                             for s in names.split(', ')))
+        rows.append({
+            'Orthologous group': og,
+            'Gene symbols': ', '.join(symbols),
+            'Parasites': parasites,
+            'Host-parasite pairs': len(reached),
+            'Interactions': '; '.join(f'{p} in {h}: {n}' for h, p, n
+                                      in reached[['host', 'taxid1_label',
+                                                  'target_name']].values)})
+
+    return pd.DataFrame(rows).sort_values(['Parasites', 'Host-parasite pairs'],
+                                          ascending=False, kind='stable')
+
+
+@st.cache_data(show_spinner=False)
 def generate_shared_og_dots(df, dots, ogs, palette, width):
     '''
     A dot wherever a parasite is predicted to interact with a protein of one of the
@@ -896,16 +925,19 @@ else:
         og_help = (f'The {shown} groups reached by the most parasites are shown, of the '
                    f'{shareable} reached by more than one at or above the confidence set '
                    'above. ' + og_help)
-        selection = f'The {shown} host protein families targeted by the most parasites.'
+        selection = f'The {shown} host orthologous groups targeted by the most parasites.'
     else:
         og_help = ('Every group reached by more than one parasite at or above the confidence '
                    'set above is shown. ' + og_help)
-        selection = f'The {shown} host protein families targeted by more than one parasite.'
+        selection = f'The {shown} host orthologous groups targeted by more than one parasite.'
     st.subheader("Most common host orthologous groups", help=og_help)
     st.caption(selection)
     st.plotly_chart(generate_shared_og_dots(overview, og_dots, ogs,
                                             parasite_palette, page),
                     width='stretch')
+    st.download_button(f'Download all {shareable} shared orthologous groups',
+                       data=utils.convert_df(get_shared_og_table(overview, score)),
+                       file_name='shared_host_orthologous_groups.tsv', mime='text/csv')
 
 st.subheader(
     "Interaction confidence scores",

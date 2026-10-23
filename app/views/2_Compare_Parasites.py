@@ -613,6 +613,34 @@ def get_top_shared_proteins(df_pred, groups, group_order, niches, order_by,
             [f'{p[0]}. {p.split(" ")[1]}' for p in order], len(counts))
 
 
+@st.cache_data(show_spinner=False)
+def get_shared_protein_table(df_pred, annotations=None, localisations=None):
+    '''
+    Every host protein more than one parasite is predicted to interact with, for
+    download, since the dot plot shows only the top of it. One row per protein.
+    '''
+    edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
+    degree = edges.groupby(['target_name', 'taxid1_label'])['source'].nunique()
+    counts = degree.groupby(level='target_name').size()
+    counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
+    ids = edges.groupby('target_name')['target'].agg(lambda t: ', '.join(sorted(set(t))))
+    labels = label_proteins(df_pred, annotations)
+
+    table = pd.DataFrame({
+        'Host protein': counts.index,
+        'STRING id': [ids[p] for p in counts.index],
+        'Description': [labels[p].partition(' · ')[2] for p in counts.index],
+        'Parasites': counts.values,
+        'Parasites (interacting parasite proteins)': [
+            '; '.join(f'{parasite} ({n})' for parasite, n in degree[p].items())
+            for p in counts.index]})
+    surface = summarise_localisations(df_pred, localisations)
+    if surface is not None:
+        table['DeepLoc'] = [surface['surface'].get(p, NO_LOCALISATION) for p in counts.index]
+
+    return table
+
+
 def localisation_labels(dots, proteins):
     '''
     What the band beside a row of the dot plot says when it is hovered: the class of the
@@ -1080,6 +1108,15 @@ if selected_host != web_utils.NO_HOST:
                 generate_shared_protein_dots(*figure_arguments,
                                              config.get('parasite_groups', {}), column),
                 width='stretch')
+            shared_table = get_shared_protein_table(
+                shared_predictions, web_utils.load_protein_annotations(data_dir),
+                web_utils.load_deeploc_localisations(data_dir))
+            tissue_suffix = '' if shared_tissue == ALL_TISSUES else f'_{shared_tissue}'
+            st.download_button(f'Download all {shareable} shared host interactors',
+                               data=utils.convert_df(shared_table),
+                               file_name=f'{selected_host}_shared_host_interactors'
+                                         f'{tissue_suffix}.tsv',
+                               mime='text/csv')
         else:
             heading.subheader("Most common host interactors", help=shared_help)
             st.info(f'No host protein{where} is reached by more than one parasite at this '

@@ -273,9 +273,6 @@ def build(cfg, title, host_icons=False):
     # --- title
     y = MARGIN + 8
     out.append(text(MARGIN, y, title, size=30, weight="600"))
-    out.append(text(MARGIN, y + 28,
-                    f"{len(parasites)} parasite species in {len(hosts)} host species",
-                    size=17, color=MUTED))
 
     # --- host band, across the full width
     band_y = y + 74

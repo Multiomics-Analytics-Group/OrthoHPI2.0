@@ -155,18 +155,6 @@ def load_eligible_proteins(data_dir):
     return utils.read_parquet_file(input_file=eligible_file)
 
 
-def load_filter_stages(data_dir):
-    '''
-    Per host-parasite pair, the proteins of either side left after each filter, as
-    scripts/build_filter_stages.py writes them; None where the file was not built.
-    '''
-    stages_file = os.path.join(data_dir, 'filter_stages.parquet')
-    if not os.path.exists(stages_file):
-        return None
-
-    return utils.read_parquet_file(input_file=stages_file)
-
-
 def filtered_pool(data_dir, taxids, niche=None):
     '''
     The proteins of these species that the pipeline had to work with: the ones that came

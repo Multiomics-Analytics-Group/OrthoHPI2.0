@@ -69,7 +69,7 @@ GO_MIN_FDR = 1e-300
 GO_TREEMAP_ROOT_ID = '__all_enriched_processes__'
 GO_TREEMAP_ROOT_LABEL = 'All enriched processes'
 # the layout spaces the proteins widely; a shorter canvas only shrinks the whole network
-NETWORK_HEIGHT = 1000
+NETWORK_HEIGHT = 750
 # height of each structure viewer in the interaction dialog
 VIEWER_HEIGHT = 400
 
@@ -1070,6 +1070,8 @@ with filter_col:
                 source_surface=df_select['source'].map(surface_calls['surface']),
                 target_surface=df_select['target'].map(surface_calls['surface']))
         st.header('Filters')
+        st.caption('These filters apply to the network, the cell-type chart and the table. '
+                   'Leave a filter empty to keep everything.')
         score = web_utils.score_slider()
 
         # the body figure sits above the tissue filter its organs set, but counts what the
@@ -1082,8 +1084,8 @@ with filter_col:
             # filter is created
             body_figure.apply_organ_click(config, selected_taxids, tissues_options,
                                           TISSUE_FILTER_KEY)
-            selected_tissues = st.multiselect('Select tissues to filter the predicted PPI',
-                                              tissues_options, key=TISSUE_FILTER_KEY)
+            selected_tissues = st.multiselect('Tissues', tissues_options,
+                                              key=TISSUE_FILTER_KEY)
             if len(selected_tissues) > 0:
                 df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
@@ -1097,7 +1099,7 @@ with filter_col:
                 return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
 
             selected_cell_types = st.multiselect(
-                'Select cell types to filter the predicted PPI', list(cell_type_counts.index),
+                'Cell types', list(cell_type_counts.index),
                 format_func=cell_type_label,
                 help='A cell type is offered with the number of host proteins expressed '
                      'in it. Cell-type annotation is available for human (HPA), mouse '
@@ -1114,8 +1116,8 @@ with filter_col:
             selected_cell_types)
         if len(surface_options) > 0:
             # sized as the labels of the widgets around it
-            st.markdown('<p style="font-size: 0.875rem;">Select host protein localizations '
-                        'to filter the predicted PPI</p>', unsafe_allow_html=True,
+            st.markdown('<p style="font-size: 0.875rem;">Host protein localization</p>',
+                        unsafe_allow_html=True,
                         help='Localization of the host protein as predicted by DeepLoc 2. '
                              'A protein predicted in several classes stays if any of them '
                              'is ticked.')
@@ -1274,29 +1276,32 @@ with st.container():
     if df_select is not None:
         marks, blocks = cell_type_marks(df_select, score, expression)
         if marks is not None:
-            st.header('Cell types expressing the host proteins')
+            st.header(
+                'Cell types expressing the host proteins',
+                help='A host protein counts towards a cell type when it is expressed there, '
+                     f'{web_utils.expression_phrase(expression)}, and an interaction '
+                     'is counted in every cell type where its host protein is expressed, '
+                     'so the bars overlap and are not a partition of the network. The '
+                     'cell types are grouped into the tissues the parasite infects, and a '
+                     'cell type is written under its block alone, since the same kind of '
+                     'cell is annotated separately in each tissue. Cell-type annotation is '
+                     'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
+                     'Cell Atlas).')
             show_active_filters(page_filters)
-            st.caption('A host protein counts towards a cell type when it is expressed there, '
-                       f'{web_utils.expression_phrase(expression)}, and an interaction '
-                       'is counted in every cell type where its host protein is expressed, '
-                       'so the bars overlap and are not a partition of the network. The '
-                       'cell types are grouped into the tissues the parasite infects, and a '
-                       'cell type is written under its block alone, since the same kind of '
-                       'cell is annotated separately in each tissue. Cell-type annotation is '
-                       'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
-                       'Cell Atlas).')
+            st.caption('How many interactions involve host proteins expressed in each cell '
+                       'type of the infected tissues.')
             st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
 
 with st.container():
     if df_select is not None:
-        st.header("Table of host-parasite PPIs")
+        st.header("Table of host-parasite PPIs",
+                  help='One row per predicted interaction, with the tissues the host protein '
+                       'is expressed in, the number of cell types it is expressed in '
+                       f'({web_utils.expression_phrase(expression)}) and its DeepLoc class.')
         show_active_filters(page_filters)
         table = generate_interactions_table(df_select, score,
                                             web_utils.load_protein_annotations(data_dir),
                                             expression)
-        st.caption('One row per predicted interaction, with the tissues the host protein is '
-                   'expressed in, the number of cell types it is expressed in '
-                   f'({web_utils.expression_phrase(expression)}) and its DeepLoc class.')
         search = st.text_input(
             "Search the table",
             key='table_search',
@@ -1316,20 +1321,23 @@ with st.container():
 
 with st.container():
     if df_select is not None:
-        st.header("Functional enrichment of the network (GO biological processes)")
+        st.header(
+            "Functional enrichment of the network (GO biological processes)",
+            help='Biological processes over-represented among the host proteins and '
+                 'among the parasite proteins, each side tested on its own. '
+                 'A side is tested against the proteins of its own species the '
+                 'pipeline had to work with -- the ones its filters passed, the host '
+                 'proteins on expression and localisation and the parasite proteins on '
+                 'being secreted -- and not against the whole proteome, which would '
+                 'return those filters themselves as a result. The two sides are tested '
+                 'apart: they are annotated to a different depth and were selected on '
+                 "different grounds. One-sided Fisher's exact test, corrected across "
+                 'terms with Benjamini-Hochberg; a process is tested when the background '
+                 'gives it at least 11 proteins, no more than a quarter of them, and at '
+                 'least two are in the network.')
         show_active_filters(page_filters)
         st.caption('Biological processes over-represented among the host proteins and '
-                   'among the parasite proteins, each side tested on its own. '
-                   'A side is tested against the proteins of its own species the '
-                   'pipeline had to work with -- the ones its filters passed, the host '
-                   'proteins on expression and localisation and the parasite proteins on '
-                   'being secreted -- and not against the whole proteome, which would '
-                   'return those filters themselves as a result. The two sides are tested '
-                   'apart: they are annotated to a different depth and were selected on '
-                   "different grounds. One-sided Fisher's exact test, corrected across "
-                   'terms with Benjamini-Hochberg; a process is tested when the background '
-                   'gives it at least 11 proteins, no more than a quarter of them, and at '
-                   'least two are in the network.')
+                   'among the parasite proteins of the network.')
         # the sides are tested one at a time and carried together with the side on each row
         enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
                                                data_dir, s,
@@ -1367,15 +1375,18 @@ with st.container():
             selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
             enrichment_viz = enrichment_viz[picked(enrichment_viz, selected_rows)]
 
-        st.subheader("Enriched biological processes")
-        st.caption('The ranked view shows the '
-                   f'{GO_TOP_N} most significantly over-represented processes, positioned by '
-                   'odds ratio, sized by the number of proteins annotated to each and shaded '
-                   'by significance. The volcano shows every process tested, with those '
-                   'passing the selected FDR highlighted. The hierarchy nests each process '
-                   'within the closest enriched process above it in the Gene Ontology; click '
-                   'a block to zoom in. Select rows in the table above to restrict the '
-                   'figures.')
+        st.subheader(
+            "Enriched biological processes",
+            help='The ranked view shows the '
+                 f'{GO_TOP_N} most significantly over-represented processes, positioned by '
+                 'odds ratio, sized by the number of proteins annotated to each and shaded '
+                 'by significance. The volcano shows every process tested, with those '
+                 'passing the selected FDR highlighted. The hierarchy nests each process '
+                 'within the closest enriched process above it in the Gene Ontology; click '
+                 'a block to zoom in. Select rows in the table above to restrict the '
+                 'figures.')
+        st.caption('The enriched processes ranked, among every process tested, and nested '
+                   'in the Gene Ontology.')
         # one tab per side, the figures of that side inside it
         for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
             with side_tab:

@@ -518,9 +518,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
                                           'Predicted in', 'Missing from', 'Why'])
 
 
-st.caption('One parasite across the hosts it is predicted against: which interactions '
-           'carried over to every host, which are found in a single host, and how the '
-           'predictions compare with the host proteins available in each.')
+st.caption('Compare the hosts for the parasites that are predicted against multiple hosts.')
 st.markdown("---")
 
 settings, _ = st.columns([1, 1])
@@ -541,12 +539,15 @@ else:
     parasites = sorted(hosts_of.index)
 
     # the overview first, so the page has something to read before a parasite is chosen
-    st.subheader('Shared and host-specific interactions per parasite')
-    st.caption('The interactions of every parasite predicted against several hosts, '
-               'counted as orthology-group links so that a host with more paralogues does '
-               'not count for more: how many carried over to every host, and how many '
-               'are found in one host only. Choose a parasite below to see which links '
-               'they are and why a host lacks them.')
+    st.subheader(
+        'Shared and host-specific interactions per parasite',
+        help='The interactions of every parasite predicted against several hosts, '
+             'counted as orthology-group links so that a host with more paralogues does '
+             'not count for more: how many carried over to every host, and how many '
+             'are found in one host only. Choose a parasite below to see which links '
+             'they are and why a host lacks them.')
+    st.caption('How many interactions of each parasite are found in every host, and how '
+               'many in one host only.')
     st.plotly_chart(generate_overview_bars(data_dir, config, score), width='stretch')
 
     with st.columns(3)[1]:
@@ -563,15 +564,18 @@ else:
 
         # the comparison first, since a host carrying more interactions may only have been
         # annotated more deeply
-        st.subheader('Predicted interactions relative to the available host proteins')
-        st.caption('Interactions predicted in each host beside the pool of host proteins '
-                   'they were drawn from: those passing the tissue and DeepLoc filters and '
-                   'lying where this parasite\'s niche can reach them — the surface of the '
-                   'cell for a parasite that stays outside it, the cytosol and nucleus as '
-                   'well for one that gets in — and those among them annotated to a tissue '
-                   'this parasite infects. The second pool is what the predictions were '
-                   'drawn from, so a host with more predicted interactions than another may '
-                   'simply have more of it.')
+        st.subheader(
+            'Predicted interactions relative to the available host proteins',
+            help='Interactions predicted in each host beside the pool of host proteins '
+                 'they were drawn from: those passing the tissue and DeepLoc filters and '
+                 'lying where this parasite\'s niche can reach them — the surface of the '
+                 'cell for a parasite that stays outside it, the cytosol and nucleus as '
+                 'well for one that gets in — and those among them annotated to a tissue '
+                 'this parasite infects. The second pool is what the predictions were '
+                 'drawn from, so a host with more predicted interactions than another may '
+                 'simply have more of it.')
+        st.caption('The interactions predicted in each host, beside how many host proteins '
+                   'this parasite could reach there.')
         st.dataframe(get_host_coverage(data_dir, config, score, parasite, hosts_taxids),
                      width='stretch', hide_index=True)
 
@@ -582,11 +586,13 @@ else:
                 tuple(taxid for host in all_hosts for taxid in hosts_taxids[host]),
                 shared_color_scale=True, title_as_subheader=True)
         with sets_column:
-            st.subheader(f'Shared and host-specific interactions of *{parasite}*')
-            st.caption(f'Interactions of {parasite} predicted in the set of hosts named by '
-                       'the matrix below the bars. Interactions are counted as pairs of '
-                       'orthologous groups rather than pairs of proteins, since the '
-                       'orthologous proteins of two hosts are distinct proteins.')
+            st.subheader(
+                f'Shared and host-specific interactions of *{parasite}*',
+                help=f'Interactions of {parasite} predicted in the set of hosts named by '
+                     'the matrix below the bars. Interactions are counted as pairs of '
+                     'orthologous groups rather than pairs of proteins, since the '
+                     'orthologous proteins of two hosts are distinct proteins.')
+            st.caption('How many interactions are found in each set of hosts.')
             st.plotly_chart(generate_combination_bars(links, all_hosts, config),
                             width='stretch')
 
@@ -622,15 +628,17 @@ else:
                            'of whether a host missing an interaction has a protein of the '
                            'orthologous group at all.')
 
-        st.subheader('Interactions per parasite and host orthologous group')
-        st.caption('One tile per transferred interaction: parasite orthologous groups on '
-                   'the x axis, host orthologous groups on the y axis, coloured by the '
-                   'host or host set that received the interaction. The groups are '
-                   'labelled with the proteins they hold, with the '
-                   'group ID and the full membership on hover, ordered so shared '
-                   'interactions gather in the upper left. The links found in every host '
-                   'are left out unless switched on below, since they are most of the '
-                   'links and are counted in the bars above.')
+        st.subheader(
+            'Interactions per parasite and host orthologous group',
+            help='One tile per transferred interaction: parasite orthologous groups on '
+                 'the x axis, host orthologous groups on the y axis, coloured by the '
+                 'host or host set that received the interaction. The groups are '
+                 'labelled with the proteins they hold, with the '
+                 'group ID and the full membership on hover, ordered so shared '
+                 'interactions gather in the upper left. The links found in every host '
+                 'are left out unless switched on below, since they are most of the '
+                 'links and are counted in the bars above.')
+        st.caption('Which hosts each interaction is found in, one tile per interaction.')
         # the shared links are most of the matrix, several hundred rows for Trichinella
         show_shared = st.toggle('Include links found in every host', value=False)
         shown = links if show_shared else links[links['n_hosts'] < len(all_hosts)]

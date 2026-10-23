@@ -470,13 +470,14 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
         st.markdown('<p style="font-size: 0.875rem;">Click a tissue to filter on, or select '
                     'from the list below.</p>', unsafe_allow_html=True)
     else:
+        description = ('Predicted interactions whose host protein is expressed in each organ, '
+                       'after the confidence score and the tissue filters. An interaction is '
+                       'counted in all of the organs, in which the host protein is expressed.')
         if title_as_subheader:
-            st.subheader('Predicted interactions per infected organ')
+            st.subheader('Predicted interactions per infected organ', help=description)
         else:
-            st.markdown('##### Predicted interactions per infected organ')
-        st.caption('Predicted interactions whose host protein is expressed in each organ, '
-                   'after the confidence score and the tissue filters. An interaction is '
-                   'counted in all of the organs, in which the host protein is expressed.')
+            st.markdown('##### Predicted interactions per infected organ', help=description)
+        st.caption('How many interactions can take place in each infected organ.')
     figures = []
     for taxid, species in drawn:
         svg, organs = load_figure(species)

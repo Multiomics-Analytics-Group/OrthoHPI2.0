@@ -939,10 +939,7 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
 # DEFAULT_PAGE_WIDTH until the browser answers
 column = web_utils.column_width(2)
 
-st.caption('The parasites predicted against one host, compared with each other: which host '
-           'interactors they share, which host proteins several of them reach, the '
-           'tissues and cell types in which their interactions can take place, and the '
-           'biological processes their host interactors are enriched in.')
+st.caption('Compare all the parasites of a selected host.')
 st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
@@ -953,9 +950,7 @@ with col1:
 with col2:
     selected_host, selected_taxids = web_utils.host_selector(
         config, web_utils.load_predictions(data_dir),
-        'Select a host to compare the parasites that infect it')
-    if selected_host == web_utils.NO_HOST:
-        st.text('Choose 1 host to explore the predicted host-parasite interactions')
+        'Select a host')
 
 with col3:
     st.write('')
@@ -1001,18 +996,21 @@ if selected_host != web_utils.NO_HOST:
     matrix, shared = st.columns(2)
 
     with matrix:
-        st.subheader("Overlap of the host interactors of each pair of parasites")
-        st.caption('How alike the host interactors of each pair of parasites are, as the '
-                   'Jaccard similarity of the two sets: the host proteins both reach, over '
-                   'the host proteins either of them reaches. A count of shared proteins on '
-                   'its own follows how many interactors the pair have between them, and '
-                   'ranks the best-predicted parasites above the most alike; this does not. '
-                   'Two strips '
-                   'run along each axis: the taxonomic group of the parasite, and whether it '
-                   'lives inside a host cell or outside one. Whichever the parasites are '
-                   'ordered by comes out in blocks. The diagonal, where a parasite meets '
-                   'itself, is greyed out. Hover a cell for the count behind its ratio, or '
-                   'click it to see the shared host proteins.')
+        st.subheader(
+            "Overlap of the host interactors",
+            help='How alike the host interactors of each pair of parasites are, as the '
+                 'Jaccard similarity of the two sets: the host proteins both reach, over '
+                 'the host proteins either of them reaches. A count of shared proteins on '
+                 'its own follows how many interactors the pair have between them, and '
+                 'ranks the best-predicted parasites above the most alike; this does not. '
+                 'Two strips '
+                 'run along each axis: the taxonomic group of the parasite, and whether it '
+                 'lives inside a host cell or outside one. Whichever the parasites are '
+                 'ordered by comes out in blocks. The diagonal, where a parasite meets '
+                 'itself, is greyed out. Hover a cell for the count behind its ratio, or '
+                 'click it to see the shared host proteins.')
+        st.caption('How alike the host proteins targeted by each pair of parasites are. '
+                   'Click a cell to see the shared proteins.')
         if shared_similarity is not None:
             # the figure carries the column width rather than being stretched, which keeps
             # the matrix square after full screen
@@ -1040,7 +1038,14 @@ if selected_host != web_utils.NO_HOST:
             st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
     with shared:
-        st.subheader("Host interactors common to several parasites")
+        # the description counts what the tissue below leaves but sits above it
+        heading = st.empty()
+        shared_help = ("A dot wherever a parasite is predicted to interact with one, sized "
+                       "by the number of that parasite's proteins reaching it. The band "
+                       'beside each row gives the DeepLoc 2 localization of the host '
+                       'protein; hover a dot for the probabilities behind it. Above the '
+                       'columns run the taxonomic group of the parasite and whether it lives '
+                       'inside a host cell or outside one.')
         # offered whatever the tissue leaves, so an emptying choice can be changed back
         shared_tissue = st.selectbox(
             'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue',
@@ -1061,35 +1066,38 @@ if selected_host != web_utils.NO_HOST:
             *figure_arguments, shareable = top_shared
             shown = len(figure_arguments[1])
             # a truncated figure says what it is a top of
-            selection = (f'The {shown} host proteins{where} reached by the most parasites, of '
-                         f'the {shareable} reached by more than one.' if shareable > shown else
-                         f'The {shown} host proteins{where} reached by more than one '
-                         'parasite, most first.')
-            st.caption(selection + ' A dot wherever a parasite is predicted to interact with '
-                       "one, sized by the number of that parasite's proteins reaching it. "
-                       'The band beside each row gives the DeepLoc 2 localization '
-                       'of the host protein; '
-                       'hover a dot for the probabilities behind it. Above the columns run the '
-                       'taxonomic group of the parasite and whether it lives inside a host cell '
-                       'or outside one.')
+            if shareable > shown:
+                shared_help = (f'The {shown} host proteins{where} reached by the most '
+                               f'parasites are shown, of the {shareable} reached by more '
+                               'than one. ' + shared_help)
+                selection = f'The {shown} host proteins{where} targeted by the most parasites.'
+            else:
+                selection = (f'The {shown} host proteins{where} targeted by more than one '
+                             'parasite, most first.')
+            heading.subheader("Most common host interactors", help=shared_help)
+            st.caption(selection)
             st.plotly_chart(
                 generate_shared_protein_dots(*figure_arguments,
                                              config.get('parasite_groups', {}), column),
                 width='stretch')
         else:
+            heading.subheader("Most common host interactors", help=shared_help)
             st.info(f'No host protein{where} is reached by more than one parasite at this '
                     'confidence.')
 
     tissues, cell_types = st.columns(2)
     with tissues:
-        st.subheader("Tissues in which the predicted interactions can take place")
-        st.caption('Predicted interactions per parasite and tissue, restricted to the tissues '
-                   'each parasite is known to infect and sized by the number of interactions with '
-                   'proteins expressed there. Tissues are ordered by the number of parasites '
-                   'infecting them. Above the columns run the taxonomic group of the parasite and '
-                   'whether it lives inside a host cell or outside one, the same two strips the '
-                   'figures above carry. An interaction is counted once per tissue, irrespective '
-                   'of the number of cell types the host protein is expressed in.')
+        st.subheader(
+            "Interactions per tissue",
+            help='Predicted interactions per parasite and tissue, restricted to the tissues '
+                 'each parasite is known to infect and sized by the number of interactions '
+                 'with proteins expressed there. Tissues are ordered by the number of '
+                 'parasites infecting them. Above the columns run the taxonomic group of the '
+                 'parasite and whether it lives inside a host cell or outside one, the same '
+                 'two strips the figures above carry. An interaction is counted once per '
+                 'tissue, irrespective of the number of cell types the host protein is '
+                 'expressed in.')
+        st.caption('How many interactions each parasite has in each tissue it infects.')
         if per_tissue.empty:
             st.info('No predicted interaction is left at this confidence in a tissue the '
                     'parasites are known to infect.')
@@ -1101,8 +1109,9 @@ if selected_host != web_utils.NO_HOST:
 
     with cell_types:
         if choices:
-            st.subheader("Cell types of a tissue")
-            caption = st.empty()
+            # the description follows the expression slider but sits above it
+            heading = st.empty()
+            st.caption('How many interactions take place in each cell type of a tissue.')
             tissue_column, expression_column = st.columns(2)
             with tissue_column:
                 tissue = st.selectbox('Tissue', choices, index=0,
@@ -1111,12 +1120,13 @@ if selected_host != web_utils.NO_HOST:
             with expression_column:
                 expression = web_utils.expression_slider('compare_expression')
             # written above the selectors once the slider has been read
-            caption.caption('Predicted interactions per cell type of the selected tissue, '
-                            'stacked by taxonomic group. A host protein counts towards a cell '
-                            'type where it is expressed, '
-                            f'{web_utils.expression_phrase(expression)}. A protein expressed '
-                            'in several cell types counts in each, so the bars are not a '
-                            'partition of the tissue.')
+            heading.subheader(
+                "Interactions per cell type",
+                help='Predicted interactions per cell type of the selected tissue, stacked '
+                     'by taxonomic group. A host protein counts towards a cell type where '
+                     f'it is expressed, {web_utils.expression_phrase(expression)}. A '
+                     'protein expressed in several cell types counts in each, so the bars '
+                     'are not a partition of the tissue.')
             _, expressed = count_interactions_per_tissue(data_dir, config, selected_taxids,
                                                          score, expression)
             if tissue in annotated and tissue not in set(expressed['Tissue']):
@@ -1130,7 +1140,20 @@ if selected_host != web_utils.NO_HOST:
                 st.info(f'No single cell data available for {tissue} in {selected_host}, so '
                         'the interactions there cannot be split by cell type.')
 
-    st.subheader("Biological processes enriched among the host interactors of each parasite")
+    st.subheader(
+        "Enriched biological processes",
+        help='Gene Ontology biological processes over-represented among the host proteins '
+             'each parasite is predicted to reach, tested one parasite at a time as on the '
+             "network page: one-sided Fisher's exact test against the host proteins of the "
+             "parasite's niche the pipeline passed, corrected with Benjamini-Hochberg. A "
+             'dot wherever a process passes the FDR for a parasite, sized by the number of '
+             'its host interactors annotated to the process and shaded by the odds ratio. '
+             'The odds ratio rather than the FDR is compared, since the FDR follows how '
+             'many interactors a parasite has. Intracellular and extracellular parasites '
+             'are tested against different host proteins, so a missing dot can come from '
+             'the background as well as the biology.')
+    st.caption('Which biological processes are over-represented among the host proteins '
+               'each parasite targets.')
     rows_column, fdr_column = st.columns([2, 1])
     with rows_column:
         go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
@@ -1144,16 +1167,6 @@ if selected_host != web_utils.NO_HOST:
                           horizontal=True, key='compare_go_fdr',
                           help='The Benjamini-Hochberg corrected significance a process has '
                                'to reach to be drawn for a parasite.')
-    st.caption('Gene Ontology biological processes over-represented among the host proteins '
-               'each parasite is predicted to reach, tested one parasite at a time as on the '
-               "network page: one-sided Fisher's exact test against the host proteins of the "
-               "parasite's niche the pipeline passed, corrected with Benjamini-Hochberg. A "
-               'dot wherever a process passes the FDR for a parasite, sized by the number of '
-               'its host interactors annotated to the process and shaded by the odds ratio. '
-               'The odds ratio rather than the FDR is compared, since the FDR follows how '
-               'many interactors a parasite has. Intracellular and extracellular parasites '
-               'are tested against different host proteins, so a missing dot can come from '
-               'the background as well as the biology.')
     with st.spinner('Testing the host interactors of every parasite'):
         go_enrichments = get_parasite_enrichments(counted, data_dir, tuple(selected_taxids),
                                                   niches)

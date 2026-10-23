@@ -140,20 +140,6 @@ def fit_titles(hosts, rooms):
     return ['<br>'.join(lines) for lines in written[best]], max(sizes[best], SMALLEST_TITLE)
 
 
-def host_coverage_caption(data_dir, config):
-    '''A compact summary of the post-filter host pools behind cross-host comparisons.'''
-    eligible = web_utils.load_eligible_proteins(data_dir)
-    if eligible is None:
-        return None
-
-    parts = []
-    for taxid, host in config['hosts'].items():
-        count = (eligible['taxid'].astype(str) == str(taxid)).sum()
-        parts.append(f"{host['label']}: {count:,} proteins (TISSUES >= "
-                     f"{host['tissue_cutoff']:g})")
-    return 'Eligible host proteins after tissue and DeepLoc filtering — ' + '; '.join(parts) + '.'
-
-
 @st.cache_data(show_spinner=False)
 def get_overview_predictions(data_dir, config):
     '''
@@ -964,9 +950,6 @@ st.markdown("---")
 # until the browser has replied
 page = web_utils.page_width()
 parasite_palette = config.get('parasite_groups', {})
-coverage = host_coverage_caption(data_dir, config)
-if coverage:
-    st.caption(coverage)
 
 # one slider for the page, in the middle column so it does not take the whole width
 with st.columns(3)[1]:
@@ -981,9 +964,9 @@ with st.columns(3)[1]:
     st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '
                f'at or above {score:g}.')
 
-st.subheader("Number of predicted interactions per parasite")
-# the description depends on the toggles but sits above them
-description = st.empty()
+# the description in the heading depends on the toggles but sits above them
+heading = st.empty()
+st.caption('How many interactions are predicted for each parasite, in each of its hosts.')
 # narrow columns: a segmented control left to itself is stretched over the page
 controls = st.columns([1.4, 1, 1.6])
 with controls[0]:
@@ -1002,16 +985,17 @@ side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
 interactions = get_interaction_localisations(overview, data_dir, side)
 
 if interactions is None:
-    description.caption('Predicted interactions per parasite at or above the confidence set above, '
-               'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
+    description = ('Predicted interactions per parasite at or above the confidence set above, '
+                   'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
 elif side == 'target':
-    description.caption('Predicted interactions per parasite at or above the confidence set above, '
-               'grouped by host and split by the localization DeepLoc 2 '
-               'assigns the host protein of each interaction.' + BANDS_STRIP)
+    description = ('Predicted interactions per parasite at or above the confidence set above, '
+                   'grouped by host and split by the localization DeepLoc 2 '
+                   'assigns the host protein of each interaction. ' + BANDS_STRIP)
 else:
-    description.caption('Predicted interactions per parasite at or above the confidence set above, '
-               'grouped by host and split by the localization DeepLoc 2 assigns the '
-               'parasite protein of each interaction.' + BANDS_STRIP)
+    description = ('Predicted interactions per parasite at or above the confidence set above, '
+                   'grouped by host and split by the localization DeepLoc 2 assigns the '
+                   'parasite protein of each interaction. ' + BANDS_STRIP)
+heading.subheader("Number of predicted interactions per parasite", help=description)
 
 st.plotly_chart(
     generate_interactions_per_parasite(overview if interactions is None else interactions,
@@ -1022,61 +1006,74 @@ st.plotly_chart(
 
 filter_stages = web_utils.load_filter_stages(data_dir)
 if filter_stages is not None:
-    st.subheader("Proteins left after each filter")
+    st.subheader(
+        "Proteins left after each filter",
+        help='For every host-parasite pair, how many proteins of the parasite (above the '
+             'line) and of the host (below it) are left after each filter of the pipeline, '
+             'each stage drawn in front of the one before it. The parasite is kept to its '
+             'secreted and membrane proteins — its secreted ones alone if multicellular — '
+             'and to those in an EggNOG orthologous group; the host to the proteins '
+             'expressed in a tissue the parasite infects and localized where its niche '
+             'reaches. The last stage counts the proteins in an interaction predicted at '
+             'or above the confidence set above. ' + BANDS_STRIP)
+    st.caption('How many parasite and host proteins each step of the pipeline keeps.')
     with st.columns([1.4, 1, 1.6])[0]:
         funnel_scale = st.segmented_control(
             'Axis', FUNNEL_SCALES, default=FUNNEL_SCALES[0], key='funnel_scale',
             help='The proteomes run to tens of thousands of proteins and the interactors '
                  'to a few dozen, so the later stages are only legible on a logarithmic '
                  'axis; a linear one shows how much of each proteome is left.')
-    st.caption('For every host-parasite pair, how many proteins of the parasite (above the '
-               'line) and of the host (below it) are left after each filter of the pipeline, '
-               'each stage drawn in front of the one before it. The parasite is kept to its '
-               'secreted and membrane proteins — its secreted ones alone if multicellular — '
-               'and to those in an EggNOG orthologous group; the host to the proteins '
-               'expressed in a tissue the parasite infects and localized where its niche '
-               'reaches. The last stage counts the proteins in an interaction predicted at '
-               'or above the confidence set above. ' + BANDS_STRIP)
     st.plotly_chart(generate_filter_funnel(config, filter_stages, overview, parasite_palette,
                                            page, score,
                                            log=funnel_scale != FUNNEL_SCALES[1]),
                     width='stretch')
 
-st.subheader("Tissues infected by each parasite")
-st.caption('A tile wherever a parasite is known to infect a tissue of its host, from the '
-           'lifecycle of the parasite; the tissues are ordered by how many parasites '
-           'infect them, the number in brackets. The tissue filter keeps a parasite to the host proteins expressed '
-           'in these tissues, so a parasite with one tile is predicted against a narrow '
-           'slice of the host and one with seven against most of it. Tissue names follow '
-           'the BRENDA Tissue Ontology. ' + BANDS_STRIP)
+st.subheader(
+    "Tissues infected by each parasite",
+    help='A tile wherever a parasite is known to infect a tissue of its host, from the '
+         'lifecycle of the parasite; the tissues are ordered by how many parasites '
+         'infect them, the number in brackets. The tissue filter keeps a parasite to the '
+         'host proteins expressed in these tissues, so a parasite with one tile is '
+         'predicted against a narrow slice of the host and one with seven against most '
+         'of it. Tissue names follow the BRENDA Tissue Ontology. ' + BANDS_STRIP)
+st.caption('Which host tissues each parasite infects during its lifecycle.')
 st.plotly_chart(generate_tissue_matrix(config, parasite_palette, page), width='stretch')
 
-st.subheader("Host orthologous groups common to several parasites")
+og_help = ('Each group is the EggNOG orthologous group of the host protein, which can hold '
+           'several paralogous genes, and is named by the gene symbols of its proteins. A dot '
+           'wherever a parasite is predicted to interact with a protein of the group, '
+           "sized by the number of that parasite's proteins reaching it; hover a dot for the "
+           'host proteins behind it. ' + BANDS_STRIP)
 shared_ogs = get_top_shared_ogs(overview, score)
 if shared_ogs is None:
+    st.subheader("Most common host orthologous groups", help=og_help)
     st.info('No host orthologous group is reached by more than one parasite at this confidence.')
 else:
     og_dots, ogs, shareable = shared_ogs
     shown = len(ogs)
-    selection = (f'The {shown} host orthologous groups reached by the most parasites, of the '
-                 f'{shareable} reached by more than one, ' if shareable > shown else
-                 f'The {shown} host orthologous groups reached by more than one parasite, ')
-    st.caption(selection + 'at or above the confidence set above. Each is the EggNOG '
-               'orthologous group of the host protein, which can hold several paralogous genes, '
-               'and is named by the gene symbols of its proteins. A dot '
-               'wherever a parasite is predicted to interact with a protein of the group, '
-               "sized by the number of that parasite's proteins reaching it; hover a dot for the host proteins behind it. "
-               + BANDS_STRIP)
+    if shareable > shown:
+        og_help = (f'The {shown} groups reached by the most parasites are shown, of the '
+                   f'{shareable} reached by more than one at or above the confidence set '
+                   'above. ' + og_help)
+        selection = f'The {shown} host protein families targeted by the most parasites.'
+    else:
+        og_help = ('Every group reached by more than one parasite at or above the confidence '
+                   'set above is shown. ' + og_help)
+        selection = f'The {shown} host protein families targeted by more than one parasite.'
+    st.subheader("Most common host orthologous groups", help=og_help)
+    st.caption(selection)
     st.plotly_chart(generate_shared_og_dots(overview, og_dots, ogs,
                                             parasite_palette, page),
                     width='stretch')
 
-st.subheader("Interaction confidence scores")
-st.caption('Boxplots of the distribution of confidence scores per parasite. Each score is '
-           'the average of the experimental and database evidence channels of the KOG-KOG '
-           'link the prediction was transferred from. Every prediction is counted here, '
-           'whatever the slider is set to; the dotted line marks the threshold it selects '
-           'instead. ' + NICHE_STRIP)
+st.subheader(
+    "Interaction confidence scores",
+    help='Boxplots of the distribution of confidence scores per parasite. Each score is '
+         'the average of the experimental and database evidence channels of the KOG-KOG '
+         'link the prediction was transferred from. Every prediction is counted here, '
+         'whatever the slider is set to; the dotted line marks the threshold it selects '
+         'instead. ' + NICHE_STRIP)
+st.caption('How confident the predictions are for each parasite.')
 st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                 width='stretch')
 
@@ -1090,32 +1087,37 @@ if parasite_proteins is not None:
     unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
 
 if host_proteins is not None:
-    st.subheader("Localization probabilities of host proteins")
-    st.caption('Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
-               'assigned localization, one column per class and one box per host. The dotted '
-               'line in each column marks the cut-off that class is called at, DeepLoc 2\'s own '
-               'default threshold for the Accurate model: '
-               + ', '.join(f'{web_utils.DEEPLOC_CUTOFFS[c]:.3f} for {c.lower()}'
-                           for c in web_utils.HOST_CLASSES) + '. '
-               'That is what the proteins were filtered on, so every point is above its own '
-               'line. A protein over several cut-offs appears in each of those columns, in '
-               'each at the probability of that class. The cytoplasm and nucleus columns hold '
-               'the host proteins of the intracellular parasites, the only ones the filter '
-               'allows them to. Each host protein is counted once per class, '
-               'irrespective of the number of parasites reaching it, and every prediction is '
-               'counted whatever the slider is set to.')
+    st.subheader(
+        "Localization probabilities of host proteins",
+        help='Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
+             'assigned localization, one column per class and one box per host. The dotted '
+             'line in each column marks the cut-off that class is called at, DeepLoc 2\'s own '
+             'default threshold for the Accurate model: '
+             + ', '.join(f'{web_utils.DEEPLOC_CUTOFFS[c]:.3f} for {c.lower()}'
+                         for c in web_utils.HOST_CLASSES) + '. '
+             'That is what the proteins were filtered on, so every point is above its own '
+             'line. A protein over several cut-offs appears in each of those columns, in '
+             'each at the probability of that class. The cytoplasm and nucleus columns hold '
+             'the host proteins of the intracellular parasites, the only ones the filter '
+             'allows them to. Each host protein is counted once per class, '
+             'irrespective of the number of parasites reaching it, and every prediction is '
+             'counted whatever the slider is set to.')
+    st.caption('How confidently DeepLoc 2 places the host proteins where they were '
+               'localized.')
     st.plotly_chart(generate_host_score_boxes(host_proteins, page), width='stretch')
 
 if parasite_proteins is not None:
-    st.subheader("Localization probabilities of extracellular parasite proteins")
-    st.caption('Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
-               'extracellular or both classes for each parasite, over every prediction whatever '
-               'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
-               'threshold for extracellular under the Accurate model '
-               f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
-               'what the secretome filter kept these proteins on. Individual proteins are '
-               'shown as points behind each box; for parasites with a hundred or more proteins '
-               'the points are read as density. ' + NICHE_STRIP)
+    st.subheader(
+        "Localization probabilities of extracellular parasite proteins",
+        help='Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
+             'extracellular or both classes for each parasite, over every prediction whatever '
+             'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
+             'threshold for extracellular under the Accurate model '
+             f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
+             'what the secretome filter kept these proteins on. Individual proteins are '
+             'shown as points behind each box; for parasites with a hundred or more proteins '
+             'the points are read as density. ' + NICHE_STRIP)
+    st.caption('How confidently DeepLoc 2 calls the parasite proteins secreted.')
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             parasite_proteins[parasite_proteins['surface'].isin(
@@ -1127,16 +1129,19 @@ if parasite_proteins is not None:
             'P(extracellular)', point_size=2),
         width='stretch')
 
-    st.subheader("Localization probabilities of membrane parasite proteins")
-    st.caption('The equivalent for parasite proteins assigned to cell membrane or both '
-               'classes, scored on that probability, again over every prediction. Only '
-               'unicellular parasites are represented, the secretome filter admitting a '
-               'multicellular parasite nothing but its secreted proteins. Individual '
-               'proteins are shown as points; boxes over very few proteins (two for '
-               '*V. corneae*) should not be read as distributions. The '
-               'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
-               f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
-               + NICHE_STRIP)
+    st.subheader(
+        "Localization probabilities of membrane parasite proteins",
+        help='The equivalent for parasite proteins assigned to cell membrane or both '
+             'classes, scored on that probability, again over every prediction. Only '
+             'unicellular parasites are represented, the secretome filter admitting a '
+             'multicellular parasite nothing but its secreted proteins. Individual '
+             'proteins are shown as points; boxes over very few proteins (two for '
+             '*V. corneae*) should not be read as distributions. The '
+             'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
+             f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
+             + NICHE_STRIP)
+    st.caption('How confidently DeepLoc 2 places the parasite proteins in the cell '
+               'membrane (unicellular parasites only).')
     st.plotly_chart(
         generate_surface_scores_per_parasite(
             unicellular[unicellular['surface'].isin(

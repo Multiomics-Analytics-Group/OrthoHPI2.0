@@ -71,7 +71,7 @@
     <g clip-path="url(#clip-image20)"><image xlink:href="../../biorender/organisms.png" x="-112.20" y="244.73" width="348.67" height="244.07" id="image20" /></g>
   </g></g>
   <g transform="translate(0 80)"><text class="lbl" x="110" y="424.0" id="text20">Parasite proteome</text></g>
-  <g transform="translate(0 80)"><text class="note" x="110" y="443.0" id="text21">45 species</text></g>
+  <g transform="translate(0 80)"><text class="note" x="110" y="443.0" id="text21">46 species</text></g>
   <g transform="translate(0 80)"><image xlink:href="../../images/logos/string.png" x="77.6" y="451.0" width="64.8" height="16" id="image21" /></g>
   <!-- ===== 2. Tissue expression (host only) ===== -->
   <g transform="translate(0 18)"><path class="flow" d="M 188 140 H 236" id="path21" /></g>

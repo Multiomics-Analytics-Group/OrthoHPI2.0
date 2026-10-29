@@ -25,6 +25,9 @@ DEEPMIND_SPLIT = 414
 # rows of tissues.png holding the wordmark; the tagline below dwarfs the other logos
 TISSUES_WORDMARK = (16, 108)
 
+# the TISSUES wordmark is all capitals, so it is padded until they match STRING's
+TISSUES_CAP_SHARE = 0.7
+
 
 def background_level(im):
     '''How light the background of a logo is, taken as the commonest colour in it.'''
@@ -70,6 +73,15 @@ def trim(im):
     return im.crop(box) if box else im
 
 
+def pad_to_share(im, share):
+    '''Pads a logo above and below with white, so it fills this share of its height.'''
+    height = round(im.height / share)
+    padded = Image.new('RGB', (im.width, height), (255, 255, 255))
+    padded.paste(im, (0, (height - im.height) // 2))
+
+    return padded
+
+
 def to_height(im, height):
     '''Scales a logo to a fixed height, keeping its aspect ratio.'''
     width = max(1, round(im.width * height / im.height))
@@ -101,7 +113,10 @@ def build():
         flattened = Image.new('RGB', original.size, (255, 255, 255))
         flattened.paste(original, mask=original)
 
-        out = to_height(trim(prepare(flattened)), height)
+        out = trim(prepare(flattened))
+        if name == 'tissues':
+            out = pad_to_share(out, TISSUES_CAP_SHARE)
+        out = to_height(out, height)
         # the footer inlines the files as data uris, and a palette halves the bytes
         out = out.quantize(colors=PALETTE_COLOURS)
         output_file = os.path.join(OUTPUT_DIR, f'{name}.png')

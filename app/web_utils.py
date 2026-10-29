@@ -565,7 +565,4 @@ def footer():
         '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem 2.5rem;'
         f' margin-bottom: 1rem;">{logos}</div>', unsafe_allow_html=True)
 
-    st.caption('Tissue names follow the BRENDA Tissue Ontology, and the localisation of '
-               'the host proteins is predicted with DeepLoc 2.')
-
     st.markdown(f'Code available at: [{REPOSITORY.split("//")[1]}]({REPOSITORY})')

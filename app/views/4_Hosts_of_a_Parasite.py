@@ -46,19 +46,6 @@ def common_name(host):
     return host[host.rfind('(') + 1:].rstrip(')') if '(' in host else host
 
 
-@st.cache_data(show_spinner=False)
-def load_host_orthologs(data_dir):
-    '''
-    Which proteins of each host belong to each of the orthologous groups the predictions
-    reach, written by scripts/build_host_orthologs.py.
-    '''
-    input_file = os.path.join(data_dir, 'host_orthologs.parquet')
-    if not os.path.exists(input_file):
-        return None
-
-    return utils.read_parquet_file(input_file=input_file)
-
-
 def host_label(host, config):
     '''The configured species name of a host taxid.'''
     return config['hosts'][int(host)]['label']
@@ -474,7 +461,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
     For every interaction predicted in some hosts but not others, why it is missing from
     the others.
     '''
-    orthologs = load_host_orthologs(data_dir)
+    orthologs = web_utils.load_host_orthologs(data_dir)
     if orthologs is None:
         return None
 

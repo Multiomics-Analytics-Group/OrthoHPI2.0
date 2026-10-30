@@ -2,6 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import utils
 import web_utils
+import similarity_heatmap
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -17,23 +18,10 @@ data_dir = web_utils.get_data_dir()
 UNKNOWN_GROUP = 'Unclassified'
 UNKNOWN_COLOR = '#999999'
 MIN_SCORE = web_utils.MIN_SCORE
-# side of a heatmap cell in pixels, which sizes the shared-interactor figure
-CELL = 22
-# the diagonal of the heatmap: a grey, so it is not read as a count
-DIAGONAL_COLOUR = '#9e9e9e'
-# pixels the colour bar takes right of the matrix; held in pixels so plotly does not widen
-# the margin and unsquare the plot
-COLORBAR_GAP = 8
-COLORBAR_ROOM = 71
-COLORBAR_DIGIT = 6.5
-# two decimals: most pairs sit under a tenth
-TICK = '.2f'
-# height of one legend row below the heatmap, in pixels
+# height of one legend row below a figure, in pixels
 LEGEND_ROW = 22
-# room one legend entry takes, in pixels: marker, padding and ~7.5 px a character of the
-# longest name
+# room one legend entry takes, in pixels: marker, padding and the longest name
 LEGEND_ENTRY = 40
-LEGEND_CHAR = 7.5
 # room left under the last legend of a dot matrix, in pixels
 LEGEND_PAD = 14
 # ~6 px a character of the longest name in a dot-matrix legend
@@ -327,164 +315,6 @@ def get_shared_interactor_similarity(df_pred, groups, group_order, niches, order
             [niches.get(g, web_utils.UNKNOWN_NICHE) for g in labels])
 
 
-@st.cache_data(show_spinner=False)
-def flat_colour_scale(values, colors):
-    '''
-    The colour scale of a strip of flat bands -- one band per value, nothing
-    interpolated between two of them -- and the codes that index it, which is what a
-    strip is drawn from.
-    '''
-    steps = [step for i, value in enumerate(colors)
-             for step in ([i / len(colors), colors[value]],
-                          [(i + 1) / len(colors), colors[value]])]
-
-    return dict(colorscale=steps, zmin=-0.5, zmax=len(colors) - 0.5, showscale=False,
-                hovertemplate='%{text}<extra></extra>'), \
-        [list(colors).index(v) for v in values]
-
-
-def generate_shared_interactor_heatmap(similarity, shared, clades, niches, palette, column):
-    '''
-    The shared-interactor similarity matrix, with a strip of the taxonomic group and a
-    strip of the niche of each parasite down the side and along the top, so that the two
-    axes are visibly the same list of parasites in the same order.
-    '''
-    shown = [g for g in palette if g in set(clades)]
-    niches_shown = [n for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]
-                    if n in set(niches)]
-    x_names = [f'{g[0]}. {g.split(" ")[1]}' for g in similarity.index]
-    y_names = list(similarity.index)
-    cells = list(range(len(y_names)))
-    strip, codes = flat_colour_scale(clades, {g: palette[g] for g in shown})
-    niche_strip, niche_codes = flat_colour_scale(
-        niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})
-
-    # the same span on both axes, so a square plot area is one of square cells
-    span = len(cells) + 2.6
-    # the ticks beside the colour bar are all that varies in the room it needs
-    right = COLORBAR_ROOM + COLORBAR_DIGIT * len(f'{np.nanmax(similarity.to_numpy()):{TICK}}')
-
-    # a line of text is about 1.1 times its point size tall
-    def fits(room, smallest=6):
-        sizes = [size for size in (10, 9, 8, 7, 6) if size >= smallest]
-        return next(size for size in sizes if room >= 1.1 * size or size == sizes[-1])
-
-    longest = max(len(name) for name in y_names)
-
-    def square(size):
-        '''Side of the square and the left margin, with the names written `size` points.'''
-        # what the cells are held square to
-        margin = 0.65 * size * longest + 12
-
-        return max(240, min(CELL * span, column - margin - right)), margin
-
-    # measured once at the largest size and again at the size that left them
-    font = fits(square(10)[0] / span)
-    side, left = square(font)
-    # column names are held to a floor of their own, being the only thing that names a
-    # column
-    x_font = fits(side / span, smallest=SMALLEST_LABEL)
-
-    # rotated sixty degrees the names stand about 0.87 of their length tall
-    top = 0.87 * (0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
-    # plotly wraps legend entries to the plot width, so the rows are counted rather than
-    # assumed
-    def legend_rows(names):
-        entry = LEGEND_ENTRY + LEGEND_CHAR * max(len(name) for name in names)
-
-        return -(-len(names) // max(1, int(side // entry)))
-
-    clade_rows = legend_rows(shown)
-    niche_rows = legend_rows(niches_shown)
-    bottom = 34 + LEGEND_ROW * (clade_rows + niche_rows)
-
-    figure = go.Figure()
-    # group and niche strips beside the rows and above the columns, a cell clear of the
-    # matrix
-    for offset, (values, code_list, scale) in enumerate([(clades, codes, strip),
-                                                         (niches, niche_codes, niche_strip)]):
-        figure.add_trace(go.Heatmap(z=[[code] for code in code_list],
-                                    x0=-1.4 - offset, dx=1, y=cells,
-                                    text=[[v] for v in values], ygap=1, **scale))
-        figure.add_trace(go.Heatmap(z=[code_list], x=cells,
-                                    y0=-1.4 - offset, dy=1,
-                                    text=[list(values)], xgap=1, **scale))
-
-    # hover belongs to the clickable layer below. The scale runs to the largest similarity
-    # rather than 1.0
-    figure.add_trace(go.Heatmap(z=similarity.to_numpy(), x=cells, y=cells, hoverinfo='skip',
-                                colorscale=['#ffffff', '#deebf7', '#9ecae1', '#6baed6',
-                                            '#3182bd', '#08519c'],
-                                zmin=0, zmax=np.nanmax(similarity.to_numpy()),
-                                hoverongaps=False,
-                                colorbar=dict(title=dict(text='Jaccard similarity',
-                                                         side='right'),
-                                              thickness=12, len=0.6, y=1, yanchor='top',
-                                              x=1 + COLORBAR_GAP / side,
-                                              tickformat=TICK,
-                                              tickfont=dict(size=10))))
-
-    # the diagonal, drawn over the empty cells; both traces turn hovering on gaps off so
-    # neither answers for the cells beneath
-    diagonal = np.full(similarity.shape, np.nan)
-    np.fill_diagonal(diagonal, 0)
-    figure.add_trace(go.Heatmap(z=diagonal, x=cells, y=cells,
-                                text=[[name] * len(y_names) for name in y_names],
-                                colorscale=[[0, DIAGONAL_COLOUR], [1, DIAGONAL_COLOUR]],
-                                zmin=0, zmax=1, showscale=False, hoverongaps=False,
-                                hovertemplate='%{text}<extra></extra>'))
-
-    # a heatmap cannot be clicked in Streamlit, so every cell carries an invisible scatter
-    # marker; x and y are the indices of the two parasites
-    click_targets = [(x, y) for y in cells for x in cells if x != y]
-    figure.add_trace(go.Scatter(
-        x=[x for x, _ in click_targets], y=[y for _, y in click_targets], mode='markers',
-        marker=dict(symbol='square', size=side / span, color='rgba(0,0,0,0)',
-                    line=dict(width=0)),
-        # plotly would otherwise dim everything but the clicked cell
-        selected=dict(marker=dict(opacity=1)), unselected=dict(marker=dict(opacity=1)),
-        # the count beside the ratio, which is what the dialog then lists
-        text=[f'{y_names[y]} and {y_names[x]}<br>'
-              f'Jaccard similarity {similarity.iat[y, x]:{TICK}}<br>'
-              f'Shared interactors {shared.iat[y, x]:.0f}' for x, y in click_targets],
-        hovertemplate='%{text}<extra></extra>', showlegend=False))
-    click_layer = len(figure.data) - 1
-
-    # the strips are heatmaps and cannot carry a legend, so their values are named by empty
-    # traces
-    for group in shown:
-        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=group,
-                                    marker=dict(size=10, symbol='square', color=palette[group]),
-                                    hoverinfo='skip', showlegend=True))
-    for niche in niches_shown:
-        figure.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name=niche,
-                                    marker=dict(size=10, symbol='square',
-                                                color=web_utils.NICHE_COLORS[niche]),
-                                    legend='legend2', hoverinfo='skip', showlegend=True))
-
-    # every parasite is named, however small the cells
-    ticks = dict(tickmode='array', tickvals=cells, ticks='')
-    # named above the matrix, slanted the way the other figures of the page slant them
-    figure.update_xaxes(range=[-3, len(cells) - 0.4], side='top',
-                        ticktext=x_names, tickangle=-60, tickfont=dict(size=x_font), **ticks)
-    # reversed, so the first parasite is the top row; the range runs back past the strips
-    figure.update_yaxes(range=[len(cells) - 0.4, -3],
-                        ticktext=y_names, tickfont=dict(size=font), **ticks)
-
-    # the plot area is `side` pixels each way, the margins holding everything else, which
-    # keeps the cells square
-    entries = dict(orientation='h', yanchor='top', xanchor='left', x=0, itemclick=False,
-                   itemdoubleclick=False, font=dict(size=11), title_font=dict(size=11))
-    figure.update_layout(width=left + side + right, height=side + top + bottom,
-                         plot_bgcolor='white',
-                         # no pad, so the names sit against the strips
-                         margin=dict(l=left, r=right, t=top, b=bottom, pad=0),
-                         legend=dict(y=-0.01, **entries),
-                         legend2=dict(y=-0.01 - LEGEND_ROW * clade_rows / side, **entries))
-
-    return figure, click_layer
-
-
 # characters a line of a host protein name on the dot matrix is wrapped at
 LABEL_WRAP = 30
 
@@ -675,7 +505,7 @@ def add_parasite_strips(figure, dots, parasites, palette):
     for offset, (values, colors) in enumerate(
             [(clades, {g: palette.get(g, UNKNOWN_COLOR) for g in groups_shown}),
              (niches, {n: web_utils.NICHE_COLORS[n] for n in niches_shown})]):
-        scale, codes = flat_colour_scale(values, colors)
+        scale, codes = similarity_heatmap.flat_colour_scale(values, colors)
         figure.add_trace(go.Heatmap(z=[codes], x=list(range(len(parasites))),
                                     y0=-1.4 - offset, dy=1, text=[values], xgap=1, **scale))
 
@@ -698,7 +528,7 @@ def add_localisation_strip(figure, dots, proteins, ys, width):
     surface_of = dict(zip(dots['protein'], dots['surface']))
     localisations = [surface_of.get(p, NO_LOCALISATION) for p in proteins]
     shown = [c for c in LOCALISATION_ORDER if c in set(localisations)]
-    scale, codes = flat_colour_scale(localisations,
+    scale, codes = similarity_heatmap.flat_colour_scale(localisations,
                                      {c: LOCALISATION_COLORS[c] for c in shown})
     # the band is `width` x units across, an x unit being a parasite
     figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-0.5 - width, dx=width,
@@ -1038,12 +868,17 @@ if selected_host != web_utils.NO_HOST:
                  'itself, is greyed out. Hover a cell for the count behind its ratio, or '
                  'click it to see the shared host proteins.')
         st.caption('How alike the host proteins targeted by each pair of parasites are. '
-                   'Click a cell to see the shared proteins.')
+                   'Click a cell to see the shared proteins of the pair.')
         if shared_similarity is not None:
             # the figure carries the column width rather than being stretched, which keeps
             # the matrix square after full screen
-            figure, click_layer = generate_shared_interactor_heatmap(
-                *shared_similarity, config.get('parasite_groups', {}), column)
+            similarity, shared_counts, clades, row_niches = shared_similarity
+            figure, click_layer = similarity_heatmap.generate(
+                similarity, shared_counts,
+                [(clades, config.get('parasite_groups', {})),
+                 (row_niches, {n: web_utils.NICHE_COLORS[n]
+                               for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]})],
+                column)
             # remounted after every dialog: Streamlit drops an identical selection and
             # plotly reads a second click as a deselection
             nonce = st.session_state.get(CELL_NONCE_KEY, 0)

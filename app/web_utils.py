@@ -288,6 +288,19 @@ def to_fasta(records, width=60):
 
 
 @st.cache_data(show_spinner=False)
+def load_host_orthologs(data_dir):
+    '''
+    Which proteins of each host belong to each of the orthologous groups the predictions
+    reach, written by scripts/build_host_orthologs.py.
+    '''
+    input_file = os.path.join(data_dir, 'host_orthologs.parquet')
+    if not os.path.exists(input_file):
+        return None
+
+    return utils.read_parquet_file(input_file=input_file)
+
+
+@st.cache_data(show_spinner=False)
 def load_deeploc_localisations(data_dir):
     '''
     Where DeepLoc 2 predicts each protein of the predictions sits, keyed by STRING id,

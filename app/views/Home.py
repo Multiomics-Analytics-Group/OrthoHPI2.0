@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import hosts_parasites
+import similarity_heatmap
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -75,6 +76,18 @@ LABEL_CHAR = 6.2
 LABEL_PADDING = 40
 # height of one horizontal legend row, in pixels
 LEGEND_ROW = 46
+# session key counting remounts of the cross-host overlap matrix, so the same cell can be
+# opened twice running
+CELL_NONCE_KEY = 'cross_host_cell_nonce'
+# side of that matrix in pixels at most
+OVERLAP_SIDE = 640
+# what the rows of that matrix can be ordered on, first to last, and the sort keys of each;
+# the parasite and its hosts close every order, so a parasite or genus stays together
+# outside the host order
+OVERLAP_ORDERS = {
+    web_utils.NICHE_TITLE: ['niche_rank', 'group_rank', 'taxid1_label', 'host_rank'],
+    'taxonomic group': ['group_rank', 'niche_rank', 'taxid1_label', 'host_rank'],
+    'host': ['host_rank', 'niche_rank', 'group_rank', 'taxid1_label']}
 # the five numbers a box is drawn from
 BOX_QUANTILES = [0, 0.25, 0.5, 0.75, 1]
 
@@ -733,6 +746,144 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     return figure
 
 
+def common_name(host):
+    '''`Homo sapiens (human)` as `human`.'''
+    return host.split('(')[-1].rstrip(')') if '(' in host else host
+
+
+@st.cache_data(show_spinner=False)
+def get_host_group_presence(df, orthologs):
+    '''
+    The host orthologous groups each host has a protein in: those of the EggNOG members
+    table, and every group a prediction reaches in that host, which the table may lack.
+    Without the table every host is taken to have every group.
+    '''
+    if orthologs is None:
+        everything = set(df['group2'].astype(str))
+        return {host: everything for host in df['host'].unique()}
+
+    present = {host: set(rows['group2'].astype(str))
+               for host, rows in df.groupby('host', observed=True)}
+    labels = {str(taxid): host['label'] for taxid, host in config['hosts'].items()}
+    for taxid, rows in orthologs.groupby('taxid'):
+        if str(taxid) in labels:
+            present.setdefault(labels[str(taxid)], set()).update(rows['group'])
+
+    return present
+
+
+def pair_label(host, parasite):
+    '''A parasite in one of its hosts, as a row of the matrix is named.'''
+    return f'{parasite} ({common_name(host)})'
+
+
+@st.cache_data(show_spinner=False)
+def get_cross_host_similarity(df, score, hosts, present, order_by):
+    '''
+    How alike the host orthologous groups reached by each pair of host-parasite pairs are,
+    as the Jaccard similarity of the two sets. Only the groups both hosts have a protein in
+    are counted, so a group one host lacks is not read as a difference between the
+    parasites. One row per parasite and host, in the order OVERLAP_ORDERS gives
+    `order_by`.
+    '''
+    kept = df[(df['weight'] >= score) & df['host'].isin(hosts)]
+    reached = {key: set(rows['group2'].astype(str))
+               for key, rows in kept.groupby(['host', 'taxid1_label'], observed=True)}
+    if len(reached) < 3:
+        return None
+
+    host_rank = {h: i for i, h in enumerate(hosts)}
+    rows = kept.drop_duplicates(['host', 'taxid1_label'])
+    rows = rows.assign(niche_rank=rows['niche'].map(web_utils.niche_rank),
+                       host_rank=rows['host'].map(host_rank)).sort_values(
+        OVERLAP_ORDERS[order_by], kind='stable')
+    keys = list(zip(rows['host'], rows['taxid1_label']))
+
+    shared = np.full((len(keys), len(keys)), np.nan)
+    similarity = np.full((len(keys), len(keys)), np.nan)
+    for i, (host_a, parasite_a) in enumerate(keys):
+        for j, (host_b, parasite_b) in enumerate(keys[:i]):
+            common = present.get(host_a, set()) & present.get(host_b, set())
+            first = reached[host_a, parasite_a] & common
+            second = reached[host_b, parasite_b] & common
+            union = len(first | second)
+            shared[i, j] = shared[j, i] = len(first & second)
+            similarity[i, j] = similarity[j, i] = shared[i, j] / union if union else 0
+
+    labels = [pair_label(h, p) for h, p in keys]
+
+    return (pd.DataFrame(similarity, index=labels, columns=labels),
+            pd.DataFrame(shared, index=labels, columns=labels),
+            list(rows['group']), list(rows['niche']),
+            [common_name(h) for h in rows['host']], keys)
+
+
+def og_table(edges, groups, keys):
+    '''
+    One row per orthologous group, named by the gene symbols the two parasites reach in
+    it, with a column per host-parasite pair counting the parasite proteins reaching it.
+    '''
+    edges = edges[edges['group2'].astype(str).isin(groups)]
+    table = pd.DataFrame({'Orthologous group': sorted(groups)})
+    symbols = edges.groupby(edges['group2'].astype(str))['target_name'].agg(
+        lambda names: ', '.join(sorted(set(str(n).upper() for n in names))))
+    table['Gene symbols'] = table['Orthologous group'].map(symbols).fillna('')
+    columns = []
+    for host, parasite in keys:
+        rows = edges[(edges['host'] == host) & (edges['taxid1_label'] == parasite)]
+        degree = rows.groupby(rows['group2'].astype(str))['source'].nunique()
+        column = f'{short_name(parasite)} ({common_name(host)}) proteins'
+        table[column] = table['Orthologous group'].map(degree).fillna(0).astype(int)
+        columns.append(column)
+
+    # the groups reached by the most parasite proteins first
+    return table.assign(_reach=table[columns].sum(axis=1)).sort_values(
+        ['_reach', 'Orthologous group'], ascending=[False, True],
+        kind='stable').drop(columns='_reach')
+
+
+@st.dialog('Host orthologous groups of a pair of parasites', width='large')
+def show_cross_host_dialog(first, second, df, score, present):
+    '''
+    The orthologous groups behind one cell of the cross-host matrix, split by why a group
+    is or is not shared: reached by both, reached by one though both hosts have it, or
+    reached by one in a host the other has no protein of the group in.
+    '''
+    keys = [first, second]
+    edges = df[df['weight'] >= score]
+    edges = edges[pd.Series(list(zip(edges['host'], edges['taxid1_label'])),
+                            index=edges.index).isin(keys)]
+    reached = {key: set(rows['group2'].astype(str))
+               for key, rows in edges.groupby(['host', 'taxid1_label'], observed=True)}
+    first_groups, second_groups = reached.get(first, set()), reached.get(second, set())
+    common = present.get(first[0], set()) & present.get(second[0], set())
+
+    shared = first_groups & second_groups & common
+    one_parasite = (first_groups ^ second_groups) & common
+    no_ortholog = (first_groups | second_groups) - common
+
+    st.markdown(f'**{pair_label(*first)}** and **{pair_label(*second)}**')
+    st.caption('Host orthologous groups the two parasites are predicted to interact with, '
+               'at the confidence set on the page. A column counts the proteins of that '
+               'parasite predicted to reach the group. The matrix counts only the first two '
+               'tabs: a group one host has no protein in cannot be reached there.')
+    tabs = st.tabs([f'Shared ({len(shared)})',
+                    f'Reached by one parasite ({len(one_parasite)})',
+                    f'No ortholog in the other host ({len(no_ortholog)})'])
+    for tab, groups, empty in [
+            (tabs[0], shared, 'The two parasites share no host orthologous group.'),
+            (tabs[1], one_parasite, 'Every group both hosts have is reached by both '
+                                    'parasites or by neither.'),
+            (tabs[2], no_ortholog, 'Every group either parasite reaches has a protein in '
+                                   'both hosts.')]:
+        with tab:
+            if groups:
+                st.dataframe(og_table(edges, groups, keys), width='stretch', height=400,
+                             hide_index=True)
+            else:
+                st.info(empty)
+
+
 st.caption('Host-parasite protein-protein interactions predicted by '
            'orthology transfer. This page presents every prediction per host, '
            '**Host-parasite network** shows the network of one host-parasite pair, '
@@ -825,6 +976,75 @@ else:
     st.download_button(f'Download all {shareable} shared orthologous groups',
                        data=utils.convert_df(get_shared_og_table(overview, score)),
                        file_name='shared_host_orthologous_groups.tsv', mime='text/csv')
+
+st.subheader(
+    "Overlap of the host orthologous groups across hosts",
+    help='How alike the host interactors of each pair of parasites are, across hosts as '
+         'well as within one: the Jaccard similarity of the host orthologous groups the two '
+         'reach, the groups both reach over the groups either reaches. A protein of one '
+         'host is never the protein of another, so the orthologous group stands in for it. '
+         'Only the groups both hosts have a protein in are counted, so a group missing '
+         'from one host is not read as a difference between the parasites; the cell '
+         'dialog lists those groups apart. A parasite predicted in several hosts has a row '
+         'in each. Ordered by niche or by taxonomic group, a parasite or genus lines up '
+         'across its hosts; ordered by host, each host is a block and the cells between '
+         'two blocks compare the parasites of the two. Three strips run along each axis: the '
+         'taxonomic group of the parasite, whether it lives inside a host cell or outside '
+         'one, and the host. Interactions below the confidence set above are left out. '
+         'Hover a cell for the count behind its ratio, or click it to see the groups.')
+st.caption('How alike the host orthologous groups targeted by each pair of parasites are, '
+           'in any of their hosts. Click a cell to see the groups.')
+host_labels = list(dict.fromkeys(overview['host']))
+hosts_column, order_column, _ = st.columns(3)
+with hosts_column:
+    overlap_hosts = st.multiselect(
+        'Hosts', host_labels, default=host_labels, format_func=common_name,
+        key='overlap_hosts',
+        help='The hosts whose parasites the matrix compares, for instance human and mouse '
+             'alone to set the Plasmodium species of the two side by side.')
+with order_column:
+    overlap_order = st.radio('Order the parasites by', list(OVERLAP_ORDERS), horizontal=True,
+                             key='overlap_order',
+                             help='Which annotation comes out in blocks along the axes. '
+                                  'The strips show all three either way.')
+host_orthologs = web_utils.load_host_orthologs(data_dir)
+if host_orthologs is None:
+    st.caption('Run `python scripts/build_host_orthologs.py` to count only the groups both '
+               'hosts have; until then every group reached is counted.')
+group_presence = get_host_group_presence(overview, host_orthologs)
+cross_host = get_cross_host_similarity(overview, score, tuple(overlap_hosts),
+                                       group_presence, overlap_order)
+if cross_host is None:
+    st.info('Fewer than three parasites of the selected hosts reach a host orthologous '
+            'group at this confidence.')
+else:
+    similarity, shared_counts, clades, row_niches, row_hosts, row_keys = cross_host
+    figure, click_layer = similarity_heatmap.generate(
+        similarity, shared_counts,
+        [(clades, {**parasite_palette, UNKNOWN_GROUP: UNKNOWN_COLOR}),
+         (row_niches, {n: web_utils.NICHE_COLORS[n]
+                       for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]}),
+         (row_hosts, {common_name(h): config['hosts'][t]['color']
+                      for t in config['hosts'] for h in [config['hosts'][t]['label']]})],
+        page,
+        x_names=[f'{short_name(p)} ({common_name(h)})' for h, p in row_keys],
+        count_label='Shared orthologous groups',
+        # held to about a screen, so the whole matrix is seen at once; with every host the
+        # names go down to eight points, upright so the narrow columns still part them
+        max_side=OVERLAP_SIDE, smallest_label=8, x_angle=-90)
+    # remounted after every dialog: Streamlit drops an identical selection and plotly
+    # reads a second click as a deselection
+    nonce = st.session_state.get(CELL_NONCE_KEY, 0)
+    clicked = st.plotly_chart(
+        figure, width='content', on_select='rerun', selection_mode='points',
+        key=f'cross_host_cells_{"_".join(overlap_hosts)}_{overlap_order}_{score}_{nonce}')
+    cell = next((point for point in (clicked or {}).get('selection', {}).get('points', [])
+                 if point.get('curve_number') == click_layer), None)
+    if cell is not None:
+        # the two host-parasite pairs are the row and column the marker sits on
+        st.session_state[CELL_NONCE_KEY] = nonce + 1
+        show_cross_host_dialog(row_keys[int(cell['y'])], row_keys[int(cell['x'])],
+                               overview, score, group_presence)
 
 st.subheader(
     "Interaction confidence scores",

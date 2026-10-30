@@ -128,6 +128,9 @@ SIDE_COLUMN = 'Side'
 # named so a click on the body figure can set it on the following run
 TISSUE_FILTER_KEY = 'net_tissues'
 
+# keyed so the choice survives a change in the protein counts its labels carry
+CELL_TYPE_FILTER_KEY = 'net_cell_types'
+
 # named so their state can be read where the predictions are filtered, before they are drawn
 # again
 SURFACE_FILTER_KEYS = {web_utils.CELL_MEMBRANE: 'net_surface_membrane',
@@ -1098,9 +1101,15 @@ with filter_col:
 
                 return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
 
+            # a cell type the new score or expression leaves empty drops out of the choice
+            if CELL_TYPE_FILTER_KEY in st.session_state:
+                st.session_state[CELL_TYPE_FILTER_KEY] = [
+                    c for c in st.session_state[CELL_TYPE_FILTER_KEY]
+                    if c in cell_type_counts.index]
+
             selected_cell_types = st.multiselect(
                 'Cell types', list(cell_type_counts.index),
-                format_func=cell_type_label,
+                format_func=cell_type_label, key=CELL_TYPE_FILTER_KEY,
                 help='A cell type is offered with the number of host proteins expressed '
                      'in it. Cell-type annotation is available for human (HPA), mouse '
                      '(Tabula Muris Senis) and pig (Pig Cell Atlas); a host protein with no '

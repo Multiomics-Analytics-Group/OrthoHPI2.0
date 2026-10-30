@@ -1054,10 +1054,14 @@ with st.columns(3)[1]:
     else:
         # only parasites that infect the selected host
         parasite_list = ['<select>'] + get_parasite_list(data_dir, selected_taxids)
-        # switching host can leave a parasite selected that the new host does not have
-        if st.session_state.get('net_par') not in parasite_list:
-            st.session_state.pop('net_par', None)
-        selected_parasite = st.selectbox('Select a parasite', parasite_list, key="net_par")
+        # keyed by host so the browser redraws the field on a host switch instead of still
+        # showing a parasite the new host does not have; the parasite carries over if it does
+        widget_key = f'net_par_{selected_host}'
+        if widget_key not in st.session_state:
+            carried = st.session_state.get('net_par')
+            st.session_state[widget_key] = carried if carried in parasite_list else '<select>'
+        selected_parasite = st.selectbox('Select a parasite', parasite_list, key=widget_key)
+        st.session_state['net_par'] = selected_parasite
 
 filter_col, network_col = st.columns([1, 2], gap='large')
 

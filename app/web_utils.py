@@ -419,7 +419,7 @@ def get_niches(config):
     return niches
 
 
-def get_host_groups(config, predictions, include_rodents=False):
+def get_host_groups(config, predictions):
     '''Maps each host species offered in the app to its taxid.'''
     predicted = set(predictions['taxid2'])
     groups = {}
@@ -427,10 +427,6 @@ def get_host_groups(config, predictions, include_rodents=False):
         taxid = str(taxid)
         if taxid in predicted:
             groups[host['label']] = [taxid]
-
-    rodent_taxids = ['10116', '10090']
-    if include_rodents and all(taxid in predicted for taxid in rodent_taxids):
-        groups['Rodent'] = rodent_taxids
 
     return {group: groups[group] for group in sorted(groups)}
 
@@ -442,9 +438,9 @@ HOST_WIDGET_KEY = 'selected_host_widget'
 NO_HOST = '<select>'
 
 
-def host_selector(config, predictions, label='Select a host', include_rodents=False):
+def host_selector(config, predictions, label='Select a host'):
     '''Draws the host selectbox, shared across pages through HOST_STATE_KEY.'''
-    groups = get_host_groups(config, predictions, include_rodents=include_rodents)
+    groups = get_host_groups(config, predictions)
     options = [NO_HOST] + list(groups)
 
     current = st.session_state.get(HOST_STATE_KEY, NO_HOST)

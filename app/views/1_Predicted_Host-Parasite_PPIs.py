@@ -382,10 +382,8 @@ def name_the_selection(table, parasite, host):
     if table.empty:
         return table
 
-    # the Rodent view already carries each row's host species
-    host_column = 'Host group' if 'Host species' in table.columns else 'Host species'
-    named = table.assign(**{'Parasite species': parasite, host_column: host})
-    front = ['Parasite species', host_column]
+    named = table.assign(**{'Parasite species': parasite, 'Host species': host})
+    front = ['Parasite species', 'Host species']
 
     return named[front + [c for c in named.columns if c not in front]]
 
@@ -1047,7 +1045,7 @@ st.caption('Investigate the predicted interaction network for a host-parasite pa
 with st.columns(3)[1]:
     # the host carries over from whichever page it was last chosen on
     selected_host, selected_taxids = web_utils.host_selector(
-        config, load_predictions(data_dir), 'Select a host', include_rodents=True)
+        config, load_predictions(data_dir), 'Select a host')
 
     if selected_host == web_utils.NO_HOST:
         selected_parasite = "<select>"
@@ -1199,9 +1197,6 @@ def network_legend(parasite_label, parasite_color, host_label, host_color):
 
 def render_network_panel(host_taxid, host_label, host_df, G, net):
     if net is not None:
-        # the species name only distinguishes the panels on the rodent page
-        if len(networks) > 1:
-            st.subheader(host_label)
         st.text(f"Nodes: {len(G.nodes())}  Edges: {len(G.edges())}")
         if host_df.empty:
             st.info(f'No predicted interactions for this parasite in {host_label}.')
@@ -1275,12 +1270,8 @@ with network_col:
         st.caption('Nodes are proteins, coloured by organism and sized by centrality in the '
                    'network. Edge width is the confidence score. Click an edge for the AlphaFold model and '
                    'sequence of the proteins.')
-        if selected_host == 'Rodent':
-            st.caption('Rat and Mouse networks are shown separately; their host nodes use '
-                       'their species-specific colors.')
         # right above the network it describes
         show_active_filters(page_filters)
-        # the rat and mouse networks are stacked; the column is too narrow to share
         for network in networks:
             render_network_panel(*network)
 

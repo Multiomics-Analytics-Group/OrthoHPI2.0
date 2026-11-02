@@ -70,22 +70,24 @@ def filter_proteins(config_file, data_dir, proteins):
     Narrow every species to the proteins an interaction could be predicted between: the
     parasite proteins the secretome predictions call secreted or membrane-bound, and the
     host proteins expressed in a tissue some parasite of the config infects and put by
-    DeepLoc in a localisation a parasite infecting that host can reach.
+    DeepLoc in a localisation a parasite infecting that host can reach. Also returns, per
+    parasite, the host proteins of that pool it can be predicted to bind.
     '''
     # proteins stays {taxid: {protein: name}} through the filters, then is flattened for the
     # homology transfer
     proteins = filters.get_secretome_predictions(config_file=config_file, secretome_dir=os.path.join(data_dir, 'secretome'), valid_proteins=proteins)
     tissues = filters.apply_tissue_filter(config_file=config_file, valid_proteins=proteins, cutoff=TISSUE_CUTOFF)
-    # the per-niche halves of the pool go on to get_links, which applies them parasite by
-    # parasite
     reachable = filters.apply_deeploc_filter(config_file=config_file, valid_proteins=proteins,
                                              deeploc_dir=os.path.join(data_dir, DEEPLOC_ACCURATE_DIR),
                                              niche_cutoffs=DEEPLOC_NICHE_CUTOFFS,
                                              default_niche=DEEPLOC_DEFAULT_NICHE)
     infected = filters.parasite_tissue_proteins(config_file=config_file, tissues=tissues,
                                                 valid_proteins=proteins)
+    targets = filters.parasite_targets(config_file=config_file, valid_proteins=proteins,
+                                       reachable=reachable, infected=infected,
+                                       default_niche=DEEPLOC_DEFAULT_NICHE)
 
-    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues, reachable, infected
+    return utils.merge_dict_of_dicts(dict_of_dicts=proteins), tissues, reachable, targets
 
 
 def save_eligible_proteins(proteins, output_file, reachable=None):
@@ -181,7 +183,7 @@ def run(config_file, data_dir, verbose=False):
     print(f"  {total_proteins} proteins before filtering")
 
     print("Applying secretome/tissue/DeepLoc filters...")
-    proteins, tissues, reachable, infected = filter_proteins(config_file=config_file,
+    proteins, tissues, reachable, targets = filter_proteins(config_file=config_file,
                                                             data_dir=data_dir, proteins=proteins)
     print(f"  {len(proteins)} proteins after filtering")
 
@@ -203,8 +205,7 @@ def run(config_file, data_dir, verbose=False):
     if verbose:
         print_group_counts(valid_groups)
     predictions = homology.get_links(filepath=os.path.join(downloads_dir, cog_filename), valid_groups=valid_groups,
-              proteins=proteins, config_file=config_file, reachable=reachable,
-              default_niche=DEEPLOC_DEFAULT_NICHE, infected=infected)
+              proteins=proteins, config_file=config_file, targets=targets)
 
     print("Annotating predictions with UniProt accessions...")
     predictions = annotate_predictions(predictions=predictions, hosts=hosts, parasites=parasites, config_file=config_file)

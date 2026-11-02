@@ -1,7 +1,7 @@
 # Prediction pipeline
 
-The pipeline in `pipeline/` produces `data/annotated_predictions.parquet`, which
-the app reads.
+The pipeline in `pipeline/` produces `data/predictions.parquet`, which the app
+reads. The other files in `data/` are listed under [Data files](#data-files).
 
 It is configured in `config.yml`:
 
@@ -53,10 +53,9 @@ Matches are collected in `{protein: [tissue, ...]}` across hosts and used again
 in step 6.
 
 The pool left after this step is per host. `filters.parasite_tissue_proteins`
-splits it per parasite (`{parasite taxid: host proteins in its tissues}`), and
-`homology.get_links` applies that during the transfer, as it does for the
-niches in step 5. Proteins of a host without a `tissues_url` pass for every
-parasite.
+splits it per parasite (`{parasite taxid: host proteins in its tissues}`), which
+goes into the per-parasite targets (end of step 5). Proteins of a host without a
+`tissues_url` pass for every parasite.
 
 ### 5. Host localization (`filters.apply_deeploc_filter`)
 
@@ -72,8 +71,14 @@ The classes that count depend on the parasite's `niche` in `config.yml`
 
 The niche is a property of the parasite but the pool is per host. The filter
 narrows `valid_proteins[taxid]` to the union of the niches of the host's
-parasites, and returns `{niche: host proteins}`, which `homology.get_links`
-applies per parasite. A parasite without a valid `niche` is treated as extracellular.
+parasites, and returns `{niche: host proteins}`. A parasite without a valid
+`niche` is treated as extracellular.
+
+`filters.parasite_targets` then combines the per-parasite parts of steps 4 and 5
+into `{parasite taxid: host proteins it can be predicted to bind}`: proteins of
+the hosts it infects, reached from its niche and expressed in a tissue it
+infects. `homology.get_links` keeps a pair only if the host protein is in its
+parasite's set.
 
 `main.save_eligible_proteins` writes one `reachable_<niche>` column per niche
 to `eligible_proteins.parquet`. The app uses it as the enrichment background,
@@ -113,11 +118,11 @@ Interactions are transferred from STRING through orthology groups:
 2. `get_links` reads STRING's `COG.links.detailed`, which scores evidence
    between orthology groups. A link is kept if both groups were kept in 1,
    `experimental_evidence >= 0.7` or `databases_evidence >= 0.7`, and it
-   connects a host protein to a parasite protein (links within one species are
-   skipped).
+   connects a parasite protein to a host protein in that parasite's targets
+   (links within one species are skipped).
 
-Every such protein pair is written to `data/predictions.parquet`, with the
-parasite protein in the `source_*` columns and the host protein in `target_*`.
+Every such protein pair goes into the predictions table, with the parasite
+protein in the `source_*` columns and the host protein in `target_*`.
 So if a parasite protein's group interacts with a host protein's group in
 STRING, the two proteins are predicted to interact.
 
@@ -125,10 +130,10 @@ STRING, the two proteins are predicted to interact.
 level-2759 groups in EggNOG 6 have hash ids (e.g. `2QPHS`). In practice only
 the ~4.8k KOG groups produce predictions.
 
-### 8. UniProt accessions (`main.py` `__main__`, `utils.annotate_alias_id`)
+### 8. UniProt accessions (`main.annotate_predictions`, `utils.annotate_alias_id`)
 
 Adds `source_uniprot` and `target_uniprot` from STRING's alias files and writes
-`data/annotated_predictions.parquet`.
+`data/predictions.parquet`.
 
 The alias files differ between species, so `sources` is a preference list and
 `parse_string_aliases` takes the first source that has an alias. Parasites use
@@ -186,3 +191,25 @@ The output is `data/host_orthologs.parquet` (`group`, `taxid`, `n_proteins`,
 `proteins`), a few thousand rows covering the ~1,000 groups in the predictions.
 Re-run it after `pipeline/main.py` when hosts or parasites change. If the file
 is missing, the page leaves that section out.
+
+## Data files
+
+The parquet files in `data/`. `pipeline/main.py` writes the first four; the
+others are built by their own script, to be re-run after `main.py` when hosts or
+parasites change.
+
+| File | Written by | One row per | Columns | Read by |
+|---|---|---|---|---|
+| `predictions.parquet` | `pipeline/main.py` (steps 7–8) | predicted host–parasite protein pair | `taxid1`/`source*` (parasite), `taxid2`/`target*` (host), `experimental_evidence_score`, `databases_evidence_score`, `weight`, `group1`, `group2`, `source_uniprot`, `target_uniprot` | the app and most scripts |
+| `eligible_proteins.parquet` | `pipeline/main.py` (step 5) | host or parasite protein left after steps 3–5 | `protein`, `name`, `taxid`, `reachable_<niche>` | app enrichment background, filter funnel, AlphaFold job scripts |
+| `tissues_cell_types.parquet` | `pipeline/main.py` (step 6) | host protein, tissue and cell type (one row per tissue if no cell types) | `Gene`, `Tissue`, `Gene name`, `Cluster`, `Cell type`, `Read count`, `nCPM` | app tissue and cell-type views |
+| `gos.parquet` | `pipeline/go.py` (step 1) | protein and GO term, all species | `#string_protein_id`, `term`, `description`, `taxid` | app GO enrichment |
+| `go_ontology.parquet` | `pipeline/go.py` (step 1) | GO parent–child relation | `parent`, `child` | app GO enrichment |
+| `host_orthologs.parquet` | `scripts/build_host_orthologs.py` | host orthology group and host | `group`, `taxid`, `n_proteins`, `proteins` | app cross-host page |
+| `host_tissues.parquet` | `scripts/build_host_tissues.py` | host protein and tissue, after step 4 but before step 5 | `protein`, `tissue` | app cross-host page, to tell "not expressed" from "out of reach" |
+| `deeploc_localisations.parquet` | `pipeline/build_deeploc_localisations.py` | protein in the predictions | `protein`, `localizations`, `signals`, `membrane_types`, one probability column per class | app localisation of interactors |
+| `protein_annotations.parquet` | `pipeline/build_protein_annotations.py` | protein in the predictions | `protein`, `description` | app network tooltips |
+| `protein_sequences.parquet` | `pipeline/build_protein_sequences.py` | protein in the predictions | `protein`, `sequence` | app FASTA downloads |
+| `figure_tissues.parquet` | `scripts/build_figure_tissues.py` | host protein and organ on the body figures | `Gene`, `Organ` | app body figure |
+| `pig_atlas_cell_types.parquet` | `pipeline/build_pig_atlas_cell_types.py` | gene, tissue and cell type | `Gene`, `Tissue`, `Cell type`, `nCPM` | step 6 |
+| `mouse_atlas_cell_types.parquet` | `pipeline/build_mouse_atlas_cell_types.py` | gene, tissue and cell type | `Gene`, `Tissue`, `Cell type`, `nCPM` | step 6 |

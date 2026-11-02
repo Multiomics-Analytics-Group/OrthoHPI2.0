@@ -1,7 +1,6 @@
 import pandas as pd
 
 import utils
-from . import filters
 
 # STRING evidence scores are integers 0-1000
 STRING_SCORE_SCALE = 1000
@@ -35,18 +34,16 @@ def get_eggnog_groups(filepath, proteins):
     return valid_groups
 
 
-def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
-              default_niche=None, infected=None):
+def get_links(filepath, valid_groups, proteins, config_file, targets):
     '''
     Obtain the transferred interactions at the EggNOG group level from STRING and return
-    them as a DataFrame (columns: LINK_COLUMNS).
+    them as a DataFrame (columns: LINK_COLUMNS). A pair is kept only if the host protein
+    is in targets[parasite taxid] (filters.parasite_targets).
     '''
     links = []
     seen = set()
     hosts = utils.read_config(filepath=config_file, field='hosts')
     parasites = utils.read_config(filepath=config_file, field='parasites')
-    niches = (filters.get_parasite_niches(config_file, set(reachable), default_niche)
-              if reachable else {})
 
     print("  Scanning COG links...")
     with utils.read_gzipped_file(filepath) as cog_links:
@@ -79,15 +76,7 @@ def get_links(filepath, valid_groups, proteins, config_file, reachable=None,
                     else:
                         target_taxid, target_group, target_protein = taxid2, group2, protein2
                         source_taxid, source_group, source_protein = taxid1, group1, protein1
-                    # restrict to hosts this parasite actually infects
-                    allowed_hosts = parasites[int(source_taxid)].get('hosts')
-                    if allowed_hosts is not None and int(target_taxid) not in allowed_hosts:
-                        continue
-                    # and to the host proteins its niche reaches
-                    if reachable and target_protein not in reachable[niches[int(source_taxid)]]:
-                        continue
-                    # and to the ones expressed in a tissue it infects
-                    if infected and target_protein not in infected[int(source_taxid)]:
+                    if target_protein not in targets[int(source_taxid)]:
                         continue
                     links.append([source_taxid, parasites[int(source_taxid)]['label'],
                                 parasites[int(source_taxid)]['color'], 'diamond', source_protein,

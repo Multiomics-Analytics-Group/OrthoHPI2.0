@@ -93,6 +93,25 @@ def parasite_tissue_proteins(config_file, tissues, valid_proteins):
     return infected
 
 
+def parasite_targets(config_file, valid_proteins, reachable, infected, default_niche):
+    '''
+    {parasite taxid: host proteins it can be predicted to bind}: those of the hosts it
+    infects that its niche reaches and that are expressed in a tissue it infects.
+    '''
+    hosts = utils.read_config(filepath=config_file, field='hosts')
+    parasites = utils.read_config(filepath=config_file, field='parasites')
+    niches = get_parasite_niches(config_file, set(reachable), default_niche)
+    targets = {}
+    for taxid, parasite in parasites.items():
+        allowed = parasite.get('hosts')
+        host_proteins = set().union(*(valid_proteins[host] for host in hosts
+                                      if allowed is None or int(host) in allowed))
+        targets[int(taxid)] = (host_proteins & reachable[niches[int(taxid)]]
+                               & infected[int(taxid)])
+
+    return targets
+
+
 def get_parasite_niches(config_file, known_niches, default_niche):
     '''
     Where each parasite of the configuration sits relative to the host cell, which

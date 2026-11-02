@@ -1,57 +1,43 @@
-'''Convert cell-type means extracted from the pig atlas into the app's Parquet format.'''
+'''Convert pooled pig-atlas counts into the app's cell-type nCPM Parquet.'''
 import argparse
-import os
 
 import pandas as pd
 
 import utils
 
 PIG_TAXID = '9823'
-REQUIRED_COLUMNS = {'Gene', 'Tissue', 'Cell type', 'nCPM'}
+COUNTS_PER_MILLION = 1_000_000
+# atlas tissue -> config['tissues'] label; other atlas tissues are kept only when their
+# lowercased name is already a label
+BRAIN_REGIONS = ['Brain', 'Cerebellum', 'FrontalLobe', 'ParietalLobe', 'OccipitalLobe',
+                 'TemporalLobe', 'Hypothalamus', 'OVoLT', 'AreaPostrema', 'SubfornicalOrgan']
+NEONATAL_ILEUM = [f'Neonatal Ileum_D{day}' for day in ['0', '01', '03', '07', '14', '21']]
 TISSUE_MAPPING = {
+    **{region: 'brain' for region in BRAIN_REGIONS},
+    **{sample: 'intestine' for sample in NEONATAL_ILEUM},
     'Intestine': 'intestine',
-    'Neonatal Ileum_D0': 'intestine',
-    'Neonatal Ileum_D01': 'intestine',
-    'Neonatal Ileum_D03': 'intestine',
-    'Neonatal Ileum_D07': 'intestine',
-    'Neonatal Ileum_D14': 'intestine',
-    'Neonatal Ileum_D21': 'intestine',
     'PBMC': 'blood',
+    'Retina': 'eye',
 }
 
 
 def map_expression(input_file, config_file):
-    '''Map pig-atlas genes and tissues to STRING IDs and OrthoHPI tissue names.'''
+    '''Pool the counts of each (tissue, cell type) across samples and scale to a million.'''
     data = pd.read_csv(input_file)
-    missing = REQUIRED_COLUMNS.difference(data.columns)
-    if missing:
-        raise ValueError(f'{input_file} is missing required columns: {sorted(missing)}')
-
-    aliases = utils.parse_string_aliases(
-        config_file=config_file,
-        sources=['Ensembl_gene', 'UniProt_GN_Name'],
-        taxid=PIG_TAXID,
-    )
     valid_tissues = {name.lower() for name in
                      utils.read_config(filepath=config_file, field='tissues').values()}
+    data['Tissue'] = data['Tissue'].map(lambda t: TISSUE_MAPPING.get(t, t.lower()))
+    data = data[data['Tissue'].isin(valid_tissues)]
 
-    data = data[list(REQUIRED_COLUMNS)].copy()
+    data = data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['Counts'].sum()
+    totals = data.groupby(['Tissue', 'Cell type'])['Counts'].transform('sum')
+    data['nCPM'] = data['Counts'] * COUNTS_PER_MILLION / totals
+
+    aliases = utils.parse_string_aliases(
+        config_file=config_file, sources=['Ensembl_gene', 'UniProt_GN_Name'], taxid=PIG_TAXID)
     data['Gene'] = data['Gene'].map(aliases)
-    data['Tissue'] = data['Tissue'].replace(TISSUE_MAPPING).str.lower()
-    data['nCPM'] = pd.to_numeric(data['nCPM'], errors='raise')
-    data = data[data['Gene'].notna() & data['Tissue'].isin(valid_tissues) & (data['nCPM'] > 0)]
-    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nCPM']
-            .mean())
-    return data
-
-
-def build(input_file, config_file, output_file):
-    '''Write mapped pig cell-type expression in the shared annotation schema.'''
-    data = map_expression(input_file=input_file, config_file=config_file)
-    os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
-    utils.save_to_parquet(data, output_file)
-    print(f'Wrote {len(data):,} pig cell-type expression rows to {output_file}')
-    return data
+    data = data[data['Gene'].notna() & (data['nCPM'] > 0)]
+    return data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].mean()
 
 
 if __name__ == '__main__':
@@ -62,4 +48,6 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='config.yml')
     parser.add_argument('--output', default='data/pig_atlas_cell_types.parquet')
     args = parser.parse_args()
-    build(input_file=args.input, config_file=args.config, output_file=args.output)
+    data = map_expression(input_file=args.input, config_file=args.config)
+    utils.save_to_parquet(data, args.output)
+    print(f'Wrote {len(data):,} pig cell-type expression rows to {args.output}')

@@ -33,23 +33,26 @@ provide. Build the pig contribution before rebuilding the pipeline artifact:
 
 ```
 Rscript scripts/extract_pig_atlas_expression.R data/pig_atlas_20221014.rds \
-    /tmp/pig_atlas_expression.csv
+    /tmp/pig_atlas_counts.csv
 .venv/bin/python -m pipeline.build_pig_atlas_cell_types \
-    --input /tmp/pig_atlas_expression.csv
+    --input /tmp/pig_atlas_counts.csv
 .venv/bin/python -m pipeline.main
 ```
 
-The R script reads Seurat's raw RNA counts, pools them over the cells of each
-atlas tissue/cell-type pair and scales each pool to a million, as HPA does for
-its single-cell nCPM, so the same `nCPM > 1` cutoff applies to both. The
-Python step maps the atlas gene symbols and Ensembl IDs to pig STRING IDs,
-normalizes atlas tissue names to the OrthoHPI vocabulary, and writes
-`data/pig_atlas_cell_types.parquet`. `pipeline.main` then appends the rows to
-the human HPA annotations before its left join with tissue-filtered host
-proteins.
+The R script sums Seurat's raw RNA counts over the cells of each atlas
+tissue/cell-type pair. The Python step maps atlas tissues to the OrthoHPI
+vocabulary, sums the counts of samples that share a tissue label and cell type,
+and scales each pool to a million, as HPA does for its single-cell nCPM, so the
+same `nCPM > 1` cutoff applies to both. It then maps the atlas gene symbols and
+Ensembl IDs to pig STRING IDs and writes `data/pig_atlas_cell_types.parquet`.
+`pipeline.main` appends the rows to the human HPA annotations before its left
+join with tissue-filtered host proteins.
 
-Only `Intestine`, each neonatal-ileum time point, and `PBMC` are normalized to
-the pipeline's `intestine` and `blood` tissue labels. The ileum time points
-remain separate during aggregation and are averaged only after they map to the
-same `(STRING protein, tissue, cell type)` annotation; they are not pooled at
-the cell level.
+The ten brain samples (`Brain`, `Cerebellum`, the four lobes, `Hypothalamus`,
+`OVoLT`, `AreaPostrema`, `SubfornicalOrgan`) map to `brain`, `Retina` to `eye`,
+`PBMC` to `blood`, and `Intestine` and the six neonatal-ileum time points to
+`intestine`; other tissues are kept when their lowercased name is already a
+label. Samples are pooled at the count level, as for mouse and for the atlas's
+own tissues that mix 10x and DNBelab cells, so a cell type's nCPM weights each
+sample by its counts. The adult `Intestine` sample shares no cell-type labels
+with the neonatal ileum, so the two are never pooled together.

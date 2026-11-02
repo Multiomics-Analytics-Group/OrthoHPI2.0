@@ -229,8 +229,10 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
                         'Cell type': cell_types,
                         'group': [g for g in palette if g in set(data['group'])]},
                     custom_data=['parasite'])
-    # two parasites of one group would read as a single bar without a line to part them
-    figure.update_traces(marker_line=dict(color='white', width=1),
+    # plotly 5 gives each group an offsetgroup of its own, which sets the groups side by
+    # side instead of stacking them; two parasites of one group would read as a single
+    # bar without a line to part them
+    figure.update_traces(offsetgroup=None, marker_line=dict(color='white', width=1),
                          hovertemplate='%{y}<br>%{customdata[0]}<br>predicted interactions: '
                                        '%{x}<extra></extra>')
     figure.update_layout(height=max(320, 26 * len(cell_types) + 160), plot_bgcolor='white',

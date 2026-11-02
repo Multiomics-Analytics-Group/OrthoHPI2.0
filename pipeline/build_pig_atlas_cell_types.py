@@ -37,7 +37,8 @@ def map_expression(input_file, config_file):
         config_file=config_file, sources=['Ensembl_gene', 'UniProt_GN_Name'], taxid=PIG_TAXID)
     data['Gene'] = data['Gene'].map(aliases)
     data = data[data['Gene'].notna() & (data['nCPM'] > 0)]
-    return data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].mean()
+    # several atlas genes can map to one protein; keep the highest, as for HPA
+    return data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].max()
 
 
 if __name__ == '__main__':

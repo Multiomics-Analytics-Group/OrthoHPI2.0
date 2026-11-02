@@ -90,7 +90,8 @@ def aggregate_expression(input_file, config_file, age):
     data = data.rename_axis(['Tissue', 'Cell type']).reset_index()
     data = data.melt(id_vars=['Tissue', 'Cell type'], var_name='Gene', value_name='nCPM')
     data = data[data['nCPM'] > 0]
-    return (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].mean()
+    # several atlas genes can map to one protein; keep the highest, as for HPA
+    return (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].max()
             [['Gene', 'Tissue', 'Cell type', 'nCPM']])
 
 

@@ -106,6 +106,25 @@ tissue and cell type, the highest nCPM is kept. Tissues HPA has no single-cell
 data for (`mouth`, `nose`, `spinal cord`, `vagina`, `macrophage`, ...) get no
 cell types.
 
+The pig and mouse atlases are preprocessed outside the pipeline into
+`data/pig_atlas_cell_types.parquet` and `data/mouse_atlas_cell_types.parquet`,
+which `pipeline.main` reads but never rebuilds. Both are put on HPA's scale:
+the raw counts of each tissue and cell type are pooled and scaled to a million,
+so the same `nCPM > 1` cutoff applies to all three sources, and when several
+atlas genes map to one protein the highest nCPM is kept.
+
+- **Pig** ([pig_atlas.md](pig_atlas.md)): the Pig Cell Atlas Seurat object.
+  `scripts/extract_pig_atlas_expression.R` sums the raw counts per atlas tissue
+  and cell type, and `pipeline/build_pig_atlas_cell_types.py` maps the atlas
+  tissues to `config['tissues']` labels, pools samples that share a label (the
+  ten brain regions → `brain`, `Retina` → `eye`, `PBMC` → `blood`, the adult
+  intestine and neonatal ileum → `intestine`) and scales each pool.
+- **Mouse** ([mouse_atlas.md](mouse_atlas.md)): Tabula Muris Senis, 3-month
+  mice, Cell Ontology cell types. `pipeline/build_mouse_atlas_cell_types.py`
+  uses the droplet data, with FACS data only for tissues the droplet data
+  lacks; the two technologies are never pooled. `Large_Intestine` is written
+  under both `intestine` and `colon`.
+
 The result is written to `data/tissues_cell_types.parquet`. It is used by the
 app only and does not filter anything.
 

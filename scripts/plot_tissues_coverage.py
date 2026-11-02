@@ -37,9 +37,9 @@ def atlas_tissue_proteins(config_file, data_dir, taxid, pool, ncpm_cutoff):
         data = cell_type_annotations.read_hpa(config_file=config_file)
         data = cell_type_annotations.map_hpa_data(config_file=config_file, hpa_data=data)
     elif str(taxid) == cell_type_annotations.MOUSE_TAXID:
-        data = cell_type_annotations.read_mouse_atlas(data_dir, pool)
+        data = cell_type_annotations.read_atlas(data_dir, 'mouse', pool)
     elif str(taxid) == cell_type_annotations.PIG_TAXID:
-        data = cell_type_annotations.read_pig_atlas(data_dir, pool)
+        data = cell_type_annotations.read_atlas(data_dir, 'pig', pool)
     else:
         return {}
     cutoff = ncpm_cutoff if taxid == venn.HUMAN else 0.0

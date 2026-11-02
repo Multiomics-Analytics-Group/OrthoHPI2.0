@@ -7,24 +7,27 @@ The default inputs are the 4.06 GB
 `tabula-muris-senis-droplet-official-raw-obj.h5ad` file and the 2.37 GB FACS
 file from the same record.
 
-Run the builder from the repository root:
+The H5ADs are not in the repository. Fetch them from the URLs under
+`urls.tabula_muris_senis_droplet_url` and `urls.tabula_muris_senis_facs_url` in
+`config.yml`, then run the builder from the repository root:
 
 ```
+mkdir -p data/downloads/tabula_muris_senis && cd data/downloads/tabula_muris_senis
+curl -L -C - -o tabula-muris-senis-droplet-official-raw-obj.h5ad \
+    https://ndownloader.figshare.com/files/23938934
+curl -L -C - -o tabula-muris-senis-facs-official-raw-obj.h5ad \
+    https://ndownloader.figshare.com/files/23939711
+cd -
 .venv/bin/python -m pipeline.build_mouse_atlas_cell_types
-.venv/bin/python -m pipeline.refresh_mouse_cell_type_annotations
+.venv/bin/python -m pipeline.main
 ```
 
-The builder downloads the H5AD when it is not already present, selects only
-`3m` mice, pools the raw counts of each `(tissue, Cell Ontology cell type)` and
-scales every pool to a million, as HPA does for its single-cell nCPM, so the
-same `nCPM > 1` cutoff applies to both. It
-maps genes to mouse STRING IDs and writes `data/mouse_atlas_cell_types.parquet`;
-the refresh command adds matching mouse rows to
-`data/tissues_cell_types.parquet`, the annotation artifact read by the app. It
-does not rerun the full prediction pipeline or download unrelated references.
-The atlas download is streamed to a temporary file and is only used after its
-HDF5 signature is validated, so an interrupted download will be discarded and
-retried safely.
+The builder selects only `3m` mice, pools the raw counts of each
+`(tissue, Cell Ontology cell type)` and scales every pool to a million, as HPA
+does for its single-cell nCPM, so the same `nCPM > 1` cutoff applies to both.
+It maps genes to mouse STRING IDs and writes
+`data/mouse_atlas_cell_types.parquet`; `pipeline.main` then appends the rows to
+the human HPA annotations in `data/tissues_cell_types.parquet`.
 
 The droplet and Smart-seq2/FACS datasets use different count technologies, so
 their values are never pooled. Droplet data is preferred for every tissue it

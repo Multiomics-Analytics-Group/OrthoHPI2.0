@@ -82,43 +82,18 @@ def parse_hpa(config_file, valid_proteins):
     return data
 
 
-def read_pig_atlas(data_dir, valid_proteins):
-    '''Load preprocessed pig cell-atlas expression, when it has been generated.'''
-    filename = f'{data_dir}/pig_atlas_cell_types.parquet'
+def read_atlas(data_dir, name, valid_proteins):
+    '''Load a preprocessed `<name>_atlas_cell_types.parquet`, when it has been generated.'''
     try:
-        data = utils.read_parquet_file(input_file=filename)
+        data = utils.read_parquet_file(input_file=f'{data_dir}/{name}_atlas_cell_types.parquet')
     except FileNotFoundError:
         return pd.DataFrame(columns=CELL_TYPE_COLUMNS)
-
-    missing = set(CELL_TYPE_COLUMNS).difference(data.columns)
-    if missing:
-        raise ValueError(f'{filename} is missing required columns: {sorted(missing)}')
-
-    data = data[CELL_TYPE_COLUMNS]
-    data = data[data['Gene'].astype(str).str.startswith(f'{PIG_TAXID}.')]
-    return filter_valid_proteins(data, valid_proteins)
-
-
-def read_mouse_atlas(data_dir, valid_proteins):
-    '''Load preprocessed Tabula Muris Senis expression, when it has been generated.'''
-    filename = f'{data_dir}/mouse_atlas_cell_types.parquet'
-    try:
-        data = utils.read_parquet_file(input_file=filename)
-    except FileNotFoundError:
-        return pd.DataFrame(columns=CELL_TYPE_COLUMNS)
-
-    missing = set(CELL_TYPE_COLUMNS).difference(data.columns)
-    if missing:
-        raise ValueError(f'{filename} is missing required columns: {sorted(missing)}')
-
-    data = data[CELL_TYPE_COLUMNS]
-    data = data[data['Gene'].astype(str).str.startswith(f'{MOUSE_TAXID}.')]
-    return filter_valid_proteins(data, valid_proteins)
+    return filter_valid_proteins(data[CELL_TYPE_COLUMNS], valid_proteins)
 
 
 def parse_cell_type_data(config_file, data_dir, valid_proteins):
     '''Return HPA and optional pig/mouse atlas cell-type annotations.'''
     human = parse_hpa(config_file=config_file, valid_proteins=valid_proteins)
-    pig = read_pig_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
-    mouse = read_mouse_atlas(data_dir=data_dir, valid_proteins=valid_proteins)
+    pig = read_atlas(data_dir=data_dir, name='pig', valid_proteins=valid_proteins)
+    mouse = read_atlas(data_dir=data_dir, name='mouse', valid_proteins=valid_proteins)
     return pd.concat([human, pig, mouse], ignore_index=True, sort=False)

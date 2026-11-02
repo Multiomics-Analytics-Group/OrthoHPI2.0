@@ -1,12 +1,10 @@
-'''Build mouse cell-type expression from the Tabula Muris Senis droplet H5AD.'''
+'''Build mouse cell-type expression from the Tabula Muris Senis raw H5ADs.'''
 import argparse
 import os
 
 import anndata
-import h5py
 import numpy as np
 import pandas as pd
-import requests
 from scipy import sparse
 
 import utils
@@ -15,194 +13,85 @@ MOUSE_TAXID = '10090'
 COUNTS_PER_MILLION = 1_000_000
 CELLS_PER_CHUNK = 4_096
 DEFAULT_AGE = '3m'
-DEFAULT_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
-                             'tabula-muris-senis-droplet-official-raw-obj.h5ad')
-DEFAULT_FACS_INPUT = os.path.join('data', 'downloads', 'tabula_muris_senis',
-                                  'tabula-muris-senis-facs-official-raw-obj.h5ad')
-HDF5_SIGNATURE = b'\x89HDF\r\n\x1a\n'
+DOWNLOAD_DIR = os.path.join('data', 'downloads', 'tabula_muris_senis')
+DEFAULT_INPUT = os.path.join(DOWNLOAD_DIR, 'tabula-muris-senis-droplet-official-raw-obj.h5ad')
+DEFAULT_FACS_INPUT = os.path.join(DOWNLOAD_DIR, 'tabula-muris-senis-facs-official-raw-obj.h5ad')
+# atlas tissue -> config['tissues'] labels. TISSUES records the large intestine under both
+# `intestine` and `colon`
 TISSUE_MAPPING = {
-    'Bladder': 'urinary bladder',
-    'Brain': 'brain',
-    'Brain_Myeloid': 'brain',
-    'Brain_Non-Myeloid': 'brain',
-    'Heart': 'heart',
-    'Heart_and_Aorta': 'heart',
-    'Kidney': 'kidney',
-    'Large_Intestine': 'intestine',
-    'Limb_Muscle': 'muscle',
-    'Liver': 'liver',
-    'Lung': 'lung',
-    'Marrow': 'bone marrow',
-    'Pancreas': 'pancreas',
-    'Skin': 'skin',
-    'Spleen': 'spleen',
+    'Bladder': ['urinary bladder'],
+    'Brain': ['brain'],
+    'Brain_Myeloid': ['brain'],
+    'Brain_Non-Myeloid': ['brain'],
+    'Heart': ['heart'],
+    'Heart_and_Aorta': ['heart'],
+    'Kidney': ['kidney'],
+    'Large_Intestine': ['intestine', 'colon'],
+    'Limb_Muscle': ['muscle'],
+    'Liver': ['liver'],
+    'Lung': ['lung'],
+    'Marrow': ['bone marrow'],
+    'Pancreas': ['pancreas'],
+    'Skin': ['skin'],
+    'Spleen': ['spleen'],
 }
 
-# TISSUES records the large intestine under both `colon` and `intestine`, and
-# `Large_Intestine` is the only atlas source for either
-SHARED_TISSUE_LABELS = {'intestine': ['colon']}
 
-
-def normalized_tissues(obs):
-    '''Map source tissue labels to the OrthoHPI vocabulary without inventing matches.'''
+def source_tissues(obs):
+    '''The atlas tissue of each cell, with Heart_and_Aorta split by its free annotation.'''
     source = obs['tissue'].astype(object).copy()
     if 'tissue_free_annotation' in obs:
-        # only this pooled source needs its free annotation to distinguish heart from aorta
         heart_or_aorta = source == 'Heart_and_Aorta'
         source.loc[heart_or_aorta] = (
             obs.loc[heart_or_aorta, 'tissue_free_annotation'].replace('', pd.NA)
             .fillna(source.loc[heart_or_aorta]).astype(object)
         )
-    return source.map(TISSUE_MAPPING)
-
-
-def add_shared_labels(data):
-    '''Write the rows of a tissue out under the other labels TISSUES also gives it.'''
-    extra = []
-    for tissue, labels in SHARED_TISSUE_LABELS.items():
-        sources = [source for source, mapped in TISSUE_MAPPING.items() if mapped == tissue]
-        # the labels are shared with one atlas tissue, so a second source has to be looked
-        # at
-        if len(sources) != 1:
-            raise ValueError(f'{tissue} is mapped from {sorted(sources)}, so it cannot be '
-                             f'labelled {labels} as well')
-        rows = data[data['Tissue'] == tissue]
-        extra.extend(rows.assign(Tissue=label) for label in labels)
-
-    return pd.concat([data, *extra], ignore_index=True) if extra else data
-
-
-def is_hdf5(filename):
-    '''Return whether filename starts with the HDF5 file signature.'''
-    try:
-        with open(filename, 'rb') as handle:
-            return handle.read(len(HDF5_SIGNATURE)) == HDF5_SIGNATURE
-    except FileNotFoundError:
-        return False
-
-
-def download_atlas(url, output_file):
-    '''Stream the large atlas download into a complete, validated H5AD file.'''
-    if is_hdf5(output_file):
-        return output_file
-
-    if os.path.exists(output_file):
-        print(f'Removing invalid atlas download: {output_file}')
-        os.remove(output_file)
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    temporary_file = f'{output_file}.part'
-    if os.path.exists(temporary_file):
-        os.remove(temporary_file)
-
-    print(f'Downloading Tabula Muris Senis atlas to {output_file}...')
-    complete = False
-    try:
-        with requests.get(url, stream=True, timeout=60) as response:
-            response.raise_for_status()
-            with open(temporary_file, 'wb') as handle:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        handle.write(chunk)
-        if not is_hdf5(temporary_file):
-            raise ValueError('Downloaded file is not a valid HDF5 file')
-        os.replace(temporary_file, output_file)
-        complete = True
-    finally:
-        if not complete and os.path.exists(temporary_file):
-            os.remove(temporary_file)
-    return output_file
-
-
-def read_csr_chunk(matrix, start, stop, n_genes):
-    '''Read consecutive rows from an H5AD CSR matrix into an in-memory CSR matrix.'''
-    offsets = matrix['indptr'][start:stop + 1]
-    data_start, data_stop = offsets[0], offsets[-1]
-    return sparse.csr_matrix(
-        (matrix['data'][data_start:data_stop], matrix['indices'][data_start:data_stop],
-         offsets - data_start),
-        shape=(stop - start, n_genes),
-    )
+    return source
 
 
 def aggregate_expression(input_file, config_file, age):
-    '''Aggregate the selected Tabula Muris Senis H5AD into the shared schema.'''
+    '''Pool the raw counts of each (tissue, cell type) and scale each pool to a million.'''
     atlas = anndata.read_h5ad(input_file, backed='r')
-    required = {'age', 'tissue', 'cell_ontology_class'}
-    missing = required.difference(atlas.obs.columns)
-    if missing:
-        raise ValueError(f'{input_file} is missing required obs columns: {sorted(missing)}')
-
-    obs_columns = list(required | {'tissue_free_annotation'})
-    obs_columns = [column for column in obs_columns if column in atlas.obs.columns]
-    obs = atlas.obs[obs_columns].copy()
-    obs = obs[obs['age'].astype(str) == age]
-    obs['Tissue'] = normalized_tissues(obs)
+    obs = atlas.obs
     valid_tissues = {name.lower() for name in
                      utils.read_config(filepath=config_file, field='tissues').values()}
-    obs = obs[obs['Tissue'].isin(valid_tissues) & obs['cell_ontology_class'].notna()]
+
+    # one row per (cell, label); a cell under two labels counts towards both
+    cells = pd.DataFrame({
+        'cell': np.arange(atlas.n_obs),
+        'Tissue': source_tissues(obs).map(TISSUE_MAPPING).to_numpy(),
+        'Cell type': obs['cell_ontology_class'].astype(object).to_numpy(),
+    })
+    cells = cells[(obs['age'].astype(str) == age).to_numpy()
+                  & cells['Tissue'].notna().to_numpy() & cells['Cell type'].notna().to_numpy()]
+    cells = cells.explode('Tissue')
+    cells = cells[cells['Tissue'].isin(valid_tissues)]
+
+    group_codes, groups = pd.factorize(pd.MultiIndex.from_frame(cells[['Tissue', 'Cell type']]))
+    membership = sparse.csc_matrix(
+        (np.ones(len(cells)), (group_codes, cells['cell'].to_numpy())),
+        shape=(len(groups), atlas.n_obs))
+    sums = np.zeros((len(groups), atlas.n_vars))
+    for start in range(0, atlas.n_obs, CELLS_PER_CHUNK):
+        stop = min(start + CELLS_PER_CHUNK, atlas.n_obs)
+        block = membership[:, start:stop]
+        if block.nnz:
+            sums += (block @ atlas.X[start:stop].astype(np.float64)).toarray()
 
     aliases = utils.parse_string_aliases(
-        config_file=config_file,
-        sources=['Ensembl_gene', 'UniProt_GN_Name'],
-        taxid=MOUSE_TAXID,
-    )
-    genes = pd.Series(atlas.var_names.astype(str), index=np.arange(atlas.n_vars)).map(aliases)
+        config_file=config_file, sources=['Ensembl_gene', 'UniProt_GN_Name'], taxid=MOUSE_TAXID)
+    genes = pd.Series(atlas.var_names.astype(str)).map(aliases)
     mapped = genes.notna().to_numpy()
-
-    group_codes, groups = pd.factorize(pd.MultiIndex.from_frame(
-        obs[['Tissue', 'cell_ontology_class']]))
-    cell_groups = np.full(atlas.n_obs, -1, dtype=np.int32)
-    cell_groups[atlas.obs.index.get_indexer(obs.index)] = group_codes
-    # HPA's single-cell CPM: the raw counts of a cell type pooled, then scaled to a
-    # million
-    sums = [np.zeros(atlas.n_vars) for _ in groups]
-    n_obs = atlas.n_obs
-    n_vars = atlas.n_vars
     atlas.file.close()
 
-    with h5py.File(input_file, 'r') as h5ad:
-        matrix = h5ad['X']
-        if matrix.attrs.get('h5sparse_format') != 'csr':
-            raise ValueError(f'{input_file} must store X as a CSR sparse matrix')
-        for start in range(0, n_obs, CELLS_PER_CHUNK):
-            stop = min(start + CELLS_PER_CHUNK, n_obs)
-            chunk_groups = cell_groups[start:stop]
-            if not (chunk_groups >= 0).any():
-                continue
-            chunk = read_csr_chunk(matrix, start, stop, n_vars).astype(np.float64)
-            for group_code in np.unique(chunk_groups[chunk_groups >= 0]):
-                sums[group_code] += np.asarray(
-                    chunk[chunk_groups == group_code].sum(axis=0)).ravel()
-
-    rows = []
-    for group_code, (tissue, cell_type) in enumerate(groups):
-        total = sums[group_code].sum()
-        if total == 0:
-            continue
-        cpm = (sums[group_code] * COUNTS_PER_MILLION / total)[mapped]
-        frame = pd.DataFrame({
-            'Gene': genes[mapped].to_numpy(),
-            'Tissue': tissue,
-            'Cell type': str(cell_type),
-            'nCPM': cpm,
-        })
-        rows.append(frame[frame['nCPM'] > 0])
-
-    if not rows:
-        return pd.DataFrame(columns=['Gene', 'Tissue', 'Cell type', 'nCPM'])
-    data = pd.concat(rows, ignore_index=True)
-    data = (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False, observed=True)['nCPM']
-            .mean())
-    return add_shared_labels(data)
-
-
-def build(input_file, config_file, output_file, age):
-    '''Write Tabula Muris Senis cell-type expression as a shared Parquet artifact.'''
-    data = aggregate_expression(input_file=input_file, config_file=config_file, age=age)
-    os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
-    utils.save_to_parquet(data, output_file)
-    print(f'Wrote {len(data):,} mouse cell-type expression rows to {output_file}')
-    return data
+    totals = sums.sum(axis=1, keepdims=True)
+    cpm = np.divide(sums * COUNTS_PER_MILLION, totals, out=np.zeros_like(sums), where=totals > 0)
+    data = pd.DataFrame(cpm[:, mapped], index=groups, columns=genes[mapped].to_numpy())
+    data = data.rename_axis(['Tissue', 'Cell type']).reset_index()
+    data = data.melt(id_vars=['Tissue', 'Cell type'], var_name='Gene', value_name='nCPM')
+    data = data[data['nCPM'] > 0]
+    return (data.groupby(['Gene', 'Tissue', 'Cell type'], as_index=False)['nCPM'].mean()
+            [['Gene', 'Tissue', 'Cell type', 'nCPM']])
 
 
 def combine_atlases(droplet, facs):
@@ -216,8 +105,8 @@ def combine_atlases(droplet, facs):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--input', default=None, help='official raw droplet H5AD')
-    parser.add_argument('--facs-input', default=None, help='official raw FACS H5AD')
+    parser.add_argument('--input', default=DEFAULT_INPUT, help='official raw droplet H5AD')
+    parser.add_argument('--facs-input', default=DEFAULT_FACS_INPUT, help='official raw FACS H5AD')
     parser.add_argument('--droplet-only', action='store_true',
                         help='do not use FACS as a fallback for missing tissues')
     parser.add_argument('--config', default='config.yml')
@@ -225,18 +114,11 @@ if __name__ == '__main__':
     parser.add_argument('--age', default=DEFAULT_AGE, help='Tabula Muris Senis age (default: 3m)')
     args = parser.parse_args()
 
-    input_file = args.input or DEFAULT_INPUT
-    urls = utils.read_config(args.config, field='urls')
-    if args.input is None:
-        input_file = download_atlas(urls['tabula_muris_senis_droplet_url'], DEFAULT_INPUT)
-    droplet = aggregate_expression(input_file=input_file, config_file=args.config, age=args.age)
+    droplet = aggregate_expression(input_file=args.input, config_file=args.config, age=args.age)
     facs = None
     if not args.droplet_only:
-        facs_file = args.facs_input or DEFAULT_FACS_INPUT
-        if args.facs_input is None:
-            facs_file = download_atlas(urls['tabula_muris_senis_facs_url'], DEFAULT_FACS_INPUT)
-        facs = aggregate_expression(input_file=facs_file, config_file=args.config, age=args.age)
+        facs = aggregate_expression(input_file=args.facs_input, config_file=args.config,
+                                    age=args.age)
     data = combine_atlases(droplet, facs)
-    os.makedirs(os.path.dirname(args.output) or '.', exist_ok=True)
     utils.save_to_parquet(data, args.output)
     print(f'Wrote {len(data):,} mouse cell-type expression rows to {args.output}')

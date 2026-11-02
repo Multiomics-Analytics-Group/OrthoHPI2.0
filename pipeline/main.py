@@ -123,8 +123,9 @@ def get_tissue_cell_type_annotation(tissues, proteins, config_file, output_file)
 PER_SPECIES_URLS = {"string_protein_url", "string_ppi_url", "string_go_url", "string_alias_url", "string_sequences_url"}
 
 # the EggNOG 6 source file is ~10 GB; pipeline/prepare_eggnog_members.py filters it to level
-# 2759
-PREPROCESSED_URLS = {"eggNOG_members_url"}
+# 2759. The cell atlases are only read by their own build_*_atlas_cell_types scripts
+PREPROCESSED_URLS = {"eggNOG_members_url", "pig_atlas_url",
+                     "tabula_muris_senis_droplet_url", "tabula_muris_senis_facs_url"}
 
 
 def setup(config_file, output_file_path):

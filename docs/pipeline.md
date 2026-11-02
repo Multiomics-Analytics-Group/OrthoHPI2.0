@@ -45,7 +45,7 @@ whose IDs are in that file.
 
 ### 4. Host tissues (`filters.apply_tissue_filter`, `get_tissues`)
 
-For each host, downloads the JensenLab TISSUES scores from its `tissues_url`
+For each host, downloads the TISSUES scores from its `tissues_url`
 and keeps a host protein if its score is at least `tissue_cutoff` in one of the
 BTO tissues listed for the host's parasites. The cutoff is 1.0 for every host.
 

@@ -684,10 +684,9 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     size = min(15, max(5, room / columns))
     sizeref = max(1, dots['degree'].max()) / size ** 2
 
-    labelled = set()
     for column, (host, host_df, names) in enumerate(hosts, start=1):
         host_dots = dots[dots['host'] == host]
-        # one trace per group, so the groups are the legend
+        # one trace per group, so the strip's legend entries toggle it
         for group in [g for g in list(palette) + [UNKNOWN_GROUP]
                       if g in set(host_dots['group'])]:
             rows = host_dots[host_dots['group'] == group]
@@ -696,7 +695,7 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
                            marker=dict(color=palette.get(group, UNKNOWN_COLOR),
                                        size=rows['degree'], sizemode='area',
                                        sizeref=sizeref, sizemin=4, line=dict(width=0)),
-                           legendgroup=group, showlegend=group not in labelled,
+                           legendgroup=group, showlegend=False,
                            customdata=rows[['og', 'parasites', 'pairs', 'degree',
                                             'host proteins', 'group2']].to_numpy(),
                            hovertemplate='%{customdata[0]} (%{customdata[5]})<br>'
@@ -706,17 +705,15 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
                                          'host proteins reached: %{customdata[4]}'
                                          '<extra></extra>'),
                 row=1, col=column)
-            labelled.add(group)
         # the range is set rather than left to the markers, which plotly pads at either
         # end, so the columns stand over the segments of the strip below them
         figure.update_xaxes(categoryorder='array', categoryarray=names,
                             range=[-0.5, len(names) - 0.5], row=1, col=column)
 
     figure = style_host_columns(figure, 'host orthologous group')
-    # the dots are the legend of the groups already, so the group strip adds no entry;
-    # the two share a legendgroup, and toggle together
-    add_band(figure, hosts, 'group', palette, set(palette) | {UNKNOWN_GROUP},
-             row=2, legend='legend2')
+    # the group strip is the legend of the groups, its squares one size where the dots
+    # are sized by degree; the two share a legendgroup, and toggle together
+    add_band(figure, hosts, 'group', palette, set(), row=2, legend='legend')
     add_band(figure, hosts, 'niche', web_utils.NICHE_COLORS, set(), row=3,
              legend='legend3', unknown=web_utils.NICHE_COLORS[web_utils.UNKNOWN_NICHE])
     stack_bands(figure)

@@ -11,6 +11,8 @@ from Bio import SeqIO
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
+from scipy.cluster import hierarchy
+from scipy.spatial.distance import pdist
 from statsmodels.stats.multitest import multipletests
 
 def read_fasta(fasta_file_path):
@@ -51,6 +53,73 @@ def prepare_go_background(go_df):
             'annotated': set(pairs['#string_protein_id']),
             'names': dict(go_df[['term', 'description']].drop_duplicates().values),
             'sizes': pairs.groupby('term').size()}
+
+
+def go_term_members(go_dfs):
+    '''The proteins annotated to each term, over these GO backgrounds together.'''
+    members = {}
+    for go_df in go_dfs:
+        for term, ids in go_df.groupby('term')['#string_protein_id']:
+            members.setdefault(term, set()).update(ids)
+
+    return members
+
+
+def representing_term(term, picked, members, redundant=0.5):
+    '''
+    The term of `picked` that stands in for this one, or None: itself, or the first with
+    at least `redundant` of their proteins (Jaccard, `members` from go_term_members) in
+    common.
+    '''
+    def jaccard(a, b):
+        return len(members[a] & members[b]) / len(members[a] | members[b])
+
+    return next((p for p in picked if p == term or jaccard(p, term) >= redundant), None)
+
+
+def first_distinct_terms(terms, members, limit, redundant=0.5):
+    '''The first `limit` of these ordered terms that no earlier one stands in for.'''
+    picked = []
+    for term in terms:
+        if len(picked) >= limit:
+            break
+        if representing_term(term, picked, members, redundant) is None:
+            picked.append(term)
+
+    return picked
+
+
+def pick_distinct_terms(enriched, by, members, per_group, redundant=0.5):
+    '''
+    Each group's most significant terms, until `per_group` are represented, a term left
+    out when one already picked stands in for it (representing_term).
+    '''
+    picked = []
+    for _, terms in enriched.sort_values([by, 'fdr_bh', 'go_id']).groupby(by):
+        covered = set()
+        for term in terms['go_id']:
+            match = representing_term(term, picked, members, redundant)
+            if match is None:
+                picked.append(term)
+                match = term
+            covered.add(match)
+            if len(covered) >= per_group:
+                break
+
+    return picked
+
+
+def cluster_terms(enriched, terms, by, columns):
+    '''These terms ordered by clustering them on the `columns` of `by` they are enriched for.'''
+    presence = (enriched[enriched['go_id'].isin(terms)].assign(hit=1)
+                .pivot_table(index='go_id', columns=by, values='hit', fill_value=0)
+                .reindex(index=terms, columns=columns, fill_value=0))
+    if len(terms) < 3:
+        return terms
+    distances = pdist(presence.to_numpy().astype(bool), metric='jaccard')
+    tree = hierarchy.optimal_leaf_ordering(hierarchy.linkage(distances, 'average'), distances)
+
+    return [terms[i] for i in hierarchy.leaves_list(tree)]
 
 
 def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,

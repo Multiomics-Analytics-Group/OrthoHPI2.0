@@ -674,6 +674,13 @@ GO_STRONGEST_PER_PARASITE = 2
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
 # characters of a process name on the axis; the hover has the whole of it
 GO_LABEL_WIDTH = 48
+# dots stop growing at this many proteins, so the largest terms do not shrink the rest
+GO_DOT_MAX_PROTEINS = 60
+
+
+def go_dot_area(n_proteins):
+    '''The area of a dot, in proportion, as the paper's figure draws it.'''
+    return 4 + 1.1 * n_proteins
 
 
 @st.cache_resource(show_spinner=False, max_entries=8)
@@ -709,20 +716,34 @@ def get_parasite_enrichments(df_pred, data_dir, host_taxids, niches):
     return pd.concat(enrichments, ignore_index=True)
 
 
-def select_go_rows(enriched, rows):
+@st.cache_resource(show_spinner=False, max_entries=8)
+def get_go_members(data_dir, host_taxids, niches):
+    '''The host proteins of each process over these niches' backgrounds; only ever read.'''
+    return utils.go_term_members([get_go_background(data_dir, host_taxids, niche)[0]
+                                  for niche in niches])
+
+
+def select_go_rows(enriched, rows, data_dir, host_taxids, niches):
     '''
-    The processes the dot matrix shows, most widely enriched first: the ones enriched for
-    the most parasites, or the union of each parasite's most significant ones.
+    The distinct processes the dot matrix shows: the union of each parasite's most
+    significant ones, picked and clustered as in the paper's figure, or the ones enriched
+    for the most parasites, most widely enriched first.
     '''
+    shown = enriched['parasite'].unique()
+    members = get_go_members(data_dir, host_taxids,
+                             tuple(sorted({niches.get(p) for p in shown}, key=str)))
+    if rows == GO_ROWS_STRONGEST:
+        taxids = {p['label']: taxid for taxid, p in config['parasites'].items()}
+        strongest = utils.pick_distinct_terms(enriched.assign(taxid=enriched['parasite'].map(taxids)),
+                                              'taxid', members, GO_STRONGEST_PER_PARASITE)
+
+        return utils.cluster_terms(enriched, strongest, 'parasite', list(shown))
+
     reach = enriched.groupby('go_id').agg(parasites=('parasite', 'nunique'),
                                           best=('fdr_bh', 'min'))
-    if rows == GO_ROWS_STRONGEST:
-        strongest = (enriched.sort_values(['fdr_bh', 'go_id'])
-                     .groupby('parasite').head(GO_STRONGEST_PER_PARASITE)['go_id'])
-        reach = reach.loc[strongest.unique()]
     order = reach.sort_values(['parasites', 'best'], ascending=[False, True], kind='stable')
 
-    return list(order.index if rows == GO_ROWS_STRONGEST else order.index[:GO_SHARED_ROWS])
+    return utils.first_distinct_terms(order.index, members, GO_SHARED_ROWS)
 
 
 def short_parasite(label):
@@ -752,11 +773,15 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
     dots['parasite_name'] = dots['parasite']
 
     size = dot_size(columns, labels, width)
-    sizeref = max(1, dots['n_proteins'].max()) / size ** 2
+    # the area of a dot grows with the proteins annotated, up to GO_DOT_MAX_PROTEINS
+    areas = go_dot_area(dots['n_proteins'].clip(upper=GO_DOT_MAX_PROTEINS))
+    sizeref = go_dot_area(GO_DOT_MAX_PROTEINS) / size ** 2
     figure = go.Figure(go.Scatter(
         x=dots['x'], y=dots['y'], mode='markers', showlegend=False,
-        marker=dict(size=dots['n_proteins'], sizemode='area', sizeref=sizeref, sizemin=3,
+        marker=dict(size=areas, sizemode='area', sizeref=sizeref, sizemin=3,
                     color=dots['log_odds'], colorscale=GO_SEQUENTIAL, line=dict(width=0),
+                    # the scale starts at an odds ratio of 1 and ends on a whole number
+                    cmin=0, cmax=max(1, np.ceil(dots['log_odds'].max())),
                     colorbar=dict(title='log<sub>2</sub> odds<br>ratio', thickness=12,
                                   outlinewidth=0, len=0.4, y=1, yanchor='top')),
         customdata=dots[['go_term', 'parasite_name', 'n_proteins', 'odds_text',
@@ -787,7 +812,7 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
                         tickangle=-60, automargin=True, ticks='',
                         tickfont=dict(size=font),
                         showgrid=True, gridcolor='#f0f0f0', zeroline=False)
-    # reversed, so the most widely enriched process is the top row
+    # reversed, so the first process is the top row
     figure.update_yaxes(range=[len(terms) - 0.5, -3], tickmode='array',
                         tickvals=list(range(len(terms))), ticktext=labels, ticks='',
                         automargin=True, showgrid=True, gridcolor='#f0f0f0', zeroline=False)
@@ -1011,8 +1036,7 @@ if selected_host != web_utils.NO_HOST:
                                                         config.get('parasite_groups', {})),
                                 width='stretch')
             else:
-                st.info(f'No single cell data available for {tissue} in {selected_host}, so '
-                        'the interactions there cannot be split by cell type.')
+                st.info(f'No single cell data available for {tissue} in {selected_host}.')
 
     st.subheader(
         "Enriched biological processes",
@@ -1033,9 +1057,12 @@ if selected_host != web_utils.NO_HOST:
         go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
                            horizontal=True,
                            help=f'The {GO_STRONGEST_PER_PARASITE} most significant processes '
-                                'of each parasite, which brings out what sets one apart, or '
-                                f'the {GO_SHARED_ROWS} enriched for the most parasites, which '
-                                'favours broad processes many share.')
+                                f'of each parasite, or the {GO_SHARED_ROWS} enriched for the '
+                                'most parasites, which favours broad processes many share. '
+                                'Either way, a process that shares at least half its host '
+                                'proteins with one already shown is left out. The first are '
+                                'clustered by the parasites they are enriched for, the second '
+                                'run from the most widely enriched down.')
     with fdr_column:
         go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
                           horizontal=True, key='compare_go_fdr',
@@ -1052,7 +1079,8 @@ if selected_host != web_utils.NO_HOST:
     else:
         go_parasites = parasite_order(counted['taxid1_label'].unique(), parasite_groups,
                                       group_order, niches, order_by)
-        st.plotly_chart(generate_go_dots(go_enriched, select_go_rows(go_enriched, go_rows),
+        go_terms = select_go_rows(go_enriched, go_rows, data_dir, tuple(selected_taxids), niches)
+        st.plotly_chart(generate_go_dots(go_enriched, go_terms,
                                          go_parasites, parasite_groups, niches,
                                          config.get('parasite_groups', {}),
                                          2 * column + web_utils.COLUMN_GAP),

@@ -21,8 +21,6 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 import numpy as np
 import pandas as pd
-from scipy.cluster import hierarchy
-from scipy.spatial.distance import pdist
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [ROOT, os.path.join(ROOT, 'app')]
@@ -34,8 +32,6 @@ from scripts import figure_style
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 # the colour ramp of the app's enrichment figures
 GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a']
-# two processes are one row when this share of their host proteins is common to both
-REDUNDANT_JACCARD = 0.5
 # process names wrap onto lines of at most this many characters
 LABEL_CHARS = 44
 # the left margin, a figure fraction, that the wrapped names take
@@ -58,48 +54,6 @@ def enrich(config, data_dir, predictions, host, min_score):
                          .assign(taxid=int(taxid), niche=niche))
 
     return pd.concat(tests, ignore_index=True), backgrounds
-
-
-def pick_rows(enriched, backgrounds, per_parasite):
-    '''
-    Each parasite's most significant processes, a process standing in for any later one
-    whose host proteins in the background it largely shares.
-    '''
-    members = {}
-    for go_df in backgrounds.values():
-        for term, ids in go_df.groupby('term')['#string_protein_id']:
-            members.setdefault(term, set()).update(ids)
-
-    def jaccard(a, b):
-        return len(members[a] & members[b]) / len(members[a] | members[b])
-
-    rows = []
-    for _, terms in enriched.sort_values(['taxid', 'fdr_bh', 'go_id']).groupby('taxid'):
-        covered = set()
-        for term in terms['go_id']:
-            match = next((r for r in rows if r == term
-                          or jaccard(r, term) >= REDUNDANT_JACCARD), None)
-            if match is None:
-                rows.append(term)
-                match = term
-            covered.add(match)
-            if len(covered) >= per_parasite:
-                break
-
-    return rows
-
-
-def order_rows(enriched, rows, columns):
-    '''The rows clustered by the parasites they are enriched for.'''
-    presence = (enriched[enriched['go_id'].isin(rows)].assign(hit=1)
-                .pivot_table(index='go_id', columns='taxid', values='hit', fill_value=0)
-                .reindex(index=rows, columns=columns, fill_value=0))
-    if len(rows) < 3:
-        return rows
-    distances = pdist(presence.to_numpy().astype(bool), metric='jaccard')
-    tree = hierarchy.optimal_leaf_ordering(hierarchy.linkage(distances, 'average'), distances)
-
-    return [rows[i] for i in hierarchy.leaves_list(tree)]
 
 
 def draw(config, enriched, rows, columns, output_stem):
@@ -204,7 +158,11 @@ if __name__ == '__main__':
                      key=lambda t: (list(NICHE_COLORS).index(parasites[t]['niche']),
                                     list(config['parasite_groups']).index(parasites[t]['group']),
                                     parasites[t]['label']))
-    rows = order_rows(enriched, pick_rows(enriched, backgrounds, args.per_parasite), columns)
+    members = utils.go_term_members(backgrounds.values())
+    rows = utils.cluster_terms(enriched,
+                               utils.pick_distinct_terms(enriched, 'taxid', members,
+                                                         args.per_parasite),
+                               'taxid', columns)
 
     table = enriched.assign(parasite=enriched['taxid'].map(lambda t: parasites[t]['label']),
                             in_figure=enriched['go_id'].isin(rows))

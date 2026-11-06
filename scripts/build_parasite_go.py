@@ -36,6 +36,10 @@ GO_SEQUENTIAL = ['#bcdcec', '#7fc0dd', '#3f9fca', '#2b8cbe', '#12587d', '#08324a
 LABEL_CHARS = 44
 # the left margin, a figure fraction, that the wrapped names take
 LEFT = 0.37
+# how a process that cannot be tested in a niche is drawn
+UNTESTED = {'facecolor': '#f0f0f0', 'edgecolor': '#c4c4c4', 'hatch': '////', 'linewidth': 0}
+# the rows a block's title takes above the block
+BLOCK_GAP = 1.4
 
 
 def enrich(config, data_dir, predictions, host, min_score):
@@ -56,7 +60,8 @@ def enrich(config, data_dir, predictions, host, min_score):
     return pd.concat(tests, ignore_index=True), backgrounds
 
 
-def draw(config, enriched, rows, columns, output_stem):
+def draw(config, enriched, rows, columns, backgrounds, output_stem, blocks=()):
+    '''The dot matrix; `blocks` is [(title, rows in it)], in the order of `rows`, to title groups of rows.'''
     figure_style.apply()
     parasites = config['parasites']
     taxon_colors = config['parasite_groups']
@@ -71,6 +76,11 @@ def draw(config, enriched, rows, columns, output_stem):
 
     labels = [textwrap.fill(names[r], LABEL_CHARS) for r in rows]
     ys = figure_style.row_positions(labels, figure_style.DENSE_ROW)
+    titles, start = [], 0
+    for title, n in blocks:
+        ys[start:] = [y + BLOCK_GAP for y in ys[start:]]
+        titles.append((title, ys[start] - 1))
+        start += n
     y_of = dict(zip(rows, ys))
     n_cols = len(columns)
     fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.DENSE_ROW * (ys[-1] + 1) + 1.98))
@@ -81,6 +91,14 @@ def draw(config, enriched, rows, columns, output_stem):
     points = ax.scatter([col_of[t] for t in dots['taxid']], [y_of[r] for r in dots['go_id']],
                         s=size(dots['n_proteins'].clip(upper=60)), c=dots['log_odds'],
                         cmap=cmap, norm=norm, linewidths=0, zorder=3)
+    # a process outside the term size limits in a niche's pool cannot be enriched there
+    for niche, background in backgrounds.items():
+        testable = set(utils.testable_terms(utils.prepare_go_background(background)))
+        own = [col_of[t] for t in columns if parasites[t]['niche'] == niche]
+        for row in rows:
+            if row not in testable:
+                ax.add_patch(Rectangle((min(own) - 0.5, y_of[row] - 0.5), max(own) - min(own) + 1, 1,
+                                       **UNTESTED))
     ax.set_xlim(-0.6, n_cols - 0.4)
     ax.set_ylim(ys[-1] + 0.6, -0.6)
     ax.set_yticks(ys)
@@ -94,6 +112,8 @@ def draw(config, enriched, rows, columns, output_stem):
     for side in ax.spines.values():
         side.set_visible(False)
     ax.xaxis.tick_top()
+    for title, y in titles:
+        ax.text(-0.9, y, title, ha='right', va='center', fontweight='bold', clip_on=False)
 
     # two strips over the columns: niche, then taxonomic group
     strip = 0.55
@@ -115,6 +135,10 @@ def draw(config, enriched, rows, columns, output_stem):
     legends = figure_style.stack_legends(fig, left=0.01, blocks=[
         ('Taxonomic group', groups), ('Niche', niches)])
     height = fig.get_figheight()
+    fig.legend(handles=[Patch(label='Term size outside the limits', **UNTESTED)],
+               title='Not testable in this niche', loc='lower left', frameon=False, handlelength=0.9,
+               alignment='left', bbox_to_anchor=(0.33, 0.02 / height),
+               title_fontsize=figure_style.FONT)
     fig.legend(handles=sizes, title='Annotated host proteins', loc='lower left',
                ncol=len(sizes), frameon=False, handlelength=0.9, columnspacing=1.2,
                alignment='left', bbox_to_anchor=(0.705, 0.02 / height),
@@ -170,5 +194,5 @@ if __name__ == '__main__':
            'p_value', 'fdr_bh', 'in_figure', 'nodes']].to_csv(args.table, index=False)
     print(f"Wrote {args.table}: {len(table)} enriched processes over {len(columns)} "
           f"parasites, {table['go_id'].nunique()} distinct")
-    draw(config, enriched, rows, columns, args.figure)
+    draw(config, enriched, rows, columns, backgrounds, args.figure)
     print(f"Wrote {args.figure}.svg and .png: {len(rows)} processes")

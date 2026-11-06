@@ -500,63 +500,91 @@ convergence the parasite-group count is there to flag.
   \label{fig:shared_ogs}
 \end{figure}
 
-The host processes reached also split by niche rather than by taxonomy
-(Figure~\ref{fig:parasite_go}). Each parasite is tested against the host
+The host processes reached show both what the niches share and where they
+differ (Figure~\ref{fig:parasite_go}). Each parasite is tested against the host
 proteins it could have reached, those of its own niche that pass the filters,
-so the split is not simply a consequence of the localization filter. Every
-parasite except \textit{T.~hominis}, which has a single prediction, reaches at
-least one over-represented process.
+so a difference between the niches is not simply a consequence of the
+localization filter. Every parasite except \textit{T.~hominis}, which has a
+single prediction, reaches at least one over-represented process. We select
+processes as we selected orthologous groups, by how many parasites of each niche
+are enriched for them. As species of one genus are not independent, we also give
+the genera, counting a genus when at least half of its species are enriched;
+every enriched process is listed in Supplementary Table~S6.
 
-Among the 16 intracellular parasites, autophagy is shared: 15 are enriched for
-autophagosome organisation and all 16 for autophagosome maturation. Autophagy
-is a cell-autonomous defence against intracellular pathogens, and
-intracellular parasites both evade and exploit it. The vacuole of
-\textit{Plasmodium} liver stages is decorated with host LC3, which the
-parasite tolerates and may use to acquire nutrients~\todo{cite Prado et al.\
-2015; Real et al.\ 2018}; host autophagy promotes \textit{T.~cruzi}
-invasion~\todo{cite Romano et al.\ 2009}; and \textit{T.~gondii} keeps its
-vacuole out of reach of autophagic killing~\todo{cite}. The spliceosome (RNA
-splicing, U2-type prespliceosome assembly and mRNA transport) is reached by
-the five \textit{Trichinella} species, the three \textit{Plasmodium} species,
-\textit{L.~braziliensis} and \textit{T.~cruzi}. For \textit{Trichinella} this
-is biologically conceivable: the larva reprogrammes the infected muscle cell,
-and its secreted products accumulate in the host nuclei~\todo{cite Despommier}.
-For \textit{Plasmodium} in erythrocytes, which have no nucleus, it is not, and
-we return to these links in the case study below.
+Seven processes are enriched in at least half of the parasites of each niche.
+Three are membrane traffic: vesicle fusion (11 intracellular and 14 extracellular
+parasites, from 6 and 13 genera), lysosomal transport (14 and 14, from 5 and 14
+genera) and Golgi vesicle transport (11 and 18, from 6 and 14 genera).
+Intracellular parasites have to manage the host endolysosomal system around their
+vacuole, and extracellular helminths release extracellular vesicles that host
+cells take up~\todo{cite Buck et al.\ 2014}, so both kinds of parasite engage host
+membrane traffic, by different routes. Two are adhesion, cell spreading on a
+substrate (11 and 23) and basement membrane organisation (9 and 20), which fit the
+laminins and integrins of Figure~\ref{fig:shared_ogs}. The process annotated as
+involved in interaction with the host (9 and 25) holds many of the entry receptors
+discussed above, among them the integrins, dystroglycan, neuropilin-1 and NPC1. The last, regulation of protein localization to membrane (9 and 17), rests on
+only 3 intracellular genera.
 
-The 26 extracellular parasites mostly reach the cell surface and its
-signalling. All 26 are enriched for cell--substrate adhesion, 24 for
-integrin-mediated signalling, 25 for lipid metabolism, and most for cell
-motility and neuron development. Many of these worms penetrate and migrate
-through host tissue: schistosome cercariae enter through the skin, hookworm
-and \textit{Strongyloides} larvae travel through skin and lungs to the
-intestine, and filarial worms settle in lymphatics or subcutaneous tissue.
-Adhesion and integrin signalling are also how host immune cells are recruited
-to and around the parasite. The enrichment for neuron development largely
-comes from the axon-guidance receptors above, and so reflects shared metazoan
-signalling families as much as neural tropism. A few processes are shared
-across the niches, most clearly vesicle fusion and lysosomal transport (14
-parasites of each niche). Intracellular parasites have to manage the host
-endolysosomal system around their vacuole, and extracellular helminths release
-extracellular vesicles that host cells take up~\todo{cite Buck et al.\ 2014},
-so both kinds of parasite engage host membrane traffic, by different routes.
+The 26 extracellular parasites otherwise mostly reach the cell surface and lipid
+metabolism. All 26 are enriched for cell--substrate adhesion (21 of 21 genera), 24
+for integrin-mediated signalling (19) and 23 for cholesterol metabolism (18). Many
+of these worms penetrate and migrate through host tissue: schistosome cercariae
+enter through the skin, hookworm and \textit{Strongyloides} larvae travel through
+skin and lungs to the intestine, and filarial worms settle in lymphatics or
+subcutaneous tissue. Adhesion and integrin signalling are also how host immune
+cells are recruited to and around the parasite. Several of the lipid rows overlap:
+protein-containing complex remodelling, foam cell differentiation and arachidonic
+acid secretion all hold the same secreted phospholipases A2, the first two also
+apolipoprotein B, so they should not be read as separate processes, nor the foam
+cell term as a finding about macrophages. Neuron development and cell motility are
+also enriched in most extracellular parasites (21 and 20; Supplementary Table~S6),
+but are too broad to be drawn. The enrichment for neuron development largely comes
+from the axon-guidance receptors above, and the proteins most parasites reach in
+neuromuscular junction development (20) are APP, laminin $\beta$2, ERBB2 and agrin,
+so both reflect shared metazoan signalling and adhesion families as much as neural
+tropism.
 
-% paper/figures/parasite_go.pdf is generated: `make figures`.
+Among the intracellular parasites, autophagy is the most shared: all 16 with an
+enriched process are enriched for autophagosome maturation (7 of 8 genera) and 15
+for autophagosome assembly (6). The proteins most parasites reach in response to
+starvation and mitochondrion organisation are the same LC3 and GABARAP proteins and
+ULK1, so these rows partly repeat this signal. Autophagy is a cell-autonomous defence against
+intracellular pathogens, and intracellular parasites both evade and exploit it. The
+vacuole of \textit{Plasmodium} liver stages is decorated with host LC3, which the
+parasite tolerates and may use to acquire nutrients~\todo{cite Prado et al.\ 2015;
+Real et al.\ 2018}; host autophagy promotes \textit{T.~cruzi}
+invasion~\todo{cite Romano et al.\ 2009}; and \textit{T.~gondii} keeps its vacuole
+out of reach of autophagic killing~\todo{cite}. Seven of the 12 rows of this block
+cannot be tested in extracellular parasites, whose pool holds too few of their
+proteins, so their absence there is not evidence of a difference. The spliceosome is
+less widely shared than the species count suggests. RNA splicing and U2-type
+prespliceosome assembly (Supplementary Table~S6) are enriched in the five
+\textit{Trichinella} species, the three \textit{Plasmodium} species,
+\textit{L.~braziliensis} and \textit{T.~cruzi}, which is 10 parasites but only 3
+genera, and the proteins most parasites reach in ribonucleoprotein complex assembly
+(13 parasites) are largely splicing proteins. For \textit{Trichinella} this is biologically conceivable: the larva
+reprogrammes the infected muscle cell, and its secreted products accumulate in the
+host nuclei~\todo{cite Despommier}. For \textit{Plasmodium} in erythrocytes, which
+have no nucleus, it is not, and we return to these links in the case study below.
+
+% paper/figures/parasite_go_common.png is generated: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go}
-  \caption{Gene Ontology biological processes over-represented among the human
-  proteins each parasite is predicted to interact with. Each parasite is tested
-  on its own with a one-sided Fisher's exact test against the human proteins
-  that passed the pipeline's filters, and corrected with Benjamini--Hochberg. A
-  dot marks a process at FDR $\le 0.05$, sized by the number of the parasite's
-  host interactors annotated to the process and shaded by the odds ratio. Rows
-  are chosen per parasite: its processes are taken from the most significant
-  down until two are represented, where a process counts as represented by a
-  row already chosen if the two share at least half of their annotated human
-  proteins, and is then not drawn separately. Hatching marks a process that
-  cannot be enriched in that niche, because the pool it is tested against holds
-  too few (at most 10) or too many (at least 500) proteins annotated to it.}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go_common}
+  \caption{Gene Ontology biological processes most often over-represented among the
+  human proteins each parasite is predicted to interact with. Each parasite is
+  tested on its own with a one-sided Fisher's exact test against the human proteins
+  that passed the pipeline's filters, and corrected with Benjamini--Hochberg. A dot
+  marks a process at FDR $\le 0.05$, sized by the number of the parasite's host
+  interactors annotated to the process and shaded by the odds ratio. Rows are
+  processes annotated to at most 200 human proteins, in three blocks: those enriched
+  in at least half of the parasites of each niche (at least 9 of 17 intracellular
+  and 13 of 26 extracellular), then the 12 most common others of each niche. Within
+  a block, rows are ordered by the number of parasites and ties by the median odds
+  ratio. A process is left out if it shares at least half of its annotated human
+  proteins with a row already chosen. Hatching marks a process that cannot be
+  enriched in that niche, because the pool it is tested against holds too few (at
+  most 10) or too many (at least 500) proteins annotated to it.}
   \label{fig:parasite_go}
 \end{figure}
 
@@ -882,6 +910,11 @@ identifier and gene name, and the confidence score.
 Supplementary Figure~\ref{fig:shared_ogs_niche}: per niche, every human
 orthologous group reached by at least two of its parasites, with the genera that
 reach it with and without its largest parasite group.
+
+\textbf{Supplementary Table S6} (\texttt{parasite\_go\_enriched.csv}). Every Gene
+Ontology biological process over-represented at FDR $\le 0.05$ among the human
+interactors of each parasite (Figure~\ref{fig:parasite_go}), with the odds ratio,
+the $p$-value and FDR, and the human proteins annotated to the process.
 
 \subsection*{Supplementary figures}
 \textbf{Supplementary Figure~\ref{fig:funnel}}. The share of proteins each

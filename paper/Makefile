@@ -29,7 +29,7 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
-	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go.png \
+	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go_common.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/web_interface.png
@@ -85,6 +85,11 @@ figures/parasite_go.svg figures/parasite_go.png tables/parasite_go.csv: ../confi
 figures/parasite_go_shared.svg figures/parasite_go_shared.png tables/parasite_go_shared.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_go.py ../scripts/build_parasite_go_shared.py
 	cd .. && $(PYTHON) scripts/build_parasite_go_shared.py
 
+# The same processes selected as the shared groups are: those most parasites of each niche
+# are enriched for, then the commonest of each niche.
+figures/parasite_go_common.svg figures/parasite_go_common.png tables/parasite_go_common.csv tables/parasite_go_enriched.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_go.py ../scripts/build_parasite_go_common.py
+	cd .. && $(PYTHON) scripts/build_parasite_go_common.py
+
 # How alike the interactomes of the parasites of human are, pair by pair.
 figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
 	cd .. && $(PYTHON) scripts/build_parasite_similarity.py
@@ -135,7 +140,7 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
+figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go_common.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

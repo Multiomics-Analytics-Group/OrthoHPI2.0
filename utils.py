@@ -122,6 +122,14 @@ def cluster_terms(enriched, terms, by, columns):
     return [terms[i] for i in hierarchy.leaves_list(tree)]
 
 
+def testable_terms(background, min_term=10, max_term=500, max_share=0.25):
+    '''The terms of a background within the size limits calculate_enrichment tests.'''
+    sizes = background['sizes']
+    max_term = min(max_term, round(max_share * len(background['annotated'])))
+
+    return sizes[(sizes > min_term) & (sizes < max_term)].index
+
+
 def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
                          min_in_set=2, background=None):
     '''
@@ -137,11 +145,9 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0
     total_nodes = len(tested)
     total_prots = len(annotated)
 
-    max_term = min(max_term, round(max_share * total_prots))
-
     hits = pairs[pairs['#string_protein_id'].isin(tested)]
     in_set = hits.groupby('term').size()
-    terms = sizes[(sizes > min_term) & (sizes < max_term)].index.intersection(
+    terms = testable_terms(background, min_term, max_term, max_share).intersection(
         in_set[in_set >= min_in_set].index).sort_values()
 
     columns = ['go_id', 'go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes']

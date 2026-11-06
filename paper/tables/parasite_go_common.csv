@@ -1,0 +1,32 @@
+block,go_id,go_term,intracellular,extracellular,intracellular_genera,extracellular_genera,size,median_odds
+Shared by the niches,GO:0034446,Substrate adhesion-dependent cell spreading,11,23,5,18,57,6.880381592386597
+Shared by the niches,GO:0051701,Biological process involved in interaction with host,9,25,4,20,136,4.962979356060606
+Shared by the niches,GO:0071711,Basement membrane organization,9,20,4,16,27,11.200566973777462
+Shared by the niches,GO:0048193,Golgi vesicle transport,11,18,6,14,188,6.910344827586207
+Shared by the niches,GO:0007041,Lysosomal transport,14,14,5,14,103,5.98265363300676
+Shared by the niches,GO:1905475,Regulation of protein localization to membrane,9,17,3,14,142,4.884588253120587
+Shared by the niches,GO:0006906,Vesicle fusion,11,14,6,13,67,12.356965174129353
+Mainly extracellular,GO:0031589,Cell-substrate adhesion,4,26,2,21,183,5.064971317561382
+Mainly extracellular,GO:0007229,Integrin-mediated signaling pathway,5,24,2,19,93,6.52743628185907
+Mainly extracellular,GO:0034367,Protein-containing complex remodeling,2,23,0,19,28,12.0
+Mainly extracellular,GO:0008203,Cholesterol metabolic process,5,23,3,18,66,9.010015117157973
+Mainly extracellular,GO:0033627,Cell adhesion mediated by integrin,8,23,3,20,37,8.23852735286492
+Mainly extracellular,GO:0006066,Alcohol metabolic process,2,22,1,18,188,5.287234357032426
+Mainly extracellular,GO:0010744,Positive regulation of macrophage derived foam cell differentiation,0,21,0,17,17,15.240265906932574
+Mainly extracellular,GO:0046470,Phosphatidylcholine metabolic process,0,20,0,16,41,9.884978111547934
+Mainly extracellular,GO:0007528,Neuromuscular junction development,3,20,2,16,38,8.692909960852544
+Mainly extracellular,GO:0046434,Organophosphate catabolic process,1,19,0,16,111,8.568905296950241
+Mainly extracellular,GO:0046475,Glycerophospholipid catabolic process,2,18,0,15,19,16.474407865335913
+Mainly extracellular,GO:0050482,Arachidonic acid secretion,1,18,0,15,18,12.048484848484849
+Mainly intracellular,GO:0097352,Autophagosome maturation,16,0,7,0,32,13.433491979932782
+Mainly intracellular,GO:0032984,Protein-containing complex disassembly,16,0,7,0,109,4.521165472409715
+Mainly intracellular,GO:0000045,Autophagosome assembly,15,0,6,0,49,8.14361001317523
+Mainly intracellular,GO:0016236,Macroautophagy,15,5,6,5,136,8.139356086401557
+Mainly intracellular,GO:0000422,Autophagy of mitochondrion,15,0,6,0,40,7.948785123542405
+Mainly intracellular,GO:0007033,Vacuole organization,15,1,6,1,120,5.467920270273005
+Mainly intracellular,GO:0042594,Response to starvation,15,0,6,0,178,3.090000290886525
+Mainly intracellular,GO:0016197,Endosomal transport,14,5,5,5,175,3.469612316757689
+Mainly intracellular,GO:0022618,Ribonucleoprotein complex assembly,13,0,5,0,183,6.029202911414877
+Mainly intracellular,GO:0007032,Endosome organization,13,0,5,0,67,5.385909090909091
+Mainly intracellular,GO:0007005,Mitochondrion organization,13,0,6,0,168,2.64952682858608
+Mainly intracellular,GO:0006406,mRNA export from nucleus,12,0,4,0,61,5.913063351563144

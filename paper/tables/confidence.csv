@@ -44,12 +44,16 @@ human,Trichomonas vaginalis,Metamonada,extracellular,859,0.354,0.359,0.450,0.593
 human,Entamoeba histolytica,Amoebozoa,extracellular,565,0.356,0.400,0.450,0.584,0.947
 rat,Cryptosporidium muris,Apicomplexa,intracellular,155,0.355,0.360,0.433,0.496,0.912
 rat,Hymenolepis diminuta,Cestoda,extracellular,74,0.359,0.409,0.441,0.505,0.928
+rat,Plasmodium berghei,Apicomplexa,intracellular,2052,0.351,0.361,0.450,0.561,0.949
+rat,Plasmodium yoelii,Apicomplexa,intracellular,1996,0.350,0.386,0.450,0.649,0.949
 rat,Angiostrongylus cantonensis,Nematoda,extracellular,554,0.357,0.374,0.441,0.550,0.941
 rat,Angiostrongylus costaricensis,Nematoda,extracellular,208,0.357,0.374,0.441,0.450,0.930
 rat,Nippostrongylus brasiliensis,Nematoda,extracellular,901,0.356,0.400,0.449,0.595,0.949
 mouse,Cryptosporidium muris,Apicomplexa,intracellular,293,0.355,0.380,0.441,0.492,0.946
 mouse,Leishmania braziliensis,Kinetoplastida,intracellular,895,0.354,0.359,0.433,0.593,0.947
 mouse,Hymenolepis diminuta,Cestoda,extracellular,172,0.357,0.441,0.450,0.595,0.943
+mouse,Plasmodium berghei,Apicomplexa,intracellular,2386,0.351,0.367,0.450,0.561,0.949
+mouse,Plasmodium yoelii,Apicomplexa,intracellular,2497,0.350,0.391,0.450,0.631,0.949
 mouse,Angiostrongylus cantonensis,Nematoda,extracellular,615,0.356,0.374,0.441,0.505,0.941
 mouse,Angiostrongylus costaricensis,Nematoda,extracellular,520,0.357,0.374,0.449,0.550,0.941
 mouse,Nippostrongylus brasiliensis,Nematoda,extracellular,1443,0.356,0.389,0.448,0.595,0.949

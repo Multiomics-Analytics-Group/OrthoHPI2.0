@@ -3,14 +3,14 @@ host,Extracellular,human,16508,1283,0.078,74,73
 host,Cell membrane,human,16508,3205,0.194,407,373
 host,Cytoplasm,human,16342,7079,0.433,630,663
 host,Nucleus,human,16342,5015,0.307,672,582
-host,Extracellular,rat,9895,567,0.057,50,44
-host,Cell membrane,rat,9895,1741,0.176,297,231
-host,Cytoplasm,rat,4456,2156,0.484,190,218
-host,Nucleus,rat,4456,1406,0.316,225,205
-host,Extracellular,mouse,14439,1042,0.072,64,65
-host,Cell membrane,mouse,14439,2737,0.190,394,309
-host,Cytoplasm,mouse,13191,5777,0.438,527,546
-host,Nucleus,mouse,13191,4139,0.314,553,503
+host,Extracellular,rat,11139,760,0.068,59,57
+host,Cell membrane,rat,11139,1985,0.178,322,247
+host,Cytoplasm,rat,10596,4782,0.451,428,470
+host,Nucleus,rat,10596,3190,0.301,474,414
+host,Extracellular,mouse,14791,1141,0.077,64,65
+host,Cell membrane,mouse,14791,2805,0.190,399,315
+host,Cytoplasm,mouse,14668,6266,0.427,562,582
+host,Nucleus,mouse,14668,4379,0.299,594,525
 host,Extracellular,pig,10482,666,0.064,52,53
 host,Cell membrane,pig,10482,1884,0.180,290,231
 host,Cytoplasm,pig,10482,4718,0.450,441,480
@@ -24,12 +24,16 @@ parasite,Extracellular,Cryptosporidium muris,3930,175,0.045,39,36
 parasite,Cell membrane,Cryptosporidium muris,3930,130,0.033,40,41
 parasite,Extracellular,Cryptosporidium parvum,3805,222,0.058,31,34
 parasite,Cell membrane,Cryptosporidium parvum,3805,88,0.023,46,29
+parasite,Extracellular,Plasmodium berghei,4927,240,0.049,61,47
+parasite,Cell membrane,Plasmodium berghei,4927,663,0.135,199,168
 parasite,Extracellular,Plasmodium falciparum,5376,202,0.038,61,34
 parasite,Cell membrane,Plasmodium falciparum,5376,806,0.150,237,193
 parasite,Extracellular,Plasmodium knowlesi,5100,229,0.045,75,42
 parasite,Cell membrane,Plasmodium knowlesi,5100,675,0.132,186,172
 parasite,Extracellular,Plasmodium vivax,5389,316,0.059,69,56
 parasite,Cell membrane,Plasmodium vivax,5389,817,0.152,213,173
+parasite,Extracellular,Plasmodium yoelii,7722,825,0.107,347,262
+parasite,Cell membrane,Plasmodium yoelii,7722,1404,0.182,233,202
 parasite,Extracellular,Toxoplasma gondii,8404,527,0.063,131,84
 parasite,Cell membrane,Toxoplasma gondii,8404,258,0.031,116,85
 parasite,Extracellular,Leishmania braziliensis,8084,87,0.011,36,20

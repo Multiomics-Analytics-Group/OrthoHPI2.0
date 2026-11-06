@@ -43,11 +43,15 @@ human,184922,Giardia lamblia,Metamonada,extracellular,19699,11598,2767,2132,56,7
 human,5722,Trichomonas vaginalis,Metamonada,extracellular,19699,11970,2786,2186,104,50190,4443,791,145,859
 human,5759,Entamoeba histolytica,Amoebozoa,extracellular,19699,15324,3973,3067,132,7959,899,348,48,565
 rat,441375,Cryptosporidium muris,Apicomplexa,intracellular,22237,4456,3453,3010,125,3930,303,92,15,155
+rat,5823,Plasmodium berghei,Apicomplexa,intracellular,22237,10294,8392,7255,974,4927,863,385,82,2052
+rat,73239,Plasmodium yoelii,Apicomplexa,intracellular,22237,8585,6874,6008,915,7722,2014,427,90,1996
 rat,6313,Angiostrongylus cantonensis,Nematoda,extracellular,22237,9408,2091,1676,158,14486,1547,899,99,554
 rat,334426,Angiostrongylus costaricensis,Nematoda,extracellular,22237,4456,808,623,55,13350,1392,806,83,208
 rat,27835,Nippostrongylus brasiliensis,Nematoda,extracellular,22237,8287,1617,1279,165,22636,3269,1733,191,901
 rat,6216,Hymenolepis diminuta,Cestoda,extracellular,22237,4456,808,623,33,11264,545,250,21,74
 mouse,441375,Cryptosporidium muris,Apicomplexa,intracellular,21840,9842,7869,6754,237,3930,303,92,21,293
+mouse,5823,Plasmodium berghei,Apicomplexa,intracellular,21840,13669,11242,9560,1143,4927,863,385,90,2386
+mouse,73239,Plasmodium yoelii,Apicomplexa,intracellular,21840,12212,9926,8488,1169,7722,2014,427,97,2497
 mouse,5660,Leishmania braziliensis,Kinetoplastida,intracellular,21840,12246,10061,8582,344,8084,366,214,39,895
 mouse,6313,Angiostrongylus cantonensis,Nematoda,extracellular,21840,12089,2926,2295,191,14486,1547,899,104,615
 mouse,334426,Angiostrongylus costaricensis,Nematoda,extracellular,21840,11188,2345,1778,148,13350,1392,806,107,520

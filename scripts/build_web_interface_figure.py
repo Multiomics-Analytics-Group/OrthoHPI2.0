@@ -29,7 +29,7 @@ COLUMNS = [['controls', 'network'], ['alphafold', 'enrichment']]
 TITLES = {
     'controls': 'Query',
     'network': 'Network',
-    'alphafold': 'AlphaFold models of a link',
+    'alphafold': "AlphaFold models of a link's proteins",
     'enrichment': 'Enriched GO processes',
 }
 # inches between the columns, between panels down a column, and for the title above each

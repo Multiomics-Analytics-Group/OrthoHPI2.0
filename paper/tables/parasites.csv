@@ -1,47 +1,49 @@
-Species,Group,U/M,I/E,Hosts,Tissues
-Trichinella britovi,Nematoda,M,I,human,"intestine, muscle, brain, heart, lung"
-Trichinella nativa,Nematoda,M,I,human,"intestine, muscle, brain, heart, lung"
-Trichinella nelsoni,Nematoda,M,I,human,"intestine, muscle, brain, heart, lung"
-Trichinella pseudospiralis,Nematoda,M,I,"human, pig","intestine, muscle, brain, heart, lung"
-Trichinella spiralis,Nematoda,M,I,"human, pig","intestine, brain, heart, muscle, lung"
-Cryptosporidium muris,Apicomplexa,U,I,"human, rat, mouse","stomach, intestine"
-Cryptosporidium parvum,Apicomplexa,U,I,human,"small intestine, intestine"
-Plasmodium falciparum,Apicomplexa,U,I,human,"skin, liver, blood, brain, spleen"
-Plasmodium knowlesi,Apicomplexa,U,I,human,"skin, liver, blood"
-Plasmodium vivax,Apicomplexa,U,I,human,"skin, liver, blood"
-Toxoplasma gondii,Apicomplexa,U,I,human,"blood, brain, eye, heart, muscle, placenta, lymph node"
-Leishmania braziliensis,Kinetoplastida,U,I,"human, mouse","skin, nose, mouth, macrophage, blood"
-Leishmania infantum,Kinetoplastida,U,I,human,"liver, spleen, bone marrow, lymph node, skin, blood, macrophage"
-Leishmania major,Kinetoplastida,U,I,human,"skin, blood, macrophage"
-Trypanosoma cruzi,Kinetoplastida,U,I,human,"skin, heart, colon, intestine, muscle, blood, eye"
-Trachipleistophora hominis,Microsporidia,U,I,human,"muscle, eye"
-Vittaforma corneae,Microsporidia,U,I,human,eye
-Ancylostoma ceylanicum,Nematoda,M,E,human,"skin, lung, small intestine, intestine"
-Angiostrongylus cantonensis,Nematoda,M,E,"rat, mouse","lung, brain"
-Angiostrongylus costaricensis,Nematoda,M,E,"rat, mouse","mesenteric artery, intestine, blood"
-Brugia malayi,Nematoda,M,E,human,"lymph vessel, lymph node, blood"
-Brugia timori,Nematoda,M,E,human,"lymph vessel, lymph node, blood"
-Dracunculus medinensis,Nematoda,M,E,human,"small intestine, intestine, skin"
-Enterobius vermicularis,Nematoda,M,E,human,"colon, intestine, skin"
-Loa loa,Nematoda,M,E,human,"skin, blood, eye"
-Necator americanus,Nematoda,M,E,human,"skin, lung, small intestine, intestine"
-Nippostrongylus brasiliensis,Nematoda,M,E,"rat, mouse","skin, blood, lung, small intestine, intestine"
-Onchocerca volvulus,Nematoda,M,E,human,"skin, eye"
-Strongyloides stercoralis,Nematoda,M,E,human,"skin, lung, small intestine, intestine"
-Toxocara canis,Nematoda,M,E,human,"liver, heart, lung, brain, muscle, eye"
-Trichuris trichiura,Nematoda,M,E,human,"colon, intestine"
-Wuchereria bancrofti,Nematoda,M,E,human,"blood, lymph node, lymph vessel"
-Clonorchis sinensis,Trematoda,M,E,human,"liver, bile duct"
-Opisthorchis felineus,Trematoda,M,E,human,"liver, bile duct, small intestine, intestine"
-Opisthorchis viverrini,Trematoda,M,E,human,"liver, bile duct"
-Schistosoma haematobium,Trematoda,M,E,human,"skin, urinary bladder, rectum, intestine, liver, blood, lung"
-Schistosoma japonicum,Trematoda,M,E,human,"skin, liver, small intestine, intestine, lung, blood"
-Schistosoma mansoni,Trematoda,M,E,human,"skin, liver, intestine, spleen, lung, blood"
-Echinococcus granulosus,Cestoda,M,E,human,"liver, lung"
-Echinococcus multilocularis,Cestoda,M,E,human,"liver, lung"
-Hymenolepis diminuta,Cestoda,M,E,"human, rat, mouse","small intestine, intestine"
-Taenia asiatica,Cestoda,M,E,human,"small intestine, intestine"
-Trypanosoma brucei,Kinetoplastida,U,E,human,"skin, blood, brain, lymph node, spinal cord"
-Giardia lamblia,Metamonada,U,E,human,"small intestine, intestine"
-Trichomonas vaginalis,Metamonada,U,E,human,"vagina, urethra, uterine cervix, prostate, urinary tract"
-Entamoeba histolytica,Amoebozoa,U,E,human,"colon, intestine, liver, brain, lung"
+Species,Group,U/M,I/E,Tissues,Hosts,PPIs
+Trichinella britovi,Nematoda,M,I,"intestine, muscle, brain, heart, lung",human,3050
+Trichinella nativa,Nematoda,M,I,"intestine, muscle, brain, heart, lung",human,2364
+Trichinella nelsoni,Nematoda,M,I,"intestine, muscle, brain, heart, lung",human,1542
+Trichinella pseudospiralis,Nematoda,M,I,"intestine, muscle, brain, heart, lung",human; pig,1592; 1138
+Trichinella spiralis,Nematoda,M,I,"intestine, brain, heart, muscle, lung",human; pig,1643; 1209
+Cryptosporidium muris,Apicomplexa,U,I,"stomach, intestine",human; rat; mouse,325; 155; 293
+Cryptosporidium parvum,Apicomplexa,U,I,"small intestine, intestine",human,195
+Plasmodium berghei,Apicomplexa,U,I,"skin, liver, blood, brain, spleen",rat; mouse,2052; 2386
+Plasmodium falciparum,Apicomplexa,U,I,"skin, liver, blood, brain, spleen",human,2794
+Plasmodium knowlesi,Apicomplexa,U,I,"skin, liver, blood",human,1917
+Plasmodium vivax,Apicomplexa,U,I,"skin, liver, blood",human,2500
+Plasmodium yoelii,Apicomplexa,U,I,"skin, liver, blood, spleen",rat; mouse,1996; 2497
+Toxoplasma gondii,Apicomplexa,U,I,"blood, brain, eye, heart, muscle, placenta, lymph node",human,444
+Leishmania braziliensis,Kinetoplastida,U,I,"skin, nose, mouth, macrophage, blood",human; mouse,769; 895
+Leishmania infantum,Kinetoplastida,U,I,"liver, spleen, bone marrow, lymph node, skin, blood, macrophage",human,376
+Leishmania major,Kinetoplastida,U,I,"skin, blood, macrophage",human,334
+Trypanosoma cruzi,Kinetoplastida,U,I,"skin, heart, colon, intestine, muscle, blood, eye",human,3509
+Trachipleistophora hominis,Microsporidia,U,I,"muscle, eye",human,1
+Vittaforma corneae,Microsporidia,U,I,eye,human,32
+Ancylostoma ceylanicum,Nematoda,M,E,"skin, lung, small intestine, intestine",human,1143
+Angiostrongylus cantonensis,Nematoda,M,E,"lung, brain",rat; mouse,554; 615
+Angiostrongylus costaricensis,Nematoda,M,E,"mesenteric artery, intestine, blood",rat; mouse,208; 520
+Brugia malayi,Nematoda,M,E,"lymph vessel, lymph node, blood",human,129
+Brugia timori,Nematoda,M,E,"lymph vessel, lymph node, blood",human,398
+Dracunculus medinensis,Nematoda,M,E,"small intestine, intestine, skin",human,628
+Enterobius vermicularis,Nematoda,M,E,"colon, intestine, skin",human,684
+Loa loa,Nematoda,M,E,"skin, blood, eye",human,349
+Necator americanus,Nematoda,M,E,"skin, lung, small intestine, intestine",human,1597
+Nippostrongylus brasiliensis,Nematoda,M,E,"skin, blood, lung, small intestine, intestine",rat; mouse,901; 1443
+Onchocerca volvulus,Nematoda,M,E,"skin, eye",human,266
+Strongyloides stercoralis,Nematoda,M,E,"skin, lung, small intestine, intestine",human,423
+Toxocara canis,Nematoda,M,E,"liver, heart, lung, brain, muscle, eye",human,1010
+Trichuris trichiura,Nematoda,M,E,"colon, intestine",human,312
+Wuchereria bancrofti,Nematoda,M,E,"blood, lymph node, lymph vessel",human,240
+Clonorchis sinensis,Trematoda,M,E,"liver, bile duct",human,301
+Opisthorchis felineus,Trematoda,M,E,"liver, bile duct, small intestine, intestine",human,620
+Opisthorchis viverrini,Trematoda,M,E,"liver, bile duct",human,489
+Schistosoma haematobium,Trematoda,M,E,"skin, urinary bladder, rectum, intestine, liver, blood, lung",human,384
+Schistosoma japonicum,Trematoda,M,E,"skin, liver, small intestine, intestine, lung, blood",human,506
+Schistosoma mansoni,Trematoda,M,E,"skin, liver, intestine, spleen, lung, blood",human,1075
+Echinococcus granulosus,Cestoda,M,E,"liver, lung",human,205
+Echinococcus multilocularis,Cestoda,M,E,"liver, lung",human,175
+Hymenolepis diminuta,Cestoda,M,E,"small intestine, intestine",human; rat; mouse,235; 74; 172
+Taenia asiatica,Cestoda,M,E,"small intestine, intestine",human,210
+Trypanosoma brucei,Kinetoplastida,U,E,"skin, blood, brain, lymph node, spinal cord",human,60
+Giardia lamblia,Metamonada,U,E,"small intestine, intestine",human,265
+Trichomonas vaginalis,Metamonada,U,E,"vagina, urethra, uterine cervix, prostate, urinary tract",human,859
+Entamoeba histolytica,Amoebozoa,U,E,"colon, intestine, liver, brain, lung",human,565

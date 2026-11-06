@@ -1,10 +1,14 @@
 '''
 Write the parasite table of the paper from config.yml: every parasite with its
-organisation (U/M), niche (I/E), hosts and lifecycle tissues. Rows are ordered by
+organisation (U/M), niche (I/E), hosts, predicted interactions and lifecycle
+tissues. Rows are ordered by
 niche, intracellular first, then by the taxonomic group order of config.yml. Three renderings of the same rows go to
 paper/tables/: parasites.tex is \input by paper.tex, parasites.csv opens in
 Google Sheets, and parasites.html pastes into Google Docs as a table when
 opened in a browser and copied.
+
+A parasite with several hosts gets one line per host in the Hosts and PPIs
+columns, so that each count sits beside the host it belongs to.
 '''
 import argparse
 import html
@@ -18,15 +22,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 
 # The niche shows as a swatch in the tex and html, so only the csv spells it out.
-COLUMNS = ['Species', 'U/M', 'Hosts', 'Tissues']
-TEXT_COLUMNS = COLUMNS[1:]
-CSV_COLUMNS = ['Species', 'Group', 'U/M', 'I/E', 'Hosts', 'Tissues']
+COLUMNS = ['Species', 'U/M', 'Tissues', 'Hosts', 'PPIs']
+CSV_COLUMNS = ['Species', 'Group', 'U/M', 'I/E', 'Tissues', 'Hosts', 'PPIs']
+# The predictions, counted per host-parasite pair for the PPIs column.
+PREDICTIONS = os.path.join('data', 'predictions.parquet')
 # The niche colours of the figures, which mark each parasite with a group strip
 # and a niche strip; the table marks each species the same way.
 NICHE_COLORS = {'intracellular': '#3d3d3d', 'extracellular': '#c7c7c7'}
 
 
-def build_rows(config_file):
+def count_predictions(predictions_file):
+    '''The number of predicted interactions of every (parasite, host) taxid pair.'''
+    predictions = pd.read_parquet(predictions_file, columns=['taxid1', 'taxid2'])
+    counts = predictions.groupby(['taxid1', 'taxid2']).size()
+    return {(int(parasite), int(host)): int(n) for (parasite, host), n in counts.items()}
+
+
+def build_rows(config_file, predictions_file):
+    counts = count_predictions(predictions_file)
     parasites = utils.read_config(filepath=config_file, field='parasites')
     hosts = utils.read_config(filepath=config_file, field='hosts')
     tissues = utils.read_config(filepath=config_file, field='tissues')
@@ -50,19 +63,32 @@ def build_rows(config_file):
             'Niche': parasite['niche'],
             'U/M': 'M' if parasite.get('multicellular') else 'U',
             'I/E': parasite['niche'][0].upper(),
-            'Hosts': ', '.join(host_names[host] for host in parasite['hosts']),
+            # One entry per host, so that each count lines up with its host.
+            'HostList': [host_names[host] for host in parasite['hosts']],
+            'PPIList': [counts.get((int(taxid), int(host)), 0)
+                        for host in parasite['hosts']],
             'Tissues': ', '.join(tissues[bto] for bto in parasite['tissues']),
         })
-    return pd.DataFrame(rows, columns=['Niche'] + CSV_COLUMNS)
+    return pd.DataFrame(rows, columns=['Niche', 'Species', 'Group', 'U/M', 'I/E',
+                                       'HostList', 'PPIList', 'Tissues'])
 
 
 def color_name(label):
     return 'parasite' + ''.join(c for c in label if c.isalnum())
 
 
+def stack(values, separator):
+    '''The per-host entries of one cell, one above the other.'''
+    return separator.join(str(value) for value in values)
+
+
 def write_tex(table, path, group_colors):
     def cell(value):
         return str(value).replace('&', r'\&').replace('%', r'\%')
+
+    def number(value):
+        # The digit grouping the rest of the paper uses.
+        return f'{value:,}'.replace(',', '{,}')
 
     colors = {**group_colors, **NICHE_COLORS}
     legend = ', '.join(rf'\swatch{{{color_name(label)}}}\,{label}' for label in group_colors)
@@ -85,10 +111,13 @@ def write_tex(table, path, group_colors):
         # The widths add up to the 180 mm text block, so the table sits
         # upright on the page, and each is a little wider than its widest
         # entry, so that no cell wraps.
-        r'\begin{longtable}{@{}L{4.4cm}c L{2.6cm}L{9.05cm}@{}}',
+        r'\begin{longtable}{@{}L{4.4cm}c L{7.85cm}L{1.9cm}L{1.3cm}@{}}',
         r'\caption{Parasites included in OrthoHPI 2.0, ordered by niche'
-        r' in the host, then taxonomic group. U/M: unicellular or multicellular; tissues are those the parasite'
-        r' occupies in the host during its lifecycle. The squares before each'
+        r' in the host, then taxonomic group. U/M: unicellular or multicellular;'
+        r' tissues are those the parasite occupies in the host during its'
+        r' lifecycle; PPIs: predicted protein--protein interactions of that'
+        r' host--parasite pair over the whole confidence range, with one line'
+        r' per host for the parasites predicted against several. The squares before each'
         r' species mark its taxonomic group and its niche'
         rf' (\swatch{{{color_name("intracellular")}}}\,intracellular,'
         rf' \swatch{{{color_name("extracellular")}}}\,extracellular), as in the'
@@ -112,8 +141,11 @@ def write_tex(table, path, group_colors):
     for _, row in table.iterrows():
         values = [rf'\swatch{{{color_name(row["Group"])}}}\,'
                   rf'\swatch{{{color_name(row["Niche"])}}}\enspace'
-                  r'\textit{' + cell(row['Species']) + '}']
-        values += [cell(row[column]) for column in TEXT_COLUMNS]
+                  r'\textit{' + cell(row['Species']) + '}',
+                  cell(row['U/M']),
+                  cell(row['Tissues']),
+                  stack(row['HostList'], r'\newline '),
+                  stack([number(n) for n in row['PPIList']], r'\newline ')]
         lines.append(' & '.join(values) + r'\\')
     lines += [r'\end{longtable}', r'\endgroup', '']
     with open(path, 'w') as handle:
@@ -126,8 +158,11 @@ def write_html(table, path, group_colors):
     for i, (_, row) in enumerate(table.iterrows()):
         swatches = ''.join(f'<span style="color:{color}">&#9632;</span>'
                            for color in (group_colors[row['Group']], NICHE_COLORS[row['Niche']]))
-        cells = [f'<td>{swatches} <i>{html.escape(row["Species"])}</i></td>']
-        cells += [f'<td>{html.escape(str(row[c]))}</td>' for c in TEXT_COLUMNS]
+        cells = [f'<td>{swatches} <i>{html.escape(row["Species"])}</i></td>',
+                 f'<td>{html.escape(str(row["U/M"]))}</td>',
+                 f'<td>{html.escape(str(row["Tissues"]))}</td>',
+                 '<td>' + stack(map(html.escape, row['HostList']), '<br>') + '</td>',
+                 '<td>' + stack([f'{n:,}' for n in row['PPIList']], '<br>') + '</td>']
         style = ' style="background:#e8f1fb"' if i % 2 == 0 else ''
         lines.append(f'<tr{style}>' + ''.join(cells) + '</tr>')
     lines += ['</table>', '']
@@ -135,11 +170,13 @@ def write_html(table, path, group_colors):
         handle.write('\n'.join(lines))
 
 
-def build(config_file, out_dir):
-    table = build_rows(config_file)
+def build(config_file, out_dir, predictions_file):
+    table = build_rows(config_file, predictions_file)
     group_colors = utils.read_config(filepath=config_file, field='parasite_groups')
     os.makedirs(out_dir, exist_ok=True)
-    table[CSV_COLUMNS].to_csv(os.path.join(out_dir, 'parasites.csv'), index=False)
+    flat = table.assign(Hosts=table.HostList.apply(lambda hosts: '; '.join(hosts)),
+                        PPIs=table.PPIList.apply(lambda n: '; '.join(map(str, n))))
+    flat[CSV_COLUMNS].to_csv(os.path.join(out_dir, 'parasites.csv'), index=False)
     write_tex(table, os.path.join(out_dir, 'parasites.tex'), group_colors)
     write_html(table, os.path.join(out_dir, 'parasites.html'), group_colors)
     print(f"Wrote {out_dir}/parasites.{{tex,csv,html}}: {len(table)} parasites")
@@ -150,6 +187,9 @@ if __name__ == '__main__':
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--config', default='config.yml', help='configuration file to read')
     parser.add_argument('--out-dir', default='paper/tables', help='directory to write into')
+    parser.add_argument('--predictions', default=PREDICTIONS,
+                        help='predictions parquet to count interactions from')
     args = parser.parse_args()
 
-    build(config_file=args.config, out_dir=args.out_dir)
+    build(config_file=args.config, out_dir=args.out_dir,
+          predictions_file=args.predictions)

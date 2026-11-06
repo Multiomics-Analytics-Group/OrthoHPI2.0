@@ -384,15 +384,16 @@ be visible at the level of conserved protein interactions.
   \label{fig:similarity}
 \end{figure}
 
-Next, we investigated which human orthologous groups the parasites share. Each
-is the EggNOG orthologous group of a host protein, and can hold several
-paralogues. Because extracellular parasites outnumber intracellular ones, a
-single count over all 43 human parasites would favour the groups extracellular
-parasites reach, so in Figure~\ref{fig:shared_ogs} we show the groups reached by
-at least half of the parasites of each niche. Of the 909 groups reached by at
-least two parasites, 13 meet this. Extracellular parasites can only reach host
-proteins of the cell membrane or the extracellular space, so these are the only
-groups the two niches can share, and six of them fall into two broad themes.
+Next, we investigated which human orthologous groups the parasites share, and
+which each niche reaches on its own (Figure~\ref{fig:shared_ogs}). Each is the
+EggNOG orthologous group of a host protein, and can hold several paralogues.
+Because extracellular parasites outnumber intracellular ones, a single count
+over all 43 human parasites would favour the groups extracellular parasites
+reach, so the first block of the figure holds the groups reached by at least half
+of the parasites of each niche. Of the 909 groups reached by at least two
+parasites, 13 meet this. Extracellular parasites can only reach host proteins of
+the cell membrane or the extracellular space, so a shared group must hold such
+proteins, and six of the 13 fall into two broad themes.
 
 The first is the host cell surface and the extracellular matrix, the first
 host structures any parasite meets: the laminins (37 parasites), the integrin
@@ -419,11 +420,12 @@ parasites that reach the brain, such as \textit{Toxoplasma gondii} and
 antimicrobial peptide~\todo{cite Soscia et al.\ 2010; Kumar et al.\ 2016}.
 
 The second theme is lipid metabolism: the lipid-handling enzymes LCAT and
-PLA2G15 (33 parasites) and the sphingomyelin synthases (32). Lipid uptake
-narrowly misses the cut and leans extracellular: the BPI/LBP/CETP lipid-transfer
-proteins (25 of 26 extracellular and 7 of 17 intracellular parasites),
-apolipoprotein B (24 and 7) and the cholesterol transporters NPC1 and NPC1L1 (18
-and 8). Many parasites cannot make all
+PLA2G15 (33 parasites) and the sphingomyelin synthases (32). Lipid uptake narrowly
+misses the shared block and leans extracellular: the BPI/LBP/CETP lipid-transfer
+proteins (25 of 26 extracellular and 7 of 17 intracellular parasites) and
+apolipoprotein B (24 and 7) are in the extracellular block. The cholesterol
+transporters NPC1 and NPC1L1 (18 and 8) lean the same way, but almost all of that
+comes from one parasite group. Many parasites cannot make all
 the lipids they need. Tapeworms and schistosomes have lost the pathways for de
 novo synthesis of fatty acids and cholesterol and take them from the
 host~\todo{cite Berriman et al.\ 2009; Tsai et al.\ 2013}, and intracellular
@@ -446,17 +448,21 @@ et al.\ 2012}, so a parasite netrin-like protein could in principle modulate
 the immune response around the worm. \todo{How many host orthologous groups
 are reached in total?}
 
-What each niche reaches on its own differs from what the two share
-(Supplementary Figure~\ref{fig:shared_ogs_niche}). There we rank groups within
-each niche by the genera that reach them, as species of one genus are not
-independent, leaving out each group's largest parasite group so that one
-conserved parasite family cannot place a group alone. The extracellular ranking
-is led by the integrin $\beta$ subunits (21 of 21 genera), the amyloid precursor
-proteins (20) and apolipoprotein B (19). The intracellular ranking is led by the
-histone-binding proteins RBBP4 and RBBP7 (7 of 8 genera), and 8 of its 15 groups
-belong to membrane fusion, among them the VAMP and SNAP25-family SNAREs, the
-syntaxins and the HOPS subunits. With only eight intracellular genera this
-ranking is coarse: 12 of the 15 groups sit exactly at the cut-off.
+What each niche reaches on its own differs from what the two share. For the other
+two blocks of Figure~\ref{fig:shared_ogs} we rank the remaining groups within each
+niche by the genera that reach them, as species of one genus are not independent,
+leaving out each group's largest parasite group so that one conserved parasite
+family cannot place a group alone. The extracellular block is led by apolipoprotein
+B (19 of 21 genera), the secreted phospholipases A2, the netrin receptors UNC5 and
+the focal adhesion kinases (16 each). The intracellular block is led by the
+histone-binding proteins RBBP4 and RBBP7 (7 of 8 genera), and 7 of its 14 groups
+belong to membrane fusion, among them the VAMP SNAREs, the syntaxins and the HOPS
+subunits. The VAMP SNAREs (11 intracellular and 12 extracellular parasites) fall
+one extracellular parasite short of the shared block, which holds the SNAP25-family
+SNAREs. Eleven of the 14 groups have no member in the extracellular host pool, so
+their absence from extracellular parasites is not evidence of a difference. With
+only eight intracellular genera this ranking is coarse: 11 of the 14 groups sit
+exactly at the cut-off.
 
 Convergence within a genus, below what Figure~\ref{fig:shared_ogs} shows, is
 rare. Of the 909 groups, few are reached by every species of one genus and by
@@ -481,22 +487,27 @@ reaching the host SNAREs and the NADPH-oxidase subunits NCF1, NCF4 and NOXO1,
 and an ATG8 reaching the host autophagy machinery, so it is the kind of
 convergence the parasite-group count is there to flag.
 
-% paper/figures/shared_ogs.png is generated: `make figures`.
+% paper/figures/shared_ogs_blocks.png is generated: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs_blocks}
   \caption{Human orthologous groups shared by intracellular and extracellular
-  parasites. Rows are the human orthologous groups with a predicted interaction
-  from at least half of the parasites of each niche (at least 9 of 17
-  intracellular and 13 of 26 extracellular), ordered by the total number of
-  parasites; columns are the parasites, grouped by taxon (lower strip) with
-  their niche (upper strip). Cell shade is the number of proteins of the parasite
-  predicted to interact with the group, on a log scale capped at 20; white cells
-  have none. The right-hand column gives the number of distinct parasite
-  orthologous groups from which the group is reached (one would mean a single
-  conserved parasite protein transferred many times).
-  Groups are named by the protein family they belong to, the name the text uses;
-  the members actually reached are listed in Supplementary Table~S2.}
+  parasites, and those each niche reaches mostly on its own. Rows are groups, in
+  three blocks. The shared block holds those with a predicted interaction from at
+  least half of the parasites of each niche (at least 9 of 17 intracellular and 13
+  of 26 extracellular), ordered by the total number of parasites. The other two
+  hold the remaining groups reached by at least 13 of the 21 extracellular or 5 of
+  the 8 intracellular genera when the group's largest parasite group, the one giving
+  it the most links, is left out, ordered by that count; a genus reaches a group
+  when at least half of its species of the niche do. Columns are the parasites,
+  grouped by taxon (lower strip) with their niche (upper strip). Cell shade is the
+  number of proteins of the parasite predicted to interact with the group, on a log
+  scale capped at 20; white cells have none. Hatching marks a niche whose host pool
+  holds no protein of the group, so that it cannot reach it. The right-hand column
+  gives the number of distinct parasite orthologous groups from which the group is
+  reached (one would mean a single conserved parasite protein transferred many
+  times). Groups are named by the protein family they belong to, the name the text
+  uses; the members reached are listed in Supplementary Table~S5.}
   \label{fig:shared_ogs}
 \end{figure}
 
@@ -906,10 +917,10 @@ row per interaction: the stage, the \textit{P.~falciparum} protein with its
 STRING identifier, gene name and description, the human protein with its STRING
 identifier and gene name, and the confidence score.
 
-\textbf{Supplementary Table S5} (\texttt{shared\_ogs\_niche.csv}). The data for
-Supplementary Figure~\ref{fig:shared_ogs_niche}: per niche, every human
-orthologous group reached by at least two of its parasites, with the genera that
-reach it with and without its largest parasite group.
+\textbf{Supplementary Table S5} (\texttt{shared\_ogs\_blocks.csv}). The rows of
+Figure~\ref{fig:shared_ogs}: the block, the group with its protein family and the
+gene symbols reached, the parasites of each niche reaching it, the genera of each
+niche left without its largest parasite group, and the niches that cannot reach it.
 
 \textbf{Supplementary Table S6} (\texttt{parasite\_go\_enriched.csv}). Every Gene
 Ontology biological process over-represented at FDR $\le 0.05$ among the human
@@ -1029,27 +1040,6 @@ for the host (Figure~\ref{fig:deeploc_pools_host}) and parasite
   are as in Supplementary Figure~\ref{fig:deeploc_pools_host}. The strips beside
   the names give the niche (outer) and the taxonomic group (inner).}
   \label{fig:deeploc_pools_parasite}
-\end{figure}
-
-\textbf{Supplementary Figure~\ref{fig:shared_ogs_niche}}. The human orthologous
-groups each niche reaches, ranked within the niche.
-
-% paper/figures/shared_ogs_niche.png is generated: `make figures` (see Makefile).
-\begin{figure}[p]
-  \captionsetup{name=Supplementary Figure}
-  \renewcommand{\thefigure}{S7}
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs_niche}
-  \caption{Human orthologous groups reached by each niche, with
-  \textbf{(A)}~extracellular and \textbf{(B)}~intracellular parasites as
-  separate matrices over that niche's parasites. A genus reaches a group when at
-  least half of its species of the niche do. Rows are the groups reached by at
-  least 13 of the 21 extracellular or 5 of the 8 intracellular genera when the
-  group's largest parasite group, the one giving it the most links, is left out.
-  Rows are ordered by that count. Dot area is the number of proteins of the
-  parasite predicted to interact with the group, and the strip gives the
-  taxonomic group. The counts are in Supplementary Table~S5.}
-  \label{fig:shared_ogs_niche}
 \end{figure}
 
 \section*{Data and code availability}

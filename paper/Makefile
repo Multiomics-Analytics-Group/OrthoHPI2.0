@@ -29,7 +29,7 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
-	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go_common.png \
+	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/shared_ogs_blocks.png figures/parasite_go_common.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/web_interface.png
@@ -74,6 +74,10 @@ figures/shared_ogs.svg figures/shared_ogs.png tables/shared_ogs.csv tables/share
 # without its largest parasite group.
 figures/shared_ogs_niche.svg figures/shared_ogs_niche.png tables/shared_ogs_niche.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_ogs.py ../scripts/build_shared_ogs_niche.py
 	cd .. && $(PYTHON) scripts/build_shared_ogs_niche.py
+
+# The groups the niches share and those each reaches mostly on its own, in one heatmap.
+figures/shared_ogs_blocks.svg figures/shared_ogs_blocks.png tables/shared_ogs_blocks.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../data/eligible_proteins.parquet ../scripts/build_shared_ogs.py ../scripts/build_shared_ogs_niche.py ../scripts/build_shared_ogs_blocks.py
+	cd .. && $(PYTHON) scripts/build_shared_ogs_blocks.py
 
 # The host processes the parasites of human reach: GO enrichment of each parasite's host
 # interactors against its niche's pool, as the app tests it.
@@ -140,7 +144,7 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go_common.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
+figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/shared_ogs_blocks.png figures/parasite_go_common.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.

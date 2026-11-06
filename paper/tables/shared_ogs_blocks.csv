@@ -1,0 +1,35 @@
+block,orthologous_group,family,parasites,intracellular,extracellular,intracellular_genera_without_largest,extracellular_genera_without_largest,parasite_groups,unreachable,symbols
+Shared by the niches,KOG0994,Laminins,37,15,22,4,13,8,,"LAMA1, LAMB1, LAMB2, LAMB3, NTN4"
+Shared by the niches,KOG1226,Integrin β subunits,36,10,26,4,21,10,,"ITGB1, ITGB2, ITGB3, ITGB4, ITGB5, ITGB6, ITGB7, ITGB8, ITGBL1"
+Shared by the niches,KOG3540,Amyloid precursor proteins,36,11,25,4,20,7,,"APLP1, APLP2, APP, PODXL2"
+Shared by the niches,KOG2369,LCAT/PLA2G15 acyltransferases,33,12,21,4,17,10,,"LCAT, PLA2G15"
+Shared by the niches,KOG0782,Diacylglycerol kinases,32,12,20,3,17,6,,"DGKI, DGKZ"
+Shared by the niches,KOG3058,Sphingomyelin synthases,32,13,19,4,8,4,,"SAMD8, SGMS1, SGMS2"
+Shared by the niches,KOG3781,Dystroglycan,31,10,21,2,17,3,,DAG1
+Shared by the niches,KOG1348,Legumain,29,9,20,0,9,3,,LGMN
+Shared by the niches,KOG4119,G protein γ subunits,28,10,18,4,14,9,,"GNG11, GNG12, GNG13, GNG5, GNG7, GNGT1, GNGT2"
+Shared by the niches,KOG3108,OB-fold proteins,27,11,16,3,8,9,,"B2M, RPA2, STN1"
+Shared by the niches,KOG3724,Uncharacterized C2ORF66,27,9,18,3,9,3,,C2ORF66
+Shared by the niches,KOG3065,SNAP25-family SNAREs,25,10,15,5,6,7,,"SNAP23, SNAP25, SNAP29, SNAP47"
+Shared by the niches,KOG2497,Methyltransferase-like proteins,25,11,14,3,4,4,,"EEF1AKMT3, EEF2KMT, METTL22, TCTN1, TCTN3"
+Mainly extracellular,KOG4338,Apolipoprotein B,31,7,24,2,19,6,,"APOB, LOC400499"
+Mainly extracellular,KOG4087,Secreted phospholipases A2,27,3,24,0,16,7,,"PLA2G10, PLA2G1B, PLA2G2A, PLA2G2D, PLA2G5"
+Mainly extracellular,KOG1480,Netrin receptors UNC5,29,7,22,1,16,5,,"UNC5A, UNC5C, UNC5CL, UNC5D"
+Mainly extracellular,KOG4257,Focal adhesion kinases,25,5,20,0,16,9,,"PTK2, PTK2B"
+Mainly extracellular,KOG4160,Lipid-transfer proteins,32,7,25,2,15,3,,"BPI, BPIFB1, BPIFB2, BPIFB3, BPIFB6, BPIFC, CETP, LBP, PLTP"
+Mainly extracellular,KOG0099,G protein α subunits,24,5,19,1,14,4,,"GNAL, GNAS"
+Mainly extracellular,KOG0085,G protein αq GNA14/GNA15,22,7,15,1,13,3,,"GNA11, GNA14, GNA15, GNAQ"
+Mainly intracellular,KOG0264,Histone-binding RBBP4/RBBP7,16,16,0,7,0,9,extracellular,"RBBP4, RBBP7, WDR73"
+Mainly intracellular,KOG0860,VAMP SNAREs,23,11,12,6,4,9,,"VAMP1, VAMP2, VAMP3, VAMP4, VAMP5, VAMP8"
+Mainly intracellular,KOG1299,Sec1-family VPS45,10,10,0,6,0,5,extracellular,VPS45
+Mainly intracellular,KOG0366,Rab geranylgeranyltransferase β,15,15,0,5,0,3,extracellular,RABGGTB
+Mainly intracellular,KOG0603,Ribosomal S6 kinases,13,13,0,5,0,5,extracellular,"HDX, RPS6KA1, RPS6KA2, RPS6KA3, RPS6KA4, RPS6KA5, RPS6KA6, RPS6KC1, RPS6KL1, SNX15"
+Mainly intracellular,KOG3251,Golgi SNARE GOSR2,10,10,0,5,0,3,extracellular,GOSR2
+Mainly intracellular,KOG0595,ULK kinases,13,13,0,5,0,6,extracellular,"PDIK1L, STK35, ULK1, ULK2, ULK3"
+Mainly intracellular,KOG0668,Casein kinase 2 α subunits,13,13,0,5,0,6,extracellular,"CSNK2A1, CSNK2A2"
+Mainly intracellular,KOG3092,Casein kinase 2 β subunit,20,13,7,5,4,8,,"CSNK2B, LY6G5B"
+Mainly intracellular,KOG1302,Sec1-family VPS33A/VPS33B,9,9,0,5,0,7,extracellular,"VPS33A, VPS33B"
+Mainly intracellular,KOG0834,"Cyclins K, Q and T",9,9,0,5,0,6,extracellular,"CCNK, CCNQ, CCNT1, CCNT2"
+Mainly intracellular,KOG2066,HOPS subunit VPS41,9,9,0,5,0,6,extracellular,VPS41
+Mainly intracellular,KOG2063,HOPS/CORVET VPS39/VPS3,9,9,0,5,0,5,extracellular,"TGFBRAP1, VPS39"
+Mainly intracellular,KOG0811,Syntaxins STX7/STX12,15,8,7,5,4,9,,"NAIF1, STX12, STX7, TSNARE1"

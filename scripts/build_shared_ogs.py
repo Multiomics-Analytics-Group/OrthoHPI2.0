@@ -45,6 +45,9 @@ STRIP = 0.085
 # the parasite proteins behind a cell, one hue from light to dark on a log scale
 CELL_SCALE = ['#cfcbe6', '#a9a5d1', '#7f78b8', '#5b4a9e', '#3a1f7a']
 CELL_CAP = 20
+# how a niche that cannot reach a group is drawn, and the rows a block's title takes
+UNREACHABLE = {'facecolor': '#f0f0f0', 'edgecolor': '#c4c4c4', 'hatch': '////', 'linewidth': 0}
+BLOCK_GAP = 1.4
 # The family each group of the figure belongs to, so that a row can be found from the
 # name the text uses rather than from its gene symbols. A group with no name here is
 # labelled by its symbols alone.
@@ -195,7 +198,11 @@ def row_label(group, symbols):
     return textwrap.fill(GROUP_NAMES.get(group) or symbols, LABEL_CHARS)
 
 
-def draw(config, ogs, edges, output_stem):
+def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachable=None):
+    '''
+    The heatmap, with rows of `row` inches. `blocks` is [(title, rows in it)], in the order of
+    `ogs`, to title groups of rows; `unreachable` is {group: niches}, to hatch those cells.
+    '''
     figure_style.apply()
     parasites = config['parasites']
     taxon_order = list(config['parasite_groups'])
@@ -208,13 +215,18 @@ def draw(config, ogs, edges, output_stem):
     labels = [row_label(group, symbols)
               for group, symbols in zip(ogs['orthologous_group'], ogs['symbols'])]
     ys = list(range(len(labels)))
+    titles, start = [], 0
+    for title, n in blocks:
+        ys[start:] = [y + BLOCK_GAP for y in ys[start:]]
+        titles.append((title, ys[start] - 1))
+        start += n
     row_of = dict(zip(ogs['orthologous_group'], ys))
 
     # a cell per (group, parasite), its shade the parasite proteins reaching the group
     proteins = (edges[edges['group2'].isin(row_of)]
                 .groupby(['group2', 'taxid1'])['source'].nunique())
     n_cols = len(columns)
-    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, HEATMAP_ROW * len(ys) + 2.35))
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, row * (ys[-1] + 1) + 2.35))
     cmap = LinearSegmentedColormap.from_list('proteins', CELL_SCALE)
     norm = LogNorm(vmin=1, vmax=CELL_CAP)
     for group, y in row_of.items():
@@ -224,6 +236,10 @@ def draw(config, ogs, edges, output_stem):
                 continue
             ax.add_patch(Rectangle((x - 0.5, y - 0.5), 1, 1, edgecolor='white', linewidth=0.5,
                                    facecolor=cmap(norm(min(n, CELL_CAP)))))
+    for group, niches in (unreachable or {}).items():
+        for niche in niches:
+            own = [x for t, x in col_of.items() if parasites[int(t)]['niche'] == niche]
+            ax.add_patch(Rectangle((min(own) - 0.5, row_of[group] - 0.5), len(own), 1, **UNREACHABLE))
     ax.set_xlim(-0.5, n_cols - 0.5)
     ax.set_ylim(ys[-1] + 0.5, -0.5)
     ax.set_yticks(ys)
@@ -236,9 +252,11 @@ def draw(config, ogs, edges, output_stem):
         side.set_visible(False)
     # the parasite names go above the strips, the strips above the cells
     ax.xaxis.tick_top()
+    for title, y in titles:
+        ax.text(-0.9, y, title, ha='right', va='center', fontweight='bold', clip_on=False)
 
     # two strips over the columns: taxonomic group, then niche
-    strip = STRIP / HEATMAP_ROW
+    strip = STRIP / row
     for i, t in enumerate(columns):
         p = parasites[int(t)]
         ax.add_patch(Rectangle((i - 0.5, -0.55 - strip), 1, strip * 0.8,
@@ -261,6 +279,11 @@ def draw(config, ogs, edges, output_stem):
     legends = figure_style.stack_legends(fig, left=0.01, blocks=[
         ('Taxonomic group', groups), ('Niche', niches)])
     height = fig.get_figheight()
+    if unreachable:
+        fig.legend(handles=[Patch(label='No group member in its pool', **UNREACHABLE)],
+                   title='Not reachable by this niche', loc='lower left', frameon=False, handlelength=0.9,
+                   alignment='left', bbox_to_anchor=(0.33, 0.02 / height),
+                   title_fontsize=figure_style.FONT)
     # room above the cells for the strips and the parasite names standing on them
     fig.subplots_adjust(left=LEFT, right=0.96, top=1 - 1.2 / height,
                         bottom=(legends + 0.2) / height)

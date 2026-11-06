@@ -8,7 +8,7 @@ orthologous groups reach the group (one means a single conserved parasite protei
 transferred many times).
 Writes paper/tables/shared_ogs.csv (every group reached by two or more parasites, with
 how many helminths, protozoa, intracellular and extracellular parasites reach it) and
-paper/figures/shared_ogs.svg/.png (the shared groups, as a dot matrix over the parasites).
+paper/figures/shared_ogs.svg/.png (the shared groups, as a heatmap over the parasites).
 
 Convergence within a genus is the other end of the same question, and too small to
 draw: paper/tables/shared_ogs_genus.csv holds, for every genus with several species of
@@ -23,7 +23,7 @@ import textwrap
 
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+from matplotlib.colors import LinearSegmentedColormap, LogNorm
 from matplotlib.patches import Patch, Rectangle
 import pandas as pd
 
@@ -38,6 +38,13 @@ DOT_COLOR = '#2a62ab'
 # group labels wrap onto lines of at most this many characters, which the longest
 # family name fits on
 LABEL_CHARS = 40
+# inches per row of the heatmap
+HEATMAP_ROW = 0.2
+# inches each strip over the columns takes
+STRIP = 0.085
+# the parasite proteins behind a cell, one hue from light to dark on a log scale
+CELL_SCALE = ['#cfcbe6', '#a9a5d1', '#7f78b8', '#5b4a9e', '#3a1f7a']
+CELL_CAP = 20
 # The family each group of the figure belongs to, so that a row can be found from the
 # name the text uses rather than from its gene symbols. A group with no name here is
 # labelled by its symbols alone.
@@ -200,71 +207,72 @@ def draw(config, ogs, edges, output_stem):
     col_of = {t: i for i, t in enumerate(columns)}
     labels = [row_label(group, symbols)
               for group, symbols in zip(ogs['orthologous_group'], ogs['symbols'])]
-    ys = figure_style.row_positions(labels, figure_style.DENSE_ROW)
+    ys = list(range(len(labels)))
     row_of = dict(zip(ogs['orthologous_group'], ys))
 
-    # a dot per (group, parasite), its area the parasite proteins reaching the group
-    dots = (edges[edges['group2'].isin(row_of)]
-            .groupby(['group2', 'taxid1'])['source'].nunique().reset_index())
+    # a cell per (group, parasite), its shade the parasite proteins reaching the group
+    proteins = (edges[edges['group2'].isin(row_of)]
+                .groupby(['group2', 'taxid1'])['source'].nunique())
     n_cols = len(columns)
-    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, figure_style.DENSE_ROW * (ys[-1] + 1) + 2.35))
-    size = lambda n: 6 + 3 * min(n, 20)
-    ax.scatter([col_of[t] for t in dots['taxid1']], [row_of[g] for g in dots['group2']],
-               s=dots['source'].map(size), color=DOT_COLOR, linewidths=0, zorder=3)
-    ax.set_xlim(-0.6, n_cols - 0.4)
-    ax.set_ylim(ys[-1] + 0.6, -0.6)
+    fig, ax = plt.subplots(figsize=(figure_style.WIDTH, HEATMAP_ROW * len(ys) + 2.35))
+    cmap = LinearSegmentedColormap.from_list('proteins', CELL_SCALE)
+    norm = LogNorm(vmin=1, vmax=CELL_CAP)
+    for group, y in row_of.items():
+        for t, x in col_of.items():
+            n = proteins.get((group, t))
+            if n is None:
+                continue
+            ax.add_patch(Rectangle((x - 0.5, y - 0.5), 1, 1, edgecolor='white', linewidth=0.5,
+                                   facecolor=cmap(norm(min(n, CELL_CAP)))))
+    ax.set_xlim(-0.5, n_cols - 0.5)
+    ax.set_ylim(ys[-1] + 0.5, -0.5)
     ax.set_yticks(ys)
     ax.set_yticklabels(labels, linespacing=1.05)
     ax.set_xticks(range(n_cols))
     ax.set_xticklabels([figure_style.short_name(parasites[int(t)]['label']) for t in columns],
                        rotation=90, style='italic')
     ax.tick_params(length=0, pad=2)
-    ax.grid(color='#eeeeee', linewidth=0.5)
-    ax.set_axisbelow(True)
     for side in ax.spines.values():
         side.set_visible(False)
-    # the parasite names go above the strips, the strips above the dots
+    # the parasite names go above the strips, the strips above the cells
     ax.xaxis.tick_top()
 
     # two strips over the columns: taxonomic group, then niche
-    strip = 0.55
+    strip = STRIP / HEATMAP_ROW
     for i, t in enumerate(columns):
         p = parasites[int(t)]
-        ax.add_patch(Rectangle((i - 0.5, -0.6 - strip), 1, strip * 0.8,
+        ax.add_patch(Rectangle((i - 0.5, -0.55 - strip), 1, strip * 0.8,
                                color=taxon_colors[p['group']], linewidth=0, clip_on=False))
-        ax.add_patch(Rectangle((i - 0.5, -0.6 - 2 * strip), 1, strip * 0.8,
+        ax.add_patch(Rectangle((i - 0.5, -0.55 - 2 * strip), 1, strip * 0.8,
                                color=NICHE_COLORS[p['niche']], linewidth=0, clip_on=False))
-    ax.tick_params(axis='x', pad=2 + 2 * strip * figure_style.DENSE_ROW * 72)
+    ax.tick_params(axis='x', pad=4 + 2 * STRIP * 72)
 
-    # the margin columns: parasites of each niche, parasite groups
+    # the margin column: the parasite groups, whose header stands like the parasite names
     margin_x = n_cols + 0.6
-    headers = [('intracellular', 'intracellular'), ('extracellular', 'extracellular'),
-               ('parasite_groups', 'parasite groups')]
-    for j, (column, header) in enumerate(headers):
-        x = margin_x + 2.4 * j
-        # the headers stand like the parasite names, from the top of the strips up
-        ax.text(x, -0.6 - 2 * strip - 0.3, header, ha='center', va='bottom',
-                rotation=90, color='#555555', clip_on=False)
-        for row in ogs.itertuples():
-            y = row_of[row.orthologous_group]
-            ax.text(x, y, f'{getattr(row, column)}', ha='center', va='center', color='#555555', clip_on=False)
+    ax.text(margin_x, -0.55 - 2 * strip - 0.1, 'parasite groups', ha='center', va='bottom',
+            rotation=90, color='#555555', clip_on=False)
+    for row in ogs.itertuples():
+        ax.text(margin_x, row_of[row.orthologous_group], f'{row.parasite_groups}', ha='center',
+                va='center', color='#555555', clip_on=False)
 
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
               if any(parasites[int(t)]['group'] == group for t in columns)]
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
-    sizes = [Line2D([], [], linestyle='', marker='o', color=DOT_COLOR,
-                    markersize=size(n) ** 0.5, label=label) for n, label in ((1, '1'), (5, '5'), (20, '20+'))]
-    # the keys take the full width: the size key sits beside the niches, as in the GO figure
     legends = figure_style.stack_legends(fig, left=0.01, blocks=[
         ('Taxonomic group', groups), ('Niche', niches)])
     height = fig.get_figheight()
-    fig.legend(handles=sizes, title='Parasite proteins', loc='lower left',
-               ncol=len(sizes), frameon=False, handlelength=0.9, columnspacing=1.2,
-               alignment='left', bbox_to_anchor=(0.705, 0.02 / height),
-               title_fontsize=figure_style.FONT)
-    # room above the dots for the strips and the parasite names standing on them
-    fig.subplots_adjust(left=LEFT, right=0.89, top=1 - 1.2 / height,
+    # room above the cells for the strips and the parasite names standing on them
+    fig.subplots_adjust(left=LEFT, right=0.96, top=1 - 1.2 / height,
                         bottom=(legends + 0.2) / height)
+
+    key = fig.add_axes([0.72, (legends - 0.2) / height, 0.22, 0.07 / height])
+    colorbar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), cax=key,
+                            orientation='horizontal')
+    colorbar.set_ticks([1, 2, 5, 10, CELL_CAP], labels=['1', '2', '5', '10', f'{CELL_CAP}+'])
+    colorbar.minorticks_off()
+    colorbar.set_label('Parasite proteins', labelpad=2)
+    colorbar.ax.xaxis.set_label_position('top')
+    colorbar.outline.set_visible(False)
     for extension in ('svg', 'png'):
         fig.savefig(f'{output_stem}.{extension}', dpi=300)
     plt.close(fig)

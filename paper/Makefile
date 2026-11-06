@@ -29,7 +29,7 @@ INKSCAPE := /Applications/Inkscape.app/Contents/MacOS/inkscape
 
 # The figures the manuscript includes, all as PNGs.
 FIGURES := figures/workflow.png figures/funnel_shares.png figures/networks.png \
-	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/parasite_go.png \
+	figures/alphafold_direct.png figures/parasite_similarity.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go.png \
 	figures/multi_host.png figures/case_study.png figures/tissues_coverage.png \
 	figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png \
 	figures/pf_case_study.png figures/web_interface.png
@@ -64,14 +64,26 @@ figures/funnel_shares.svg figures/funnel_shares.png tables/funnel_shares.csv: ..
 figures/multi_host.svg figures/multi_host.png tables/multi_host.csv: ../config.yml ../data/predictions.parquet ../data/host_orthologs.parquet ../scripts/build_multi_host_figure.py
 	cd .. && $(PYTHON) scripts/build_multi_host_figure.py
 
-# The host orthologous groups the most parasites converge on, over the parasites of human.
-figures/shared_ogs.svg figures/shared_ogs.png tables/shared_ogs.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_ogs.py
+# The host orthologous groups at least half of each niche reaches, over the parasites of
+# human, and the groups each genus of several species reaches on its own.
+figures/shared_ogs.svg figures/shared_ogs.png tables/shared_ogs.csv tables/shared_ogs_genus.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_ogs.py
 	cd .. && $(PYTHON) scripts/build_shared_ogs.py
+
+# The same groups ranked within each niche, so that the extracellular parasites do not
+# outnumber the intracellular ones in the selection, by the genera that reach a group
+# without its largest parasite group.
+figures/shared_ogs_niche.svg figures/shared_ogs_niche.png tables/shared_ogs_niche.csv: ../config.yml ../data/predictions.parquet ../scripts/build_shared_ogs.py ../scripts/build_shared_ogs_niche.py
+	cd .. && $(PYTHON) scripts/build_shared_ogs_niche.py
 
 # The host processes the parasites of human reach: GO enrichment of each parasite's host
 # interactors against its niche's pool, as the app tests it.
 figures/parasite_go.svg figures/parasite_go.png tables/parasite_go.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_go.py
 	cd .. && $(PYTHON) scripts/build_parasite_go.py
+
+# The same processes on equal terms: every parasite tested on the host proteins both
+# niches can reach, compared per genus.
+figures/parasite_go_shared.svg figures/parasite_go_shared.png tables/parasite_go_shared.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_go.py ../scripts/build_parasite_go_shared.py
+	cd .. && $(PYTHON) scripts/build_parasite_go_shared.py
 
 # How alike the interactomes of the parasites of human are, pair by pair.
 figures/parasite_similarity.svg figures/parasite_similarity.png tables/parasite_similarity.csv tables/parasite_similarity_medians.csv: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_similarity.py
@@ -123,11 +135,11 @@ figures/confidence.svg figures/confidence.png tables/confidence.csv: ../config.y
 figures/deeploc_pools_host.svg figures/deeploc_pools_host.png figures/deeploc_pools_parasite.svg figures/deeploc_pools_parasite.png tables/deeploc_pools.csv: ../config.yml ../scripts/build_deeploc_pools_figure.py ../scripts/build_deeploc_figure.py
 	cd .. && $(PYTHON) scripts/build_deeploc_pools_figure.py
 
-figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
+figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares.png figures/multi_host.png figures/shared_ogs.png figures/shared_ogs_niche.png figures/parasite_go.png figures/parasite_similarity.png figures/case_study.png figures/networks.png figures/tissues_coverage.png figures/confidence.png figures/deeploc_pools_host.png figures/deeploc_pools_parasite.png figures/pf_case_study.png figures/web_interface.png
 
 # The parasite table, in three renderings: .tex for the paper, .csv and .html
 # for pasting into Google Sheets / Docs.
-tables/parasites.tex: ../config.yml ../scripts/build_parasite_table.py
+tables/parasites.tex: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_table.py
 	cd .. && $(PYTHON) scripts/build_parasite_table.py
 
 tables: tables/parasites.tex

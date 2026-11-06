@@ -26,17 +26,14 @@ import utils
 from scripts import figure_style
 from scripts.build_shared_ogs import DOT_COLOR, row_label
 
-NICHES = ['intracellular', 'extracellular']
+NICHES = ['extracellular', 'intracellular']
 # inches: the labels left of the columns, one column, the header over the columns, the
 # gap between the panels, and the keys at the foot
 GUTTER = 2.0
-COLUMN = 0.155
+COLUMN = 0.185
 HEADER = 1.2
 GAP = 0.2
 LEGEND = 0.75
-# columns the margin counts start after, and take each
-MARGIN_START = 0.6
-MARGIN_STEP = 1.3
 
 
 def genera_reached(edges, species):
@@ -85,7 +82,7 @@ def count_niche_ogs(config, predictions, host):
     return ogs, edges
 
 
-def draw_panel(fig, config, ogs, edges, niche, minimum, top, size):
+def draw_panel(fig, config, ogs, edges, niche, letter, top, size):
     '''The matrix of one niche, its top `top` inches below the top of the figure. Returns its bottom.'''
     parasites = config['parasites']
     taxon_order = list(config['parasite_groups'])
@@ -98,7 +95,6 @@ def draw_panel(fig, config, ogs, edges, niche, minimum, top, size):
     ys = figure_style.row_positions(labels)
     row_of = dict(zip(ogs['orthologous_group'], ys))
     n_cols = len(columns)
-    n_genera = edges.loc[edges['niche'] == niche, 'genus'].nunique()
 
     ax_width = (n_cols + 0.2) * COLUMN
     ax_height = (ys[-1] + 1.2) * figure_style.ROW
@@ -131,20 +127,9 @@ def draw_panel(fig, config, ogs, edges, niche, minimum, top, size):
                                color=config['parasite_groups'][parasites[int(t)]['group']]))
     ax.tick_params(axis='x', pad=2 + strip * figure_style.ROW * 72)
 
-    headers = [('genera', 'genera'), ('genera_without_largest', 'without largest'),
-               ('other_niche_genera', 'other niche'),
-               ('parasite_groups', 'parasite groups')]
-    for j, (column, header) in enumerate(headers):
-        x = n_cols - 0.4 + MARGIN_START + MARGIN_STEP * j
-        ax.text(x, -0.6 - strip - 0.3, header, ha='center', va='bottom', rotation=90,
-                color='#555555', clip_on=False)
-        for row in ogs.itertuples():
-            ax.text(x, row_of[row.orthologous_group], f'{getattr(row, column)}', ha='center',
-                    va='center', color='#555555', clip_on=False)
-
     fig.text(0.06 / width, 1 - (top + HEADER - 0.02) / height,
-             f'{niche.capitalize()} parasites\nreached by ≥{minimum} of {n_genera} genera\nwithout the largest parasite group',
-             ha='left', va='bottom', fontsize=figure_style.FONT, linespacing=1.15, color='#333333')
+             f'({letter}) {niche.capitalize()} parasites', ha='left', va='bottom',
+             fontsize=figure_style.TITLE, fontweight='bold')
 
     return bottom
 
@@ -154,12 +139,12 @@ def draw(config, panels, edges, output_stem):
     size = lambda n: 6 + 3 * min(n, 20)
     heights = [HEADER + (figure_style.row_positions(
         [row_label(g, s) for g, s in zip(ogs['orthologous_group'], ogs['symbols'])])[-1] + 1.2)
-        * figure_style.ROW for _, ogs, _ in panels]
+        * figure_style.ROW for _, ogs in panels]
     fig = plt.figure(figsize=(figure_style.WIDTH, sum(heights) + GAP + LEGEND))
 
     top = 0.05
-    for niche, ogs, minimum in panels:
-        top = draw_panel(fig, config, ogs, edges, niche, minimum, top, size) + GAP
+    for letter, (niche, ogs) in zip('AB', panels):
+        top = draw_panel(fig, config, ogs, edges, niche, letter, top, size) + GAP
 
     # the size key sits beside the taxa, as in the GO figure
     groups = [Patch(color=color, label=group) for group, color in config['parasite_groups'].items()
@@ -198,7 +183,7 @@ if __name__ == '__main__':
     panels = []
     for niche in NICHES:
         kept = ogs[(ogs['niche'] == niche) & (ogs['genera_without_largest'] >= minimums[niche])]
-        panels.append((niche, kept, minimums[niche]))
+        panels.append((niche, kept))
         print(f"{niche}: {(ogs['niche'] == niche).sum()} groups reached by two or more parasites, "
               f"{len(kept)} by {minimums[niche]} or more genera without the largest parasite group, "
               f"{(kept['other_niche_genera'] == 0).sum()} of them by no genus of the other niche")

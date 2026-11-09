@@ -916,6 +916,30 @@ sufficient. When a conserved housekeeping protein of the parasite is called
 secreted, group-level transfer hands it the host's copy of the module it
 belongs to, and the enrichment that follows looks like biology.
 
+A second kind of artefact survives even when every filter works as intended.
+The host membrane-fusion machinery of Figure~\ref{fig:shared_ogs} is reached by
+most intracellular genera, but the parasite proteins behind it are the
+parasites' own fusion machinery: Qa-syntaxins, Qc-SNAREs, vesicle-associated
+membrane proteins and ATG8, with Rab GTPases, an AP-2 adaptor subunit, NSF
+attachment proteins, ferlins and HOPS/CORVET subunits alongside them. These are
+genuine membrane proteins, correctly placed in the secreted and membrane pool
+and correctly assigned to their orthologous groups, so nothing in the pipeline
+is wrong. The transfer is nevertheless uninformative: STRING links the subunits
+of a complex to one another, so the host partners of a parasite protein's own
+orthologue are handed to it as predictions, and a conserved module maps onto
+itself. The count of distinct parasite orthologous groups, which is what
+Figure~\ref{fig:shared_ogs} reports to separate a real convergence from a single
+transferred protein, does not catch this. GOSR2 is reached from three distinct
+parasite groups, which looks reassuring until one notices that all three are
+SNAREs; across the seven affected rows every contributing group belongs to the
+same module, so leaving them out is what exposes the rows, as it does above.
+The level at which the predictions are summarised also matters, since the same
+proteins do not dominate the membrane-traffic processes of Figure~\ref{fig:parasite_go},
+which hold up when they are removed. A shared, deeply conserved module is
+therefore the hardest case for orthology transfer, and asking whether the
+contributing parasite groups are functionally independent of one another is a
+more useful check than counting them.
+
 \section{Conclusion}
 \todo{conclusion}
 

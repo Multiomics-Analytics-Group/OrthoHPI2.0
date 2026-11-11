@@ -827,18 +827,10 @@ column = web_utils.column_width(2)
 st.caption('Compare all the parasites of a selected host.')
 st.markdown("---")
 
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.write('')
-
-with col2:
+with st.columns(3)[0]:
     selected_host, selected_taxids = web_utils.host_selector(
         config, web_utils.load_predictions(data_dir),
         'Select a host')
-
-with col3:
-    st.write('')
 
 
 if selected_host != web_utils.NO_HOST:

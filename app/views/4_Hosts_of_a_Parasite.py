@@ -508,7 +508,7 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
 st.caption('Compare the hosts for the parasites that are predicted against multiple hosts.')
 st.markdown("---")
 
-settings, _ = st.columns([1, 1])
+settings = st.columns(3)[0]
 with settings:
     score = web_utils.score_slider(
         help='Interactions predicted below this confidence are left out, as '
@@ -537,7 +537,7 @@ else:
                'many in one host only.')
     st.plotly_chart(generate_overview_bars(data_dir, config, score), width='stretch')
 
-    with st.columns(3)[1]:
+    with st.columns(3)[0]:
         parasite = st.selectbox('Select a parasite to compare its hosts', parasites,
                                 format_func=lambda p: f'{p} ({hosts_of[p]})',
                                 index=None, placeholder='<select>')

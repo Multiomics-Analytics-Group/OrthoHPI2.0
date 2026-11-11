@@ -34,6 +34,10 @@ header[data-testid="stHeader"] {
     background-color: #023858;
 }
 
+header[data-testid="stHeader"] img[data-testid="stHeaderLogo"] {
+    margin-right: 1.5rem;
+}
+
 header[data-testid="stHeader"] [data-testid="stTopNavLink"],
 header[data-testid="stHeader"] [data-testid="stTopNavLink"] p,
 header[data-testid="stHeader"] [data-testid="stIconMaterial"],

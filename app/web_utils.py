@@ -8,11 +8,11 @@ import utils
 
 # menu entries as (label, material icon, path relative to the app root); the page file
 # numbers no longer match this order
-PAGES = [('Home', ':material/home:', 'views/Home.py'),
-         ('Host-parasite network', ':material/share:', 'views/1_Predicted_Host-Parasite_PPIs.py'),
-         ('Parasites of a host', ':material/bug_report:', 'views/2_Compare_Parasites.py'),
-         ('Multi-host parasites', ':material/person:', 'views/4_Hosts_of_a_Parasite.py'),
-         ('About', ':material/info:', 'views/3_About.py')]
+PAGES = [('Home', 'views/Home.py'),
+         ('Host-parasite network', 'views/1_Predicted_Host-Parasite_PPIs.py'),
+         ('Parasites of a host', 'views/2_Compare_Parasites.py'),
+         ('Multi-host parasites', 'views/4_Hosts_of_a_Parasite.py'),
+         ('About', 'views/3_About.py')]
 
 # pixels one line of a wrapped axis name takes, at plotly's default font
 LABEL_LINE = 15
@@ -60,17 +60,22 @@ def navigation():
     The menu across the top, holding every page; the first one is opened when the
     address names none.
     '''
-    pages = [st.Page(path, title=label, icon=icon, default=i == 0)
-             for i, (label, icon, path) in enumerate(PAGES)]
+    pages = [st.Page(path, title=label, default=i == 0)
+             for i, (label, path) in enumerate(PAGES)]
 
     return st.navigation(pages, position='top')
 
 
+# colours of the title and subtitle on a light and on a dark background
+HEADER_COLORS = {'light': ('#023858', '#385380'), 'dark': ('#a6bddb', '#74a9cf')}
+
+
 def show_header():
     '''The name of the app and what it does, which the home page opens with.'''
-    st.markdown(f"<h1 style='text-align: center; color: #023858;'>{TITLE}</h1>",
+    title, subtitle = HEADER_COLORS['dark' if st.context.theme.type == 'dark' else 'light']
+    st.markdown(f"<h1 style='color: {title}; padding-bottom: 0;'>{TITLE}</h1>",
                 unsafe_allow_html=True)
-    st.markdown(f"<h3 style='text-align: center; color: #2b8cbe;'>{SUBTITLE}</h3>",
+    st.markdown(f"<h3 style='color: {subtitle}; padding-top: 0;'>{SUBTITLE}</h3>",
                 unsafe_allow_html=True)
 
 # width figures are drawn at until the browser has reported the real page width

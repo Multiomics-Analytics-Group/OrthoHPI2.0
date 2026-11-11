@@ -22,6 +22,7 @@ STYLE = '''
 .hp { font-size: 0.95rem; }
 .hp-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; opacity: 0.6;
             margin: 1.2rem 0 0.5rem; }
+.hp-label:first-child { margin-top: 0; }
 .hp-hosts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .hp-host { display: inline-flex; align-items: baseline; gap: 0.45rem; border-radius: 999px;
            padding: 0.3rem 0.9rem; background: color-mix(in srgb, var(--c) 10%, transparent); }

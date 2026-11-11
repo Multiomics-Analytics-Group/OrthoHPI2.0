@@ -886,7 +886,7 @@ st.caption('Host-parasite protein-protein interactions predicted by '
            '**Host-parasite network** shows the network of one host-parasite pair, '
            '**Parasites of a host** compares the parasites of a single host, and **Multi-host '
            'parasites** compares the hosts of multi-host parasites.')
-st.markdown("---")
+st.markdown("<hr style=\"margin: 0.5rem 0 0;\">", unsafe_allow_html=True)
 
 st.subheader('Hosts and parasites')
 overview = get_overview_predictions(data_dir, config)
@@ -898,8 +898,8 @@ st.markdown("---")
 page = web_utils.page_width()
 parasite_palette = config.get('parasite_groups', {})
 
-# one slider for the page, in the middle column so it does not take the whole width
-with st.columns(3)[1]:
+# one slider for the page, in the left column so it does not take the whole width
+with st.columns(3)[0]:
     score = web_utils.score_slider(
         help='Interactions predicted below this confidence are left out '
              'of the counts and of the localization split drawn on them. The '

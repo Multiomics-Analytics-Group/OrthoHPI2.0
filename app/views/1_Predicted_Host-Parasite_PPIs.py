@@ -1042,7 +1042,7 @@ def show_structures_dialog(edge):
 st.caption('Investigate the predicted interaction network for a host-parasite pair.')
 
 
-with st.columns(3)[1]:
+with st.columns([1, 2], gap='large')[0]:
     # the host carries over from whichever page it was last chosen on
     selected_host, selected_taxids = web_utils.host_selector(
         config, load_predictions(data_dir), 'Select a host')

@@ -1,0 +1,4 @@
+parasite,host,curated,parasite_proteins,publications,pair_predicted,group_predicted,host_predicted,host_predicted_any,parasite_in_proteome,host_in_proteome,parasite_eligible,host_eligible
+Toxoplasma gondii,Homo sapiens,17,1,1,0,0,0,2,0,17,0,15
+Plasmodium falciparum,Homo sapiens,4,3,3,0,0,0,2,2,4,2,4
+Schistosoma mansoni,Homo sapiens,1,1,1,0,0,0,1,0,1,0,0

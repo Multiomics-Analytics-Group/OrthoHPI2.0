@@ -112,7 +112,6 @@ defense and metabolic systems''}
 \todo{Find interactions that could be targeted.}
 \todo{Other studies of host--parasite PPI prediction?}
 \todo{Big amounts of experimental intra-species PPI data, mention databases?}
-\todo{Little amount of host--parasite PPI data.}
 \todo{Going from intra-species PPIs to inter-species PPIs. Homology-based
 prediction. Interlogs.}
 
@@ -140,7 +139,16 @@ atlas data. Finally, we provide an interactive web resource that allows for
 detailed investigation of individual host--parasite PPI networks as well as
 comparisons across parasites and hosts at different score thresholds.
 
-\todo{Evaluation not really possible\ldots}
+Experimental host--parasite interaction data are too scarce for a conventional
+benchmark. Over the parasites and hosts of this work, IntAct~\todo{ref} holds 22
+curated inter-species interactions, contributed by six parasite proteins in four
+publications; 17 of the 22 are a single \textit{Toxoplasma gondii} protein
+screened against human preys in one two-hybrid experiment. Four of the six
+proteins are not in the reference proteome of their species at all, having been
+characterised in another strain or isolate. There is no set of positives large
+enough to estimate precision or recall, and no negatives, so we characterise the
+predictions by what they recover of known host biology and by how they behave
+across parasites rather than against a gold standard.
 
 \section{Materials and methods}
 
@@ -902,8 +910,17 @@ proteins are not filtered by life stage. We have very little transcriptomics
 data for the parasites. Check what we have in VEuPathDB
 (\url{https://veupathdb.org/veupathdb/app}). We can't include this at this
 point.}
-\todo{False negatives: parasite proteins that don't look like any proteins in
-intra-species interactions.}
+The transfer also misses the proteins the experimental literature is made of.
+The curated interactions are invasion ligands and secreted effectors, which are
+the parasite proteins least likely to have a host counterpart. Two of the six,
+the \textit{P.~falciparum} invasion ligands RH5 and CyRPA, passed every filter
+and still received no prediction: RH5 belongs to no eukaryotic orthologous group
+at all, and the group CyRPA belongs to carries no transferable
+link~(Supplementary Table~S8). Lineage-specific genes are where the
+host--parasite interface is expected to sit~\todo{cite}, and orthology transfer
+cannot reach them by construction. The predictions are therefore a map of the
+conserved part of that interface, and what makes a parasite distinctive lies
+outside them.
 
 A single parasite protein can also generate a whole spurious module, and the
 result can be convincing. The five \textit{Trichinella} species share 44 host
@@ -1023,6 +1040,13 @@ that passed the secretome filter, on processes annotated to more than 10 and
 fewer than 500 of them, and corrected with Benjamini--Hochberg. Given are the
 odds ratio, the $p$-value and FDR, the parasite proteins annotated to the
 process and the number of parasite orthologous groups they belong to.
+
+\textbf{Supplementary Table S8} (\texttt{known\_ppis.csv}). The curated
+inter-species interactions IntAct holds for the host--parasite pairs of this
+work, one row per interaction, with the accessions and names of both sides, the
+STRING identifiers they resolve to, the detection methods and publications, and
+whether the pipeline reached the protein pair, the orthologous-group pair or the
+host protein alone.
 
 \subsection*{Supplementary figures}
 \textbf{Supplementary Figure~\ref{fig:funnel}}. The share of proteins each

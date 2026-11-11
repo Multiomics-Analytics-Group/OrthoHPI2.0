@@ -142,6 +142,13 @@ comparisons across parasites and hosts at different score thresholds.
 
 \todo{Evaluation not really possible\ldots}
 
+\section{Materials and methods}
+
+% The stages below mirror docs/pipeline.md, which is the running description
+% of what `python -m pipeline.main` actually does. Keep the two in step.
+
+Figure~\ref{fig:workflow} gives an overview of the prediction pipeline.
+
 % paper/figures/workflow.png is exported from workflow.svg: `make figures`.
 \begin{figure}[htbp]
   \centering
@@ -156,11 +163,6 @@ comparisons across parasites and hosts at different score thresholds.
   database evidence scores of the group link.}
   \label{fig:workflow}
 \end{figure}
-
-\section{Materials and methods}
-
-% The stages below mirror docs/pipeline.md, which is the running description
-% of what `python -m pipeline.main` actually does. Keep the two in step.
 
 \subsection{Proteomes}
 The hosts are the four species covered by the TISSUES database~\todo{ref}:
@@ -346,8 +348,20 @@ The same limit explains the smallest networks: the microsporidia are obligate
 intracellular fungi with reduced genomes and fast-evolving
 proteins~\todo{cite}. Conservation therefore works against the proteins that
 matter most, since those most specific to a parasite, such as variant surface
-antigens, are often the ones acting directly on the host. How far the
-transferred links are structurally plausible is examined below.
+antigens, are often the ones acting directly on the host.
+
+To test whether transferred interactions are structurally plausible, we
+modelled 48 predicted interactions whose human counterparts are known to bind
+directly, each alongside that human reference complex, using AlphaFold~3
+(Supplementary Figure~\ref{fig:alphafold_direct}). AlphaFold found a confident
+interface (ipSAE $\ge 0.1$) for 20 of the 48 human references, but for only 8
+of the predicted parasite--human pairs (by ipTM $\ge 0.6$, 11 references and
+one predicted pair). The reference usually scored higher than the predicted
+pair (30 pairs higher, 6 lower, 12 tied), most clearly when it shared the
+predicted human partner. A low score therefore does not rule out an
+interaction (Discussion), and links with a confident model, such as
+Q4D3L1--DR1 of \textit{T.~cruzi} (Figure~\ref{fig:web_interface}C), are the
+best candidates for experimental follow-up.
 
 \subsection{Shared host interactors across parasites}
 To investigate which human parasites interact with the same human proteins, we
@@ -367,13 +381,6 @@ extracellular matrix. Part of this split also follows from the method, since
 the host localization filter differs between the niches
 (Figure~\ref{fig:workflow}).
 
-Within a niche, related parasites are more alike. Most clearly, the five
-\textit{Trichinella} species reach nearly the same host proteins (Jaccard
-similarity 0.65--0.81). They share the same life cycle, in which the larvae
-invade skeletal muscle cells, and differ mainly in host range, geography and
-whether the nurse cell is encapsulated~\todo{cite}, traits that are unlikely to
-be visible at the level of conserved protein interactions.
-
 % paper/figures/parasite_similarity.pdf is generated: `make figures`.
 \begin{figure}[p]
   \centering
@@ -383,6 +390,12 @@ be visible at the level of conserved protein interactions.
   group and niche. The diagonal is left grey.}
   \label{fig:similarity}
 \end{figure}
+Within a niche, related parasites are more alike. Most clearly, the five
+\textit{Trichinella} species reach nearly the same host proteins (Jaccard
+similarity 0.65--0.81). They share the same life cycle, in which the larvae
+invade skeletal muscle cells, and differ mainly in host range, geography and
+whether the nurse cell is encapsulated~\todo{cite}, traits that are unlikely to
+be visible at the level of conserved protein interactions.
 
 Next, we investigated which human orthologous groups the parasites share, and
 which each niche reaches on its own (Figure~\ref{fig:shared_ogs}). Each is the
@@ -396,13 +409,37 @@ niche by the genera that reach them, as species of one genus are not independent
 and leave out each group's largest parasite group, so that a single conserved
 parasite family cannot place a group on its own.
 
+% paper/figures/shared_ogs_blocks.png is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs_blocks}
+  \caption{Human orthologous groups shared by intracellular and extracellular
+  parasites, and those each niche reaches mostly on its own. Rows are groups, in
+  three blocks. The shared block holds those with a predicted interaction from at
+  least half of the parasites of each niche (at least 9 of 17 intracellular and 13
+  of 26 extracellular), ordered by the total number of parasites. The other two
+  hold the remaining groups reached by at least 13 of the 21 extracellular or 5 of
+  the 8 intracellular genera when the group's largest parasite group, the one giving
+  it the most links, is left out, ordered by that count; a genus reaches a group
+  when at least half of its species of the niche do. Columns are the parasites,
+  grouped by taxon (lower strip) with their niche (upper strip). Cell shade is the
+  number of proteins of the parasite predicted to interact with the group, on a log
+  scale capped at 20; white cells have none. Hatching marks a niche whose host pool
+  holds no protein of the group, so that it cannot reach it. The right-hand column
+  gives the number of distinct parasite orthologous groups from which the group is
+  reached (one would mean a single conserved parasite protein transferred many
+  times). Groups are named by the protein family they belong to, the name the text
+  uses; the members reached are listed in Supplementary Table~S5.}
+  \label{fig:shared_ogs}
+\end{figure}
 Extracellular parasites can only reach host proteins of the cell membrane or the
-extracellular space, so a shared group has to hold such proteins. Six of the 13
-sit at the cell surface or in the space around it, the first host structures any
-parasite meets: the laminins (37 parasites), the integrin $\beta$ subunits (36),
-the amyloid precursor proteins (36) and dystroglycan (31), together with the
-secreted asparaginyl endopeptidase legumain (29) and the uncharacterised C2ORF66
-(27).
+extracellular space, so every shared group has to hold such proteins, and DeepLoc
+places at least one reached member of each of the 13 there. What distinguishes
+them is therefore function rather than position. Six are adhesion molecules,
+matrix components and receptors, the first host structures any parasite meets:
+the laminins (37 parasites), the integrin $\beta$ subunits (36), the amyloid
+precursor proteins (36) and dystroglycan (31), together with the secreted
+asparaginyl endopeptidase legumain (29) and the uncharacterised C2ORF66 (27).
 Many of these are known pathogen targets. Laminin is bound by \textit{T.~cruzi},
 \textit{Leishmania} and \textit{Entamoeba} during adhesion and
 invasion~\todo{cite}, and the hookworm neutrophil inhibitory factor blocks the
@@ -410,13 +447,12 @@ leukocyte integrin CD11b/CD18~\todo{cite Moyle et al.\ 1994}. Integrins are entr
 receptors for bacteria such as \textit{Yersinia}~\todo{cite Isberg and Leong
 1990} and for adenoviruses~\todo{cite Wickham et al.\ 1993}, and dystroglycan is
 the receptor of \textit{Mycobacterium leprae} on Schwann cells and of Lassa
-virus~\todo{cite Rambukkana et al.\ 1998; Cao et al.\ 1998}. Among the groups
-just outside the shared block, the basement-membrane proteoglycans agrin and
-perlecan are reached by 20 extracellular and 7 intracellular parasites, and
-heparan sulfate proteoglycans anchor \textit{Plasmodium} sporozoites to
-hepatocytes~\todo{cite Frevert et al.\ 1993}; neuropilin-1, a cofactor of
-SARS-CoV-2~\todo{cite Cantuti-Castelvetri et al.\ 2020; Daly et al.\ 2020}, sits
-in a CUB-domain group reached by 20 and 8. That so many parasites converge on
+virus~\todo{cite Rambukkana et al.\ 1998; Cao et al.\ 1998}. Just outside the
+shared block, and so not drawn, are the basement-membrane proteoglycans agrin
+and perlecan, reached by 20 extracellular and 7 intracellular parasites
+(Supplementary Table~S2); heparan sulfate proteoglycans anchor
+\textit{Plasmodium} sporozoites to hepatocytes~\todo{cite Frevert et al.\ 1993}.
+That so many parasites converge on
 proteins that unrelated pathogens are known to hijack suggests these are general
 points of entry into, and attachment to, host tissue. The amyloid precursor
 protein is reached by parasites of both niches, among them \textit{Toxocara
@@ -439,11 +475,12 @@ the GP63 leishmanolysins, and without it only six intracellular parasites reach
 them. The remaining four shared groups are harder to read as a theme. One is an
 OB-fold group in which the reached member is essentially B2M, the light chain of
 MHC class~I: all 27 parasites of that row reach it, against 11 and 8 for the two
-other members. With legumain, which processes antigens for presentation~\todo{cite Manoury et al.\ 1998}, it is
-one of the few shared groups with a clear immune function. The others are the G protein $\gamma$ subunits (28), the
-SNAP25-family SNAREs (25), and a group (25) whose most-reached members are the
-ciliary transition-zone tectonics TCTN3 and TCTN1 rather than its
-methyltransferase-like proteins.
+other members, which are nuclear and reached only by intracellular parasites.
+With legumain, which processes antigens for presentation~\todo{cite Manoury et
+al.\ 1998}, it is one of the few shared groups with a clear immune function. The
+others are the G protein $\gamma$ subunits (28), the SNAP25-family SNAREs (25),
+and a group (25) whose most-reached members are the ciliary transition-zone
+tectonics TCTN3 and TCTN1 rather than its methyltransferase-like proteins.
 
 The extracellular block is led by apolipoprotein~B (19 of 21 genera), the
 secreted phospholipases~A2, the netrin receptors UNC5 and the focal adhesion
@@ -452,12 +489,16 @@ three G protein $\alpha$ groups (14, 14 and 13). Lipid uptake therefore sits her
 rather than in the shared block: apolipoprotein~B is reached by 24 of 26
 extracellular but only 7 of 17 intracellular parasites, and the lipid-transfer
 proteins by 25 and 7. The cholesterol transporters NPC1 and NPC1L1 lean the same
-way (18 and 8), but almost all of that comes from one parasite group, leaving
-only two extracellular genera, so we do not read them as a convergence. One of
-these groups, the netrin receptors UNC5, belongs to a wider helminth-specific
+way (18 and 8), but almost all of that comes from one parasite group, so they
+are not a convergence in the sense the other rows are; we return to them below.
+One of these groups, the netrin receptors UNC5, belongs to a wider helminth-specific
 set: UNC5, the netrin receptors DCC/neogenin, the sortilins, SPARC and CHID1 are
-reached by 24 to 26 helminths and at most three protozoa, although only UNC5 is
-common enough across genera to enter the figure (Supplementary Table~S2). Helminths are animals and, unlike protozoa, carry metazoan signalling
+reached by 24 to 26 helminths and at most three protozoa (Supplementary
+Table~S2). Only UNC5 is drawn, and the others thin out once each group's
+largest parasite family is set aside: DCC/neogenin keeps 10 of 21 extracellular
+genera, the sortilins 6, SPARC 4 and CHID1 none at all. For the last three that
+single family is itself informative, as the next paragraph describes. Helminths
+are animals and, unlike protozoa, carry metazoan signalling
 families such as the netrins, whose receptors UNC-40/DCC and UNC-5 were first
 described in \textit{Caenorhabditis elegans}~\todo{cite}. Shared ancestry with
 the host gives helminth proteins the opportunity to act on host receptors
@@ -467,6 +508,41 @@ through the mammalian TGF-$\beta$ receptor~\todo{cite Gomez-Escobar et al.\
 migration and retains macrophages in inflamed tissue~\todo{cite Ly et al.\ 2005;
 van Gils et al.\ 2012}, so a parasite netrin-like protein could in principle
 modulate the immune response around the worm.
+
+Four groups just outside the figure share a pattern worth separating from the
+fusion artefact below. The sterol transporters NPC1 and NPC1L1 (18 extracellular
+and 8 intracellular parasites), the sortilins (20 and 5), SPARC (19 and 5) and
+the chitinase-like CHID1 (21 and 5) each rest almost entirely on one parasite
+orthologous group, which is why none of them survives the genus test. In every
+case that group is the parasite orthologue of a protein the host target itself
+binds: NPC2 for NPC1, apolipoprotein~B for the sortilins and SPARC, and the
+saposins for CHID1. What separates them from the host fusion machinery is that
+these parasite proteins are secreted, DeepLoc placing all 111 NPC2-like, all 35
+apolipoprotein~B-like and all 52 saposin-like proteins outside the cell, so they
+are at least in a position to meet the host protein. The pairings are also the
+ones the biology would suggest: NPC2 hands cholesterol to NPC1 in human
+cells~\todo{cite}, helminth vitellogenins are apolipoprotein~B homologues and
+the sortilins SORT1 and SORL1 are lipoprotein receptors~\todo{cite}, and
+parasites that cannot make their own sterols have to take them from the host.
+Because each prediction follows from the host complex rather than from
+independent transfers, we read these as hypotheses about lipid acquisition to be
+tested, not as convergence.
+Testing the parasite side in the same way, against each parasite's own proteins
+that passed the secretome filter (Supplementary Table~S7), shows how much of
+some networks the NPC2-like family is. In the three liver flukes,
+\textit{O.~felineus}, \textit{O.~viverrini} and \textit{C.~sinensis}, sterol
+transport is over-represented among the proteins with a predicted interaction
+(FDR $\le 2 \times 10^{-9}$): every protein that passed the secretome filter and
+is annotated to the process has a predicted interaction, 53, 18 and 28 proteins
+respectively, and almost all of them are NPC2-like (52, 16 and 26). In
+\textit{O.~felineus} they are more than half of the network, 52 of the 94
+parasite proteins with an interaction. Liver flukes live in the bile ducts,
+where bile carries the host's cholesterol, so a large secreted NPC2-like family
+would fit a parasite that has to take its sterols from the
+host~\todo{cite}, but it also means that the size of these networks says more
+about one gene family than about the breadth of the interaction. The other
+processes enriched on the parasite side are mostly broad, and many rest on one
+or two parasite orthologous groups, which the table counts for each.
 
 The intracellular block reaches further into the cell, as the niche allows, but
 it is also the block to read most carefully. Eleven of its 14 groups have no
@@ -519,30 +595,6 @@ reaching the host SNAREs and the NADPH-oxidase subunits NCF1, NCF4 and NOXO1,
 and an ATG8 reaching the host autophagy machinery, so it is the kind of
 convergence the parasite-group count is there to flag.
 
-% paper/figures/shared_ogs_blocks.png is generated: `make figures`.
-\begin{figure}[p]
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/shared_ogs_blocks}
-  \caption{Human orthologous groups shared by intracellular and extracellular
-  parasites, and those each niche reaches mostly on its own. Rows are groups, in
-  three blocks. The shared block holds those with a predicted interaction from at
-  least half of the parasites of each niche (at least 9 of 17 intracellular and 13
-  of 26 extracellular), ordered by the total number of parasites. The other two
-  hold the remaining groups reached by at least 13 of the 21 extracellular or 5 of
-  the 8 intracellular genera when the group's largest parasite group, the one giving
-  it the most links, is left out, ordered by that count; a genus reaches a group
-  when at least half of its species of the niche do. Columns are the parasites,
-  grouped by taxon (lower strip) with their niche (upper strip). Cell shade is the
-  number of proteins of the parasite predicted to interact with the group, on a log
-  scale capped at 20; white cells have none. Hatching marks a niche whose host pool
-  holds no protein of the group, so that it cannot reach it. The right-hand column
-  gives the number of distinct parasite orthologous groups from which the group is
-  reached (one would mean a single conserved parasite protein transferred many
-  times). Groups are named by the protein family they belong to, the name the text
-  uses; the members reached are listed in Supplementary Table~S5.}
-  \label{fig:shared_ogs}
-\end{figure}
-
 The host processes reached show both what the niches share and where they
 differ (Figure~\ref{fig:parasite_go}). Each parasite is tested against the host
 proteins it could have reached, those of its own niche that pass the filters,
@@ -554,6 +606,26 @@ are enriched for them. As species of one genus are not independent, we also give
 the genera, counting a genus when at least half of its species are enriched;
 every enriched process is listed in Supplementary Table~S6.
 
+% paper/figures/parasite_go_common.png is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go_common}
+  \caption{Gene Ontology biological processes most often over-represented among the
+  human proteins each parasite is predicted to interact with. Each parasite is
+  tested on its own with a one-sided Fisher's exact test against the human proteins
+  that passed the pipeline's filters, and corrected with Benjamini--Hochberg. A dot
+  marks a process at FDR $\le 0.05$, sized by the number of the parasite's host
+  interactors annotated to the process and shaded by the odds ratio. Rows are
+  processes annotated to at most 200 human proteins, in three blocks: those enriched
+  in at least half of the parasites of each niche (at least 9 of 17 intracellular
+  and 13 of 26 extracellular), then the 12 most common others of each niche. Within
+  a block, rows are ordered by the number of parasites and ties by the median odds
+  ratio. A process is left out if it shares at least half of its annotated human
+  proteins with a row already chosen. Hatching marks a process that cannot be
+  enriched in that niche, because the pool it is tested against holds too few (at
+  most 10) or too many (at least 500) proteins annotated to it.}
+  \label{fig:parasite_go}
+\end{figure}
 Seven processes are enriched in at least half of the parasites of each niche.
 Three are membrane traffic: vesicle fusion (11 intracellular and 14 extracellular
 parasites, from 6 and 13 genera), lysosomal transport (14 and 14, from 5 and 14
@@ -568,9 +640,10 @@ of the 14 for lysosomal transport and all 11 for Golgi vesicle transport still
 reach them through other parasite proteins. Two are adhesion, cell spreading on a
 substrate (11 and 23) and basement membrane organisation (9 and 20), which fit the
 laminins and integrins of Figure~\ref{fig:shared_ogs}. The process annotated as
-involved in interaction with the host (9 and 25) holds many of the entry receptors
-discussed above, among them the integrins, dystroglycan, neuropilin-1 and NPC1. The last, regulation of protein localization to membrane (9 and 17), rests on
-only 3 intracellular genera.
+involved in interaction with the host (9 and 25) is built from the same kind of
+cell-surface receptor: the integrins, dystroglycan and NPC1 discussed above,
+together with EGFR and neuropilin-1. The last, regulation of protein localization
+to membrane (9 and 17), rests on only 3 intracellular genera.
 
 The 26 extracellular parasites otherwise mostly reach the cell surface and lipid
 metabolism. All 26 are enriched for cell--substrate adhesion (21 of 21 genera), 24
@@ -614,27 +687,6 @@ reprogrammes the infected muscle cell, and its secreted products accumulate in t
 host nuclei~\todo{cite Despommier}. For \textit{Plasmodium} in erythrocytes, which
 have no nucleus, it is not, and we return to these links in the case study below.
 
-% paper/figures/parasite_go_common.png is generated: `make figures`.
-\begin{figure}[p]
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/parasite_go_common}
-  \caption{Gene Ontology biological processes most often over-represented among the
-  human proteins each parasite is predicted to interact with. Each parasite is
-  tested on its own with a one-sided Fisher's exact test against the human proteins
-  that passed the pipeline's filters, and corrected with Benjamini--Hochberg. A dot
-  marks a process at FDR $\le 0.05$, sized by the number of the parasite's host
-  interactors annotated to the process and shaded by the odds ratio. Rows are
-  processes annotated to at most 200 human proteins, in three blocks: those enriched
-  in at least half of the parasites of each niche (at least 9 of 17 intracellular
-  and 13 of 26 extracellular), then the 12 most common others of each niche. Within
-  a block, rows are ordered by the number of parasites and ties by the median odds
-  ratio. A process is left out if it shares at least half of its annotated human
-  proteins with a row already chosen. Hatching marks a process that cannot be
-  enriched in that niche, because the pool it is tested against holds too few (at
-  most 10) or too many (at least 500) proteins annotated to it.}
-  \label{fig:parasite_go}
-\end{figure}
-
 \subsection{Comparing the hosts of one parasite}
 Ten parasites were predicted against more than one host, and the hosts play
 different roles in their life cycles. Rats are the definitive hosts of
@@ -649,21 +701,6 @@ the rodent malaria parasites \textit{Plasmodium berghei} and
 compare the hosts, we compare links between orthologous groups rather than
 individual PPIs, since the host proteins differ
 (Figure~\ref{fig:multi_host}).
-
-Most of each interactome is shared between hosts
-(Figure~\ref{fig:multi_host}A). This is expected, since the host proteins most
-often reached are conserved across mammals, and it is consistent with the
-ability of these parasites to complete, or at least begin, their development
-in several mammals. Where the hosts differ, the host with fewer links is often
-the natural one, such as rat for \textit{H.~diminuta} and pig for
-\textit{Trichinella} (Figure~\ref{fig:multi_host}B), the opposite of what one
-would expect if the differences reflected adaptation to that host.
-
-\textit{P.~berghei} and \textit{P.~yoelii} are natural parasites of African
-thicket rats and complete the same liver and blood stages in laboratory mice
-and rats~\todo{cite}. Their interactomes are accordingly among the most
-consistent between hosts, and most of what differs is lost from rat at the
-expression filter. \todo{Expand the malaria comparison in mouse and rat.}
 
 % paper/figures/multi_host.pdf is generated: `make figures`.
 \begin{figure}[htbp]
@@ -680,6 +717,20 @@ expression filter. \todo{Expand the malaria comparison in mouse and rat.}
   filter, or removed by the DeepLoc filter.}
   \label{fig:multi_host}
 \end{figure}
+Most of each interactome is shared between hosts
+(Figure~\ref{fig:multi_host}A). This is expected, since the host proteins most
+often reached are conserved across mammals, and it is consistent with the
+ability of these parasites to complete, or at least begin, their development
+in several mammals. Where the hosts differ, the host with fewer links is often
+the natural one, such as rat for \textit{H.~diminuta} and pig for
+\textit{Trichinella} (Figure~\ref{fig:multi_host}B), the opposite of what one
+would expect if the differences reflected adaptation to that host.
+
+\textit{P.~berghei} and \textit{P.~yoelii} are natural parasites of African
+thicket rats and complete the same liver and blood stages in laboratory mice
+and rats~\todo{cite}. Their interactomes are accordingly among the most
+consistent between hosts, and most of what differs is lost from rat at the
+expression filter. \todo{Expand the malaria comparison in mouse and rat.}
 
 Three quarters of the links missing from a host are lost at the TISSUES filter,
 and these losses follow how well each host's infected tissues are annotated
@@ -723,6 +774,30 @@ organs, which underlies cerebral malaria, and are cleared in the
 spleen~\todo{cite}. We used the cell-type resolution of OrthoHPI 2.0 to narrow
 the predicted network to the blood stage (Figure~\ref{fig:pf_case_study}).
 
+% paper/figures/pf_case_study.png is generated: `make figures`.
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/pf_case_study}
+  \caption{Case study: human--\textit{P.~falciparum} network, narrowed
+  in stages: the predicted interactions with a confidence score of at least
+  0.7 (A); those whose host protein is found in blood (B); and from these
+  two branches, those whose host protein is detected in erythrocytes, at more
+  than 1 normalized count per million (nCPM), in the blood single-cell RNA-seq
+  data of the Human Protein Atlas (C) \todo{cite Digre and Lindskog 2023},
+  and those whose host protein is found in none of the other tissues the
+  parasite infects, namely skin, liver, brain and spleen (D).
+  \textbf{(A--D)} The network of each stage, drawn as in the OrthoHPI app:
+  parasite proteins as diamonds, host proteins as circles, and link width by
+  confidence score. In (A) and (B), proteins and links that reach no later
+  stage are greyed. In (D), a parasite protein is named by its STRING
+  description, or by its gene name where it has none, and a host protein by its
+  gene name; the links of (C) and (D) are listed in Supplementary Table S4. \textbf{(E)} Gene Ontology biological processes enriched
+  among the host proteins of each stage (Fisher's exact test against the host
+  proteins the pipeline could have predicted, Benjamini--Hochberg FDR $<$
+  0.05); each stage contributes its three best terms, leaving out a term
+  covering the same host proteins as a better one.}
+  \label{fig:pf_case_study}
+\end{figure}
 At a confidence score of at least 0.7, \textit{P.~falciparum} has 462
 predicted links between 49 parasite and 278 human proteins
 (Figure~\ref{fig:pf_case_study}A). Restricting to host proteins found in blood
@@ -774,70 +849,26 @@ to the host's response to oxidative and heme stress during the blood
 stage~\todo{cite}, so the link is worth noting as a hypothesis about the
 erythroid lineage rather than as a contact in the circulating cell.
 
-% paper/figures/pf_case_study.png is generated: `make figures`.
+% paper/figures/web_interface.png is built from screenshots of the app: `make figures`.
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/pf_case_study}
-  \caption{Case study: human--\textit{P.~falciparum} network, narrowed
-  in stages: the predicted interactions with a confidence score of at least
-  0.7 (A); those whose host protein is found in blood (B); and from these
-  two branches, those whose host protein is detected in erythrocytes, at more
-  than 1 normalized count per million (nCPM), in the blood single-cell RNA-seq
-  data of the Human Protein Atlas (C) \todo{cite Digre and Lindskog 2023},
-  and those whose host protein is found in none of the other tissues the
-  parasite infects, namely skin, liver, brain and spleen (D).
-  \textbf{(A--D)} The network of each stage, drawn as in the OrthoHPI app:
-  parasite proteins as diamonds, host proteins as circles, and link width by
-  confidence score. In (A) and (B), proteins and links that reach no later
-  stage are greyed. In (D), a parasite protein is named by its STRING
-  description, or by its gene name where it has none, and a host protein by its
-  gene name; the links of (C) and (D) are listed in Supplementary Table S4. \textbf{(E)} Gene Ontology biological processes enriched
-  among the host proteins of each stage (Fisher's exact test against the host
-  proteins the pipeline could have predicted, Benjamini--Hochberg FDR $<$
-  0.05); each stage contributes its three best terms, leaving out a term
-  covering the same host proteins as a better one.}
-  \label{fig:pf_case_study}
-\end{figure}
-
-\subsection{Structural modelling of interactions}
-To test whether transferred interactions are structurally plausible, we
-modelled 48 predicted interactions whose human counterparts are known to bind
-directly, each alongside that human reference complex, using AlphaFold~3
-(Figure~\ref{fig:alphafold_direct}). AlphaFold found a confident interface
-(ipSAE $\ge 0.1$) for 20 of the 48 human references, but for only 8 of the
-predicted parasite--human pairs (by ipTM $\ge 0.6$, 11 references and one
-predicted pair). The reference usually scored higher than the predicted pair
-(30 pairs higher, 6 lower, 12 tied), most clearly when it shared the predicted
-human partner.
-
-Two points follow. First, that more than half of the experimentally supported
-human complexes were not modelled confidently shows that the test is
-conservative: a low score does not rule out an interaction. Second, the weaker
-scores of the parasite--human pairs are expected, since the parasite protein
-has diverged from the human one the interaction was transferred from, and
-binding interfaces can be lost with few substitutions. Links with a confident
-model, such as Q4D3L1--DR1 of \textit{T.~cruzi}
-(Figure~\ref{fig:web_interface}C), are the best candidates for experimental
-follow-up.
-
-% paper/figures/alphafold_direct.png is generated: `make figures`.
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/alphafold_direct}
-  \caption{Structural modelling of interactions. AlphaFold 3 interface
-  confidence of predicted parasite--human links against that of the human
-  interaction each was transferred from. The 48 links are predicted against
-  human, eight from each confidence-score bin between 0.35 and 1, at most one
-  per pair of orthologous groups. Each is paired with a human reference: a pair
-  of human members of the same two orthologous groups shown to bind directly in
-  BioGRID or IntAct, the predicted human partner itself where possible
-  (circles), otherwise the pair with the most publications (diamonds).
-  \textbf{(A)} ipTM and \textbf{(B)} ipSAE of the best-ranked model of each
-  complex, coloured by the confidence score of the link. The dashed lines mark
-  an interface as found (ipTM $\ge 0.6$, ipSAE $\ge 0.1$), and the counts give
-  the links in each quadrant: an interface in both models, only in the
-  reference, only in the predicted link, or in neither.}
-  \label{fig:alphafold_direct}
+  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_interface}
+  \caption{The web resource: network page, for \textit{Trypanosoma cruzi} in
+  \textit{Homo sapiens} at a confidence score of at least 0.7, restricted to the
+  heart. \textbf{(A)} The host, parasite, confidence score, tissues and
+  cell-type expression are chosen beside a body map of the predicted
+  interactions per infected organ. \textbf{(B)} The network, whose host
+  proteins can be restricted by DeepLoc localisation; hovering over a link
+  names its proteins and confidence score. \textbf{(C)} Clicking a link opens
+  the AlphaFold models of its parasite and host protein, coloured by pLDDT,
+  with the STRING link between orthologous groups it was transferred from;
+  shown for Q4D3L1--DR1, the link with the highest ipSAE in
+  Supplementary Figure~\ref{fig:alphafold_direct}. \textbf{(D)} Gene Ontology biological
+  processes enriched among the host proteins of the network; the page also
+  tests the parasite proteins, and lists every tested process and its place in
+  the GO hierarchy. The network, interaction table and enrichment results can
+  each be downloaded.}
+  \label{fig:web_interface}
 \end{figure}
 
 \subsection{The web resource}
@@ -860,35 +891,12 @@ a specific pair of parasites.}
 different hosts. Get a table of the reasons why some interactions are missing
 from one host.}
 
-% paper/figures/web_interface.png is built from screenshots of the app: `make figures`.
-\begin{figure}[p]
-  \centering
-  \includegraphics[width=\textwidth,height=0.83\textheight,keepaspectratio]{figures/web_interface}
-  \caption{The web resource: network page, for \textit{Trypanosoma cruzi} in
-  \textit{Homo sapiens} at a confidence score of at least 0.7, restricted to the
-  heart. \textbf{(A)} The host, parasite, confidence score, tissues and
-  cell-type expression are chosen beside a body map of the predicted
-  interactions per infected organ. \textbf{(B)} The network, whose host
-  proteins can be restricted by DeepLoc localisation; hovering over a link
-  names its proteins and confidence score. \textbf{(C)} Clicking a link opens
-  the AlphaFold models of its parasite and host protein, coloured by pLDDT,
-  with the STRING link between orthologous groups it was transferred from;
-  shown for Q4D3L1--DR1, the link with the highest ipSAE in
-  Figure~\ref{fig:alphafold_direct}. \textbf{(D)} Gene Ontology biological
-  processes enriched among the host proteins of the network; the page also
-  tests the parasite proteins, and lists every tested process and its place in
-  the GO hierarchy. The network, interaction table and enrichment results can
-  each be downloaded.}
-  \label{fig:web_interface}
-\end{figure}
-
 \section{Discussion}
 \todo{Complexes: STRING interactions can mean that they are part of the same
 complex, not necessarily that those two proteins are in direct contact.}
 \todo{Mention somewhere that we lowered the cut-off for TISSUES compared to the
 previous version.}
 \todo{Discuss false positives.}
-\todo{Single residue mutations can change binding.}
 \todo{The expression filter is only on the host side, so the parasites'
 proteins are not filtered by life stage. We have very little transcriptomics
 data for the parasites. Check what we have in VEuPathDB
@@ -940,6 +948,26 @@ therefore the hardest case for orthology transfer, and asking whether the
 contributing parasite groups are functionally independent of one another is a
 more useful check than counting them.
 
+Whether the parasite protein is secreted is the second question to ask, and it
+decides how such a transfer should be read. The syntaxins and SNAREs behind the
+fusion rows are membrane and lysosomal proteins that act on the parasite's own
+compartments, so a host interaction is implausible however many parasites carry
+them. The same pattern elsewhere involves families DeepLoc places wholly outside
+the cell, among them the NPC2-like, apolipoprotein~B-like and saposin-like
+proteins that reach host NPC1, the sortilins and CHID1, and those are at least
+in a position to bind what their host counterpart binds. Self-transfer of a
+conserved module is therefore not uniformly an artefact: it is uninformative
+when the parasite protein never leaves the parasite, and a hypothesis worth
+testing when it does.
+
+The structural models give a sense of how far a transferred link can be
+trusted at the level of a single contact. That more than half of the
+experimentally supported human complexes were not modelled confidently shows
+that the test is conservative: a low score does not rule out an interaction.
+The weaker scores of the parasite--human pairs are expected, since the parasite
+protein has diverged from the human one the interaction was transferred from,
+and binding interfaces can be lost with few substitutions.
+
 \section{Conclusion}
 \todo{conclusion}
 
@@ -986,6 +1014,15 @@ niche left without its largest parasite group, and the niches that cannot reach 
 Ontology biological process over-represented at FDR $\le 0.05$ among the human
 interactors of each parasite (Figure~\ref{fig:parasite_go}), with the odds ratio,
 the $p$-value and FDR, and the human proteins annotated to the process.
+
+\textbf{Supplementary Table S7} (\texttt{parasite\_protein\_go\_enriched.csv}).
+Every Gene Ontology biological process over-represented at FDR $\le 0.05$ among
+the parasite proteins of each parasite with a predicted human interaction. Each
+parasite is tested with a one-sided Fisher's exact test against its own proteins
+that passed the secretome filter, on processes annotated to more than 10 and
+fewer than 500 of them, and corrected with Benjamini--Hochberg. Given are the
+odds ratio, the $p$-value and FDR, the parasite proteins annotated to the
+process and the number of parasite orthologous groups they belong to.
 
 \subsection*{Supplementary figures}
 \textbf{Supplementary Figure~\ref{fig:funnel}}. The share of proteins each
@@ -1100,6 +1137,32 @@ for the host (Figure~\ref{fig:deeploc_pools_host}) and parasite
   are as in Supplementary Figure~\ref{fig:deeploc_pools_host}. The strips beside
   the names give the niche (outer) and the taxonomic group (inner).}
   \label{fig:deeploc_pools_parasite}
+\end{figure}
+
+\textbf{Supplementary Figure~\ref{fig:alphafold_direct}}. AlphaFold~3 models
+of predicted interactions against the human complexes they were transferred
+from.
+
+% paper/figures/alphafold_direct.png is generated: `make figures`.
+\begin{figure}[p]
+  \captionsetup{name=Supplementary Figure}
+  \renewcommand{\thefigure}{S7}
+  \centering
+  \includegraphics[width=\textwidth]{figures/alphafold_direct}
+  \caption{Structural modelling of interactions. AlphaFold 3 interface
+  confidence of predicted parasite--human links against that of the human
+  interaction each was transferred from. The 48 links are predicted against
+  human, eight from each confidence-score bin between 0.35 and 1, at most one
+  per pair of orthologous groups. Each is paired with a human reference: a pair
+  of human members of the same two orthologous groups shown to bind directly in
+  BioGRID or IntAct, the predicted human partner itself where possible
+  (circles), otherwise the pair with the most publications (diamonds).
+  \textbf{(A)} ipTM and \textbf{(B)} ipSAE of the best-ranked model of each
+  complex, coloured by the confidence score of the link. The dashed lines mark
+  an interface as found (ipTM $\ge 0.6$, ipSAE $\ge 0.1$), and the counts give
+  the links in each quadrant: an interface in both models, only in the
+  reference, only in the predicted link, or in neither.}
+  \label{fig:alphafold_direct}
 \end{figure}
 
 \section*{Data and code availability}

@@ -151,7 +151,11 @@ figures: figures/workflow.png figures/alphafold_direct.png figures/funnel_shares
 tables/parasites.tex: ../config.yml ../data/predictions.parquet ../scripts/build_parasite_table.py
 	cd .. && $(PYTHON) scripts/build_parasite_table.py
 
-tables: tables/parasites.tex
+# Supplementary Table S7: the parasite processes behind the predicted interactions.
+tables/parasite_protein_go_enriched.csv: ../config.yml ../data/predictions.parquet ../data/gos.parquet ../data/eligible_proteins.parquet ../app/web_utils.py ../scripts/build_parasite_protein_go.py
+	cd .. && $(PYTHON) scripts/build_parasite_protein_go.py
+
+tables: tables/parasites.tex tables/parasite_protein_go_enriched.csv
 
 # Not a dependency of paper.pdf: the Zotero library changes under the Makefile's
 # feet, and a build that silently rewrote the bibliography would be worse than

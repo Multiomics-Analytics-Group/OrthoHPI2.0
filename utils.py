@@ -122,16 +122,15 @@ def cluster_terms(enriched, terms, by, columns):
     return [terms[i] for i in hierarchy.leaves_list(tree)]
 
 
-def testable_terms(background, min_term=10, max_term=500, max_share=0.25):
+def testable_terms(background, min_term=10, max_term=500):
     '''The terms of a background within the size limits calculate_enrichment tests.'''
     sizes = background['sizes']
-    max_term = min(max_term, round(max_share * len(background['annotated'])))
 
     return sizes[(sizes > min_term) & (sizes < max_term)].index
 
 
-def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0.25,
-                         min_in_set=2, background=None):
+def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=2,
+                         background=None):
     '''
     Fisher's exact test (one-sided, greater) of every Gene Ontology term against one set
     of proteins; `background` is prepare_go_background(go_df), when already worked out.
@@ -147,7 +146,7 @@ def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, max_share=0
 
     hits = pairs[pairs['#string_protein_id'].isin(tested)]
     in_set = hits.groupby('term').size()
-    terms = testable_terms(background, min_term, max_term, max_share).intersection(
+    terms = testable_terms(background, min_term, max_term).intersection(
         in_set[in_set >= min_in_set].index).sort_values()
 
     columns = ['go_id', 'go_term', 'A', 'B', 'C', 'D', 'p_value', 'odds_ratio', 'nodes']

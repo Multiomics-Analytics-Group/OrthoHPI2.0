@@ -6,7 +6,10 @@ from css import style
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 FAVICON = os.path.join(APP_DIR, "favicon.png")
-st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={}, page_icon=FAVICON)
+FAVICON_URL = ("https://raw.githubusercontent.com/Multiomics-Analytics-Group/OrthoHPI2.0/"
+               "main/app/favicon.png")
+st.set_page_config(layout="wide", page_title="OrthoHPI 2.0", menu_items={},
+                   page_icon=FAVICON_URL)
 st.session_state.data_dir = 'data'
 st.session_state.config_file = 'config.yml'
 style.load_css()

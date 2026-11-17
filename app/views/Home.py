@@ -64,15 +64,18 @@ SPLIT_SIDES = {'Taxonomic group': (None, None),
 # how far under the lowest cut-off or point a probability scale starts
 SCALE_MARGIN = 0.05
 # rows of the shared orthologous group dot plot, pixels a row takes, and what the strip,
-# the names and the legends take besides
-TOP_OGS = 40
+# the titles and the strips take besides; the names and the legends under them are added
+TOP_OGS = 20
 DOT_ROW = 19
-DOT_CHROME = 230
+DOT_CHROME = 140
 # characters a line of an orthologous group name is wrapped at
 LABEL_CHARS = 30
 # room a group name takes left of the dots: ~6.2 px a character, plus the axis title
 LABEL_CHAR = 6.2
 LABEL_PADDING = 40
+# slant and size of the parasite names under the columns
+NAME_ANGLE = -60
+NAME_FONT = 11
 # height of one horizontal legend row, in pixels
 LEGEND_ROW = 46
 # session key counting remounts of the cross-host overlap matrix, so the same cell can be
@@ -302,7 +305,7 @@ def style_host_columns(figure, y_title):
                          margin=dict(l=0, r=0, t=95, b=10),
                          legend=dict(orientation='h', yanchor='bottom', y=1.14, x=0,
                                      title_text='', font=dict(size=11)))
-    figure.update_xaxes(tickangle=-60, showgrid=False, tickfont=dict(size=11))
+    figure.update_xaxes(tickangle=NAME_ANGLE, showgrid=False, tickfont=dict(size=NAME_FONT))
     figure.update_yaxes(showgrid=True, gridcolor='#f0f0f0', zerolinecolor='#e0e0e0')
     figure.update_yaxes(title_text=y_title, row=1, col=1)
 
@@ -677,7 +680,11 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     '''
     # a wrapped name opens its row up
     ys = web_utils.row_positions(ogs, DOT_ROW)
-    height = round(DOT_ROW * (ys[-1] + 1)) + DOT_CHROME
+    # the slanted parasite names, then a row for each of the two legends
+    names = abs(np.sin(np.radians(NAME_ANGLE))) * (
+        0.65 * NAME_FONT * max(len(short_name(n)) for n in df['name'].unique()) + 12) + 10
+    bottom = round(names) + 2 * LEGEND_ROW
+    height = round(DOT_ROW * (ys[-1] + 1)) + DOT_CHROME + bottom
     # the strips keep the height they have under the other figures
     figure, hosts = host_columns(df, width, bands=2,
                                  band_height=BAND_HEIGHT * 470 / height)
@@ -734,15 +741,16 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
     # the names belong under the strips
     figure.update_xaxes(showticklabels=False, row=1)
     figure.update_xaxes(showticklabels=False, row=2)
-    figure.update_xaxes(automargin=True, row=3)
-    # the legends are placed from the top of the figure rather than the plot, which the
-    # rows have made tall
-    figure.update_layout(height=height, margin=dict(t=2 * LEGEND_ROW),
-                         legend=dict(yref='container', yanchor='top', y=1,
+    # the margin holds the names and the legends under them, placed from the bottom of
+    # the figure rather than the plot, which the rows have made tall
+    figure.update_xaxes(automargin=False, row=3)
+    figure.update_layout(height=height, margin=dict(t=50, b=bottom),
+                         legend=dict(yref='container', yanchor='bottom',
+                                     y=LEGEND_ROW / height,
                                      title_text='taxonomic group',
                                      title_font=dict(size=11)),
                          legend3=dict(orientation='h', x=0, yref='container',
-                                      yanchor='top', y=1 - LEGEND_ROW / height,
+                                      yanchor='bottom', y=0,
                                       title_text=web_utils.NICHE_TITLE,
                                       title_font=dict(size=11), font=dict(size=11)))
 

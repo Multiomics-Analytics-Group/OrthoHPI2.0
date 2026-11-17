@@ -1045,11 +1045,11 @@ with nav.body:
              'the background as well as the biology.')
     st.caption('Which biological processes are over-represented among the host proteins '
                'each parasite targets.')
-    # run once asked for, then kept until the host changes: it tests every parasite
-    # against the GO annotations of the host
-    run_for = tuple(selected_taxids)
+    # run once asked for, and asked for again when the host or the confidence changes, which
+    # are what the interactors it tests are taken by: it tests every parasite
+    run_for = (tuple(selected_taxids), score)
     if (st.session_state.get('compare_enrichment_for') != run_for
-            and st.button('Run the enrichment analysis')):
+            and st.button('Run enrichment analysis')):
         st.session_state['compare_enrichment_for'] = run_for
         st.rerun()
     if st.session_state.get('compare_enrichment_for') == run_for:

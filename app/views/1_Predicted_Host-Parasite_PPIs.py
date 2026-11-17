@@ -1332,11 +1332,11 @@ with nav.body:
                      'least two are in the network.')
             st.caption('Biological processes over-represented among the host proteins and '
                        'among the parasite proteins of the network.')
-            # run once asked for, then kept through the filters until the parasite or host
-            # changes: each new network reads the GO annotations of its species
-            run_for = (selected_parasite, tuple(selected_taxids))
+            # run once asked for, and asked for again whenever the network changes, with the
+            # host, the parasite or any filter: the test is the slow part of the page
+            run_for = (selected_parasite, tuple(selected_taxids), tuple(page_filters))
             if (st.session_state.get('net_enrichment_for') != run_for
-                    and st.button('Run the enrichment analysis')):
+                    and st.button('Run enrichment analysis')):
                 st.session_state['net_enrichment_for'] = run_for
                 st.rerun()
             if st.session_state.get('net_enrichment_for') == run_for:

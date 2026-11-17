@@ -605,14 +605,19 @@ def style_go_axes(fig):
     return fig
 
 
-def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
+def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N, selected_terms=None):
     '''
     The enriched processes as a ranked dot plot: the most significant terms, named on
     the axis, placed by odds ratio, sized by how many proteins of the network carry them
-    and shaded by significance.
+    and shaded by significance. The processes in `selected_terms` are ringed in the colour
+    they are highlighted in on the network, and added where they fall outside the top.
     '''
+    selected_terms = set(selected_terms or [])
     view = prepare_enrichment_view(enrichment_df)
-    view = view.nsmallest(top_n, 'fdr_bh').sort_values('odds_ratio_plot')
+    top = view.nsmallest(top_n, 'fdr_bh')
+    view = pd.concat([top, view[view['go_term'].isin(selected_terms)
+                                & ~view.index.isin(top.index)]])
+    view = view.sort_values('odds_ratio_plot')
     view['label'] = view['go_term'].map(wrap_term)
     view['odds_ratio_text'] = np.where(view['capped'], 'infinite (all proteins in the network)',
                                        view['odds_ratio_plot'].map('{:.1f}'.format))
@@ -621,7 +626,10 @@ def get_enrichment_dotplot(enrichment_df, top_n=GO_TOP_N):
                      color='significance', color_continuous_scale=GO_SEQUENTIAL,
                      size_max=26,
                      custom_data=['go_term', 'odds_ratio_text', 'n_proteins', 'fdr_bh'])
-    fig.update_traces(marker=dict(line=dict(color=NETWORK_BACKGROUND, width=1.5)),
+    chosen = view['go_term'].isin(selected_terms).tolist()
+    fig.update_traces(marker=dict(line=dict(
+                          color=[HIGHLIGHT_COLOR if c else NETWORK_BACKGROUND for c in chosen],
+                          width=[3 if c else 1.5 for c in chosen])),
                       hovertemplate='<b>%{customdata[0]}</b><br>'
                                     'Odds ratio: %{customdata[1]}<br>'
                                     'Proteins in the network: %{customdata[2]}<br>'
@@ -1334,96 +1342,110 @@ with nav.body:
                 enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
                 by_side = enrichment_view['side'].value_counts()
                 per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
-                st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
-                           'Select rows to highlight GO terms in the network.')
-                grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
-                                    hide_index=True, on_select='rerun',
-                                    selection_mode='multi-row', key='enrichment_table')
-                # a selection made before the FDR shortened the table can point past its end
-                selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
-                                                       if r < len(enrichment_table)]]
+                # the figures come first on the page but are drawn once the table below
+                # them has said which rows are selected
+                figures_slot = st.container()
+                if not enrichment_view.empty:
+                    st.subheader(
+                        "Highlight a biological process in the network",
+                        help='Select one or more processes to colour the proteins annotated '
+                             'to them in a copy of the network, drawn under the table, and to '
+                             'narrow the figures above to those processes.')
+                    st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} '
+                               f'({per_side}). Select rows to colour their proteins in the '
+                               'network below.')
+                    grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                        hide_index=True, on_select='rerun',
+                                        selection_mode='multi-row', key='enrichment_table')
+                    # a selection made before the FDR shortened the table can point past
+                    # its end
+                    selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                           if r < len(enrichment_table)]]
             else:
                 st.subheader("No GO terms were found enriched")
 
-    with st.container():
-        if enrichment_view is not None and enrichment_view.empty:
-            st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
-                    "to see the processes that are enriched less strongly.")
-        elif enrichment_view is not None:
-            enrichment_viz = enrichment_view
-            if selected_rows is not None and len(selected_rows) > 0:
-                selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
-                enrichment_viz = enrichment_viz[picked(enrichment_viz, selected_rows)]
+    if enrichment_view is not None:
+        with figures_slot:
+            if enrichment_view.empty:
+                st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction "
+                        "above to see the processes that are enriched less strongly.")
+            else:
+                if selected_rows is not None and len(selected_rows) > 0:
+                    selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
 
-            st.subheader(
-                "Enriched biological processes",
-                help='The ranked view shows the '
-                     f'{GO_TOP_N} most significantly over-represented processes, positioned by '
-                     'odds ratio, sized by the number of proteins annotated to each and shaded '
-                     'by significance. The volcano shows every process tested, with those '
-                     'passing the selected FDR highlighted. The hierarchy nests each process '
-                     'within the closest enriched process above it in the Gene Ontology; click '
-                     'a block to zoom in. Select rows in the table above to restrict the '
-                     'figures.')
-            st.caption('The enriched processes ranked, among every process tested, and nested '
-                       'in the Gene Ontology.')
-            # one tab per side, the figures of that side inside it
-            for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
-                with side_tab:
-                    tested = enrichment[enrichment['side'] == s]
-                    passing = enrichment_viz[enrichment_viz['side'] == s]
-                    if tested.empty:
-                        st.caption(f'No process could be tested among the {s.lower()}.')
-                        continue
-                    ranked_tab, volcano_tab, tree_tab = st.tabs(
-                        ["Ranked processes", "All tested processes", "Hierarchy"])
-                    with ranked_tab:
-                        if passing.empty:
-                            st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
-                        else:
-                            st.plotly_chart(get_enrichment_dotplot(passing), width='stretch',
-                                            key=f'dotplot_{s}')
-                    with volcano_tab:
-                        picked_terms = passing['go_term'].tolist() if selected_terms else []
-                        st.plotly_chart(get_enrichment_volcano(tested, fdr, picked_terms),
-                                        width='stretch', key=f'volcano_{s}')
-                    with tree_tab:
-                        part = enrichment_view[enrichment_view['side'] == s]
-                        if part.empty:
-                            st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
-                        else:
-                            st.plotly_chart(get_enrichment_summary(part,
-                                                                   load_ontology_parents(data_dir)),
-                                            width='stretch', key=f'treemap_{s}')
+                st.subheader(
+                    "Enriched biological processes",
+                    help='The ranked view shows the '
+                         f'{GO_TOP_N} most significantly over-represented processes, positioned by '
+                         'odds ratio, sized by the number of proteins annotated to each and shaded '
+                         'by significance. The volcano shows every process tested, with those '
+                         'passing the selected FDR highlighted. The hierarchy nests each process '
+                         'within the closest enriched process above it in the Gene Ontology; click '
+                         'a block to zoom in. Processes selected in the table below are ringed '
+                         'in pink in the ranked view and the volcano.')
+                st.caption('The enriched processes ranked, among every process tested, and nested '
+                           'in the Gene Ontology.')
+                # one tab per side, the figures of that side inside it
+                for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
+                    with side_tab:
+                        tested = enrichment[enrichment['side'] == s]
+                        passing = enrichment_view[enrichment_view['side'] == s]
+                        # the processes of this side picked in the table, which are marked
+                        # rather than filtered on
+                        picked_terms = (passing[picked(passing, selected_rows)]['go_term'].tolist()
+                                        if len(selected_terms) > 0 else [])
+                        if tested.empty:
+                            st.caption(f'No process could be tested among the {s.lower()}.')
+                            continue
+                        ranked_tab, volcano_tab, tree_tab = st.tabs(
+                            ["Ranked processes", "All tested processes", "Hierarchy"])
+                        with ranked_tab:
+                            if passing.empty:
+                                st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                            else:
+                                st.plotly_chart(get_enrichment_dotplot(
+                                                    passing, selected_terms=picked_terms),
+                                                width='stretch', key=f'dotplot_{s}')
+                        with volcano_tab:
+                            st.plotly_chart(get_enrichment_volcano(tested, fdr, picked_terms),
+                                            width='stretch', key=f'volcano_{s}')
+                        with tree_tab:
+                            part = enrichment_view[enrichment_view['side'] == s]
+                            if part.empty:
+                                st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                            else:
+                                st.plotly_chart(get_enrichment_summary(part,
+                                                                       load_ontology_parents(data_dir)),
+                                                width='stretch', key=f'treemap_{s}')
 
-            with st.container():
-                if len(selected_terms) > 0:
-                    if enrichment is not None:
-                        highlighted_nodes = enrichment[picked(enrichment, selected_rows)]['nodes'].values
-                        highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
-                        highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
-                        G = generate_graph(df_select, score,
-                                           web_utils.load_protein_annotations(data_dir),
-                                           surface_calls)
-                        nx.set_node_attributes(G, MUTED_COLOR, 'color')
-                        nx.set_node_attributes(G, highlight_color, 'color')
-                        net = GraphNetwork(height="450px", width="100%",
-                                      bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
-                        net.from_nx(G)
-                        G = None
-                        style_network(net)
-                        html_data = net.generate_html()
-                        net = None
-                        st.subheader("Nodes annotated to the selected biological processes")
-                        st.caption('The network with the proteins annotated to the biological '
-                                   'processes selected above in pink and the remainder in grey.')
-                        st.iframe(html_data, height=500)
-                        st.download_button(
-                            label="Download Network as Html",
-                            data=html_data,
-                            file_name=f'{selected_parasite}_enrichment_network.html',
-                            mime='text/html',
-                        )
+        # under the table it is chosen from
+        if len(selected_terms) > 0:
+            if enrichment is not None:
+                highlighted_nodes = enrichment[picked(enrichment, selected_rows)]['nodes'].values
+                highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
+                highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
+                G = generate_graph(df_select, score,
+                                   web_utils.load_protein_annotations(data_dir),
+                                   surface_calls)
+                nx.set_node_attributes(G, MUTED_COLOR, 'color')
+                nx.set_node_attributes(G, highlight_color, 'color')
+                net = GraphNetwork(height="450px", width="100%",
+                              bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
+                net.from_nx(G)
+                G = None
+                style_network(net)
+                html_data = net.generate_html()
+                net = None
+                st.subheader("Nodes annotated to the selected biological processes")
+                st.caption('The network with the proteins annotated to the biological '
+                           'processes selected in the table in pink and the remainder in grey.')
+                st.iframe(html_data, height=500)
+                st.download_button(
+                    label="Download Network as Html",
+                    data=html_data,
+                    file_name=f'{selected_parasite}_enrichment_network.html',
+                    mime='text/html',
+                )
 
 nav.finish()
 

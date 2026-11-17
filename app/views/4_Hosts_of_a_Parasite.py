@@ -425,7 +425,7 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     available = {}
     for host, taxids in hosts_taxids.items():
         proteins = web_utils.filtered_pool(data_dir, taxids, niche=niche)
-        available[host] = (len(proteins), len(proteins & infected))
+        available[host] = len(proteins & infected)
 
     return available
 
@@ -446,10 +446,7 @@ def get_host_coverage(data_dir, config, score, parasite, hosts_taxids):
         'parasite proteins': ('source', 'nunique'),
         'host proteins reached': ('target', 'nunique'),
         'host orthologous groups reached': ('group2', 'nunique')}).reset_index()
-    coverage['host proteins this parasite could reach'] = coverage['host'].map(
-        lambda h: available[h][0])
-    coverage['of those, in a tissue it infects'] = coverage['host'].map(
-        lambda h: available[h][1])
+    coverage['candidate host proteins'] = coverage['host'].map(available)
 
     return coverage.rename(columns={'host': 'Host'}).sort_values(
         'predicted interactions', ascending=False, kind='stable')
@@ -553,18 +550,22 @@ else:
         # annotated more deeply
         st.subheader(
             'Predicted interactions relative to the available host proteins',
-            help='Interactions predicted in each host beside the pool of host proteins '
-                 'they were drawn from: those passing the tissue and DeepLoc filters and '
+            help='Interactions predicted in each host beside the candidate host proteins '
+                 'they were drawn from: those passing the tissue and DeepLoc filters, '
                  'lying where this parasite\'s niche can reach them — the surface of the '
                  'cell for a parasite that stays outside it, the cytosol and nucleus as '
-                 'well for one that gets in — and those among them annotated to a tissue '
-                 'this parasite infects. The second pool is what the predictions were '
-                 'drawn from, so a host with more predicted interactions than another may '
-                 'simply have more of it.')
-        st.caption('The interactions predicted in each host, beside how many host proteins '
-                   'this parasite could reach there.')
+                 'well for one that gets in — and annotated to a tissue this parasite '
+                 'infects. A host with more predicted interactions than another may '
+                 'simply have more candidates.')
+        st.caption('The interactions predicted in each host, beside how many candidate '
+                   'host proteins it had.')
         st.dataframe(get_host_coverage(data_dir, config, score, parasite, hosts_taxids),
-                     width='stretch', hide_index=True)
+                     width='stretch', hide_index=True,
+                     column_config={'candidate host proteins': st.column_config.NumberColumn(
+                         help='Host proteins that pass the tissue and DeepLoc filters, '
+                              'lie where this parasite can reach them, and are expressed '
+                              'in a tissue it infects: the pool the predictions were '
+                              'drawn from.')})
 
         body_column, sets_column = st.columns([1, 1], gap='large')
         with body_column:

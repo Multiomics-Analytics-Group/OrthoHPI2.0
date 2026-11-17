@@ -3,13 +3,13 @@ The web interface figure: screenshots of the network page laid out in two column
 column's screenshots at one width and the columns as tall as each other, lettered down
 the first column and then the second.
 
-  A  the body figure and the query controls
+  A  the OrthoHPI logo over the body figure and the query controls
   B  the network
   C  the AlphaFold models of a link's proteins, opened by clicking it
   D  the GO biological processes enriched among the host proteins
 
 The screenshots are paper/figures/web/*.png, taken from the running app by
-scripts/capture_web_screenshots.py. Writes paper/figures/web_interface.svg/.png.
+scripts/capture_web_screenshots.py, and the logo paper/figures/web/logo.png. Writes paper/figures/web_interface.svg/.png.
 '''
 import argparse
 import os
@@ -18,6 +18,7 @@ import sys
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -37,6 +38,25 @@ GAP = 0.2
 ROW_GAP = 0.08
 TITLE_ROOM = 0.2
 BORDER_COLOR = '#c7cfd9'
+# the logo over the controls screenshot: its height, and the margins around it, in
+# screenshot pixels
+LOGO_HEIGHT = 110
+LOGO_MARGIN = (16, 18, 24)  # left, top, bottom
+
+
+def with_logo(image, logo):
+    '''The screenshot with the logo, flattened onto white, in a strip across its top.'''
+    from PIL import Image
+
+    logo = Image.fromarray((logo * 255).astype(np.uint8))
+    logo = logo.resize((round(logo.width * LOGO_HEIGHT / logo.height), LOGO_HEIGHT), Image.LANCZOS)
+    logo = np.asarray(logo, dtype=float) / 255
+    rgb, alpha = logo[..., :3], logo[..., 3:]
+    left, top, bottom = LOGO_MARGIN
+    strip = np.ones((top + LOGO_HEIGHT + bottom, image.shape[1], image.shape[2]))
+    strip[top:top + LOGO_HEIGHT, left:left + logo.shape[1], :3] = rgb * alpha + (1 - alpha)
+
+    return np.vstack([strip, image])
 
 
 def column_widths(images):
@@ -54,6 +74,10 @@ def draw(columns, screenshot_dir, output_stem):
     figure_style.apply()
     images = [[mpimg.imread(os.path.join(screenshot_dir, f'{name}.png')) for name in column]
               for column in columns]
+    logo = mpimg.imread(os.path.join(screenshot_dir, 'logo.png'))
+    images = [[with_logo(image, logo) if name == 'controls' else image
+               for name, image in zip(column, column_images)]
+              for column, column_images in zip(columns, images)]
     widths = column_widths(images)
     panels = max(len(column) for column in columns)
     chrome = (TITLE_ROOM + ROW_GAP) * panels - ROW_GAP

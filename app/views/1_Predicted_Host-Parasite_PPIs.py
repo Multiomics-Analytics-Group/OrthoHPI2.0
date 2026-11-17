@@ -1345,35 +1345,43 @@ with st.container():
                  'terms with Benjamini-Hochberg; a process is tested when the background '
                  'gives it at least 11 proteins, no more than a quarter of them, and at '
                  'least two are in the network.')
-        show_active_filters(page_filters)
         st.caption('Biological processes over-represented among the host proteins and '
                    'among the parasite proteins of the network.')
-        # the sides are tested one at a time and carried together with the side on each row
-        enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
-                                               data_dir, s,
-                                               web_utils.get_config_file()).assign(side=s)
-                                for s in SIDES], ignore_index=True)
-        if not enrichment.empty:
-            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                           horizontal=True,
-                           help='The Benjamini-Hochberg corrected significance a process '
-                                'has to reach to be counted as enriched.')
-            # only the grid and the file it hands out are renamed for reading
-            enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
-            column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
-            enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
-            by_side = enrichment_view['side'].value_counts()
-            per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
-            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
-                       'Select rows to highlight GO terms in the network.')
-            grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
-                                hide_index=True, on_select='rerun',
-                                selection_mode='multi-row', key='enrichment_table')
-            # a selection made before the FDR shortened the table can point past its end
-            selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
-                                                   if r < len(enrichment_table)]]
-        else:
-            st.subheader("No GO terms were found enriched")
+        # run once asked for, then kept through the filters until the parasite or host
+        # changes: each new network reads the GO annotations of its species
+        run_for = (selected_parasite, tuple(selected_taxids))
+        if (st.session_state.get('net_enrichment_for') != run_for
+                and st.button('Run the enrichment analysis')):
+            st.session_state['net_enrichment_for'] = run_for
+            st.rerun()
+        if st.session_state.get('net_enrichment_for') == run_for:
+            show_active_filters(page_filters)
+            # the sides are tested one at a time and carried together with the side on each row
+            enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
+                                                   data_dir, s,
+                                                   web_utils.get_config_file()).assign(side=s)
+                                    for s in SIDES], ignore_index=True)
+            if not enrichment.empty:
+                fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                               horizontal=True,
+                               help='The Benjamini-Hochberg corrected significance a process '
+                                    'has to reach to be counted as enriched.')
+                # only the grid and the file it hands out are renamed for reading
+                enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
+                column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
+                enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
+                by_side = enrichment_view['side'].value_counts()
+                per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
+                st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
+                           'Select rows to highlight GO terms in the network.')
+                grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                    hide_index=True, on_select='rerun',
+                                    selection_mode='multi-row', key='enrichment_table')
+                # a selection made before the FDR shortened the table can point past its end
+                selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                       if r < len(enrichment_table)]]
+            else:
+                st.subheader("No GO terms were found enriched")
 
 with st.container():
     if enrichment_view is not None and enrichment_view.empty:

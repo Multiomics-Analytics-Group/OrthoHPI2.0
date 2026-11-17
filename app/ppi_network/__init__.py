@@ -7,7 +7,10 @@ _FRONTEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _component = components.declare_component('ppi_network', path=_FRONTEND_DIR)
 
 
-def ppi_network(nodes, edges, options, height=1000, key=None):
-    '''Draws a vis.js network and reports back the interaction the user clicks on.'''
+def ppi_network(nodes, edges, options, height=1000, key=None, clickable=True):
+    '''
+    Draws a vis.js network and reports back the interaction the user clicks on, unless it
+    is not `clickable`.
+    '''
     return _component(nodes=nodes, edges=edges, options=options, height=height,
-                      key=key, default=None)
+                      clickable=clickable, key=key, default=None)

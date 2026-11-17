@@ -65,6 +65,46 @@
       #loading[hidden] {
         display: none;
       }
+      /* the button that expands the network over the whole window, shown in the corner
+         while the pointer is over the network, as on the figures */
+      #expand {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.85);
+        color: #6b7785;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      #frame:hover #expand,
+      #expand:focus-visible,
+      body.expanded #expand {
+        opacity: 1;
+      }
+      #expand:hover {
+        color: #1f2937;
+        background: #eef1f5;
+      }
+      #expand .collapse,
+      body.expanded #expand .enlarge {
+        display: none;
+      }
+      body.expanded #expand .collapse {
+        display: block;
+      }
+      body.expanded {
+        background-color: #ffffff;
+      }
       #unavailable {
         font-family: sans-serif;
         color: #555555;
@@ -74,9 +114,19 @@
   </head>
 
   <body>
-    <div style="position: relative">
+    <div id="frame" style="position: relative">
       <div id="mynetwork"></div>
       <div id="loading">Loading network…</div>
+      <button id="expand" type="button" title="Expand" hidden>
+        <svg class="enlarge" width="16" height="16" viewBox="0 0 16 16" fill="none"
+             stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />
+        </svg>
+        <svg class="collapse" width="16" height="16" viewBox="0 0 16 16" fill="none"
+             stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4" />
+        </svg>
+      </button>
     </div>
     <div id="unavailable" hidden>
       The network could not be drawn: vis-network.min.js did not load.
@@ -87,6 +137,13 @@
         var container = document.getElementById('mynetwork');
         var unavailable = document.getElementById('unavailable');
         var loading = document.getElementById('loading');
+        var expandButton = document.getElementById('expand');
+        // the iframe the network is drawn in, which is served from the same origin as the
+        // page and so can be laid over it
+        var iframe = null;
+        try {
+          iframe = window.frameElement;
+        } catch (e) {}
         var network = null;
         // the graph the network currently shows. Streamlit re-fires the render event on
         // every rerun of the page -- moving the confidence slider, paging the table,
@@ -94,6 +151,44 @@
         // restart the physics and throw away the pan and zoom the user had set up.
         var drawnGraph = null;
         var frameHeight = null;
+        // the height the page gives the network, which it returns to on collapsing
+        var pageHeight = 600;
+        var clickable = true;
+        // the iframe's own style, put back on collapsing
+        var pageStyle = null;
+
+        function isExpanded() {
+          return pageStyle !== null;
+        }
+
+        // lays the iframe over the whole window, as streamlit does for the figures, and
+        // zooms the network to fill whichever space it has
+        function setExpanded(expand) {
+          if (expand === isExpanded()) {
+            return;
+          }
+          if (expand) {
+            pageStyle = iframe.style.cssText;
+            iframe.style.cssText = pageStyle + ';position: fixed; inset: 0; width: 100vw;'
+              + 'height: 100vh; z-index: 1000000; background: #ffffff;';
+          } else {
+            iframe.style.cssText = pageStyle;
+            pageStyle = null;
+          }
+          document.body.classList.toggle('expanded', expand);
+          expandButton.title = expand ? 'Close' : 'Expand';
+          container.style.height = expand ? '100vh' : pageHeight + 'px';
+          if (network !== null) {
+            network.redraw();
+            fitNetwork(network);
+          }
+        }
+
+        function onKey(event) {
+          if (event.key === 'Escape') {
+            setExpanded(false);
+          }
+        }
 
         function send(type, data) {
           data = data || {};
@@ -128,6 +223,8 @@
           if (!edge) {
             return;
           }
+          // the structures open on the page, under an expanded network
+          setExpanded(false);
           // the timestamp is what tells one click from the next: without it, clicking
           // the same edge twice sends an identical value, Streamlit does not rerun and
           // the structures never reopen
@@ -165,36 +262,40 @@
               return;
             }
             fitted = true;
-
-            var positions = net.getPositions();
-            var ids = Object.keys(positions);
-            if (ids.length === 0) {
-              return;
-            }
-            var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            ids.forEach(function (id) {
-              var p = positions[id];
-              minX = Math.min(minX, p.x);
-              maxX = Math.max(maxX, p.x);
-              minY = Math.min(minY, p.y);
-              maxY = Math.max(maxY, p.y);
-            });
-
-            var box = container.getBoundingClientRect();
-            var scale = Math.min(
-              Math.max(box.width - FIT_PADDING, 100) / Math.max(maxX - minX, 1),
-              Math.max(box.height - FIT_PADDING, 100) / Math.max(maxY - minY, 1)
-            );
-            net.moveTo({
-              position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-              scale: Math.max(0.12, Math.min(scale, MAX_FIT_SCALE)),
-              animation: false
-            });
+            fitNetwork(net);
           }
 
           net.once('stabilizationIterationsDone', fit);
           // physics can be switched off, in which case the event above never fires
           setTimeout(fit, 4000);
+        }
+
+        // zooms to the extent of the nodes, within the box the network has now
+        function fitNetwork(net) {
+          var positions = net.getPositions();
+          var ids = Object.keys(positions);
+          if (ids.length === 0) {
+            return;
+          }
+          var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          ids.forEach(function (id) {
+            var p = positions[id];
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+          });
+
+          var box = container.getBoundingClientRect();
+          var scale = Math.min(
+            Math.max(box.width - FIT_PADDING, 100) / Math.max(maxX - minX, 1),
+            Math.max(box.height - FIT_PADDING, 100) / Math.max(maxY - minY, 1)
+          );
+          net.moveTo({
+            position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+            scale: Math.max(0.12, Math.min(scale, MAX_FIT_SCALE)),
+            animation: false
+          });
         }
 
         // vis.js draws nothing until the physics has settled, so the box says how far it
@@ -224,7 +325,11 @@
           }
           var args = event.data.args;
           var height = args.height || 600;
-          container.style.height = height + 'px';
+          pageHeight = height;
+          clickable = args.clickable !== false;
+          if (!isExpanded()) {
+            container.style.height = height + 'px';
+          }
           setFrameHeight(height + 4);
 
           if (typeof vis === 'undefined') {
@@ -250,13 +355,24 @@
             args.options
           );
           showLoading(network, args.options);
-          network.on('click', onClick);
-          // only the edges open anything, so only they get the pointer
-          network.on('hoverEdge', onHover);
-          network.on('blurEdge', onBlur);
+          if (clickable) {
+            network.on('click', onClick);
+            // only the edges open anything, so only they get the pointer
+            network.on('hoverEdge', onHover);
+            network.on('blurEdge', onBlur);
+          }
+          expandButton.hidden = iframe === null;
           fitWhenSettled(network);
         }
 
+        expandButton.addEventListener('click', function () {
+          setExpanded(!isExpanded());
+        });
+        // Esc closes it wherever the focus is, in the network or on the page
+        document.addEventListener('keydown', onKey);
+        if (iframe !== null) {
+          window.parent.document.addEventListener('keydown', onKey);
+        }
         window.addEventListener('message', onRender);
         send('streamlit:componentReady', { apiVersion: 1 });
       })();

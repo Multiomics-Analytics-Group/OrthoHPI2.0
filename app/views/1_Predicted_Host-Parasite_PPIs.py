@@ -1450,11 +1450,14 @@ with nav.body:
                 G = None
                 style_network(net)
                 html_data = net.generate_html()
-                net = None
+                nodes, edges = net.get_network_data()[:2]
                 st.subheader("Nodes annotated to the selected biological processes")
                 st.caption('The network with the proteins annotated to the biological '
                            'processes selected in the table in pink and the remainder in grey.')
-                st.iframe(html_data, height=500)
+                ppi_network(nodes=nodes, edges=edges, options=network_options(net),
+                            height=500, clickable=False,
+                            key=f'enrichment_network_{selected_parasite}')
+                net = None
                 st.download_button(
                     label="Download Network as Html",
                     data=html_data,

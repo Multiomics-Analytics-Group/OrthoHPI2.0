@@ -100,6 +100,17 @@ header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"]
     padding: 0;
 }
 
+/* the top menu holds About alone, at the right end of the bar; the other pages are reached
+   from the start page */
+header[data-testid="stHeader"] div:has(> div > div > [data-testid="stTopNavLinkContainer"]) {
+    flex: 1;
+    justify-content: flex-end;
+}
+
+header[data-testid="stHeader"] div:has(> div > [data-testid="stTopNavLinkContainer"] > a:not([href$="/About"])) {
+    display: none;
+}
+
 /* streamlit hangs a caption 16px below its box, which at the foot of the column would
    overflow it into a scrollbar */
 .st-key-section_controls [data-testid="stCaptionContainer"] {

@@ -58,7 +58,6 @@ if host or parasite:
 
 organism_picker.show(config, data_dir)
 
-st.page_link(web_utils.ABOUT, label='About OrthoHPI', icon=':material/info:')
 st.markdown('---')
 with st.container():
     web_utils.footer()

@@ -64,12 +64,12 @@ SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'
 
 def navigation():
     '''
-    Every page of the app, with no menu: the start page leads to the others and each of
-    them leads back.
+    Every page of the app. The menu across the top shows About alone (see style.css): the
+    start page leads to the others and each of them leads back.
     '''
     pages = [st.Page(path, title=label, default=path == START) for label, path in PAGES]
 
-    return st.navigation(pages, position='hidden')
+    return st.navigation(pages, position='top')
 
 
 # colours of the title and subtitle on a light and on a dark background
@@ -569,7 +569,7 @@ LOGOS = [('EggNOG', 'http://eggnog6.embl.de/', 'eggnog.png'),
 LOGO_DIR = os.path.join('images', 'logos')
 
 # the files are written at twice this so they stay sharp on a retina screen
-LOGO_HEIGHT = 40
+LOGO_HEIGHT = 24
 
 REPOSITORY = 'https://github.com/Multiomics-Analytics-Group/OrthoHPI2.0'
 
@@ -599,7 +599,7 @@ def footer():
         for name, link, filename in LOGOS)
 
     st.markdown(
-        '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem 2.5rem;'
+        '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem;'
         f' margin-bottom: 1rem;">{logos}</div>', unsafe_allow_html=True)
 
     st.markdown(f'Code available at: [{REPOSITORY.split("//")[1]}]({REPOSITORY})')

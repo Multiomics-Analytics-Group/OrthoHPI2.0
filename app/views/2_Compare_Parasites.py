@@ -63,10 +63,10 @@ def load_tissue_expression(data_dir):
     The tissue and cell-type table keyed by host protein, shared rather than copied on
     every call; only ever read.
     '''
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+    tissues = pd.read_parquet(f'{data_dir}/tissues_cell_types.parquet',
+                              columns=['Gene', 'Tissue', 'Cell type', 'nCPM'])
 
-    return tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
-                                                       'nCPM']]
+    return tissues.rename({'Gene': 'target'}, axis=1)
 
 
 def infected_tissues(config):
@@ -89,9 +89,11 @@ def get_infected_tissue_expression(data_dir, config, host_taxids):
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
         ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
     aux = predictions.drop_duplicates().astype({'taxid1': str})
-    aux = pd.merge(aux, load_tissue_expression(data_dir), on='target')
+    # paired with the infected tissues first: joined to every tissue, the host's
+    # predictions run to millions of rows
+    aux = pd.merge(aux, infected_tissues(config), on='taxid1')
 
-    return pd.merge(aux, infected_tissues(config), on=['taxid1', 'Tissue'])
+    return pd.merge(aux, load_tissue_expression(data_dir), on=['target', 'Tissue'])
 
 
 @st.cache_data(show_spinner=False)
@@ -693,9 +695,9 @@ def get_go_background(data_dir, host_taxids, niche):
     The GO background of a niche, with what the enrichment reads from it worked out; the
     same at every threshold, and only ever read.
     '''
-    go_df = web_utils.go_background(data_dir, host_taxids, niche)
+    go_df = web_utils.go_background(data_dir, host_taxids, niche, descriptions=False)
 
-    return go_df, utils.prepare_go_background(go_df)
+    return go_df, utils.prepare_go_background(go_df, web_utils.load_go_names(data_dir))
 
 
 @st.cache_data(show_spinner=False)
@@ -1043,43 +1045,51 @@ with nav.body:
              'the background as well as the biology.')
     st.caption('Which biological processes are over-represented among the host proteins '
                'each parasite targets.')
-    rows_column, fdr_column = st.columns([2, 1])
-    with rows_column:
-        go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
-                           horizontal=True,
-                           help=f'The {GO_STRONGEST_PER_PARASITE} most significant processes '
-                                f'of each parasite, or the {GO_SHARED_ROWS} enriched for the '
-                                'most parasites, which favours broad processes many share. '
-                                'Either way, a process that shares at least half its host '
-                                'proteins with one already shown is left out. The first are '
-                                'clustered by the parasites they are enriched for, the second '
-                                'run from the most widely enriched down.')
-    with fdr_column:
-        go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                          horizontal=True, key='compare_go_fdr',
-                          help='The Benjamini-Hochberg corrected significance a process has '
-                               'to reach to be drawn for a parasite.')
-    with st.spinner('Testing the host interactors of every parasite'):
-        go_enrichments = get_parasite_enrichments(counted, data_dir, tuple(selected_taxids),
-                                                  niches)
-    go_enriched = (None if go_enrichments is None else
-                   go_enrichments[go_enrichments['fdr_bh'] <= go_fdr])
-    if go_enriched is None or go_enriched.empty:
-        st.info(f'No biological process passes an FDR of {go_fdr} for any parasite at this '
-                'confidence.')
-    else:
-        go_parasites = parasite_order(counted['taxid1_label'].unique(), parasite_groups,
-                                      group_order, niches, order_by)
-        go_terms = select_go_rows(go_enriched, go_rows, data_dir, tuple(selected_taxids), niches)
-        st.plotly_chart(generate_go_dots(go_enriched, go_terms,
-                                         go_parasites, parasite_groups, niches,
-                                         config.get('parasite_groups', {}),
-                                         column),
-                        width='stretch')
-        st.download_button('Download the enriched processes of every parasite',
-                           data=utils.convert_df(go_enriched.drop(columns=['nodes'])),
-                           file_name=f'{selected_host}_parasite_go_enrichment.tsv',
-                           mime='text/csv')
+    # run once asked for, then kept until the host changes: it tests every parasite
+    # against the GO annotations of the host
+    run_for = tuple(selected_taxids)
+    if (st.session_state.get('compare_enrichment_for') != run_for
+            and st.button('Run the enrichment analysis')):
+        st.session_state['compare_enrichment_for'] = run_for
+        st.rerun()
+    if st.session_state.get('compare_enrichment_for') == run_for:
+        rows_column, fdr_column = st.columns([2, 1])
+        with rows_column:
+            go_rows = st.radio('Processes shown', [GO_ROWS_STRONGEST, GO_ROWS_SHARED],
+                               horizontal=True,
+                               help=f'The {GO_STRONGEST_PER_PARASITE} most significant processes '
+                                    f'of each parasite, or the {GO_SHARED_ROWS} enriched for the '
+                                    'most parasites, which favours broad processes many share. '
+                                    'Either way, a process that shares at least half its host '
+                                    'proteins with one already shown is left out. The first are '
+                                    'clustered by the parasites they are enriched for, the second '
+                                    'run from the most widely enriched down.')
+        with fdr_column:
+            go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                              horizontal=True, key='compare_go_fdr',
+                              help='The Benjamini-Hochberg corrected significance a process has '
+                                   'to reach to be drawn for a parasite.')
+        with st.spinner('Testing the host interactors of every parasite'):
+            go_enrichments = get_parasite_enrichments(counted, data_dir, tuple(selected_taxids),
+                                                      niches)
+        go_enriched = (None if go_enrichments is None else
+                       go_enrichments[go_enrichments['fdr_bh'] <= go_fdr])
+        if go_enriched is None or go_enriched.empty:
+            st.info(f'No biological process passes an FDR of {go_fdr} for any parasite at this '
+                    'confidence.')
+        else:
+            go_parasites = parasite_order(counted['taxid1_label'].unique(), parasite_groups,
+                                          group_order, niches, order_by)
+            go_terms = select_go_rows(go_enriched, go_rows, data_dir, tuple(selected_taxids), niches)
+            st.plotly_chart(generate_go_dots(go_enriched, go_terms,
+                                             go_parasites, parasite_groups, niches,
+                                             config.get('parasite_groups', {}),
+                                             column),
+                            width='stretch')
+            st.download_button('Download the enriched processes of every parasite',
+                               data=utils.convert_df(go_enriched.drop(columns=['nodes'])),
+                               file_name=f'{selected_host}_parasite_go_enrichment.tsv',
+                               mime='text/csv')
 
 nav.finish()
 

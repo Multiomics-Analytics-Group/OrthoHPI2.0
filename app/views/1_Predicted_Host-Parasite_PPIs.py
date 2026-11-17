@@ -9,6 +9,8 @@ import utils
 import web_utils
 import streamlit as st
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute as pc
 import numpy as np
 import networkx as nx
 from pyvis.network import Network
@@ -160,9 +162,12 @@ def get_parasite_tissues(data_dir, parasite, host_taxids):
     and cell types its host targets are expressed in.
     '''
     predictions = load_predictions(data_dir)
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     predictions = predictions[(predictions['taxid1_label'] == parasite)
                               & (predictions['taxid2'].isin(host_taxids))]
+    # only the rows of these targets: the whole table is several hundred MB in memory
+    tissues = pd.read_parquet(f'{data_dir}/tissues_cell_types.parquet',
+                              filters=pc.field('Gene').isin(
+                                  pa.array(predictions['target'].unique(), pa.string())))
 
     return pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 
@@ -554,8 +559,9 @@ def get_enrichment(pred_df, data_dir, side, config_file):
         niches = {web_utils.parasite_niche(utils.read_config(config_file), taxid)
                   for taxid in pred_df['taxid1'].unique()}
         niche = niches.pop() if len(niches) == 1 else None
-    go_df = web_utils.go_background(data_dir, species, niche)
-    enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
+    go_df = web_utils.go_background(data_dir, species, niche, descriptions=False)
+    enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df,
+                                            names=web_utils.load_go_names(data_dir))
     # A is the number of proteins of the side annotated to the term
     enrichment = enrichment.rename(columns={'A': 'n_proteins'})
 
@@ -960,9 +966,11 @@ def network_options(net):
     return json.loads(net.get_network_data()[5])
 
 
-@st.cache_data(show_spinner=False)
 def get_structures(query_proteins):
-    '''The AlphaFold model of each of the two proteins.'''
+    '''
+    The AlphaFold model of each of the two proteins. Not cached here, so a failed fetch is
+    retried on the next click; the model url and file are cached in strv.
+    '''
     return strv.get_alphafold_structure(query_proteins=query_proteins)
 
 
@@ -988,15 +996,14 @@ def show_structures_dialog(edge):
                f"database evidence {edge['databases']:.2f}.")
     st.markdown(strv.plddt_legend(), unsafe_allow_html=True)
 
-    # one entry per protein, so the species stays attached even if the two proteins share a
-    # name
+    # parasite then host, so the species stays attached even if the two proteins share a name
     proteins = [(edge['parasite'], edge['parasite_uniprot'],
                  edge['parasite_full'], edge['parasite_species']),
                 (edge['host'], edge['host_uniprot'],
                  edge['host_full'], edge['host_species'])]
     sequences = web_utils.load_protein_sequences(data_dir)
     # parasite then host, ready to paste into AlphaFold Server as a two-chain job
-    fasta = {protein: (fasta_header(edge[f'{side}_id'], protein, species, uniprot),
+    fasta = {side: (fasta_header(edge[f'{side}_id'], protein, species, uniprot),
                        sequences.get(edge[f'{side}_id']))
              for side, (protein, uniprot, _, species) in zip(('parasite', 'host'), proteins)}
     if all(sequence for _, sequence in fasta.values()):
@@ -1005,14 +1012,14 @@ def show_structures_dialog(edge):
                            web_utils.to_fasta(fasta.values()),
                            file_name=f"{edge['parasite']}_{edge['host']}.fasta",
                            mime='text/plain', on_click='ignore')
-    query_proteins = {edge['parasite']: edge['parasite_uniprot'],
-                      edge['host']: edge['host_uniprot']}
+    # keyed by side, since the two proteins can share a name
+    query_proteins = {'parasite': edge['parasite_uniprot'], 'host': edge['host_uniprot']}
     with st.spinner('Fetching the AlphaFold models...'):
         structures = get_structures(query_proteins)
 
     cols = st.columns(2)
     for i, (protein, uniprot, full_name, species) in enumerate(proteins):
-        pdb_file, url, website, reason = structures[protein]
+        pdb_file, url, website, reason = structures[('parasite', 'host')[i]]
         with cols[i % len(cols)]:
             st.markdown(f'''<h4>{protein} ({species})</h4>''', unsafe_allow_html=True)
             subtitle = f'{full_name} · {uniprot}' if full_name else str(uniprot)
@@ -1028,7 +1035,7 @@ def show_structures_dialog(edge):
                 st.markdown('''<h5>No AlphaFold model</h5>''', unsafe_allow_html=True)
                 st.caption(reason)
                 bcol3 = st.container()
-            header, sequence = fasta[protein]
+            header, sequence = fasta[('parasite', 'host')[i]]
             if sequence:
                 with bcol3:
                     st.download_button('FASTA', web_utils.to_fasta([(header, sequence)]),
@@ -1323,46 +1330,54 @@ with nav.body:
                      'terms with Benjamini-Hochberg; a process is tested when the background '
                      'gives it at least 11 proteins, no more than a quarter of them, and at '
                      'least two are in the network.')
-            show_active_filters(page_filters)
             st.caption('Biological processes over-represented among the host proteins and '
                        'among the parasite proteins of the network.')
-            # the sides are tested one at a time and carried together with the side on each row
-            enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
-                                                   data_dir, s,
-                                                   web_utils.get_config_file()).assign(side=s)
-                                    for s in SIDES], ignore_index=True)
-            if not enrichment.empty:
-                fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                               horizontal=True,
-                               help='The Benjamini-Hochberg corrected significance a process '
-                                    'has to reach to be counted as enriched.')
-                # only the grid and the file it hands out are renamed for reading
-                enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
-                column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
-                enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
-                by_side = enrichment_view['side'].value_counts()
-                per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
-                # the figures come first on the page but are drawn once the table below
-                # them has said which rows are selected
-                figures_slot = st.container()
-                if not enrichment_view.empty:
-                    st.subheader(
-                        "Highlight a biological process in the network",
-                        help='Select one or more processes to colour the proteins annotated '
-                             'to them in a copy of the network, drawn under the table, and to '
-                             'narrow the figures above to those processes.')
-                    st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} '
-                               f'({per_side}). Select rows to colour their proteins in the '
-                               'network below.')
-                    grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
-                                        hide_index=True, on_select='rerun',
-                                        selection_mode='multi-row', key='enrichment_table')
-                    # a selection made before the FDR shortened the table can point past
-                    # its end
-                    selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
-                                                           if r < len(enrichment_table)]]
-            else:
-                st.subheader("No GO terms were found enriched")
+            # run once asked for, then kept through the filters until the parasite or host
+            # changes: each new network reads the GO annotations of its species
+            run_for = (selected_parasite, tuple(selected_taxids))
+            if (st.session_state.get('net_enrichment_for') != run_for
+                    and st.button('Run the enrichment analysis')):
+                st.session_state['net_enrichment_for'] = run_for
+                st.rerun()
+            if st.session_state.get('net_enrichment_for') == run_for:
+                show_active_filters(page_filters)
+                # the sides are tested one at a time and carried together with the side on each row
+                enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
+                                                       data_dir, s,
+                                                       web_utils.get_config_file()).assign(side=s)
+                                        for s in SIDES], ignore_index=True)
+                if not enrichment.empty:
+                    fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                                   horizontal=True,
+                                   help='The Benjamini-Hochberg corrected significance a process '
+                                        'has to reach to be counted as enriched.')
+                    # only the grid and the file it hands out are renamed for reading
+                    enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
+                    column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
+                    enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
+                    by_side = enrichment_view['side'].value_counts()
+                    per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
+                    # the figures come first on the page but are drawn once the table below
+                    # them has said which rows are selected
+                    figures_slot = st.container()
+                    if not enrichment_view.empty:
+                        st.subheader(
+                            "Highlight a biological process in the network",
+                            help='Select one or more processes to colour the proteins annotated '
+                                 'to them in a copy of the network, drawn under the table, and to '
+                                 'ring them in pink in the figures above.')
+                        st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} '
+                                   f'({per_side}). Select rows to colour their proteins in the '
+                                   'network below.')
+                        grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                            hide_index=True, on_select='rerun',
+                                            selection_mode='multi-row', key='enrichment_table')
+                        # a selection made before the FDR shortened the table can point past
+                        # its end
+                        selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                               if r < len(enrichment_table)]]
+                else:
+                    st.subheader("No GO terms were found enriched")
 
     if enrichment_view is not None:
         with figures_slot:

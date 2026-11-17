@@ -424,7 +424,7 @@ def count_available_proteins(data_dir, config, parasite_taxid, hosts_taxids):
     available = {}
     for host, taxids in hosts_taxids.items():
         proteins = web_utils.filtered_pool(data_dir, taxids, niche=niche)
-        available[host] = (len(proteins), len(proteins & infected))
+        available[host] = len(proteins & infected)
 
     return available
 
@@ -445,10 +445,7 @@ def get_host_coverage(data_dir, config, score, parasite, hosts_taxids):
         'parasite proteins': ('source', 'nunique'),
         'host proteins reached': ('target', 'nunique'),
         'host orthologous groups reached': ('group2', 'nunique')}).reset_index()
-    coverage['host proteins this parasite could reach'] = coverage['host'].map(
-        lambda h: available[h][0])
-    coverage['of those, in a tissue it infects'] = coverage['host'].map(
-        lambda h: available[h][1])
+    coverage['candidate host proteins'] = coverage['host'].map(available)
 
     return coverage.rename(columns={'host': 'Host'}).sort_values(
         'predicted interactions', ascending=False, kind='stable')

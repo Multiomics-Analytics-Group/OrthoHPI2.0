@@ -47,18 +47,22 @@ with nav.body:
         # annotated more deeply
         nav.subheader(
             'Predicted interactions relative to the available host proteins', 'coverage',
-            help='Interactions predicted in each host beside the pool of host proteins '
-                 'they were drawn from: those passing the tissue and DeepLoc filters and '
+            help='Interactions predicted in each host beside the candidate host proteins '
+                 'they were drawn from: those passing the tissue and DeepLoc filters, '
                  'lying where this parasite\'s niche can reach them — the surface of the '
                  'cell for a parasite that stays outside it, the cytosol and nucleus as '
-                 'well for one that gets in — and those among them annotated to a tissue '
-                 'this parasite infects. The second pool is what the predictions were '
-                 'drawn from, so a host with more predicted interactions than another may '
-                 'simply have more of it.')
-        st.caption('The interactions predicted in each host, beside how many host proteins '
-                   'this parasite could reach there.')
+                 'well for one that gets in — and annotated to a tissue this parasite '
+                 'infects. A host with more predicted interactions than another may '
+                 'simply have more candidates.')
+        st.caption('The interactions predicted in each host, beside how many candidate '
+                   'host proteins it had.')
         st.dataframe(get_host_coverage(data_dir, config, score, parasite, hosts_taxids),
-                     width='stretch', hide_index=True)
+                     width='stretch', hide_index=True,
+                     column_config={'candidate host proteins': st.column_config.NumberColumn(
+                         help='Host proteins that pass the tissue and DeepLoc filters, '
+                              'lie where this parasite can reach them, and are expressed '
+                              'in a tissue it infects: the pool the predictions were '
+                              'drawn from.')})
 
         # the figure is drawn narrower than the page, where the body outlines are read best
         nav.add('Predicted interactions per infected organ', body_figure.ORGANS_ANCHOR)

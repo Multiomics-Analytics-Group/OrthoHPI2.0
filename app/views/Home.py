@@ -154,7 +154,7 @@ def get_overview_predictions(data_dir, config):
     # the order of the paper's figures: niche, then taxonomic group as configured, then
     # name, unclassified last
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
-    df['name'] = df['taxid1_label'].map(short_name)
+    df['name'] = df['taxid1_label']
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
         web_utils.UNKNOWN_NICHE)
 
@@ -194,6 +194,10 @@ def host_columns(df, width, bands=0, band_height=BAND_HEIGHT):
                              [width * w / sum(widths) - COLUMN_PADDING for w in widths])
     for title, text in zip(figure.layout.annotations, texts):
         title.update(text=text, font=dict(size=size))
+    # the columns are the full names, so a hover reads them, and the axes the abbreviations
+    for column, (_, _, names) in enumerate(hosts, start=1):
+        figure.update_xaxes(tickmode='array', tickvals=names,
+                            ticktext=[short_name(n) for n in names], col=column)
 
     return figure, hosts
 
@@ -365,7 +369,7 @@ def get_interactor_proteins(data_dir, config, side):
     order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
     df['group'] = df['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
     df['group_rank'] = df['group'].map(lambda g: order.get(g, len(order)))
-    df['name'] = df['taxid1_label'].map(short_name)
+    df['name'] = df['taxid1_label']
     df['niche'] = df['taxid1_label'].map(web_utils.get_niches(config)).fillna(
         web_utils.UNKNOWN_NICHE)
 
@@ -434,8 +438,7 @@ def generate_host_score_boxes(proteins, width, point_size=3):
     # here a column is a localization class and what is in it are the hosts, so the two are
     # swapped
     host_order = {host: rank for rank, host in enumerate(scored['host'].unique())}
-    # four classes to a figure leave no room for full names
-    scored['name'] = scored['host'].map(short_name)
+    scored['name'] = scored['host']
     scored['taxid1_label'] = scored['host']
     scored['group_rank'] = scored['host'].map(host_order)
     scored['host'] = scored['surface']

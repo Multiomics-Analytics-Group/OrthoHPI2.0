@@ -160,6 +160,9 @@ The alias files differ between species, so `sources` is a preference list and
 protein, human only) and fall back to `UniProt_AC` for rat, mouse and pig,
 which otherwise get no accession and so no structures in the app. Doesn't use
 `Ensembl_UniProt` because it has gene names mixed in with the accessions.
+`UniProt_AC` also lists secondary accessions of merged and demerged entries,
+which the AlphaFold database doesn't know, so of a protein's `UniProt_AC`
+accessions the one also under `Ensembl_UniProt` is taken.
 
 ## DeepLoc secretome prediction
 

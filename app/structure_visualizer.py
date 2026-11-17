@@ -8,14 +8,41 @@ import py3Dmol
 
 api_url = 'https://alphafold.ebi.ac.uk/api/prediction/query_protein'
 web_url = 'https://alphafold.ebi.ac.uk/entry/query_protein'
+uniprot_url = 'https://rest.uniprot.org/uniprotkb/query_protein.json?fields=accession'
+
+
+def merged_into(uniprot_id):
+    '''
+    The accession UniProt merged an inactive entry into, or None. STRING's aliases still
+    carry some of these, and the AlphaFold database only knows the current one.
+    '''
+    request = urllib.request.Request(uniprot_url.replace('query_protein', uniprot_id))
+    with urllib.request.urlopen(request, timeout=30) as response:
+        entry = json.loads(response.read().decode('utf-8'))
+
+    # UniProt redirects a merged accession to the entry it was merged into
+    current = entry.get('primaryAccession')
+    if entry.get('entryType') == 'Inactive' or current == uniprot_id:
+        return None
+
+    return current
 
 
 @lru_cache(maxsize=None)
 def get_alphafold_url(uniprot_id):
-    '''Returns the url of the current AlphaFold model file for a UniProt id.'''
+    '''
+    Returns the url of the current AlphaFold model file for a UniProt id, following a
+    merged accession to the entry it was merged into.
+    '''
     request = urllib.request.Request(api_url.replace('query_protein', uniprot_id))
-    with urllib.request.urlopen(request, timeout=30) as response:
-        predictions = json.loads(response.read().decode('utf-8'))
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            predictions = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        current = merged_into(uniprot_id) if e.code == 404 else None
+        if current is None:
+            raise
+        return get_alphafold_url(current)
 
     if not predictions:
         raise ValueError(f'no AlphaFold prediction for {uniprot_id}')
@@ -51,7 +78,12 @@ def get_alphafold_structure(query_proteins={}, output_dir='data/tmp'):
                 reason = 'This protein has no UniProt accession to look a model up by'
             else:
                 pdb_url = get_alphafold_url(uniprot_id)
-                pdb_filename = os.path.join(output_dir, query_protein+'_output_structure.pdb')
+                # model files are named AF-<accession>-F1-..., which differs from
+                # uniprot_id when it was merged
+                found = os.path.basename(pdb_url).split('-')[1]
+                entry_url = web_url.replace('query_protein', found)
+                # by accession, since gene names repeat across species
+                pdb_filename = os.path.join(output_dir, uniprot_id+'_output_structure.pdb')
                 if not os.path.isfile(pdb_filename) or os.path.getsize(pdb_filename) == 0:
                     download_structure(pdb_url, pdb_filename)
         except urllib.error.HTTPError as e:

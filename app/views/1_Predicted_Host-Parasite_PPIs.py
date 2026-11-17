@@ -963,9 +963,11 @@ def network_options(net):
     return json.loads(net.get_network_data()[5])
 
 
-@st.cache_data(show_spinner=False)
 def get_structures(query_proteins):
-    '''The AlphaFold model of each of the two proteins.'''
+    '''
+    The AlphaFold model of each of the two proteins. Not cached here, so a failed fetch is
+    retried on the next click; the model url and file are cached in strv.
+    '''
     return strv.get_alphafold_structure(query_proteins=query_proteins)
 
 
@@ -991,15 +993,14 @@ def show_structures_dialog(edge):
                f"database evidence {edge['databases']:.2f}.")
     st.markdown(strv.plddt_legend(), unsafe_allow_html=True)
 
-    # one entry per protein, so the species stays attached even if the two proteins share a
-    # name
+    # parasite then host, so the species stays attached even if the two proteins share a name
     proteins = [(edge['parasite'], edge['parasite_uniprot'],
                  edge['parasite_full'], edge['parasite_species']),
                 (edge['host'], edge['host_uniprot'],
                  edge['host_full'], edge['host_species'])]
     sequences = web_utils.load_protein_sequences(data_dir)
     # parasite then host, ready to paste into AlphaFold Server as a two-chain job
-    fasta = {protein: (fasta_header(edge[f'{side}_id'], protein, species, uniprot),
+    fasta = {side: (fasta_header(edge[f'{side}_id'], protein, species, uniprot),
                        sequences.get(edge[f'{side}_id']))
              for side, (protein, uniprot, _, species) in zip(('parasite', 'host'), proteins)}
     if all(sequence for _, sequence in fasta.values()):
@@ -1008,14 +1009,14 @@ def show_structures_dialog(edge):
                            web_utils.to_fasta(fasta.values()),
                            file_name=f"{edge['parasite']}_{edge['host']}.fasta",
                            mime='text/plain', on_click='ignore')
-    query_proteins = {edge['parasite']: edge['parasite_uniprot'],
-                      edge['host']: edge['host_uniprot']}
+    # keyed by side, since the two proteins can share a name
+    query_proteins = {'parasite': edge['parasite_uniprot'], 'host': edge['host_uniprot']}
     with st.spinner('Fetching the AlphaFold models...'):
         structures = get_structures(query_proteins)
 
     cols = st.columns(2)
     for i, (protein, uniprot, full_name, species) in enumerate(proteins):
-        pdb_file, url, website, reason = structures[protein]
+        pdb_file, url, website, reason = structures[('parasite', 'host')[i]]
         with cols[i % len(cols)]:
             st.markdown(f'''<h4>{protein} ({species})</h4>''', unsafe_allow_html=True)
             subtitle = f'{full_name} · {uniprot}' if full_name else str(uniprot)
@@ -1031,7 +1032,7 @@ def show_structures_dialog(edge):
                 st.markdown('''<h5>No AlphaFold model</h5>''', unsafe_allow_html=True)
                 st.caption(reason)
                 bcol3 = st.container()
-            header, sequence = fasta[protein]
+            header, sequence = fasta[('parasite', 'host')[i]]
             if sequence:
                 with bcol3:
                     st.download_button('FASTA', web_utils.to_fasta([(header, sequence)]),

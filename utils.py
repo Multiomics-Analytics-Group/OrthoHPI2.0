@@ -218,6 +218,14 @@ def parse_string_aliases(config_file, sources, taxid='9606', reverse=False):
         filename = download_file(url=urls['string_alias_url'].replace('TAXID', taxid), data_dir=os.path.join('data/downloads/species', str(taxid)))
 
     data = pd.read_csv(filename, sep='\t', header=0)
+    if reverse and sources is not None and 'UniProt_AC' in sources:
+        # UniProt_AC also lists the secondary accessions of merged and demerged entries,
+        # which the AlphaFold database does not know; the primary one is the accession
+        # Ensembl links the protein to, so written last within its source
+        linked = set(zip(data.loc[data['source'] == 'Ensembl_UniProt', '#string_protein_id'],
+                         data.loc[data['source'] == 'Ensembl_UniProt', 'alias']))
+        is_linked = [(p, a) in linked for p, a in zip(data['#string_protein_id'], data['alias'])]
+        data = data.assign(_linked=is_linked).sort_values('_linked', kind='stable')
     if sources is not None:
         data = data[data['source'].isin(sources)]
         # later rows overwrite earlier ones, so descending preference leaves the most

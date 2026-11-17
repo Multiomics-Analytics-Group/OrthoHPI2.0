@@ -3,53 +3,40 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import web_utils
 import streamlit as st
 import body_figure
+import section_nav
 from multi_host import (ABSENT_GROUP, NOT_EXPRESSED, NOT_TRANSFERRED, OUT_OF_REACH,
-                        common_name, explain_host_specific, generate_combination_bars,
-                        generate_link_matrix, generate_overview_bars, get_host_coverage,
-                        get_link_combinations, get_multi_host_predictions)
+                        explain_host_specific, generate_combination_bars,
+                        generate_link_matrix, get_host_coverage, get_link_combinations,
+                        get_multi_host_predictions)
 
 config = web_utils.load_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
 
 
-st.caption('Compare the hosts for the parasites that are predicted against multiple hosts.')
-st.markdown("---")
 
-settings = st.columns(3)[0]
-with settings:
+# the sections on the left, with the slider that sets them under them; the title heads
+# the column of figures
+nav = section_nav.SectionNav('hosts_of_parasite', [
+    ('Predicted interactions relative to the available host proteins', 'coverage'),
+    ('Predicted interactions per infected organ', body_figure.ORGANS_ANCHOR),
+    ('Shared and host-specific interactions', 'sets'),
+    ('Interactions per parasite and host orthologous group', 'links')])
+with nav.body:
+    _, parasite = web_utils.require_selection('Hosts of a parasite', parasite=True,
+                                              back=nav.back)
+    st.caption('Compare the hosts the selected parasite is predicted against.')
+with nav.side:
     score = web_utils.score_slider(
         help='Interactions predicted below this confidence are left out, as '
              'on the other pages. These are the smallest interactomes of the '
-             'set: raising it leaves fewer parasites with more than one host.')
+             'set: raising it can leave a parasite with only one host.')
 
-df_pred = get_multi_host_predictions(data_dir, config, score)
+with nav.body:
+    df_pred = get_multi_host_predictions(data_dir, config, score)
 
-if df_pred.empty:
-    st.text('No parasite is predicted against more than one host at this confidence')
-else:
-    # each parasite is listed with its hosts, `Trichinella spiralis (human, pig)`
-    hosts_of = df_pred.groupby('taxid1_label')['host'].agg(
-        lambda h: ', '.join(common_name(host) for host in sorted(set(h))))
-    parasites = sorted(hosts_of.index)
-
-    # the overview first, so the page has something to read before a parasite is chosen
-    st.subheader(
-        'Shared and host-specific interactions per parasite',
-        help='The interactions of every parasite predicted against several hosts, '
-             'counted as orthology-group links so that a host with more paralogues does '
-             'not count for more: how many carried over to every host, and how many '
-             'are found in one host only. Choose a parasite below to see which links '
-             'they are and why a host lacks them.')
-    st.caption('How many interactions of each parasite are found in every host, and how '
-               'many in one host only.')
-    st.plotly_chart(generate_overview_bars(data_dir, config, score), width='stretch')
-
-    with st.columns(3)[0]:
-        parasite = st.selectbox('Select a parasite to compare its hosts', parasites,
-                                format_func=lambda p: f'{p} ({hosts_of[p]})',
-                                index=None, placeholder='<select>')
-
-    if parasite is not None:
+    if parasite not in set(df_pred['taxid1_label']):
+        st.info(f'{parasite} is not predicted against more than one host at this confidence.')
+    else:
         edges = df_pred[df_pred['taxid1_label'] == parasite]
         all_hosts = sorted(edges['host'].unique())
         hosts_taxids = {host: tuple(sorted(set(rows['taxid2'])))
@@ -58,8 +45,8 @@ else:
 
         # the comparison first, since a host carrying more interactions may only have been
         # annotated more deeply
-        st.subheader(
-            'Predicted interactions relative to the available host proteins',
+        nav.subheader(
+            'Predicted interactions relative to the available host proteins', 'coverage',
             help='Interactions predicted in each host beside the pool of host proteins '
                  'they were drawn from: those passing the tissue and DeepLoc filters and '
                  'lying where this parasite\'s niche can reach them — the surface of the '
@@ -73,57 +60,60 @@ else:
         st.dataframe(get_host_coverage(data_dir, config, score, parasite, hosts_taxids),
                      width='stretch', hide_index=True)
 
-        body_column, sets_column = st.columns([1, 1], gap='large')
-        with body_column:
+        # the figure is drawn narrower than the page, where the body outlines are read best
+        nav.add('Predicted interactions per infected organ', body_figure.ORGANS_ANCHOR)
+        nav.divider()
+        with st.columns([2, 1])[0]:
             body_figure.show_body_figure(
                 config, data_dir, edges[edges['weight'] >= score],
                 tuple(taxid for host in all_hosts for taxid in hosts_taxids[host]),
                 shared_color_scale=True, title_as_subheader=True)
-        with sets_column:
-            st.subheader(
-                f'Shared and host-specific interactions of *{parasite}*',
-                help=f'Interactions of {parasite} predicted in the set of hosts named by '
-                     'the matrix below the bars. Interactions are counted as pairs of '
-                     'orthologous groups rather than pairs of proteins, since the '
-                     'orthologous proteins of two hosts are distinct proteins.')
-            st.caption('How many interactions are found in each set of hosts.')
-            st.plotly_chart(generate_combination_bars(links, all_hosts, config),
-                            width='stretch')
 
-            reasons = explain_host_specific(links, all_hosts, data_dir, config,
-                                            edges['taxid1'].iloc[0], hosts_taxids)
-            if reasons is not None and not reasons.empty:
-                counts = reasons['Why'].value_counts()
-                # `none` rather than `0`: a nought in bold reads as a value the page failed
-                # to fill in
-                absent = counts.get(ABSENT_GROUP, 0) or 'none'
-                lead = (f'**Of the {len(reasons)} host–link combinations missing from a '
-                        f'host, {absent} are missing because the host lacks the orthologous group.**')
-                clauses = []
-                if counts.get(NOT_EXPRESSED):
-                    clauses.append(f'in {counts[NOT_EXPRESSED]} the group is not annotated '
-                                   'to a tissue the parasite infects')
-                if counts.get(OUT_OF_REACH):
-                    clauses.append(f'in {counts[OUT_OF_REACH]} it is expressed there, but '
-                                   'DeepLoc places it in compartments the parasite cannot '
-                                   'reach')
-                if counts.get(NOT_TRANSFERRED):
-                    clauses.append(f'{counts[NOT_TRANSFERRED]} have a member that passes '
-                                   'every filter, yet no interaction is recorded — a '
-                                   'mismatch between the predictions and the data directory')
-                if clauses:
-                    rest = '; '.join(clauses)
-                    lead += ' ' + rest[0].upper() + rest[1:] + '.'
-                st.markdown(lead)
-                with st.expander(f'The {len(reasons)} missing links, one row each'):
-                    st.dataframe(reasons, width='stretch', height=400, hide_index=True)
-            elif reasons is None:
-                st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
-                           'of whether a host missing an interaction has a protein of the '
-                           'orthologous group at all.')
+        nav.subheader(
+            f'Shared and host-specific interactions of *{parasite}*', 'sets',
+            label='Shared and host-specific interactions',
+            help=f'Interactions of {parasite} predicted in the set of hosts named by '
+                 'the matrix below the bars. Interactions are counted as pairs of '
+                 'orthologous groups rather than pairs of proteins, since the '
+                 'orthologous proteins of two hosts are distinct proteins.')
+        st.caption('How many interactions are found in each set of hosts.')
+        st.plotly_chart(generate_combination_bars(links, all_hosts, config),
+                        width='stretch')
 
-        st.subheader(
-            'Interactions per parasite and host orthologous group',
+        reasons = explain_host_specific(links, all_hosts, data_dir, config,
+                                        edges['taxid1'].iloc[0], hosts_taxids)
+        if reasons is not None and not reasons.empty:
+            counts = reasons['Why'].value_counts()
+            # `none` rather than `0`: a nought in bold reads as a value the page failed
+            # to fill in
+            absent = counts.get(ABSENT_GROUP, 0) or 'none'
+            lead = (f'**Of the {len(reasons)} host–link combinations missing from a '
+                    f'host, {absent} are missing because the host lacks the orthologous group.**')
+            clauses = []
+            if counts.get(NOT_EXPRESSED):
+                clauses.append(f'in {counts[NOT_EXPRESSED]} the group is not annotated '
+                               'to a tissue the parasite infects')
+            if counts.get(OUT_OF_REACH):
+                clauses.append(f'in {counts[OUT_OF_REACH]} it is expressed there, but '
+                               'DeepLoc places it in compartments the parasite cannot '
+                               'reach')
+            if counts.get(NOT_TRANSFERRED):
+                clauses.append(f'{counts[NOT_TRANSFERRED]} have a member that passes '
+                               'every filter, yet no interaction is recorded — a '
+                               'mismatch between the predictions and the data directory')
+            if clauses:
+                rest = '; '.join(clauses)
+                lead += ' ' + rest[0].upper() + rest[1:] + '.'
+            st.markdown(lead)
+            with st.expander(f'The {len(reasons)} missing links, one row each'):
+                st.dataframe(reasons, width='stretch', height=400, hide_index=True)
+        elif reasons is None:
+            st.caption('Run `python scripts/build_host_orthologs.py` to add the check '
+                       'of whether a host missing an interaction has a protein of the '
+                       'orthologous group at all.')
+
+        nav.subheader(
+            'Interactions per parasite and host orthologous group', 'links',
             help='One tile per transferred interaction: parasite orthologous groups on '
                  'the x axis, host orthologous groups on the y axis, coloured by the '
                  'host or host set that received the interaction. The groups are '
@@ -140,6 +130,8 @@ else:
             st.text(f'Every link of {parasite} is found in every host')
         else:
             st.plotly_chart(generate_link_matrix(shown, all_hosts, config), width='stretch')
+
+nav.finish()
 
 st.markdown("---")
 

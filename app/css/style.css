@@ -26,7 +26,7 @@ footer {
 
 /* the menu sits in the bar above, so the page needs no more room under it than that */
 div[data-testid="stMainBlockContainer"] {
-    padding-top: 4.5rem;
+    padding-top: 4.25rem;
 }
 
 /* the bar across the top, in the dark blue of the title, holding the logo and the menu */
@@ -56,4 +56,67 @@ header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"]
 header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"] p,
 header[data-testid="stHeader"] [data-testid="stTopNavLink"][aria-current="page"] [data-testid="stIconMaterial"] {
     color: #ffffff;
+}
+
+/* an analysis on the start page that needs organisms not yet picked */
+[class*="st-key-card_locked_"] {
+    opacity: 0.45;
+}
+
+/* the selection line between the analyses and the overview takes no more room than a line */
+.st-key-selection_line {
+    min-height: 2rem;
+}
+
+/* the section list of a long page stays in view while the figures beside it scroll */
+/* streamlit wraps the container in a box of its own height, so the box is what sticks */
+[data-testid="stLayoutWrapper"]:has(> .st-key-section_nav) {
+    position: sticky;
+    top: 5rem;
+    align-self: flex-start;
+    /* as tall as the window, and a column of filters taller than that scrolls on its own */
+    height: calc(100vh - 7rem);
+    overflow-y: auto;
+}
+
+/* the list at the top of the column and the controls at its foot; streamlit wraps each
+   container in a box of its own, which is what is pushed down */
+.st-key-section_nav {
+    min-height: 100%;
+}
+
+[data-testid="stLayoutWrapper"]:has(> .st-key-section_controls) {
+    margin-top: auto;
+    padding-top: 1.5rem;
+}
+
+/* the way back and the title of an analysis page, packed together at the top of it */
+.st-key-page_header h2 {
+    padding: 0;
+}
+
+.st-key-page_header [data-testid="stButton"] button {
+    min-height: 0;
+    padding: 0;
+}
+
+/* streamlit hangs a caption 16px below its box, which at the foot of the column would
+   overflow it into a scrollbar */
+.st-key-section_controls [data-testid="stCaptionContainer"] {
+    margin-bottom: 0;
+}
+
+/* room for the min and max a slider writes under itself, when it is the last control */
+.st-key-section_controls {
+    padding-bottom: 0.75rem;
+}
+
+/* the way back sits above the section list, apart from it */
+.st-key-section_back {
+    margin-bottom: 1rem;
+}
+
+.st-key-section_back [data-testid="stButton"] button {
+    min-height: 0;
+    padding: 0;
 }

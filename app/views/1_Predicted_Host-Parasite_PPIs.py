@@ -17,6 +17,7 @@ import plotly.express as px
 import plotly.graph_objects as pgo
 import structure_visualizer as strv
 import body_figure
+import section_nav
 from ppi_network import ppi_network
 
 df_select = None
@@ -164,18 +165,6 @@ def get_parasite_tissues(data_dir, parasite, host_taxids):
                               & (predictions['taxid2'].isin(host_taxids))]
 
     return pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
-
-
-@st.cache_data(show_spinner=False)
-def get_parasite_list(data_dir, host_taxids):
-    '''
-    Parasites with predictions against the selected host, so the parasite selector never
-    offers one that yields an empty network.
-    '''
-    predictions = load_predictions(data_dir)
-    predictions = predictions[predictions['taxid2'].isin(host_taxids)]
-
-    return predictions['taxid1_label'].sort_values().unique().tolist()
 
 
 @st.cache_data(show_spinner=False)
@@ -1039,138 +1028,112 @@ def show_structures_dialog(edge):
                                        on_click='ignore', key=f'fasta_{i}')
 
 
-st.caption('Investigate the predicted interaction network for a host-parasite pair.')
+# the sections on the left, with the filters that set all of them under them; the title
+# heads the column of figures
+nav = section_nav.SectionNav('network', [
+    ('Interactions per tissue', 'tissues'),
+    ('Network of host-parasite PPIs', 'network'),
+    ('Cell types expressing the host proteins', 'cell-types'),
+    ('Table of host-parasite PPIs', 'table'),
+    ('Functional enrichment (GO)', 'enrichment')])
+with nav.body:
+    selected_host, selected_parasite = web_utils.require_selection(
+        'Host-parasite network', host=True, parasite=True, back=nav.back)
+selected_taxids = web_utils.host_taxids(config, selected_host)
 
+df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
+df_select = web_utils.filter_tissues(config, df_select)
+# carried on the predictions so the filter, the table and the network read the same call
+surface_calls = get_surface_calls(data_dir, tuple(str(t) for t in selected_taxids))
+if not surface_calls.empty:
+    df_select = df_select.assign(
+        source_surface=df_select['source'].map(surface_calls['surface']),
+        target_surface=df_select['target'].map(surface_calls['surface']))
 
-with st.columns([1, 2], gap='large')[0]:
-    # the host carries over from whichever page it was last chosen on
-    selected_host, selected_taxids = web_utils.host_selector(
-        config, load_predictions(data_dir), 'Select a host')
+with nav.side:
+    score = web_utils.score_slider()
 
-    if selected_host == web_utils.NO_HOST:
-        selected_parasite = "<select>"
-    else:
-        # only parasites that infect the selected host
-        parasite_list = ['<select>'] + get_parasite_list(data_dir, selected_taxids)
-        # keyed by host so the browser redraws the field on a host switch instead of still
-        # showing a parasite the new host does not have; the parasite carries over if it does
-        widget_key = f'net_par_{selected_host}'
-        if widget_key not in st.session_state:
-            carried = st.session_state.get('net_par')
-            st.session_state[widget_key] = carried if carried in parasite_list else '<select>'
-        selected_parasite = st.selectbox('Select a parasite', parasite_list, key=widget_key)
-        st.session_state['net_par'] = selected_parasite
+    tissues_options = generate_tissue_filters(df_select)
+    if len(tissues_options) > 0:
+        # a click on the body figure is read here, on the run after it, before the
+        # filter is created
+        body_figure.apply_organ_click(config, selected_taxids, tissues_options,
+                                      TISSUE_FILTER_KEY)
+        selected_tissues = st.multiselect('Tissues', tissues_options,
+                                          key=TISSUE_FILTER_KEY)
+        if len(selected_tissues) > 0:
+            df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
-filter_col, network_col = st.columns([1, 2], gap='large')
+    # cell types are offered on their own; picking tissues first narrows what is offered
+    expression = web_utils.expression_slider('net_expression')
+    cell_type_counts = generate_cell_type_filters(df_select, score, expression)
+    if len(cell_type_counts) > 0:
+        def cell_type_label(cell_type):
+            proteins = cell_type_counts[cell_type]
 
-with filter_col:
-    if selected_parasite != "<select>":
-        df_select = get_parasite_tissues(data_dir, selected_parasite, selected_taxids)
-        df_select = web_utils.filter_tissues(config, df_select)
-        # carried on the predictions so the filter, the table and the network read the same
-        # call
-        surface_calls = get_surface_calls(data_dir, tuple(str(t) for t in selected_taxids))
-        if not surface_calls.empty:
-            df_select = df_select.assign(
-                source_surface=df_select['source'].map(surface_calls['surface']),
-                target_surface=df_select['target'].map(surface_calls['surface']))
-        st.header('Filters')
-        st.caption('These filters apply to the network, the cell-type chart and the table. '
-                   'Leave a filter empty to keep everything.')
-        score = web_utils.score_slider()
+            return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
 
-        # the body figure sits above the tissue filter its organs set, but counts what the
-        # filters below leave, so it is drawn once they have run
-        body_slot = st.container()
+        # a cell type the new score or expression leaves empty drops out of the choice
+        if CELL_TYPE_FILTER_KEY in st.session_state:
+            st.session_state[CELL_TYPE_FILTER_KEY] = [
+                c for c in st.session_state[CELL_TYPE_FILTER_KEY]
+                if c in cell_type_counts.index]
 
-        tissues_options = generate_tissue_filters(df_select)
-        if len(tissues_options) > 0:
-            # a click on the body figure is read here, on the run after it, before the
-            # filter is created
-            body_figure.apply_organ_click(config, selected_taxids, tissues_options,
-                                          TISSUE_FILTER_KEY)
-            selected_tissues = st.multiselect('Tissues', tissues_options,
-                                              key=TISSUE_FILTER_KEY)
-            if len(selected_tissues) > 0:
-                df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
+        selected_cell_types = st.multiselect(
+            'Cell types', list(cell_type_counts.index),
+            format_func=cell_type_label, key=CELL_TYPE_FILTER_KEY,
+            help='A cell type is offered with the number of host proteins expressed '
+                 'in it. Cell-type annotation is available for human (HPA), mouse '
+                 '(Tabula Muris Senis) and pig (Pig Cell Atlas); a host protein with no '
+                 'cell type is left out once a cell type is chosen.')
+        if len(selected_cell_types) > 0:
+            expressed = web_utils.keep_expressed_cell_types(
+                df_select[df_select['Cell type'].notna()], expression)
+            df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
 
-        # cell types are offered on their own; picking tissues first narrows what is offered
-        expression = web_utils.expression_slider('net_expression')
-        cell_type_counts = generate_cell_type_filters(df_select, score, expression)
-        if len(cell_type_counts) > 0:
-            def cell_type_label(cell_type):
-                proteins = cell_type_counts[cell_type]
+    surface_options = generate_surface_filters(
+        df_select, surface_calls,
+        web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE),
+        selected_cell_types)
+    if len(surface_options) > 0:
+        # sized as the labels of the widgets around it
+        st.markdown('<p style="font-size: 0.875rem;">Host protein localization</p>',
+                    unsafe_allow_html=True,
+                    help='Localization of the host protein as predicted by DeepLoc 2. '
+                         'A protein predicted in several classes stays if any of them '
+                         'is ticked.')
+    # in a row that wraps when the column is too narrow for all of them
+    with st.container(horizontal=True, key='surface_filters'):
+        ticked = [c for c in surface_options
+                  if st.checkbox(c, key=SURFACE_FILTER_KEYS[c])]
+    # ticking every class leaves every host protein in, as ticking none does
+    selected_surface = ticked if 0 < len(ticked) < len(surface_options) else []
+    if selected_surface:
+        # read from the probabilities so a protein called for several answers to each
+        over = pd.concat([surface_calls[web_utils.DEEPLOC_SCORES[c]]
+                          > web_utils.DEEPLOC_CUTOFFS[c]
+                          for c in selected_surface], axis=1).any(axis=1)
+        df_select = df_select[df_select['target'].map(over).fillna(False)]
 
-                return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
+annotations = web_utils.load_protein_annotations(data_dir)
+for host_taxid in selected_taxids:
+    host_df = df_select[df_select['taxid2'].astype(str) == host_taxid]
+    host_df = host_df.assign(
+        target_color=config['hosts'][int(host_taxid)]['color'])
+    G = generate_graph(host_df, score, annotations, surface_calls)
+    net = GraphNetwork(height=f'{NETWORK_HEIGHT}px', width="100%",
+                       bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
+    net.from_nx(G)
+    net.repulsion(node_distance=420, central_gravity=0.33,
+                  spring_length=110, spring_strength=0.10,
+                  damping=0.95)
+    style_network(net)
+    networks.append((host_taxid, config['hosts'][int(host_taxid)]['label'],
+                     host_df, G, net))
 
-            # a cell type the new score or expression leaves empty drops out of the choice
-            if CELL_TYPE_FILTER_KEY in st.session_state:
-                st.session_state[CELL_TYPE_FILTER_KEY] = [
-                    c for c in st.session_state[CELL_TYPE_FILTER_KEY]
-                    if c in cell_type_counts.index]
-
-            selected_cell_types = st.multiselect(
-                'Cell types', list(cell_type_counts.index),
-                format_func=cell_type_label, key=CELL_TYPE_FILTER_KEY,
-                help='A cell type is offered with the number of host proteins expressed '
-                     'in it. Cell-type annotation is available for human (HPA), mouse '
-                     '(Tabula Muris Senis) and pig (Pig Cell Atlas); a host protein with no '
-                     'cell type is left out once a cell type is chosen.')
-            if len(selected_cell_types) > 0:
-                expressed = web_utils.keep_expressed_cell_types(
-                    df_select[df_select['Cell type'].notna()], expression)
-                df_select = expressed[expressed['Cell type'].isin(selected_cell_types)]
-
-        surface_options = generate_surface_filters(
-            df_select, surface_calls,
-            web_utils.get_niches(config).get(selected_parasite, web_utils.UNKNOWN_NICHE),
-            selected_cell_types)
-        if len(surface_options) > 0:
-            # sized as the labels of the widgets around it
-            st.markdown('<p style="font-size: 0.875rem;">Host protein localization</p>',
-                        unsafe_allow_html=True,
-                        help='Localization of the host protein as predicted by DeepLoc 2. '
-                             'A protein predicted in several classes stays if any of them '
-                             'is ticked.')
-        # in a row that wraps when the column is too narrow for all of them
-        with st.container(horizontal=True, key='surface_filters'):
-            ticked = [c for c in surface_options
-                      if st.checkbox(c, key=SURFACE_FILTER_KEYS[c])]
-        # ticking every class leaves every host protein in, as ticking none does
-        selected_surface = ticked if 0 < len(ticked) < len(surface_options) else []
-        if selected_surface:
-            # read from the probabilities so a protein called for several answers to each
-            over = pd.concat([surface_calls[web_utils.DEEPLOC_SCORES[c]]
-                              > web_utils.DEEPLOC_CUTOFFS[c]
-                              for c in selected_surface], axis=1).any(axis=1)
-            df_select = df_select[df_select['target'].map(over).fillna(False)]
-
-        annotations = web_utils.load_protein_annotations(data_dir)
-        for host_taxid in selected_taxids:
-            host_df = df_select[df_select['taxid2'].astype(str) == host_taxid]
-            host_df = host_df.assign(
-                target_color=config['hosts'][int(host_taxid)]['color'])
-            G = generate_graph(host_df, score, annotations, surface_calls)
-            net = GraphNetwork(height=f'{NETWORK_HEIGHT}px', width="100%",
-                          bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
-            net.from_nx(G)
-            net.repulsion(node_distance=420, central_gravity=0.33,
-                          spring_length=110, spring_strength=0.10,
-                          damping=0.95)
-            style_network(net)
-            networks.append((host_taxid, config['hosts'][int(host_taxid)]['label'],
-                             host_df, G, net))
-        
-        
-        
 # resolved after the column that draws the filters, read by every section below
 page_filters = active_filters(score, selected_tissues, expression, selected_cell_types,
-                              selected_surface) if df_select is not None else []
-
-if df_select is not None:
-    with body_slot:
-        body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
-                                     selected_taxids, selected_tissues, clickable=True)
+                              selected_surface)
 
 
 def network_legend(parasite_label, parasite_color, host_label, host_color):
@@ -1264,192 +1227,206 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                 )
 
 
-with network_col:
-    if networks:
-        st.header('Network of host-parasite PPIs')
-        st.caption('Nodes are proteins, coloured by organism and sized by centrality in the '
-                   'network. Edge width is the confidence score. Click an edge for the AlphaFold model and '
-                   'sequence of the proteins.')
-        # right above the network it describes
-        show_active_filters(page_filters)
-        for network in networks:
-            render_network_panel(*network)
+with nav.body:
+    # the organs first: a click on one sets the tissue filter on the left
+    nav.subheader('Interactions per tissue', 'tissues',
+                  help='Predicted interactions whose host protein is expressed in each organ, '
+                       'after the filters on the left. An interaction is counted in all of the '
+                       'organs in which the host protein is expressed.')
+    show_active_filters(page_filters)
+    with st.columns(2)[0]:
+        body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
+                                     selected_taxids, selected_tissues, clickable=True)
 
-
-with st.container():
-    if df_select is not None:
-        marks, blocks = cell_type_marks(df_select, score, expression)
-        if marks is not None:
-            st.header(
-                'Cell types expressing the host proteins',
-                help='A host protein counts towards a cell type when it is expressed there, '
-                     f'{web_utils.expression_phrase(expression)}, and an interaction '
-                     'is counted in every cell type where its host protein is expressed, '
-                     'so the bars overlap and are not a partition of the network. The '
-                     'cell types are grouped into the tissues the parasite infects, and a '
-                     'cell type is written under its block alone, since the same kind of '
-                     'cell is annotated separately in each tissue. Cell-type annotation is '
-                     'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
-                     'Cell Atlas).')
+    with st.container():
+        if networks:
+            nav.subheader('Network of host-parasite PPIs', 'network')
+            st.caption('Nodes are proteins, coloured by organism and sized by centrality in the '
+                       'network. Edge width is the confidence score. Click an edge for the AlphaFold model and '
+                       'sequence of the proteins.')
+            # right above the network it describes
             show_active_filters(page_filters)
-            st.caption('How many interactions involve host proteins expressed in each cell '
-                       'type of the infected tissues.')
-            st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
+            for network in networks:
+                render_network_panel(*network)
 
-with st.container():
-    if df_select is not None:
-        st.header("Table of host-parasite PPIs",
-                  help='One row per predicted interaction, with the tissues the host protein '
-                       'is expressed in, the number of cell types it is expressed in '
-                       f'({web_utils.expression_phrase(expression)}) and its DeepLoc class.')
-        show_active_filters(page_filters)
-        table = generate_interactions_table(df_select, score,
-                                            web_utils.load_protein_annotations(data_dir),
-                                            expression)
-        search = st.text_input(
-            "Search the table",
-            key='table_search',
-            placeholder="Protein name, identifier, tissue ...",
-            help="Keeps the rows holding the text typed, looked for in any column.")
-        table = search_table(table, search)
-        if search.strip() and table.empty:
-            st.info(f"No interaction holds '{search}'.")
-        st.dataframe(table, width='stretch', height=TABLE_HEIGHT, hide_index=True)
-        st.download_button(
-            label="Download Network Table",
-            data=utils.convert_df(name_the_selection(table, selected_parasite,
-                                                     selected_host)),
-            file_name=download_name(selected_parasite, page_filters, 'network_table.tsv'),
-            mime='text/csv',
-        )
 
-with st.container():
-    if df_select is not None:
-        st.header(
-            "Functional enrichment of the network (GO biological processes)",
-            help='Biological processes over-represented among the host proteins and '
-                 'among the parasite proteins, each side tested on its own. '
-                 'A side is tested against the proteins of its own species the '
-                 'pipeline had to work with -- the ones its filters passed, the host '
-                 'proteins on expression and localisation and the parasite proteins on '
-                 'being secreted -- and not against the whole proteome, which would '
-                 'return those filters themselves as a result. The two sides are tested '
-                 'apart: they are annotated to a different depth and were selected on '
-                 "different grounds. One-sided Fisher's exact test, corrected across "
-                 'terms with Benjamini-Hochberg; a process is tested when the background '
-                 'gives it at least 11 proteins, no more than a quarter of them, and at '
-                 'least two are in the network.')
-        show_active_filters(page_filters)
-        st.caption('Biological processes over-represented among the host proteins and '
-                   'among the parasite proteins of the network.')
-        # the sides are tested one at a time and carried together with the side on each row
-        enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
-                                               data_dir, s,
-                                               web_utils.get_config_file()).assign(side=s)
-                                for s in SIDES], ignore_index=True)
-        if not enrichment.empty:
-            fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                           horizontal=True,
-                           help='The Benjamini-Hochberg corrected significance a process '
-                                'has to reach to be counted as enriched.')
-            # only the grid and the file it hands out are renamed for reading
-            enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
-            column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
-            enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
-            by_side = enrichment_view['side'].value_counts()
-            per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
-            st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
-                       'Select rows to highlight GO terms in the network.')
-            grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
-                                hide_index=True, on_select='rerun',
-                                selection_mode='multi-row', key='enrichment_table')
-            # a selection made before the FDR shortened the table can point past its end
-            selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
-                                                   if r < len(enrichment_table)]]
-        else:
-            st.subheader("No GO terms were found enriched")
+    with st.container():
+        if df_select is not None:
+            marks, blocks = cell_type_marks(df_select, score, expression)
+            if marks is not None:
+                nav.subheader(
+                    'Cell types expressing the host proteins', 'cell-types',
+                    help='A host protein counts towards a cell type when it is expressed there, '
+                         f'{web_utils.expression_phrase(expression)}, and an interaction '
+                         'is counted in every cell type where its host protein is expressed, '
+                         'so the bars overlap and are not a partition of the network. The '
+                         'cell types are grouped into the tissues the parasite infects, and a '
+                         'cell type is written under its block alone, since the same kind of '
+                         'cell is annotated separately in each tissue. Cell-type annotation is '
+                         'available for human (HPA), mouse (Tabula Muris Senis) and pig (Pig '
+                         'Cell Atlas).')
+                show_active_filters(page_filters)
+                st.caption('How many interactions involve host proteins expressed in each cell '
+                           'type of the infected tissues.')
+                st.plotly_chart(generate_cell_type_bars(marks, blocks), width='stretch')
 
-with st.container():
-    if enrichment_view is not None and enrichment_view.empty:
-        st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
-                "to see the processes that are enriched less strongly.")
-    elif enrichment_view is not None:
-        enrichment_viz = enrichment_view
-        if selected_rows is not None and len(selected_rows) > 0:
-            selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
-            enrichment_viz = enrichment_viz[picked(enrichment_viz, selected_rows)]
+    with st.container():
+        if df_select is not None:
+            nav.subheader("Table of host-parasite PPIs", 'table',
+                          help='One row per predicted interaction, with the tissues the host '
+                               'protein is expressed in, the number of cell types it is '
+                               f'expressed in ({web_utils.expression_phrase(expression)}) and '
+                               'its DeepLoc class.')
+            show_active_filters(page_filters)
+            table = generate_interactions_table(df_select, score,
+                                                web_utils.load_protein_annotations(data_dir),
+                                                expression)
+            search = st.text_input(
+                "Search the table",
+                key='table_search',
+                placeholder="Protein name, identifier, tissue ...",
+                help="Keeps the rows holding the text typed, looked for in any column.")
+            table = search_table(table, search)
+            if search.strip() and table.empty:
+                st.info(f"No interaction holds '{search}'.")
+            st.dataframe(table, width='stretch', height=TABLE_HEIGHT, hide_index=True)
+            st.download_button(
+                label="Download Network Table",
+                data=utils.convert_df(name_the_selection(table, selected_parasite,
+                                                         selected_host)),
+                file_name=download_name(selected_parasite, page_filters, 'network_table.tsv'),
+                mime='text/csv',
+            )
 
-        st.subheader(
-            "Enriched biological processes",
-            help='The ranked view shows the '
-                 f'{GO_TOP_N} most significantly over-represented processes, positioned by '
-                 'odds ratio, sized by the number of proteins annotated to each and shaded '
-                 'by significance. The volcano shows every process tested, with those '
-                 'passing the selected FDR highlighted. The hierarchy nests each process '
-                 'within the closest enriched process above it in the Gene Ontology; click '
-                 'a block to zoom in. Select rows in the table above to restrict the '
-                 'figures.')
-        st.caption('The enriched processes ranked, among every process tested, and nested '
-                   'in the Gene Ontology.')
-        # one tab per side, the figures of that side inside it
-        for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
-            with side_tab:
-                tested = enrichment[enrichment['side'] == s]
-                passing = enrichment_viz[enrichment_viz['side'] == s]
-                if tested.empty:
-                    st.caption(f'No process could be tested among the {s.lower()}.')
-                    continue
-                ranked_tab, volcano_tab, tree_tab = st.tabs(
-                    ["Ranked processes", "All tested processes", "Hierarchy"])
-                with ranked_tab:
-                    if passing.empty:
-                        st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
-                    else:
-                        st.plotly_chart(get_enrichment_dotplot(passing), width='stretch',
-                                        key=f'dotplot_{s}')
-                with volcano_tab:
-                    picked_terms = passing['go_term'].tolist() if selected_terms else []
-                    st.plotly_chart(get_enrichment_volcano(tested, fdr, picked_terms),
-                                    width='stretch', key=f'volcano_{s}')
-                with tree_tab:
-                    part = enrichment_view[enrichment_view['side'] == s]
-                    if part.empty:
-                        st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
-                    else:
-                        st.plotly_chart(get_enrichment_summary(part,
-                                                               load_ontology_parents(data_dir)),
-                                        width='stretch', key=f'treemap_{s}')
+    with st.container():
+        if df_select is not None:
+            nav.subheader(
+                "Functional enrichment of the network (GO biological processes)", 'enrichment',
+                label='Functional enrichment (GO)',
+                help='Biological processes over-represented among the host proteins and '
+                     'among the parasite proteins, each side tested on its own. '
+                     'A side is tested against the proteins of its own species the '
+                     'pipeline had to work with -- the ones its filters passed, the host '
+                     'proteins on expression and localisation and the parasite proteins on '
+                     'being secreted -- and not against the whole proteome, which would '
+                     'return those filters themselves as a result. The two sides are tested '
+                     'apart: they are annotated to a different depth and were selected on '
+                     "different grounds. One-sided Fisher's exact test, corrected across "
+                     'terms with Benjamini-Hochberg; a process is tested when the background '
+                     'gives it at least 11 proteins, no more than a quarter of them, and at '
+                     'least two are in the network.')
+            show_active_filters(page_filters)
+            st.caption('Biological processes over-represented among the host proteins and '
+                       'among the parasite proteins of the network.')
+            # the sides are tested one at a time and carried together with the side on each row
+            enrichment = pd.concat([get_enrichment(df_select[df_select['weight'] >= score],
+                                                   data_dir, s,
+                                                   web_utils.get_config_file()).assign(side=s)
+                                    for s in SIDES], ignore_index=True)
+            if not enrichment.empty:
+                fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
+                               horizontal=True,
+                               help='The Benjamini-Hochberg corrected significance a process '
+                                    'has to reach to be counted as enriched.')
+                # only the grid and the file it hands out are renamed for reading
+                enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
+                column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
+                enrichment_table = enrichment_view[list(column_names)].rename(columns=column_names)
+                by_side = enrichment_view['side'].value_counts()
+                per_side = ', '.join(f'{by_side.get(s, 0)} among the {s.lower()}' for s in SIDES)
+                st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} ({per_side}). '
+                           'Select rows to highlight GO terms in the network.')
+                grid = st.dataframe(enrichment_table, width='stretch', height=TABLE_HEIGHT,
+                                    hide_index=True, on_select='rerun',
+                                    selection_mode='multi-row', key='enrichment_table')
+                # a selection made before the FDR shortened the table can point past its end
+                selected_rows = enrichment_table.iloc[[r for r in grid.selection.rows
+                                                       if r < len(enrichment_table)]]
+            else:
+                st.subheader("No GO terms were found enriched")
 
-        with st.container():
-            if len(selected_terms) > 0:
-                if enrichment is not None:
-                    highlighted_nodes = enrichment[picked(enrichment, selected_rows)]['nodes'].values
-                    highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
-                    highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
-                    G = generate_graph(df_select, score,
-                                       web_utils.load_protein_annotations(data_dir),
-                                       surface_calls)
-                    nx.set_node_attributes(G, MUTED_COLOR, 'color')
-                    nx.set_node_attributes(G, highlight_color, 'color')
-                    net = GraphNetwork(height="450px", width="100%",
-                                  bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
-                    net.from_nx(G)
-                    G = None
-                    style_network(net)
-                    html_data = net.generate_html()
-                    net = None
-                    st.subheader("Nodes annotated to the selected biological processes")
-                    st.caption('The network with the proteins annotated to the biological '
-                               'processes selected above in pink and the remainder in grey.')
-                    st.iframe(html_data, height=500)
-                    st.download_button(
-                        label="Download Network as Html",
-                        data=html_data,
-                        file_name=f'{selected_parasite}_enrichment_network.html',
-                        mime='text/html',
-                    )
+    with st.container():
+        if enrichment_view is not None and enrichment_view.empty:
+            st.info(f"No biological process passes an FDR of {fdr}. Loosen the correction above "
+                    "to see the processes that are enriched less strongly.")
+        elif enrichment_view is not None:
+            enrichment_viz = enrichment_view
+            if selected_rows is not None and len(selected_rows) > 0:
+                selected_terms = selected_rows[GO_TERM_COLUMN].values.tolist()
+                enrichment_viz = enrichment_viz[picked(enrichment_viz, selected_rows)]
 
-st.markdown("---")
+            st.subheader(
+                "Enriched biological processes",
+                help='The ranked view shows the '
+                     f'{GO_TOP_N} most significantly over-represented processes, positioned by '
+                     'odds ratio, sized by the number of proteins annotated to each and shaded '
+                     'by significance. The volcano shows every process tested, with those '
+                     'passing the selected FDR highlighted. The hierarchy nests each process '
+                     'within the closest enriched process above it in the Gene Ontology; click '
+                     'a block to zoom in. Select rows in the table above to restrict the '
+                     'figures.')
+            st.caption('The enriched processes ranked, among every process tested, and nested '
+                       'in the Gene Ontology.')
+            # one tab per side, the figures of that side inside it
+            for s, side_tab in zip(SIDES, st.tabs([f'{s} ({by_side.get(s, 0)})' for s in SIDES])):
+                with side_tab:
+                    tested = enrichment[enrichment['side'] == s]
+                    passing = enrichment_viz[enrichment_viz['side'] == s]
+                    if tested.empty:
+                        st.caption(f'No process could be tested among the {s.lower()}.')
+                        continue
+                    ranked_tab, volcano_tab, tree_tab = st.tabs(
+                        ["Ranked processes", "All tested processes", "Hierarchy"])
+                    with ranked_tab:
+                        if passing.empty:
+                            st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                        else:
+                            st.plotly_chart(get_enrichment_dotplot(passing), width='stretch',
+                                            key=f'dotplot_{s}')
+                    with volcano_tab:
+                        picked_terms = passing['go_term'].tolist() if selected_terms else []
+                        st.plotly_chart(get_enrichment_volcano(tested, fdr, picked_terms),
+                                        width='stretch', key=f'volcano_{s}')
+                    with tree_tab:
+                        part = enrichment_view[enrichment_view['side'] == s]
+                        if part.empty:
+                            st.caption(f'No process passes an FDR of {fdr} among the {s.lower()}.')
+                        else:
+                            st.plotly_chart(get_enrichment_summary(part,
+                                                                   load_ontology_parents(data_dir)),
+                                            width='stretch', key=f'treemap_{s}')
+
+            with st.container():
+                if len(selected_terms) > 0:
+                    if enrichment is not None:
+                        highlighted_nodes = enrichment[picked(enrichment, selected_rows)]['nodes'].values
+                        highlighted_nodes = utils.merge_list_of_lists([i.split(',') for i in highlighted_nodes])
+                        highlight_color = {i: HIGHLIGHT_COLOR for i in highlighted_nodes}
+                        G = generate_graph(df_select, score,
+                                           web_utils.load_protein_annotations(data_dir),
+                                           surface_calls)
+                        nx.set_node_attributes(G, MUTED_COLOR, 'color')
+                        nx.set_node_attributes(G, highlight_color, 'color')
+                        net = GraphNetwork(height="450px", width="100%",
+                                      bgcolor=NETWORK_BACKGROUND, font_color=LABEL_FONT_COLOR)
+                        net.from_nx(G)
+                        G = None
+                        style_network(net)
+                        html_data = net.generate_html()
+                        net = None
+                        st.subheader("Nodes annotated to the selected biological processes")
+                        st.caption('The network with the proteins annotated to the biological '
+                                   'processes selected above in pink and the remainder in grey.')
+                        st.iframe(html_data, height=500)
+                        st.download_button(
+                            label="Download Network as Html",
+                            data=html_data,
+                            file_name=f'{selected_parasite}_enrichment_network.html',
+                            mime='text/html',
+                        )
+
+nav.finish()
+
 st.markdown("---")
 
 # Footer

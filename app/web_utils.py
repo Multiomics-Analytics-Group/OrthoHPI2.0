@@ -6,13 +6,20 @@ import streamlit as st
 import textwrap
 import utils
 
-# menu entries as (label, material icon, path relative to the app root); the page file
-# numbers no longer match this order
-PAGES = [('Home', 'views/Home.py'),
-         ('Host-parasite network', 'views/1_Predicted_Host-Parasite_PPIs.py'),
-         ('Parasites of a host', 'views/2_Compare_Parasites.py'),
-         ('Multi-host parasites', 'views/4_Hosts_of_a_Parasite.py'),
-         ('About', 'views/3_About.py')]
+# the pages of the app as (title, path relative to the app root); Start opens when the
+# address names none
+START = 'views/Start.py'
+GENERAL = 'views/Home.py'
+NETWORK = 'views/1_Predicted_Host-Parasite_PPIs.py'
+PARASITES_OF_HOST = 'views/2_Compare_Parasites.py'
+HOSTS_OF_PARASITE = 'views/4_Hosts_of_a_Parasite.py'
+ABOUT = 'views/3_About.py'
+PAGES = [('Start', START),
+         ('General analysis', GENERAL),
+         ('View network', NETWORK),
+         ('Compare parasites of a host', PARASITES_OF_HOST),
+         ('Compare hosts of a parasite', HOSTS_OF_PARASITE),
+         ('About', ABOUT)]
 
 # pixels one line of a wrapped axis name takes, at plotly's default font
 LABEL_LINE = 15
@@ -57,13 +64,12 @@ SUBTITLE = 'Orthology Prediction of Host-Parasite PPIs'
 
 def navigation():
     '''
-    The menu across the top, holding every page; the first one is opened when the
-    address names none.
+    Every page of the app, with no menu: the start page leads to the others and each of
+    them leads back.
     '''
-    pages = [st.Page(path, title=label, default=i == 0)
-             for i, (label, path) in enumerate(PAGES)]
+    pages = [st.Page(path, title=label, default=path == START) for label, path in PAGES]
 
-    return st.navigation(pages, position='top')
+    return st.navigation(pages, position='hidden')
 
 
 # colours of the title and subtitle on a light and on a dark background
@@ -71,12 +77,15 @@ HEADER_COLORS = {'light': ('#023858', '#385380'), 'dark': ('#a6bddb', '#74a9cf')
 
 
 def show_header():
-    '''The name of the app and what it does, which the home page opens with.'''
+    '''
+    The name of the app and what it does, on one line, which the start page opens with.
+    '''
     title, subtitle = HEADER_COLORS['dark' if st.context.theme.type == 'dark' else 'light']
-    st.markdown(f"<h1 style='color: {title}; padding-bottom: 0;'>{TITLE}</h1>",
-                unsafe_allow_html=True)
-    st.markdown(f"<h3 style='color: {subtitle}; padding-top: 0;'>{SUBTITLE}</h3>",
-                unsafe_allow_html=True)
+    st.markdown(f"<div style='display: flex; flex-wrap: wrap; align-items: baseline; "
+                f"column-gap: 1rem; margin-bottom: 0.75rem;'><h2 style='color: {title}; padding: 0;'>{TITLE}</h2>"
+                f"<span style='color: {subtitle}; font-size: 1.25rem; font-weight: 600;'>"
+                f"{SUBTITLE}</span></div>", unsafe_allow_html=True)
+
 
 # width figures are drawn at until the browser has reported the real page width
 DEFAULT_PAGE_WIDTH = 1000
@@ -424,45 +433,59 @@ def get_niches(config):
     return niches
 
 
-def get_host_groups(config, predictions):
-    '''Maps each host species offered in the app to its taxid.'''
-    predicted = set(predictions['taxid2'])
-    groups = {}
-    for taxid, host in config['hosts'].items():
-        taxid = str(taxid)
-        if taxid in predicted:
-            groups[host['label']] = [taxid]
-
-    return {group: groups[group] for group in sorted(groups)}
-
-
-# Streamlit drops the state of a widget the current page does not draw, so the host is kept
-# in a key of our own that every page seeds from and writes back to
+# the host and parasite picked on the start page, by their config labels, which every
+# other page reads
 HOST_STATE_KEY = 'selected_host'
-HOST_WIDGET_KEY = 'selected_host_widget'
-NO_HOST = '<select>'
+PARASITE_STATE_KEY = 'selected_parasite'
 
 
-def host_selector(config, predictions, label='Select a host'):
-    '''Draws the host selectbox, shared across pages through HOST_STATE_KEY.'''
-    groups = get_host_groups(config, predictions)
-    options = [NO_HOST] + list(groups)
+def get_selection():
+    '''The selected host and parasite labels, None where nothing is picked.'''
+    return (st.session_state.get(HOST_STATE_KEY), st.session_state.get(PARASITE_STATE_KEY))
 
-    current = st.session_state.get(HOST_STATE_KEY, NO_HOST)
-    if current not in options:
-        # the stored host has no predictions in this data_dir (snapshot entrypoints), so
-        # fall back
-        current = NO_HOST
 
-    # seeded through the key rather than `index`: a changing `index` makes Streamlit treat
-    # it as a new widget and drop the click that changed the host
-    if st.session_state.get(HOST_WIDGET_KEY) not in options:
-        st.session_state[HOST_WIDGET_KEY] = current
+def set_selection(host, parasite):
+    st.session_state[HOST_STATE_KEY] = host
+    st.session_state[PARASITE_STATE_KEY] = parasite
 
-    selected = st.selectbox(label, options, key=HOST_WIDGET_KEY)
-    st.session_state[HOST_STATE_KEY] = selected
 
-    return selected, tuple(groups.get(selected, ()))
+def host_taxids(config, host):
+    '''The taxids, as the predictions write them, of a host label.'''
+    return tuple(str(taxid) for taxid, entry in config['hosts'].items()
+                 if entry['label'] == host)
+
+
+def page_header(title, host=None, parasite=None, back=None):
+    '''
+    The way back to the start page, drawn in `back` where the page gives a place for it,
+    the title of an analysis page and the organisms it shows.
+    '''
+    label = 'Change selection' if host or parasite else 'Back to start'
+    with st.container(key='page_header', gap='small'):
+        if (back or st).button(label, icon=':material/arrow_back:', type='tertiary'):
+            st.switch_page(START)
+        st.header(title, anchor=False)
+        parts = []
+        if host:
+            parts.append(f'Host: **{host}**')
+        if parasite:
+            parts.append(f'Parasite: ***{parasite}***')
+        if parts:
+            st.markdown(' · '.join(parts))
+
+
+def require_selection(title, host=False, parasite=False, back=None):
+    '''
+    The selection an analysis page needs, named under its title; a page opened without
+    it, from a bookmark or after the session expired, goes back to the start page.
+    '''
+    selected_host, selected_parasite = get_selection()
+    if (host and not selected_host) or (parasite and not selected_parasite):
+        st.switch_page(START)
+    page_header(title, selected_host if host else None, selected_parasite if parasite else None,
+                back)
+
+    return selected_host, selected_parasite
 
 
 # the confidence score is shared across pages the same way as the host

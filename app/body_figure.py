@@ -431,6 +431,10 @@ def legend_html(bounds, compact=False):
             + ''.join(swatches) + '</div>')
 
 
+# the anchor of the figure's heading, for a page that lists its sections
+ORGANS_ANCHOR = 'organs'
+
+
 def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                      shared_color_scale=False, compact_human=False, title_as_subheader=False,
                      clickable=False):
@@ -453,7 +457,7 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     infected = infected_organs(config, df['taxid1'].unique()[0])
     if not infected:
         if title_as_subheader:
-            st.subheader('Predicted interactions per infected organ')
+            st.subheader('Predicted interactions per infected organ', anchor=ORGANS_ANCHOR)
         elif not clickable:
             st.markdown('##### Predicted interactions per infected organ')
         st.caption('The figure draws none of the tissues this parasite is recorded as '
@@ -466,15 +470,16 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
     shown_organs = infected & (filtered_organs or infected)
 
     if clickable:
-        # drawn among the filters, above the tissue filter it sets
-        st.markdown('<p style="font-size: 0.875rem;">Click a tissue to filter on, or select '
-                    'from the list below.</p>', unsafe_allow_html=True)
+        # the tissue filter it sets sits in the column of filters beside it
+        st.markdown('<p style="font-size: 0.875rem;">Click a tissue to filter on, or pick '
+                    'tissues in the filter on the left.</p>', unsafe_allow_html=True)
     else:
         description = ('Predicted interactions whose host protein is expressed in each organ, '
                        'after the confidence score and the tissue filters. An interaction is '
                        'counted in all of the organs, in which the host protein is expressed.')
         if title_as_subheader:
-            st.subheader('Predicted interactions per infected organ', help=description)
+            st.subheader('Predicted interactions per infected organ', help=description,
+                         anchor=ORGANS_ANCHOR)
         else:
             st.markdown('##### Predicted interactions per infected organ', help=description)
         st.caption('How many interactions can take place in each infected organ.')

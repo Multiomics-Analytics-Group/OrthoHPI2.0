@@ -3,14 +3,13 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import utils
 import web_utils
-import hosts_parasites
+import multi_host
+import section_nav
 import similarity_heatmap
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-web_utils.show_header()
 
 config = utils.read_config(web_utils.get_config_file())
 data_dir = web_utils.get_data_dir()
@@ -881,25 +880,23 @@ def show_cross_host_dialog(first, second, df, score, present):
                 st.info(empty)
 
 
-st.caption('Host-parasite protein-protein interactions predicted by '
-           'orthology transfer. This page presents every prediction per host, '
-           '**Host-parasite network** shows the network of one host-parasite pair, '
-           '**Parasites of a host** compares the parasites of a single host, and **Multi-host '
-           'parasites** compares the hosts of multi-host parasites.')
-st.markdown("<hr style=\"margin: 0.5rem 0 0;\">", unsafe_allow_html=True)
-
-st.subheader('Hosts and parasites')
+# the sections on the left, with the one slider that sets them all under them; the title
+# heads the column of figures
+nav = section_nav.SectionNav('general', [
+    ('Number of predicted interactions per parasite', 'interactions'),
+    ('Most common host orthologous groups', 'host-groups'),
+    ('Overlap of the host orthologous groups across hosts', 'overlap'),
+    ('Shared and host-specific interactions per multi-host parasite', 'multi-host'),
+    ('Interaction confidence scores', 'confidence'),
+    ('Localization probabilities of host proteins', 'host-localization'),
+    ('Localization probabilities of extracellular parasite proteins', 'parasite-secretion'),
+    ('Localization probabilities of membrane parasite proteins', 'parasite-membrane')])
+with nav.body:
+    web_utils.page_header('General analysis', back=nav.back)
+    st.caption('Every prediction of the study, across all hosts and parasites.')
 overview = get_overview_predictions(data_dir, config)
-hosts_parasites.show(config)
-st.markdown("---")
 
-# measured once here so the column titles can be fitted; page_width answers with a default
-# until the browser has replied
-page = web_utils.page_width()
-parasite_palette = config.get('parasite_groups', {})
-
-# one slider for the page, in the left column so it does not take the whole width
-with st.columns(3)[0]:
+with nav.side:
     score = web_utils.score_slider(
         help='Interactions predicted below this confidence are left out '
              'of the counts and of the localization split drawn on them. The '
@@ -911,224 +908,253 @@ with st.columns(3)[0]:
     st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '
                f'at or above {score:g}.')
 
-# the description in the heading depends on the toggles but sits above them
-heading = st.empty()
-st.caption('How many interactions are predicted for each parasite, in each of its hosts.')
-# narrow columns: a segmented control left to itself is stretched over the page
-with st.columns([1.4, 1, 1.6])[0]:
+# the figures are sized to the column they are drawn in; page_width answers with a default
+# until the browser has replied
+page = nav.content_width()
+parasite_palette = config.get('parasite_groups', {})
+
+with nav.body:
+    # the description in the heading depends on the toggles but sits above them
+    heading = st.empty()
+    st.caption('How many interactions are predicted for each parasite, in each of its hosts.')
+    # as wide as its options, on one line
     split_side = st.segmented_control(
         'Colour by', list(SPLIT_SIDES), default=list(SPLIT_SIDES)[0],
-        key='split_side',
+        key='split_side', width='content',
         help='The taxonomic group of the parasite, or the localization DeepLoc 2 assigns '
              'the host or the parasite protein of each interaction, which splits the bars.')
-side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
-interactions = None if side is None else get_interaction_localisations(overview, data_dir,
-                                                                       side)
+    side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
+    interactions = None if side is None else get_interaction_localisations(overview, data_dir,
+                                                                           side)
 
-if interactions is None:
-    description = ('Predicted interactions per parasite at or above the confidence set above, '
-                   'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
-elif side == 'target':
-    description = ('Predicted interactions per parasite at or above the confidence set above, '
-                   'grouped by host and split by the localization DeepLoc 2 '
-                   'assigns the host protein of each interaction. ' + BANDS_STRIP)
-else:
-    description = ('Predicted interactions per parasite at or above the confidence set above, '
-                   'grouped by host and split by the localization DeepLoc 2 assigns the '
-                   'parasite protein of each interaction. ' + BANDS_STRIP)
-heading.subheader("Number of predicted interactions per parasite", help=description)
-
-st.plotly_chart(
-    generate_interactions_per_parasite(overview if interactions is None else interactions,
-                                       parasite_palette, page, score,
-                                       classes=None if interactions is None else split_classes),
-    width='stretch')
-
-og_help = ('Each group is the EggNOG orthologous group of the host protein, which can hold '
-           'several paralogous genes, and is named by the gene symbols of its proteins. A dot '
-           'wherever a parasite is predicted to interact with a protein of the group, '
-           "sized by the number of that parasite's proteins reaching it; hover a dot for the "
-           'host proteins behind it. ' + BANDS_STRIP)
-shared_ogs = get_top_shared_ogs(overview, score)
-if shared_ogs is None:
-    st.subheader("Most common host orthologous groups", help=og_help)
-    st.info('No host orthologous group is reached by more than one parasite at this confidence.')
-else:
-    og_dots, ogs, shareable = shared_ogs
-    shown = len(ogs)
-    if shareable > shown:
-        og_help = (f'The {shown} groups reached by the most parasites are shown, of the '
-                   f'{shareable} reached by more than one at or above the confidence set '
-                   'above. ' + og_help)
-        selection = f'The {shown} host orthologous groups targeted by the most parasites.'
+    if interactions is None:
+        description = ('Predicted interactions per parasite at or above the confidence set '
+                       'on the left, '
+                       'grouped by host and coloured by parasite taxonomic group. ' + NICHE_STRIP)
+    elif side == 'target':
+        description = ('Predicted interactions per parasite at or above the confidence set '
+                       'on the left, '
+                       'grouped by host and split by the localization DeepLoc 2 '
+                       'assigns the host protein of each interaction. ' + BANDS_STRIP)
     else:
-        og_help = ('Every group reached by more than one parasite at or above the confidence '
-                   'set above is shown. ' + og_help)
-        selection = f'The {shown} host orthologous groups targeted by more than one parasite.'
-    st.subheader("Most common host orthologous groups", help=og_help)
-    st.caption(selection)
-    st.plotly_chart(generate_shared_og_dots(overview, og_dots, ogs,
-                                            parasite_palette, page),
+        description = ('Predicted interactions per parasite at or above the confidence set '
+                       'on the left, '
+                       'grouped by host and split by the localization DeepLoc 2 assigns the '
+                       'parasite protein of each interaction. ' + BANDS_STRIP)
+    nav.subheader("Number of predicted interactions per parasite", 'interactions',
+                   help=description, slot=heading)
+
+    st.plotly_chart(
+        generate_interactions_per_parasite(overview if interactions is None else interactions,
+                                           parasite_palette, page, score,
+                                           classes=None if interactions is None else split_classes),
+        width='stretch')
+
+    og_help = ('Each group is the EggNOG orthologous group of the host protein, which can hold '
+               'several paralogous genes, and is named by the gene symbols of its proteins. A dot '
+               'wherever a parasite is predicted to interact with a protein of the group, '
+               "sized by the number of that parasite's proteins reaching it; hover a dot for the "
+               'host proteins behind it. ' + BANDS_STRIP)
+    shared_ogs = get_top_shared_ogs(overview, score)
+    if shared_ogs is None:
+        nav.subheader("Most common host orthologous groups", 'host-groups', help=og_help)
+        st.info('No host orthologous group is reached by more than one parasite at this confidence.')
+    else:
+        og_dots, ogs, shareable = shared_ogs
+        shown = len(ogs)
+        if shareable > shown:
+            og_help = (f'The {shown} groups reached by the most parasites are shown, of the '
+                       f'{shareable} reached by more than one at or above the confidence set '
+                       'on the left. ' + og_help)
+            selection = f'The {shown} host orthologous groups targeted by the most parasites.'
+        else:
+            og_help = ('Every group reached by more than one parasite at or above the confidence '
+                       'set on the left is shown. ' + og_help)
+            selection = f'The {shown} host orthologous groups targeted by more than one parasite.'
+        nav.subheader("Most common host orthologous groups", 'host-groups', help=og_help)
+        st.caption(selection)
+        st.plotly_chart(generate_shared_og_dots(overview, og_dots, ogs,
+                                                parasite_palette, page),
+                        width='stretch')
+        st.download_button(f'Download all {shareable} shared orthologous groups',
+                           data=utils.convert_df(get_shared_og_table(overview, score)),
+                           file_name='shared_host_orthologous_groups.tsv', mime='text/csv')
+
+    nav.subheader(
+        "Overlap of the host orthologous groups across hosts", 'overlap',
+        help='How alike the host interactors of each pair of parasites are, across hosts as '
+             'well as within one: the Jaccard similarity of the host orthologous groups the two '
+             'reach, the groups both reach over the groups either reaches. A protein of one '
+             'host is never the protein of another, so the orthologous group stands in for it. '
+             'Only the groups both hosts have a protein in are counted, so a group missing '
+             'from one host is not read as a difference between the parasites; the cell '
+             'dialog lists those groups apart. A parasite predicted in several hosts has a row '
+             'in each. Ordered by niche or by taxonomic group, a parasite or genus lines up '
+             'across its hosts; ordered by host, each host is a block and the cells between '
+             'two blocks compare the parasites of the two. Three strips run along each axis: the '
+             'taxonomic group of the parasite, whether it lives inside a host cell or outside '
+             'one, and the host. Interactions below the confidence set on the left are '
+             'left out. '
+             'Hover a cell for the count behind its ratio, or click it to see the groups.')
+    st.caption('How alike the host orthologous groups targeted by each pair of parasites are, '
+               'in any of their hosts. Click a cell to see the groups.')
+    host_labels = list(dict.fromkeys(overview['host']))
+    hosts_column, order_column, _ = st.columns(3)
+    with hosts_column:
+        overlap_hosts = st.multiselect(
+            'Hosts', host_labels, default=host_labels, format_func=common_name,
+            key='overlap_hosts',
+            help='The hosts whose parasites the matrix compares, for instance human and mouse '
+                 'alone to set the Plasmodium species of the two side by side.')
+    with order_column:
+        overlap_order = st.radio('Order the parasites by', list(OVERLAP_ORDERS), horizontal=True,
+                                 key='overlap_order',
+                                 help='Which annotation comes out in blocks along the axes. '
+                                      'The strips show all three either way.')
+    host_orthologs = web_utils.load_host_orthologs(data_dir)
+    if host_orthologs is None:
+        st.caption('Run `python scripts/build_host_orthologs.py` to count only the groups both '
+                   'hosts have; until then every group reached is counted.')
+    group_presence = get_host_group_presence(overview, host_orthologs)
+    cross_host = get_cross_host_similarity(overview, score, tuple(overlap_hosts),
+                                           group_presence, overlap_order)
+    if cross_host is None:
+        st.info('Fewer than three parasites of the selected hosts reach a host orthologous '
+                'group at this confidence.')
+    else:
+        similarity, shared_counts, clades, row_niches, row_hosts, row_keys = cross_host
+        figure, click_layer = similarity_heatmap.generate(
+            similarity, shared_counts,
+            [(clades, {**parasite_palette, UNKNOWN_GROUP: UNKNOWN_COLOR}),
+             (row_niches, {n: web_utils.NICHE_COLORS[n]
+                           for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]}),
+             (row_hosts, {common_name(h): config['hosts'][t]['color']
+                          for t in config['hosts'] for h in [config['hosts'][t]['label']]})],
+            page,
+            x_names=[f'{short_name(p)} ({common_name(h)})' for h, p in row_keys],
+            count_label='Shared orthologous groups',
+            # held to about a screen, so the whole matrix is seen at once; with every host the
+            # names go down to eight points, upright so the narrow columns still part them
+            max_side=OVERLAP_SIDE, smallest_label=8, x_angle=-90)
+        # remounted after every dialog: Streamlit drops an identical selection and plotly
+        # reads a second click as a deselection
+        nonce = st.session_state.get(CELL_NONCE_KEY, 0)
+        clicked = st.plotly_chart(
+            figure, width='content', on_select='rerun', selection_mode='points',
+            key=f'cross_host_cells_{"_".join(overlap_hosts)}_{overlap_order}_{score}_{nonce}')
+        cell = next((point for point in (clicked or {}).get('selection', {}).get('points', [])
+                     if point.get('curve_number') == click_layer), None)
+        if cell is not None:
+            # the two host-parasite pairs are the row and column the marker sits on
+            st.session_state[CELL_NONCE_KEY] = nonce + 1
+            show_cross_host_dialog(row_keys[int(cell['y'])], row_keys[int(cell['x'])],
+                                   overview, score, group_presence)
+
+    nav.subheader(
+        'Shared and host-specific interactions per multi-host parasite', 'multi-host',
+        help='The interactions of every parasite predicted against several hosts, '
+             'counted as orthology-group links so that a host with more paralogues does '
+             'not count for more: how many carried over to every host, and how many '
+             'are found in one host only. Pick one of these parasites on the start page '
+             'to see which links they are and why a host lacks them.')
+    st.caption('How many interactions of each multi-host parasite are found in every host, '
+               'and how many in one host only.')
+    if multi_host.get_multi_host_predictions(data_dir, config, score).empty:
+        st.info('No parasite is predicted against more than one host at this confidence.')
+    else:
+        st.plotly_chart(multi_host.generate_overview_bars(data_dir, config, score),
+                        width='stretch')
+
+    nav.subheader(
+        "Interaction confidence scores", 'confidence',
+        help='Boxplots of the distribution of confidence scores per parasite. Each score is '
+             'the average of the experimental and database evidence channels of the KOG-KOG '
+             'link the prediction was transferred from. Every prediction is counted here, '
+             'whatever the slider is set to; the dotted line marks the threshold it selects '
+             'instead. ' + NICHE_STRIP)
+    st.caption('How confident the predictions are for each parasite.')
+    st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
                     width='stretch')
-    st.download_button(f'Download all {shareable} shared orthologous groups',
-                       data=utils.convert_df(get_shared_og_table(overview, score)),
-                       file_name='shared_host_orthologous_groups.tsv', mime='text/csv')
 
-st.subheader(
-    "Overlap of the host orthologous groups across hosts",
-    help='How alike the host interactors of each pair of parasites are, across hosts as '
-         'well as within one: the Jaccard similarity of the host orthologous groups the two '
-         'reach, the groups both reach over the groups either reaches. A protein of one '
-         'host is never the protein of another, so the orthologous group stands in for it. '
-         'Only the groups both hosts have a protein in are counted, so a group missing '
-         'from one host is not read as a difference between the parasites; the cell '
-         'dialog lists those groups apart. A parasite predicted in several hosts has a row '
-         'in each. Ordered by niche or by taxonomic group, a parasite or genus lines up '
-         'across its hosts; ordered by host, each host is a block and the cells between '
-         'two blocks compare the parasites of the two. Three strips run along each axis: the '
-         'taxonomic group of the parasite, whether it lives inside a host cell or outside '
-         'one, and the host. Interactions below the confidence set above are left out. '
-         'Hover a cell for the count behind its ratio, or click it to see the groups.')
-st.caption('How alike the host orthologous groups targeted by each pair of parasites are, '
-           'in any of their hosts. Click a cell to see the groups.')
-host_labels = list(dict.fromkeys(overview['host']))
-hosts_column, order_column, _ = st.columns(3)
-with hosts_column:
-    overlap_hosts = st.multiselect(
-        'Hosts', host_labels, default=host_labels, format_func=common_name,
-        key='overlap_hosts',
-        help='The hosts whose parasites the matrix compares, for instance human and mouse '
-             'alone to set the Plasmodium species of the two side by side.')
-with order_column:
-    overlap_order = st.radio('Order the parasites by', list(OVERLAP_ORDERS), horizontal=True,
-                             key='overlap_order',
-                             help='Which annotation comes out in blocks along the axes. '
-                                  'The strips show all three either way.')
-host_orthologs = web_utils.load_host_orthologs(data_dir)
-if host_orthologs is None:
-    st.caption('Run `python scripts/build_host_orthologs.py` to count only the groups both '
-               'hosts have; until then every group reached is counted.')
-group_presence = get_host_group_presence(overview, host_orthologs)
-cross_host = get_cross_host_similarity(overview, score, tuple(overlap_hosts),
-                                       group_presence, overlap_order)
-if cross_host is None:
-    st.info('Fewer than three parasites of the selected hosts reach a host orthologous '
-            'group at this confidence.')
-else:
-    similarity, shared_counts, clades, row_niches, row_hosts, row_keys = cross_host
-    figure, click_layer = similarity_heatmap.generate(
-        similarity, shared_counts,
-        [(clades, {**parasite_palette, UNKNOWN_GROUP: UNKNOWN_COLOR}),
-         (row_niches, {n: web_utils.NICHE_COLORS[n]
-                       for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]}),
-         (row_hosts, {common_name(h): config['hosts'][t]['color']
-                      for t in config['hosts'] for h in [config['hosts'][t]['label']]})],
-        page,
-        x_names=[f'{short_name(p)} ({common_name(h)})' for h, p in row_keys],
-        count_label='Shared orthologous groups',
-        # held to about a screen, so the whole matrix is seen at once; with every host the
-        # names go down to eight points, upright so the narrow columns still part them
-        max_side=OVERLAP_SIDE, smallest_label=8, x_angle=-90)
-    # remounted after every dialog: Streamlit drops an identical selection and plotly
-    # reads a second click as a deselection
-    nonce = st.session_state.get(CELL_NONCE_KEY, 0)
-    clicked = st.plotly_chart(
-        figure, width='content', on_select='rerun', selection_mode='points',
-        key=f'cross_host_cells_{"_".join(overlap_hosts)}_{overlap_order}_{score}_{nonce}')
-    cell = next((point for point in (clicked or {}).get('selection', {}).get('points', [])
-                 if point.get('curve_number') == click_layer), None)
-    if cell is not None:
-        # the two host-parasite pairs are the row and column the marker sits on
-        st.session_state[CELL_NONCE_KEY] = nonce + 1
-        show_cross_host_dialog(row_keys[int(cell['y'])], row_keys[int(cell['x'])],
-                               overview, score, group_presence)
+    # one protein per row rather than one interaction, on every prediction and not at the
+    # threshold
+    host_proteins = get_interactor_proteins(data_dir, config, 'target')
+    parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
+    # the membrane figure is drawn over the unicellular parasites alone
+    unicellular = None
+    if parasite_proteins is not None:
+        unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
 
-st.subheader(
-    "Interaction confidence scores",
-    help='Boxplots of the distribution of confidence scores per parasite. Each score is '
-         'the average of the experimental and database evidence channels of the KOG-KOG '
-         'link the prediction was transferred from. Every prediction is counted here, '
-         'whatever the slider is set to; the dotted line marks the threshold it selects '
-         'instead. ' + NICHE_STRIP)
-st.caption('How confident the predictions are for each parasite.')
-st.plotly_chart(generate_confidence_per_parasite(overview, parasite_palette, page, score),
-                width='stretch')
+    if host_proteins is not None:
+        nav.subheader(
+            "Localization probabilities of host proteins", 'host-localization',
+            help='Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
+                 'assigned localization, one column per class and one box per host. The dotted '
+                 'line in each column marks the cut-off that class is called at, DeepLoc 2\'s own '
+                 'default threshold for the Accurate model: '
+                 + ', '.join(f'{web_utils.DEEPLOC_CUTOFFS[c]:.3f} for {c.lower()}'
+                             for c in web_utils.HOST_CLASSES) + '. '
+                 'That is what the proteins were filtered on, so every point is above its own '
+                 'line. A protein over several cut-offs appears in each of those columns, in '
+                 'each at the probability of that class. The cytoplasm and nucleus columns hold '
+                 'the host proteins of the intracellular parasites, the only ones the filter '
+                 'allows them to. Each host protein is counted once per class, '
+                 'irrespective of the number of parasites reaching it, and every prediction is '
+                 'counted whatever the slider is set to.')
+        st.caption('How confidently DeepLoc 2 places the host proteins where they were '
+                   'localized.')
+        st.plotly_chart(generate_host_score_boxes(host_proteins, page), width='stretch')
 
-# one protein per row rather than one interaction, on every prediction and not at the
-# threshold
-host_proteins = get_interactor_proteins(data_dir, config, 'target')
-parasite_proteins = get_interactor_proteins(data_dir, config, 'source')
-# the membrane figure is drawn over the unicellular parasites alone
-unicellular = None
-if parasite_proteins is not None:
-    unicellular = parasite_proteins[parasite_proteins['group'].isin(UNICELLULAR_GROUPS)]
+    if parasite_proteins is not None:
+        nav.subheader(
+            "Localization probabilities of extracellular parasite proteins",
+            'parasite-secretion',
+            help='Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
+                 'extracellular or both classes for each parasite, over every prediction whatever '
+                 'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
+                 'threshold for extracellular under the Accurate model '
+                 f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
+                 'what the secretome filter kept these proteins on. Individual proteins are '
+                 'shown as points behind each box; for parasites with a hundred or more proteins '
+                 'the points are read as density. ' + NICHE_STRIP)
+        st.caption('How confidently DeepLoc 2 calls the parasite proteins secreted.')
+        st.plotly_chart(
+            generate_surface_scores_per_parasite(
+                parasite_proteins[parasite_proteins['surface'].isin(
+                    [web_utils.EXTRACELLULAR, web_utils.BOTH_SURFACE])],
+                parasite_palette, page, 'extracellular',
+                web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR],
+                # forty-five columns and up to 180 proteins in one, so the smallest dot that
+                # still carries colour
+                'P(extracellular)', point_size=2),
+            width='stretch')
 
-if host_proteins is not None:
-    st.subheader(
-        "Localization probabilities of host proteins",
-        help='Boxplots of the DeepLoc 2 probabilities of the host proteins for their '
-             'assigned localization, one column per class and one box per host. The dotted '
-             'line in each column marks the cut-off that class is called at, DeepLoc 2\'s own '
-             'default threshold for the Accurate model: '
-             + ', '.join(f'{web_utils.DEEPLOC_CUTOFFS[c]:.3f} for {c.lower()}'
-                         for c in web_utils.HOST_CLASSES) + '. '
-             'That is what the proteins were filtered on, so every point is above its own '
-             'line. A protein over several cut-offs appears in each of those columns, in '
-             'each at the probability of that class. The cytoplasm and nucleus columns hold '
-             'the host proteins of the intracellular parasites, the only ones the filter '
-             'allows them to. Each host protein is counted once per class, '
-             'irrespective of the number of parasites reaching it, and every prediction is '
-             'counted whatever the slider is set to.')
-    st.caption('How confidently DeepLoc 2 places the host proteins where they were '
-               'localized.')
-    st.plotly_chart(generate_host_score_boxes(host_proteins, page), width='stretch')
+        nav.subheader(
+            "Localization probabilities of membrane parasite proteins",
+            'parasite-membrane',
+            help='The equivalent for parasite proteins assigned to cell membrane or both '
+                 'classes, scored on that probability, again over every prediction. Only '
+                 'unicellular parasites are represented, the secretome filter admitting a '
+                 'multicellular parasite nothing but its secreted proteins. Individual '
+                 'proteins are shown as points; boxes over very few proteins (two for '
+                 '*V. corneae*) should not be read as distributions. The '
+                 'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
+                 f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
+                 + NICHE_STRIP)
+        st.caption('How confidently DeepLoc 2 places the parasite proteins in the cell '
+                   'membrane (unicellular parasites only).')
+        st.plotly_chart(
+            generate_surface_scores_per_parasite(
+                unicellular[unicellular['surface'].isin(
+                    [web_utils.CELL_MEMBRANE, web_utils.BOTH_SURFACE])],
+                parasite_palette, page, 'cell_membrane',
+                web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE],
+                # fewer parasites and proteins than the figure above, so the dots can be told
+                # apart
+                'P(cell membrane)', point_size=3),
+            width='stretch')
 
-if parasite_proteins is not None:
-    st.subheader(
-        "Localization probabilities of extracellular parasite proteins",
-        help='Boxplots of the DeepLoc 2 extracellular probability for proteins assigned '
-             'extracellular or both classes for each parasite, over every prediction whatever '
-             'the slider is set to. The dotted line marks the cut-off, DeepLoc 2\'s default '
-             'threshold for extracellular under the Accurate model '
-             f'({web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR]:.3f}), which is '
-             'what the secretome filter kept these proteins on. Individual proteins are '
-             'shown as points behind each box; for parasites with a hundred or more proteins '
-             'the points are read as density. ' + NICHE_STRIP)
-    st.caption('How confidently DeepLoc 2 calls the parasite proteins secreted.')
-    st.plotly_chart(
-        generate_surface_scores_per_parasite(
-            parasite_proteins[parasite_proteins['surface'].isin(
-                [web_utils.EXTRACELLULAR, web_utils.BOTH_SURFACE])],
-            parasite_palette, page, 'extracellular',
-            web_utils.DEEPLOC_CUTOFFS[web_utils.EXTRACELLULAR],
-            # forty-five columns and up to 180 proteins in one, so the smallest dot that
-            # still carries colour
-            'P(extracellular)', point_size=2),
-        width='stretch')
-
-    st.subheader(
-        "Localization probabilities of membrane parasite proteins",
-        help='The equivalent for parasite proteins assigned to cell membrane or both '
-             'classes, scored on that probability, again over every prediction. Only '
-             'unicellular parasites are represented, the secretome filter admitting a '
-             'multicellular parasite nothing but its secreted proteins. Individual '
-             'proteins are shown as points; boxes over very few proteins (two for '
-             '*V. corneae*) should not be read as distributions. The '
-             'dotted line marks the cut-off, DeepLoc 2\'s default for cell membrane under '
-             f'the Accurate model ({web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE]:.3f}). '
-             + NICHE_STRIP)
-    st.caption('How confidently DeepLoc 2 places the parasite proteins in the cell '
-               'membrane (unicellular parasites only).')
-    st.plotly_chart(
-        generate_surface_scores_per_parasite(
-            unicellular[unicellular['surface'].isin(
-                [web_utils.CELL_MEMBRANE, web_utils.BOTH_SURFACE])],
-            parasite_palette, page, 'cell_membrane',
-            web_utils.DEEPLOC_CUTOFFS[web_utils.CELL_MEMBRANE],
-            # fewer parasites and proteins than the figure above, so the dots can be told
-            # apart
-            'P(cell membrane)', point_size=3),
-        width='stretch')
+nav.finish()
 
 st.markdown("---")
 

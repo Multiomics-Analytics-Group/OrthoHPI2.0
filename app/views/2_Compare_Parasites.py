@@ -3,6 +3,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import utils
 import web_utils
 import similarity_heatmap
+import section_nav
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -32,6 +33,9 @@ LEGEND_TITLE_ROW = 18
 SMALLEST_LABEL = 9
 # pixels per row of the shared-interactor dot plot
 DOT_ROW = 19
+# the overlap matrix and the shared interactors are held to about a laptop screen
+OVERLAP_SIDE = 560
+SHARED_PROTEINS = 25
 DOT_CHROME = 240
 # session key counting remounts of the shared-interactor matrix, so the same cell can be
 # opened twice running
@@ -820,42 +824,41 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
     return figure
 
 
+# the sections on the left, with the slider and the order that set the figures under
+# them; the title heads the column of figures
+nav = section_nav.SectionNav('parasites_of_host', [
+    ('Overlap of the host interactors', 'overlap'),
+    ('Most common host interactors', 'shared'),
+    ('Interactions per tissue', 'tissues'),
+    ('Interactions per cell type', 'cell-types'),
+    ('Enriched biological processes', 'processes')])
+with nav.body:
+    selected_host, _ = web_utils.require_selection('Parasites of a host', host=True,
+                                                    back=nav.back)
+selected_taxids = web_utils.host_taxids(config, selected_host)
+
+# the heatmap and dot matrix read the same filtered interactions
+parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
+                   for p in config['parasites'].values()}
+group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
+niches = web_utils.get_niches(config)
+
 # the matrix keeps its cells square, so it needs the column width; drawn for
 # DEFAULT_PAGE_WIDTH until the browser answers
-column = web_utils.column_width(2)
-
-st.caption('Compare all the parasites of a selected host.')
-st.markdown("---")
-
-with st.columns(3)[0]:
-    selected_host, selected_taxids = web_utils.host_selector(
-        config, web_utils.load_predictions(data_dir),
-        'Select a host')
-
-
-if selected_host != web_utils.NO_HOST:
-    # the heatmap and dot matrix read the same filtered interactions
-    parasite_groups = {p['label']: p.get('group', UNKNOWN_GROUP)
-                       for p in config['parasites'].values()}
-    group_order = {g: i for i, g in enumerate(config.get('parasite_groups', {}))}
-    niches = web_utils.get_niches(config)
-
-    # one slider for the four figures below; the tissue dots at the foot keep every
-    # prediction
-    slider_column, order_column, _ = st.columns(3)
-    with slider_column:
-        score = web_utils.score_slider(
-            help='Interactions predicted below this confidence are left out of '
-                 'the four figures below. The tissue plot at the foot of the '
-                 'page counts every prediction.')
-    with order_column:
-        # the order decides which blocks the figures show: contiguous values make a square
-        # against the diagonal
-        order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
-                            horizontal=True,
-                            help='Which annotation the two figures below put next to each '
-                                 'other on their axes. The strips beside the axes show both '
-                                 'either way; this is which of them comes out in blocks.')
+column = nav.content_width()
+with nav.side:
+    score = web_utils.score_slider(
+        help='Interactions predicted below this confidence are left out of '
+             'the figures on this page, except the tissue plot, which counts '
+             'every prediction.')
+    # the order decides which blocks the figures show: contiguous values make a square
+    # against the diagonal
+    order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
+                        help='Which annotation the overlap matrix and the most common '
+                             'interactors put next to each '
+                             'other on their axes. The strips beside the axes show both '
+                             'either way; this is which of them comes out in blocks.')
+with nav.body:
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
     shared_similarity = get_shared_interactor_similarity(counted, parasite_groups,
                                                         group_order, niches, order_by)
@@ -870,168 +873,164 @@ if selected_host != web_utils.NO_HOST:
     # guessed at
     choices = list(ranked.index)
 
-    matrix, shared = st.columns(2)
-
-    with matrix:
-        st.subheader(
-            "Overlap of the host interactors",
-            help='How alike the host interactors of each pair of parasites are, as the '
-                 'Jaccard similarity of the two sets: the host proteins both reach, over '
-                 'the host proteins either of them reaches. A count of shared proteins on '
-                 'its own follows how many interactors the pair have between them, and '
-                 'ranks the best-predicted parasites above the most alike; this does not. '
-                 'Two strips '
-                 'run along each axis: the taxonomic group of the parasite, and whether it '
-                 'lives inside a host cell or outside one. Whichever the parasites are '
-                 'ordered by comes out in blocks. The diagonal, where a parasite meets '
-                 'itself, is greyed out. Hover a cell for the count behind its ratio, or '
-                 'click it to see the shared host proteins.')
-        st.caption('How alike the host proteins targeted by each pair of parasites are. '
-                   'Click a cell to see the shared proteins of the pair.')
-        if shared_similarity is not None:
-            # the figure carries the column width rather than being stretched, which keeps
-            # the matrix square after full screen
-            similarity, shared_counts, clades, row_niches = shared_similarity
-            figure, click_layer = similarity_heatmap.generate(
-                similarity, shared_counts,
-                [(clades, config.get('parasite_groups', {})),
-                 (row_niches, {n: web_utils.NICHE_COLORS[n]
-                               for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]})],
-                column)
-            # remounted after every dialog: Streamlit drops an identical selection and
-            # plotly reads a second click as a deselection
-            nonce = st.session_state.get(CELL_NONCE_KEY, 0)
-            clicked = st.plotly_chart(
-                figure, width='content', on_select='rerun', selection_mode='points',
-                key=f'shared_cells_{selected_host}_{order_by}_{score}_{nonce}')
-            # the layer the click came from is checked
-            cell = next((point for point
-                         in (clicked or {}).get('selection', {}).get('points', [])
-                         if point.get('curve_number') == click_layer), None)
-            if cell is not None:
-                # the two parasites are the row and column the marker sits on
-                parasites = list(shared_similarity[0].index)
-                st.session_state[CELL_NONCE_KEY] = nonce + 1
-                show_shared_interactors_dialog(
-                    parasites[int(cell['y'])], parasites[int(cell['x'])], counted,
-                    web_utils.load_protein_annotations(data_dir),
-                    web_utils.load_deeploc_localisations(data_dir))
-        else:
-            st.text(f'Fewer than three parasites of {selected_host} share any host protein')
-
-    with shared:
-        # the description counts what the tissue below leaves but sits above it
-        heading = st.empty()
-        shared_help = ("A dot wherever a parasite is predicted to interact with one, sized "
-                       "by the number of that parasite's proteins reaching it. The band "
-                       'beside each row gives the DeepLoc 2 localization of the host '
-                       'protein; hover a dot for the probabilities behind it. Above the '
-                       'columns run the taxonomic group of the parasite and whether it lives '
-                       'inside a host cell or outside one.')
-        # offered whatever the tissue leaves, so an emptying choice can be changed back
-        shared_tissue = st.selectbox(
-            'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue',
-            help='Keep only the host proteins expressed in this tissue, for the parasites '
-                 'known to infect it. Tissues the parasites infect, most interactions first.')
-        # narrowed to one tissue where one is chosen; the heatmap keeps every tissue
-        shared_predictions = (counted if shared_tissue == ALL_TISSUES else
-                              get_tissue_expressed_predictions(data_dir, config,
-                                                               selected_taxids, score,
-                                                               shared_tissue))
-        top_shared = get_top_shared_proteins(shared_predictions, parasite_groups, group_order,
-                                             niches, order_by,
-                                             web_utils.load_protein_annotations(data_dir),
-                                             web_utils.load_deeploc_localisations(data_dir))
-        where = '' if shared_tissue == ALL_TISSUES else f' in {shared_tissue}'
-        if top_shared is not None:
-            # the count of what the rows were taken from belongs to the caption
-            *figure_arguments, shareable = top_shared
-            shown = len(figure_arguments[1])
-            # a truncated figure says what it is a top of
-            if shareable > shown:
-                shared_help = (f'The {shown} host proteins{where} reached by the most '
-                               f'parasites are shown, of the {shareable} reached by more '
-                               'than one. ' + shared_help)
-                selection = f'The {shown} host proteins{where} targeted by the most parasites.'
-            else:
-                selection = (f'The {shown} host proteins{where} targeted by more than one '
-                             'parasite, most first.')
-            heading.subheader("Most common host interactors", help=shared_help)
-            st.caption(selection)
-            st.plotly_chart(
-                generate_shared_protein_dots(*figure_arguments,
-                                             config.get('parasite_groups', {}), column),
-                width='stretch')
-            shared_table = get_shared_protein_table(
-                shared_predictions, web_utils.load_protein_annotations(data_dir),
+    nav.subheader(
+        "Overlap of the host interactors", 'overlap',
+        help='How alike the host interactors of each pair of parasites are, as the '
+             'Jaccard similarity of the two sets: the host proteins both reach, over '
+             'the host proteins either of them reaches. A count of shared proteins on '
+             'its own follows how many interactors the pair have between them, and '
+             'ranks the best-predicted parasites above the most alike; this does not. '
+             'Two strips '
+             'run along each axis: the taxonomic group of the parasite, and whether it '
+             'lives inside a host cell or outside one. Whichever the parasites are '
+             'ordered by comes out in blocks. The diagonal, where a parasite meets '
+             'itself, is greyed out. Hover a cell for the count behind its ratio, or '
+             'click it to see the shared host proteins.')
+    st.caption('How alike the host proteins targeted by each pair of parasites are. '
+               'Click a cell to see the shared proteins of the pair.')
+    if shared_similarity is not None:
+        # the figure carries the column width rather than being stretched, which keeps
+        # the matrix square after full screen
+        similarity, shared_counts, clades, row_niches = shared_similarity
+        figure, click_layer = similarity_heatmap.generate(
+            similarity, shared_counts,
+            [(clades, config.get('parasite_groups', {})),
+             (row_niches, {n: web_utils.NICHE_COLORS[n]
+                           for n in web_utils.NICHE_ORDER + [web_utils.UNKNOWN_NICHE]})],
+            column, max_side=OVERLAP_SIDE)
+        # remounted after every dialog: Streamlit drops an identical selection and
+        # plotly reads a second click as a deselection
+        nonce = st.session_state.get(CELL_NONCE_KEY, 0)
+        clicked = st.plotly_chart(
+            figure, width='content', on_select='rerun', selection_mode='points',
+            key=f'shared_cells_{selected_host}_{order_by}_{score}_{nonce}')
+        # the layer the click came from is checked
+        cell = next((point for point
+                     in (clicked or {}).get('selection', {}).get('points', [])
+                     if point.get('curve_number') == click_layer), None)
+        if cell is not None:
+            # the two parasites are the row and column the marker sits on
+            parasites = list(shared_similarity[0].index)
+            st.session_state[CELL_NONCE_KEY] = nonce + 1
+            show_shared_interactors_dialog(
+                parasites[int(cell['y'])], parasites[int(cell['x'])], counted,
+                web_utils.load_protein_annotations(data_dir),
                 web_utils.load_deeploc_localisations(data_dir))
-            tissue_suffix = '' if shared_tissue == ALL_TISSUES else f'_{shared_tissue}'
-            st.download_button(f'Download all {shareable} shared host interactors',
-                               data=utils.convert_df(shared_table),
-                               file_name=f'{selected_host}_shared_host_interactors'
-                                         f'{tissue_suffix}.tsv',
-                               mime='text/csv')
-        else:
-            heading.subheader("Most common host interactors", help=shared_help)
-            st.info(f'No host protein{where} is reached by more than one parasite at this '
-                    'confidence.')
+    else:
+        st.text(f'Fewer than three parasites of {selected_host} share any host protein')
 
-    tissues, cell_types = st.columns(2)
-    with tissues:
-        st.subheader(
-            "Interactions per tissue",
-            help='Predicted interactions per parasite and tissue, restricted to the tissues '
-                 'each parasite is known to infect and sized by the number of interactions '
-                 'with proteins expressed there. Tissues are ordered by the number of '
-                 'parasites infecting them. Above the columns run the taxonomic group of the '
-                 'parasite and whether it lives inside a host cell or outside one, the same '
-                 'two strips the figures above carry. An interaction is counted once per '
-                 'tissue, irrespective of the number of cell types the host protein is '
-                 'expressed in.')
-        st.caption('How many interactions each parasite has in each tissue it infects.')
-        if per_tissue.empty:
-            st.info('No predicted interaction is left at this confidence in a tissue the '
-                    'parasites are known to infect.')
+    # the description counts what the tissue below leaves but sits above it
+    heading = st.empty()
+    shared_help = ("A dot wherever a parasite is predicted to interact with one, sized "
+                   "by the number of that parasite's proteins reaching it. The band "
+                   'beside each row gives the DeepLoc 2 localization of the host '
+                   'protein; hover a dot for the probabilities behind it. Above the '
+                   'columns run the taxonomic group of the parasite and whether it lives '
+                   'inside a host cell or outside one.')
+    # offered whatever the tissue leaves, so an emptying choice can be changed back
+    shared_tissue = st.selectbox(
+        'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320,
+        help='Keep only the host proteins expressed in this tissue, for the parasites '
+             'known to infect it. Tissues the parasites infect, most interactions first.')
+    # narrowed to one tissue where one is chosen; the heatmap keeps every tissue
+    shared_predictions = (counted if shared_tissue == ALL_TISSUES else
+                          get_tissue_expressed_predictions(data_dir, config,
+                                                           selected_taxids, score,
+                                                           shared_tissue))
+    top_shared = get_top_shared_proteins(shared_predictions, parasite_groups, group_order,
+                                         niches, order_by,
+                                         web_utils.load_protein_annotations(data_dir),
+                                         web_utils.load_deeploc_localisations(data_dir),
+                                         top=SHARED_PROTEINS)
+    where = '' if shared_tissue == ALL_TISSUES else f' in {shared_tissue}'
+    if top_shared is not None:
+        # the count of what the rows were taken from belongs to the caption
+        *figure_arguments, shareable = top_shared
+        shown = len(figure_arguments[1])
+        # a truncated figure says what it is a top of
+        if shareable > shown:
+            shared_help = (f'The {shown} host proteins{where} reached by the most '
+                           f'parasites are shown, of the {shareable} reached by more '
+                           'than one. ' + shared_help)
+            selection = f'The {shown} host proteins{where} targeted by the most parasites.'
         else:
-            st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
-                                                 niches, config.get('parasite_groups', {}),
-                                                 column),
+            selection = (f'The {shown} host proteins{where} targeted by more than one '
+                         'parasite, most first.')
+        nav.subheader("Most common host interactors", 'shared', help=shared_help,
+                      slot=heading)
+        st.caption(selection)
+        st.plotly_chart(
+            generate_shared_protein_dots(*figure_arguments,
+                                         config.get('parasite_groups', {}), column),
+            width='stretch')
+        shared_table = get_shared_protein_table(
+            shared_predictions, web_utils.load_protein_annotations(data_dir),
+            web_utils.load_deeploc_localisations(data_dir))
+        tissue_suffix = '' if shared_tissue == ALL_TISSUES else f'_{shared_tissue}'
+        st.download_button(f'Download all {shareable} shared host interactors',
+                           data=utils.convert_df(shared_table),
+                           file_name=f'{selected_host}_shared_host_interactors'
+                                     f'{tissue_suffix}.tsv',
+                           mime='text/csv')
+    else:
+        nav.subheader("Most common host interactors", 'shared', help=shared_help,
+                      slot=heading)
+        st.info(f'No host protein{where} is reached by more than one parasite at this '
+                'confidence.')
+
+    nav.subheader(
+        "Interactions per tissue", 'tissues',
+        help='Predicted interactions per parasite and tissue, restricted to the tissues '
+             'each parasite is known to infect and sized by the number of interactions '
+             'with proteins expressed there. Tissues are ordered by the number of '
+             'parasites infecting them. Above the columns run the taxonomic group of the '
+             'parasite and whether it lives inside a host cell or outside one, the same '
+             'two strips the figures above carry. An interaction is counted once per '
+             'tissue, irrespective of the number of cell types the host protein is '
+             'expressed in.')
+    st.caption('How many interactions each parasite has in each tissue it infects.')
+    if per_tissue.empty:
+        st.info('No predicted interaction is left at this confidence in a tissue the '
+                'parasites are known to infect.')
+    else:
+        st.plotly_chart(generate_tissue_dots(per_tissue, parasite_groups, group_order,
+                                             niches, config.get('parasite_groups', {}),
+                                             column),
+                        width='stretch')
+
+    if choices:
+        # the description follows the expression slider but sits above it
+        heading = st.empty()
+        st.caption('How many interactions take place in each cell type of a tissue.')
+        tissue_column, expression_column, _ = st.columns(3)
+        with tissue_column:
+            tissue = st.selectbox('Tissue', choices, index=0,
+                                  help='Tissues the parasites infect, most interactions '
+                                       'first')
+        with expression_column:
+            expression = web_utils.expression_slider('compare_expression')
+        # written above the selectors once the slider has been read
+        nav.subheader(
+            "Interactions per cell type", 'cell-types', slot=heading,
+            help='Predicted interactions per cell type of the selected tissue, stacked '
+                 'by taxonomic group. A host protein counts towards a cell type where '
+                 f'it is expressed, {web_utils.expression_phrase(expression)}. A '
+                 'protein expressed in several cell types counts in each, so the bars '
+                 'are not a partition of the tissue.')
+        _, expressed = count_interactions_per_tissue(data_dir, config, selected_taxids,
+                                                     score, expression)
+        if tissue in annotated and tissue not in set(expressed['Tissue']):
+            st.info(f'No host protein interacting with these parasites is expressed '
+                    f'{web_utils.expression_phrase(expression)} in a cell type of {tissue}.')
+        elif tissue in annotated:
+            st.plotly_chart(generate_cell_type_bars(expressed, tissue, parasite_groups,
+                                                    config.get('parasite_groups', {})),
                             width='stretch')
+        else:
+            st.info(f'No single cell data available for {tissue} in {selected_host}.')
 
-    with cell_types:
-        if choices:
-            # the description follows the expression slider but sits above it
-            heading = st.empty()
-            st.caption('How many interactions take place in each cell type of a tissue.')
-            tissue_column, expression_column = st.columns(2)
-            with tissue_column:
-                tissue = st.selectbox('Tissue', choices, index=0,
-                                      help='Tissues the parasites infect, most interactions '
-                                           'first')
-            with expression_column:
-                expression = web_utils.expression_slider('compare_expression')
-            # written above the selectors once the slider has been read
-            heading.subheader(
-                "Interactions per cell type",
-                help='Predicted interactions per cell type of the selected tissue, stacked '
-                     'by taxonomic group. A host protein counts towards a cell type where '
-                     f'it is expressed, {web_utils.expression_phrase(expression)}. A '
-                     'protein expressed in several cell types counts in each, so the bars '
-                     'are not a partition of the tissue.')
-            _, expressed = count_interactions_per_tissue(data_dir, config, selected_taxids,
-                                                         score, expression)
-            if tissue in annotated and tissue not in set(expressed['Tissue']):
-                st.info(f'No host protein interacting with these parasites is expressed '
-                        f'{web_utils.expression_phrase(expression)} in a cell type of {tissue}.')
-            elif tissue in annotated:
-                st.plotly_chart(generate_cell_type_bars(expressed, tissue, parasite_groups,
-                                                        config.get('parasite_groups', {})),
-                                width='stretch')
-            else:
-                st.info(f'No single cell data available for {tissue} in {selected_host}.')
-
-    st.subheader(
-        "Enriched biological processes",
+    nav.subheader(
+        "Enriched biological processes", 'processes',
         help='Gene Ontology biological processes over-represented among the host proteins '
              'each parasite is predicted to reach, tested one parasite at a time as on the '
              "network page: one-sided Fisher's exact test against the host proteins of the "
@@ -1075,12 +1074,14 @@ if selected_host != web_utils.NO_HOST:
         st.plotly_chart(generate_go_dots(go_enriched, go_terms,
                                          go_parasites, parasite_groups, niches,
                                          config.get('parasite_groups', {}),
-                                         2 * column + web_utils.COLUMN_GAP),
+                                         column),
                         width='stretch')
         st.download_button('Download the enriched processes of every parasite',
                            data=utils.convert_df(go_enriched.drop(columns=['nodes'])),
                            file_name=f'{selected_host}_parasite_go_enrichment.tsv',
                            mime='text/csv')
+
+nav.finish()
 
 st.markdown("---")
 

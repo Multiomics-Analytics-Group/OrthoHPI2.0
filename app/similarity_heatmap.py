@@ -18,6 +18,8 @@ COLORBAR_ROOM = 71
 COLORBAR_DIGIT = 6.5
 # two decimals: most pairs sit under a tenth
 TICK = '.2f'
+# width of a character of a slanted column name, as a share of its point size
+SLANT_CHAR = 0.45
 # height of one legend row below the heatmap, in pixels
 LEGEND_ROW = 22
 # room one legend entry takes, in pixels: marker, padding and ~7.5 px a character of the
@@ -94,7 +96,7 @@ def generate(similarity, shared, strips, column, x_names=None,
 
     # slanted, the names stand the sine of their angle of their length tall
     top = abs(np.sin(np.radians(x_angle))) * (
-        0.65 * x_font * max(len(name) for name in x_names) + 12) + 25
+        SLANT_CHAR * x_font * max(len(name) for name in x_names) + 12) + 8
     # plotly wraps legend entries to the plot width, so the rows are counted rather than
     # assumed
     def legend_rows(names):

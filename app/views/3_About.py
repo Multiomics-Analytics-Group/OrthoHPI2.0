@@ -4,7 +4,7 @@ import streamlit as st
 config = web_utils.load_config(web_utils.get_config_file())
 hosts = ', '.join(host['label'].split(' (')[1].rstrip(')') for host in config['hosts'].values())
 
-st.title('About')
+web_utils.page_header('About')
 
 st.markdown(f'''
 OrthoHPI predicts protein–protein interactions between {len(config['parasites'])} parasites

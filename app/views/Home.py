@@ -193,7 +193,8 @@ def host_columns(df, width, bands=0, band_height=BAND_HEIGHT):
                              [width * w / sum(widths) - COLUMN_PADDING for w in widths])
     for title, text in zip(figure.layout.annotations, texts):
         title.update(text=text, font=dict(size=size))
-    # the columns are the full names, so a hover reads them, and the axes the abbreviations
+    # the columns are the full names and the axes the abbreviations; plotly writes the
+    # abbreviation for %{x} in a hover too, so the hovers take the name from customdata
     for column, (_, _, names) in enumerate(hosts, start=1):
         figure.update_xaxes(tickmode='array', tickvals=names,
                             ticktext=[short_name(n) for n in names], col=column)
@@ -223,8 +224,8 @@ def add_band(figure, hosts, field, palette, labelled, row=2, legend='legend2',
                        # sake, and would otherwise be dealt half a column each
                        offsetgroup=field,
                        legend=legend, legendgroup=value,
-                       showlegend=value not in labelled,
-                       hovertemplate='%{x}' f'<extra>{value}</extra>'),
+                       showlegend=value not in labelled, customdata=rows['taxid1_label'],
+                       hovertemplate='%{customdata}' f'<extra>{value}</extra>'),
                 row=row, col=column)
             labelled.add(value)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=row, col=column)
@@ -397,7 +398,8 @@ def generate_surface_scores_per_parasite(proteins, palette, width, score, cutoff
                        fillcolor='rgba(0,0,0,0)',
                        boxpoints='all', jitter=0.8, pointpos=0,
                        legendgroup=group, showlegend=group not in labelled,
-                       hovertemplate='%{x}<br>' f'{y_title} ' '%{y:.2f}'
+                       customdata=rows['taxid1_label'],
+                       hovertemplate='%{customdata}<br>' f'{y_title} ' '%{y:.2f}'
                                      f'<extra>{host}</extra>'),
                 row=1, col=column)
             labelled.add(group)
@@ -450,8 +452,8 @@ def generate_host_score_boxes(proteins, width, point_size=3):
                                opacity=0.45),
                    line=dict(color=SURFACE_LINE_COLORS[surface_class], width=1),
                    fillcolor='rgba(0,0,0,0)', boxpoints='all', jitter=0.8, pointpos=0,
-                   showlegend=False,
-                   hovertemplate='%{x}<br>P %{y:.2f}' f'<extra>{surface_class}</extra>'),
+                   showlegend=False, customdata=class_df['taxid1_label'],
+                   hovertemplate='%{customdata}<br>P %{y:.2f}' f'<extra>{surface_class}</extra>'),
             row=1, col=column)
         figure.update_xaxes(categoryorder='array', categoryarray=names, row=1, col=column)
         # in the column it applies to, not across the figure
@@ -499,9 +501,10 @@ def generate_interactions_per_parasite(df, palette, width, score, classes=None):
                 go.Bar(x=counts.index, y=counts[surface_class],
                        name=surface_class, marker_color=SURFACE_COLORS[surface_class],
                        customdata=pd.DataFrame({'n': counts[surface_class],
-                                                'share': counts[surface_class] / total}),
+                                                'share': counts[surface_class] / total,
+                                                'parasite': counts.index}),
                        legendgroup=surface_class, showlegend=surface_class not in labelled,
-                       hovertemplate='%{x}<br>%{customdata[0]} predicted interactions '
+                       hovertemplate='%{customdata[2]}<br>%{customdata[0]} predicted interactions '
                                      '(%{customdata[1]:.0%} of the parasite)'
                                      f'<extra>{surface_class}</extra>'),
                 row=1, col=column)
@@ -533,7 +536,8 @@ def generate_interactions_by_group(df, palette, width, score):
                        # strip below them
                        offsetgroup='parasite',
                        legendgroup=group, showlegend=group not in labelled_groups,
-                       hovertemplate='%{x}<br>%{y} predicted interactions'
+                       customdata=rows['name'],
+                       hovertemplate='%{customdata}<br>%{y} predicted interactions'
                                      f'<extra>{group}</extra>'),
                 row=1, col=column)
             labelled_groups.add(group)
@@ -699,11 +703,11 @@ def generate_shared_og_dots(df, dots, ogs, palette, width):
                                        sizeref=sizeref, sizemin=4, line=dict(width=0)),
                            legendgroup=group, showlegend=False,
                            customdata=rows[['og', 'parasites', 'pairs', 'degree',
-                                            'host proteins', 'group2']].to_numpy(),
+                                            'host proteins', 'group2', 'name']].to_numpy(),
                            hovertemplate='%{customdata[0]} (%{customdata[5]})<br>'
                                          'parasites reaching it: %{customdata[1]}, in '
                                          '%{customdata[2]} host-parasite pairs<br>'
-                                         'proteins of %{x} reaching it: %{customdata[3]}<br>'
+                                         'proteins of %{customdata[6]} reaching it: %{customdata[3]}<br>'
                                          'host proteins reached: %{customdata[4]}'
                                          '<extra></extra>'),
                 row=1, col=column)

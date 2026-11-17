@@ -1031,7 +1031,6 @@ def show_structures_dialog(edge):
 # the sections on the left, with the filters that set all of them under them; the title
 # heads the column of figures
 nav = section_nav.SectionNav('network', [
-    ('Interactions per tissue', 'tissues'),
     ('Network of host-parasite PPIs', 'network'),
     ('Cell types expressing the host proteins', 'cell-types'),
     ('Table of host-parasite PPIs', 'table'),
@@ -1228,26 +1227,27 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
 
 
 with nav.body:
-    # the organs first: a click on one sets the tissue filter on the left
-    nav.subheader('Interactions per tissue', 'tissues',
-                  help='Predicted interactions whose host protein is expressed in each organ, '
-                       'after the filters on the left. An interaction is counted in all of the '
-                       'organs in which the host protein is expressed.')
+    nav.subheader('Network of host-parasite PPIs', 'network')
+    # right above the network and the organs it describes
     show_active_filters(page_filters)
-    with st.columns(2)[0]:
-        body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
-                                     selected_taxids, selected_tissues, clickable=True)
-
-    with st.container():
+    network_column, organs_column = st.columns([2, 1], gap='medium')
+    with network_column:
         if networks:
-            nav.subheader('Network of host-parasite PPIs', 'network')
             st.caption('Nodes are proteins, coloured by organism and sized by centrality in the '
-                       'network. Edge width is the confidence score. Click an edge for the AlphaFold model and '
-                       'sequence of the proteins.')
-            # right above the network it describes
-            show_active_filters(page_filters)
+                       'network. Edge width is the confidence score. Click an edge for the '
+                       'AlphaFold model and sequence of the proteins.')
             for network in networks:
                 render_network_panel(*network)
+    # beside the network, the organs it reaches: a click on one sets the tissue filter on
+    # the left
+    with organs_column:
+        st.markdown('##### Interactions per tissue',
+                    help='Predicted interactions whose host protein is expressed in each '
+                         'organ, after the filters on the left. An interaction is counted in '
+                         'all of the organs in which the host protein is expressed.')
+        body_figure.show_body_figure(config, data_dir, df_select[df_select['weight'] >= score],
+                                     selected_taxids, selected_tissues, clickable=True,
+                                     front_only=True)
 
 
     with st.container():

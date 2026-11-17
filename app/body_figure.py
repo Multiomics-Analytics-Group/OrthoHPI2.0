@@ -393,6 +393,22 @@ def frontal_human_view(root):
             f'{inline(ET.tostring(root, encoding="unicode"))}</div>')
 
 
+def front_human_view(svg):
+    '''
+    The frontal human view alone, for the network page: it draws every organ a parasite of
+    the configuration infects, the side view adding only the pancreas and adrenal gland.
+    '''
+    root = ET.fromstring(svg)
+    _, y, _, height = (float(value) for value in root.get('viewBox').replace(',', ' ').split())
+    x, width = HUMAN_FRONT_VIEW
+    root.set('viewBox', f'{x} {y} {width} {height}')
+    root.set('style', 'width: auto; height: 100%; max-width: 100%;')
+
+    return (f'<div style="height: {COMPACT_HUMAN_FIGURE_HEIGHT}px; display: flex; '
+            f'align-items: flex-end; justify-content: center;">'
+            f'{inline(ET.tostring(root, encoding="unicode"))}</div>')
+
+
 def compact_human_views(svg):
     '''
     Places cropped frontal and side human views together for the detailed network page.
@@ -437,7 +453,7 @@ ORGANS_ANCHOR = 'organs'
 
 def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
                      shared_color_scale=False, compact_human=False, title_as_subheader=False,
-                     clickable=False):
+                     clickable=False, front_only=False):
     '''
     Draws the body figure of each selected host, its organs shaded by the number of
     predicted interactions reaching them.
@@ -521,7 +537,9 @@ def show_body_figure(config, data_dir, df, taxids, selected_tissues=None,
         with column:
             figure = shade_figure(svg, counts, bounds)
             figure = bottom_aligned(figure) if shared_color_scale else figure
-            if compact_human and not shared_color_scale and get_species(config, taxid) == 'human':
+            if front_only and not shared_color_scale and get_species(config, taxid) == 'human':
+                figure = front_human_view(figure)
+            elif compact_human and not shared_color_scale and get_species(config, taxid) == 'human':
                 figure = compact_human_views(figure)
             if clickable and click_detector is not None:
                 figure = link_organs(figure, drawn_organs, filtered_organs, config)

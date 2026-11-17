@@ -691,9 +691,9 @@ def get_go_background(data_dir, host_taxids, niche):
     The GO background of a niche, with what the enrichment reads from it worked out; the
     same at every threshold, and only ever read.
     '''
-    go_df = web_utils.go_background(data_dir, host_taxids, niche)
+    go_df = web_utils.go_background(data_dir, host_taxids, niche, descriptions=False)
 
-    return go_df, utils.prepare_go_background(go_df)
+    return go_df, utils.prepare_go_background(go_df, web_utils.load_go_names(data_dir))
 
 
 @st.cache_data(show_spinner=False)

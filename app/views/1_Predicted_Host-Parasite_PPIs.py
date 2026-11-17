@@ -570,8 +570,9 @@ def get_enrichment(pred_df, data_dir, side, config_file):
         niches = {web_utils.parasite_niche(utils.read_config(config_file), taxid)
                   for taxid in pred_df['taxid1'].unique()}
         niche = niches.pop() if len(niches) == 1 else None
-    go_df = web_utils.go_background(data_dir, species, niche)
-    enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df)
+    go_df = web_utils.go_background(data_dir, species, niche, descriptions=False)
+    enrichment = utils.calculate_enrichment(set(pred_df[column]), go_df,
+                                            names=web_utils.load_go_names(data_dir))
     # A is the number of proteins of the side annotated to the term
     enrichment = enrichment.rename(columns={'A': 'n_proteins'})
 

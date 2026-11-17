@@ -42,16 +42,19 @@ def export_graph(G, filename, format='graphml', output_dir='tmp'):
         with open(file_path, 'w') as out:
             out.write(json.dumps(cytoscape_data))
 
-def prepare_go_background(go_df):
+def prepare_go_background(go_df, names=None):
     '''
     What calculate_enrichment reads from a background, worked out once so a background
-    tested against many protein sets is not regrouped for each of them.
+    tested against many protein sets is not regrouped for each of them. `names` maps term
+    ids to names for a go_df read without its descriptions.
     '''
     pairs = go_df[['term', '#string_protein_id']].drop_duplicates()
+    if names is None:
+        names = dict(go_df[['term', 'description']].drop_duplicates().values)
 
     return {'pairs': pairs,
             'annotated': set(pairs['#string_protein_id']),
-            'names': dict(go_df[['term', 'description']].drop_duplicates().values),
+            'names': names,
             'sizes': pairs.groupby('term').size()}
 
 
@@ -130,13 +133,14 @@ def testable_terms(background, min_term=10, max_term=500):
 
 
 def calculate_enrichment(proteins, go_df, min_term=10, max_term=500, min_in_set=2,
-                         background=None):
+                         background=None, names=None):
     '''
     Fisher's exact test (one-sided, greater) of every Gene Ontology term against one set
-    of proteins; `background` is prepare_go_background(go_df), when already worked out.
+    of proteins; `background` is prepare_go_background(go_df), when already worked out,
+    and `names` the term names of a go_df read without its descriptions.
     '''
     if background is None:
-        background = prepare_go_background(go_df)
+        background = prepare_go_background(go_df, names)
     pairs, annotated = background['pairs'], background['annotated']
     sizes = background['sizes']
     # the universe is what is annotated

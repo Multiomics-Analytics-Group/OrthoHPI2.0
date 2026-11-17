@@ -2,6 +2,7 @@ import base64
 import os
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import streamlit as st
 import textwrap
 import utils
@@ -180,15 +181,18 @@ def filtered_pool(data_dir, taxids, niche=None):
     return set(tissues.loc[tissues['Gene'].str.split('.').str[0].isin(taxids), 'Gene'])
 
 
-def go_background(data_dir, taxids, niche=None):
+def go_background(data_dir, taxids, niche=None, descriptions=True):
     '''
     The GO annotations an enrichment of these species is tested against: those of the
-    proteins the network could have been drawn from (filtered_pool).
+    proteins the network could have been drawn from (filtered_pool). Without
+    `descriptions`, the term names are left out (load_go_names holds them), which
+    roughly halves the memory the table takes.
     '''
     species = [int(t) for t in taxids]
+    columns = None if descriptions else ['#string_protein_id', 'term', 'taxid']
     # fastparquet prunes row groups only, so the exact selection is still applied afterwards
-    go_df = utils.read_parquet_file(input_file=f'{data_dir}/gos.parquet',
-                                    filters=[('taxid', 'in', species)])
+    go_df = pd.read_parquet(f'{data_dir}/gos.parquet', columns=columns,
+                            filters=[('taxid', 'in', species)])
     go_df = go_df[go_df['taxid'].isin(species)]
     pool = filtered_pool(data_dir, tuple(str(t) for t in taxids), niche=niche)
     # a directory carrying neither table is left on the proteome rather than emptied
@@ -196,6 +200,21 @@ def go_background(data_dir, taxids, niche=None):
         go_df = go_df[go_df['#string_protein_id'].isin(pool)]
 
     return go_df
+
+
+@st.cache_resource(show_spinner=False)
+def load_go_names(data_dir):
+    '''
+    The name of every GO term, by id; only ever read. The file is read a batch at a time,
+    since the names repeat on every annotation.
+    '''
+    names = {}
+    batches = pq.ParquetFile(f'{data_dir}/gos.parquet').iter_batches(
+        columns=['term', 'description'])
+    for batch in batches:
+        names.update(batch.to_pandas().drop_duplicates('term').values)
+
+    return names
 
 
 @st.cache_data(show_spinner=False)

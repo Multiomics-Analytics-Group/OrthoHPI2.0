@@ -183,7 +183,7 @@ def generate_tissue_dots(per_tissue, groups, group_order, niches, palette, colum
                         sizemode='area', sizeref=sizeref, sizemin=4, line=dict(width=0)),
             # a dot wider than its column is not cut at either end of the axis
             cliponaxis=False,
-            customdata=rows[['Tissue', 'parasite', 'interactions']].to_numpy(),
+            customdata=rows[['Tissue', 'taxid1_label', 'interactions']].to_numpy(),
             hovertemplate='%{customdata[0]}<br>%{customdata[1]}<br>predicted interactions: '
                           '%{customdata[2]}<extra></extra>'))
 
@@ -234,7 +234,7 @@ def generate_cell_type_bars(per_cell_type, tissue, groups, palette):
                     color_discrete_map=palette, category_orders={
                         'Cell type': cell_types,
                         'group': [g for g in palette if g in set(data['group'])]},
-                    custom_data=['parasite'])
+                    custom_data=['taxid1_label'])
     # plotly 5 gives each group an offsetgroup of its own, which sets the groups side by
     # side instead of stacking them; two parasites of one group would read as a single
     # bar without a line to part them
@@ -611,7 +611,7 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
 
     # written out: `parasites` and `degree` are two different counts, and the parasite is
     # named from the row rather than the x
-    hover_columns = ['protein_full', 'parasites', 'degree', 'parasite']
+    hover_columns = ['protein_full', 'parasites', 'degree', 'taxid1_label']
     hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
                    'proteins of %{customdata[3]} reaching it: %{customdata[2]}']
     if localised:

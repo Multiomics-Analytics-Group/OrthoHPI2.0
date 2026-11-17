@@ -287,9 +287,11 @@ def generate_combination_bars(links, all_hosts, config):
 
     figure = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
                            row_heights=[0.7, 0.3])
+    full_names = [' + '.join(sorted(members[c])) for c in order]
     figure.add_trace(go.Bar(x=order, y=counts.values, marker_color=colors,
-                            text=counts.values, textposition='outside',
-                            hovertemplate='%{x}<br>%{y} orthology-group links<extra></extra>'),
+                            text=counts.values, textposition='outside', customdata=full_names,
+                            hovertemplate='%{customdata}<br>%{y} orthology-group links'
+                                          '<extra></extra>'),
                      row=1, col=1)
 
     # the matrix below the bars: a filled dot where the set includes the host, a line

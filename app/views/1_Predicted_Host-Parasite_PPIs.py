@@ -9,6 +9,8 @@ import utils
 import web_utils
 import streamlit as st
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute as pc
 import numpy as np
 import networkx as nx
 from pyvis.network import Network
@@ -159,9 +161,12 @@ def get_parasite_tissues(data_dir, parasite, host_taxids):
     and cell types its host targets are expressed in.
     '''
     predictions = load_predictions(data_dir)
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
     predictions = predictions[(predictions['taxid1_label'] == parasite)
                               & (predictions['taxid2'].isin(host_taxids))]
+    # only the rows of these targets: the whole table is several hundred MB in memory
+    tissues = pd.read_parquet(f'{data_dir}/tissues_cell_types.parquet',
+                              filters=pc.field('Gene').isin(
+                                  pa.array(predictions['target'].unique(), pa.string())))
 
     return pd.merge(predictions, tissues.rename({'Gene': 'target'}, axis=1), on='target', how='left')
 

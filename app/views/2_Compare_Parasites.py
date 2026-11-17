@@ -59,10 +59,10 @@ def load_tissue_expression(data_dir):
     The tissue and cell-type table keyed by host protein, shared rather than copied on
     every call; only ever read.
     '''
-    tissues = utils.read_parquet_file(input_file=f'{data_dir}/tissues_cell_types.parquet')
+    tissues = pd.read_parquet(f'{data_dir}/tissues_cell_types.parquet',
+                              columns=['Gene', 'Tissue', 'Cell type', 'nCPM'])
 
-    return tissues.rename({'Gene': 'target'}, axis=1)[['target', 'Tissue', 'Cell type',
-                                                       'nCPM']]
+    return tissues.rename({'Gene': 'target'}, axis=1)
 
 
 def infected_tissues(config):
@@ -85,9 +85,11 @@ def get_infected_tissue_expression(data_dir, config, host_taxids):
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[
         ['taxid1', 'taxid1_label', 'source', 'target', 'target_name', 'weight']]
     aux = predictions.drop_duplicates().astype({'taxid1': str})
-    aux = pd.merge(aux, load_tissue_expression(data_dir), on='target')
+    # paired with the infected tissues first: joined to every tissue, the host's
+    # predictions run to millions of rows
+    aux = pd.merge(aux, infected_tissues(config), on='taxid1')
 
-    return pd.merge(aux, infected_tissues(config), on=['taxid1', 'Tissue'])
+    return pd.merge(aux, load_tissue_expression(data_dir), on=['target', 'Tissue'])
 
 
 @st.cache_data(show_spinner=False)

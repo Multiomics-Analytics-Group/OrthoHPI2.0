@@ -513,12 +513,12 @@ SCORE_STATE_KEY = 'selected_score'
 SCORE_WIDGET_KEY = 'selected_score_widget'
 
 
-def score_slider(help=None):
+def score_slider():
     '''Draws the confidence score slider, shared across pages through SCORE_STATE_KEY.'''
     if SCORE_WIDGET_KEY not in st.session_state:
         st.session_state[SCORE_WIDGET_KEY] = st.session_state.get(SCORE_STATE_KEY, DEFAULT_SCORE)
 
-    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, key=SCORE_WIDGET_KEY, help=help)
+    score = st.slider('Confidence score', MIN_SCORE, MAX_SCORE, key=SCORE_WIDGET_KEY)
     st.session_state[SCORE_STATE_KEY] = score
 
     return score

@@ -26,10 +26,7 @@ with nav.body:
                                               back=nav.back)
     st.caption('Compare the hosts the selected parasite is predicted against.')
 with nav.side:
-    score = web_utils.score_slider(
-        help='Interactions predicted below this confidence are left out, as '
-             'on the other pages. These are the smallest interactomes of the '
-             'set: raising it can leave a parasite with only one host.')
+    score = web_utils.score_slider()
 
 with nav.body:
     df_pred = get_multi_host_predictions(data_dir, config, score)

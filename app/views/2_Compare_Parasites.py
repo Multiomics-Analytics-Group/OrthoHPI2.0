@@ -882,16 +882,10 @@ niches = web_utils.get_niches(config)
 # DEFAULT_PAGE_WIDTH until the browser answers
 column = nav.content_width()
 with nav.side:
-    score = web_utils.score_slider(
-        help='Interactions predicted below this confidence are left out of '
-             'the counts and figures on this page.')
+    score = web_utils.score_slider()
     # the order decides which blocks the figures show: contiguous values make a square
     # against the diagonal
-    order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
-                        help='Which annotation the overlap matrix and the most common '
-                             'interactors put next to each '
-                             'other on their axes. The strips beside the axes show both '
-                             'either way; this is which of them comes out in blocks.')
+    order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP])
 with nav.body:
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
     show_summary(counted)
@@ -970,8 +964,7 @@ with nav.body:
     # offered whatever the tissue leaves, so an emptying choice can be changed back
     shared_tissue = st.selectbox(
         'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320,
-        help='Keep only the host proteins expressed in this tissue, for the parasites '
-             'known to infect it. Tissues the parasites infect, most interactions first.')
+        help='Applies only to the parasites known to infect this tissue.')
     # narrowed to one tissue where one is chosen; the heatmap keeps every tissue
     shared_predictions = (counted if shared_tissue == ALL_TISSUES else
                           get_tissue_expressed_predictions(data_dir, config,
@@ -1044,9 +1037,7 @@ with nav.body:
         st.caption('How many interactions take place in each cell type of a tissue.')
         tissue_column, expression_column, _ = st.columns(3)
         with tissue_column:
-            tissue = st.selectbox('Tissue', choices, index=0,
-                                  help='Tissues the parasites infect, most interactions '
-                                       'first')
+            tissue = st.selectbox('Tissue', choices, index=0)
         with expression_column:
             expression = web_utils.expression_slider('compare_expression')
         # written above the selectors once the slider has been read
@@ -1104,9 +1095,7 @@ with nav.body:
                                     'run from the most widely enriched down.')
         with fdr_column:
             go_fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                              horizontal=True, key='compare_go_fdr',
-                              help='The Benjamini-Hochberg corrected significance a process has '
-                                   'to reach to be drawn for a parasite.')
+                              horizontal=True, key='compare_go_fdr')
         with st.spinner('Testing the host interactors of every parasite'):
             go_enrichments = get_parasite_enrichments(counted, data_dir, tuple(selected_taxids),
                                                       niches)

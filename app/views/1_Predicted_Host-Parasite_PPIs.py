@@ -1096,10 +1096,8 @@ with nav.side:
         selected_cell_types = st.multiselect(
             'Cell types', list(cell_type_counts.index),
             format_func=cell_type_label, key=CELL_TYPE_FILTER_KEY,
-            help='A cell type is offered with the number of host proteins expressed '
-                 'in it. Cell-type annotation is available for human (HPA), mouse '
-                 '(Tabula Muris Senis) and pig (Pig Cell Atlas); a host protein with no '
-                 'cell type is left out once a cell type is chosen.')
+            help='Available for human (HPA), mouse (Tabula Muris Senis) and pig '
+                 '(Pig Cell Atlas).')
         if len(selected_cell_types) > 0:
             expressed = web_utils.keep_expressed_cell_types(
                 df_select[df_select['Cell type'].notna()], expression)
@@ -1113,9 +1111,8 @@ with nav.side:
         # sized as the labels of the widgets around it
         st.markdown('<p style="font-size: 0.875rem;">Host protein localization</p>',
                     unsafe_allow_html=True,
-                    help='Localization of the host protein as predicted by DeepLoc 2. '
-                         'A protein predicted in several classes stays if any of them '
-                         'is ticked.')
+                    help='A protein predicted in several classes stays if any of '
+                         'them is ticked.')
     # in a row that wraps when the column is too narrow for all of them
     with st.container(horizontal=True, key='surface_filters'):
         ticked = [c for c in surface_options
@@ -1287,11 +1284,7 @@ with nav.body:
 
     with st.container():
         if df_select is not None:
-            nav.subheader("Table of host-parasite PPIs", 'table',
-                          help='One row per predicted interaction, with the tissues the host '
-                               'protein is expressed in, the number of cell types it is '
-                               f'expressed in ({web_utils.expression_phrase(expression)}) and '
-                               'its DeepLoc class.')
+            nav.subheader("Table of host-parasite PPIs", 'table')
             show_active_filters(page_filters)
             table = generate_interactions_table(df_select, score,
                                                 web_utils.load_protein_annotations(data_dir),
@@ -1299,8 +1292,7 @@ with nav.body:
             search = st.text_input(
                 "Search the table",
                 key='table_search',
-                placeholder="Protein name, identifier, tissue ...",
-                help="Keeps the rows holding the text typed, looked for in any column.")
+                placeholder="Protein name, identifier, tissue ...")
             table = search_table(table, search)
             if search.strip() and table.empty:
                 st.info(f"No interaction holds '{search}'.")
@@ -1348,9 +1340,7 @@ with nav.body:
                                         for s in SIDES], ignore_index=True)
                 if not enrichment.empty:
                     fdr = st.radio('False discovery rate', (0.01, 0.05, 0.1), index=1,
-                                   horizontal=True,
-                                   help='The Benjamini-Hochberg corrected significance a process '
-                                        'has to reach to be counted as enriched.')
+                                   horizontal=True)
                     # only the grid and the file it hands out are renamed for reading
                     enrichment_view = enrichment[enrichment['fdr_bh'] <= fdr]
                     column_names = {'side': SIDE_COLUMN} | ENRICHMENT_COLUMN_NAMES
@@ -1361,11 +1351,7 @@ with nav.body:
                     # them has said which rows are selected
                     figures_slot = st.container()
                     if not enrichment_view.empty:
-                        st.subheader(
-                            "Highlight a biological process in the network",
-                            help='Select one or more processes to colour the proteins annotated '
-                                 'to them in a copy of the network, drawn under the table, and to '
-                                 'ring them in pink in the figures above.')
+                        st.subheader("Highlight a biological process in the network")
                         st.caption(f'{len(enrichment_table)} processes pass an FDR of {fdr} '
                                    f'({per_side}). Select rows to colour their proteins in the '
                                    'network below.')

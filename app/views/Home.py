@@ -912,12 +912,7 @@ with nav.body:
 overview = get_overview_predictions(data_dir, config)
 
 with nav.side:
-    score = web_utils.score_slider(
-        help='Interactions predicted below this confidence are left out '
-             'of the counts and of the localization split drawn on them. The '
-             'boxplots keep every prediction: the confidence figure draws '
-             'this threshold as a line instead, and the localization ones '
-             'stand on too few proteins to be thresholded as well.')
+    score = web_utils.score_slider()
     # what the threshold keeps, under the slider
     kept = int((overview['weight'] >= score).sum())
     st.caption(f'{kept:,} of {len(overview):,} interactions ({kept / len(overview):.0%}) '
@@ -935,9 +930,7 @@ with nav.body:
     # as wide as its options, on one line
     split_side = st.segmented_control(
         'Colour by', list(SPLIT_SIDES), default=list(SPLIT_SIDES)[0],
-        key='split_side', width='content',
-        help='The taxonomic group of the parasite, or the localization DeepLoc 2 assigns '
-             'the host or the parasite protein of each interaction, which splits the bars.')
+        key='split_side', width='content')
     side, split_classes = SPLIT_SIDES[split_side or list(SPLIT_SIDES)[0]]
     interactions = None if side is None else get_interaction_localisations(overview, data_dir,
                                                                            side)
@@ -1018,14 +1011,10 @@ with nav.body:
     with hosts_column:
         overlap_hosts = st.multiselect(
             'Hosts', host_labels, default=host_labels, format_func=common_name,
-            key='overlap_hosts',
-            help='The hosts whose parasites the matrix compares, for instance human and mouse '
-                 'alone to set the Plasmodium species of the two side by side.')
+            key='overlap_hosts')
     with order_column:
         overlap_order = st.radio('Order the parasites by', list(OVERLAP_ORDERS), horizontal=True,
-                                 key='overlap_order',
-                                 help='Which annotation comes out in blocks along the axes. '
-                                      'The strips show all three either way.')
+                                 key='overlap_order')
     host_orthologs = web_utils.load_host_orthologs(data_dir)
     if host_orthologs is None:
         st.caption('Run `python scripts/build_host_orthologs.py` to count only the groups both '

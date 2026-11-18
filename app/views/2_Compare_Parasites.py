@@ -256,8 +256,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     same restriction the tissue matrix applies.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'source',
-                                                               'target', 'target_name', 'group2',
-                                                               'weight']]
+                                                               'target', 'target_name', 'group1',
+                                                               'group2', 'weight']]
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     expressed = load_tissue_expression(data_dir)[['target', 'Tissue']].drop_duplicates()
 
@@ -267,7 +267,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     if tissue is not None:
         aux = aux[aux['Tissue'] == tissue]
 
-    return aux[['taxid1_label', 'source', 'target', 'target_name', 'group2']].drop_duplicates()
+    return aux[['taxid1_label', 'source', 'target', 'target_name', 'group1',
+                'group2']].drop_duplicates()
 
 
 # what the matrix axes and dot plot columns can be ordered on; the order decides which
@@ -845,6 +846,19 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
     return figure
 
 
+def show_summary(counted):
+    '''
+    Counts over the interactions the figures below draw, one to a line.
+    '''
+    lines = [(counted['taxid1_label'].nunique(), 'parasites'),
+             (len(counted[['source', 'target_name']].drop_duplicates()),
+              'predicted interactions'),
+             (counted['target_name'].nunique(), 'host proteins in predicted interactions'),
+             (len(counted[['group1', 'group2']].drop_duplicates()),
+              'orthologous group pairs')]
+    st.markdown('  \n'.join(f'**{count:,}** {label}' for count, label in lines))
+
+
 # the sections on the left, with the slider and the order that set the figures under
 # them; the title heads the column of figures
 nav = section_nav.SectionNav('parasites_of_host', [
@@ -870,8 +884,7 @@ column = nav.content_width()
 with nav.side:
     score = web_utils.score_slider(
         help='Interactions predicted below this confidence are left out of '
-             'the figures on this page, except the tissue plot, which counts '
-             'every prediction.')
+             'the counts and figures on this page.')
     # the order decides which blocks the figures show: contiguous values make a square
     # against the diagonal
     order_by = st.radio('Order the parasites by', [ORDER_BY_NICHE, ORDER_BY_GROUP],
@@ -881,6 +894,7 @@ with nav.side:
                              'either way; this is which of them comes out in blocks.')
 with nav.body:
     counted = get_tissue_expressed_predictions(data_dir, config, selected_taxids, score)
+    show_summary(counted)
     shared_similarity = get_shared_interactor_similarity(counted, parasite_groups,
                                                         group_order, niches, order_by)
 

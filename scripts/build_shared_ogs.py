@@ -43,11 +43,23 @@ HEATMAP_ROW = 0.2
 # inches each strip over the columns takes
 STRIP = 0.085
 # the parasite proteins behind a cell, one hue from light to dark on a log scale
-CELL_SCALE = ['#cfcbe6', '#a9a5d1', '#7f78b8', '#5b4a9e', '#3a1f7a']
+CELL_SCALE = ['#c7e6c0', '#93cf8c', '#55ae5d', '#23843f', '#00501f']
 CELL_CAP = 20
 # how a niche that cannot reach a group is drawn, and the rows a block's title takes
 UNREACHABLE = {'facecolor': '#f0f0f0', 'edgecolor': '#c4c4c4', 'hatch': '////', 'linewidth': 0}
 BLOCK_GAP = 1.4
+# the localisation band left of the cells, in parasite columns, and its colours, those of
+# the app
+LOC_CLASSES = ('Extracellular', 'Cell membrane', 'Cytoplasm', 'Nucleus')
+LOC_SEVERAL = 'Several'
+LOC_NONE = 'Neither'
+LOC_COLORS = {'Extracellular': '#a6bddb', 'Cell membrane': '#045a8d',
+              'Cytoplasm': '#fdae6b', 'Nucleus': '#a63603',
+              LOC_SEVERAL: '#756bb1', LOC_NONE: '#d9d9d9'}
+LOC_WIDTH = 1
+# the room the band takes from the left margin, a figure fraction
+LOC_LEFT = 0.025
+LOC_GAP = 0.3
 # The family each group of the figure belongs to, so that a row can be found from the
 # name the text uses rather than from its gene symbols. A group with no name here is
 # labelled by its symbols alone.
@@ -198,13 +210,17 @@ def row_label(group, symbols):
     return textwrap.fill(GROUP_NAMES.get(group) or symbols, LABEL_CHARS)
 
 
-def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachable=None):
+def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachable=None,
+         localisation=None):
     '''
     The heatmap, with rows of `row` inches. `blocks` is [(title, rows in it)], in the order of
-    `ogs`, to title groups of rows; `unreachable` is {group: niches}, to hatch those cells.
+    `ogs`, to title groups of rows; `unreachable` is {group: niches}, to hatch those cells;
+    `localisation` is {group: class}, the DeepLoc class of the members reached, drawn as a
+    band left of the cells.
     '''
     figure_style.apply()
     parasites = config['parasites']
+    left = LEFT + (LOC_LEFT if localisation else 0)
     taxon_order = list(config['parasite_groups'])
     taxon_colors = config['parasite_groups']
     columns = sorted(set(edges['taxid1']),
@@ -240,7 +256,14 @@ def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachabl
         for niche in niches:
             own = [x for t, x in col_of.items() if parasites[int(t)]['niche'] == niche]
             ax.add_patch(Rectangle((min(own) - 0.5, row_of[group] - 0.5), len(own), 1, **UNREACHABLE))
-    ax.set_xlim(-0.5, n_cols - 0.5)
+    # the localisation band, left of the cells
+    if localisation:
+        for group, y in row_of.items():
+            ax.add_patch(Rectangle((-0.5 - LOC_GAP - LOC_WIDTH, y - 0.5), LOC_WIDTH, 1,
+                                   edgecolor='white', linewidth=0.5, clip_on=False,
+                                   facecolor=LOC_COLORS[localisation.get(group, LOC_NONE)]))
+    right = n_cols - 0.5
+    ax.set_xlim(-0.5, right)
     ax.set_ylim(ys[-1] + 0.5, -0.5)
     ax.set_yticks(ys)
     ax.set_yticklabels(labels, linespacing=1.05)
@@ -248,12 +271,16 @@ def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachabl
     ax.set_xticklabels([figure_style.short_name(parasites[int(t)]['label']) for t in columns],
                        rotation=90, style='italic')
     ax.tick_params(length=0, pad=2)
+    if localisation:
+        # the row labels and block titles stand left of the band
+        cell = fig.get_figwidth() * (0.96 - left) / n_cols * 72
+        ax.tick_params(axis='y', pad=2 + (LOC_GAP + LOC_WIDTH) * cell)
     for side in ax.spines.values():
         side.set_visible(False)
     # the parasite names go above the strips, the strips above the cells
     ax.xaxis.tick_top()
     for title, y in titles:
-        ax.text(-0.9, y, title, ha='right', va='center', fontweight='bold', clip_on=False)
+        ax.text(-0.9 - (LOC_GAP + LOC_WIDTH if localisation else 0), y, title, ha='right', va='center', fontweight='bold', clip_on=False)
 
     # two strips over the columns: taxonomic group, then niche
     strip = STRIP / row
@@ -276,8 +303,11 @@ def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachabl
     groups = [Patch(color=color, label=group) for group, color in taxon_colors.items()
               if any(parasites[int(t)]['group'] == group for t in columns)]
     niches = [Patch(color=color, label=niche) for niche, color in NICHE_COLORS.items()]
+    shown = [c for c in LOC_COLORS if c in set(localisation.values())] if localisation else []
+    places = ([('Localisation of the members reached (DeepLoc)',
+                [Patch(color=LOC_COLORS[c], label=c) for c in shown], len(shown))] if localisation else [])
     legends = figure_style.stack_legends(fig, left=0.01, blocks=[
-        ('Taxonomic group', groups), ('Niche', niches)])
+        ('Taxonomic group', groups), *places, ('Niche', niches)])
     height = fig.get_figheight()
     if unreachable:
         fig.legend(handles=[Patch(label='No group member in its pool', **UNREACHABLE)],
@@ -285,7 +315,7 @@ def draw(config, ogs, edges, output_stem, row=HEATMAP_ROW, blocks=(), unreachabl
                    alignment='left', bbox_to_anchor=(0.33, 0.02 / height),
                    title_fontsize=figure_style.FONT)
     # room above the cells for the strips and the parasite names standing on them
-    fig.subplots_adjust(left=LEFT, right=0.96, top=1 - 1.2 / height,
+    fig.subplots_adjust(left=left, right=0.96, top=1 - 1.2 / height,
                         bottom=(legends + 0.2) / height)
 
     key = fig.add_axes([0.72, (legends - 0.2) / height, 0.22, 0.07 / height])

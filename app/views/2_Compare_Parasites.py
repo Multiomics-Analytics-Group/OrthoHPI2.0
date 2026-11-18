@@ -35,7 +35,7 @@ SMALLEST_LABEL = 9
 DOT_ROW = 19
 # the overlap matrix and the shared interactors are held to about a laptop screen
 OVERLAP_SIDE = 560
-SHARED_PROTEINS = 25
+SHARED_OGS = 20
 DOT_CHROME = 240
 # session key counting remounts of the shared-interactor matrix, so the same cell can be
 # opened twice running
@@ -51,10 +51,6 @@ LOCALISATION_ORDER = list(web_utils.HOST_CLASSES) + [web_utils.SEVERAL,
                                                      web_utils.NOT_SURFACE, NO_LOCALISATION]
 # paler than the grey of a rejected protein
 LOCALISATION_COLORS = {**web_utils.LOCALISATION_COLORS, NO_LOCALISATION: '#f0f0f0'}
-# names the DeepLoc columns are read under in the hover
-DEEPLOC_LABELS = {'surface': 'DeepLoc', 'localizations': 'localizations',
-                  **{column: f'P({name.lower()})'
-                     for name, column in web_utils.DEEPLOC_SCORES.items()}}
 
 
 @st.cache_resource(show_spinner=False)
@@ -260,7 +256,8 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     same restriction the tissue matrix applies.
     '''
     predictions = web_utils.get_host_predictions(data_dir, host_taxids)[['taxid1', 'taxid1_label', 'source',
-                                                               'target', 'target_name', 'weight']]
+                                                               'target', 'target_name', 'group2',
+                                                               'weight']]
     predictions = predictions[predictions['weight'] >= score].drop('weight', axis=1)
     expressed = load_tissue_expression(data_dir)[['target', 'Tissue']].drop_duplicates()
 
@@ -270,7 +267,7 @@ def get_tissue_expressed_predictions(data_dir, config, host_taxids, score=MIN_SC
     if tissue is not None:
         aux = aux[aux['Tissue'] == tissue]
 
-    return aux[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
+    return aux[['taxid1_label', 'source', 'target', 'target_name', 'group2']].drop_duplicates()
 
 
 # what the matrix axes and dot plot columns can be ordered on; the order decides which
@@ -414,41 +411,87 @@ def show_shared_interactors_dialog(first, second, df_pred, annotations, localisa
     st.dataframe(table, width='stretch', height=400, hide_index=True)
 
 
-@st.cache_data(show_spinner=False)
-def get_top_shared_proteins(df_pred, groups, group_order, niches, order_by,
-                            annotations=None, localisations=None, top=40):
-    '''The host proteins that the most parasites are predicted to interact with.'''
-    edges = df_pred[['taxid1_label', 'source', 'target', 'target_name']].drop_duplicates()
-    # one row per dot, keyed by display gene name so aliases do not stack
-    pairs = edges[['taxid1_label', 'target_name']].drop_duplicates()
-    counts = pairs.groupby('target_name')['taxid1_label'].nunique()
-    counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
-    if counts.empty:
+def summarise_og_localisations(members, localisations):
+    '''
+    The DeepLoc class of each host orthologous group: the class most of its proteins are
+    called for, Several on a tie. Also the hover of the band, naming the classes of each
+    protein.
+    '''
+    surface = summarise_localisations(members, localisations)
+    if surface is None:
         return None
 
-    proteins = list(counts.head(top).index)
-    degree = edges.groupby(['taxid1_label', 'target_name'])['source'].nunique()
-    dots = pairs[pairs['target_name'].isin(proteins)].copy()
+    scores = {c: web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
+              if web_utils.DEEPLOC_SCORES[c] in surface}
+    crossed = {name: [c for c, column in scores.items()
+                      if row[column] > web_utils.DEEPLOC_CUTOFFS[c]]
+               for name, row in surface.iterrows()}
+    rows = {}
+    for og, names in members.groupby('group2')['target_name']:
+        names = sorted(set(names))
+        calls = pd.Series([surface['surface'][n] for n in names if n in crossed])
+        tally = calls.value_counts()
+        if tally.empty:
+            call = NO_LOCALISATION
+        elif len(tally) > 1 and tally.iloc[0] == tally.iloc[1]:
+            call = web_utils.SEVERAL
+        else:
+            call = tally.index[0]
+        hover = '<br>'.join(f'{n}: ' + (' + '.join(crossed[n]) or web_utils.NOT_SURFACE
+                                         if n in crossed else NO_LOCALISATION)
+                            for n in names)
+        rows[og] = (call, hover)
+
+    return pd.DataFrame.from_dict(rows, orient='index', columns=['surface', 'band'])
+
+
+@st.cache_data(show_spinner=False)
+def get_top_shared_ogs(df_pred, groups, group_order, niches, order_by,
+                       annotations=None, localisations=None, top=SHARED_OGS):
+    '''
+    The host orthologous groups the most parasites are predicted to interact with. A
+    group's paralogues are reached through the same group link, so they would otherwise
+    fill rows with the same dots.
+    '''
+    edges = df_pred[['taxid1_label', 'source', 'target_name', 'group2']].drop_duplicates()
+    dots = edges.groupby(['taxid1_label', 'group2']).agg(
+        degree=('source', 'nunique'),
+        targets=('target_name', lambda n: ', '.join(sorted(set(str(x) for x in n))))
+    ).reset_index()
+    counts = dots.groupby('group2')['taxid1_label'].nunique()
+    reach = dots.groupby('group2')['degree'].sum()
+    ranked = pd.DataFrame({'parasites': counts, 'reach': reach})
+    ranked = ranked[ranked['parasites'] > 1].sort_values(['parasites', 'reach'],
+                                                         ascending=False, kind='stable')
+    if ranked.empty:
+        return None
+
+    ogs = list(ranked.head(top).index)
+    dots = dots[dots['group2'].isin(ogs)].copy()
+    members = df_pred[df_pred['group2'].isin(ogs)][['target', 'target_name', 'group2']]
+    # a group of one protein reads as the protein does, a larger one by its symbols
+    protein_labels = label_proteins(members, annotations)
+    full_labels = {}
+    for og, names in members.groupby('group2')['target_name']:
+        names = sorted(set(str(n) for n in names))
+        full_labels[og] = protein_labels[names[0]] if len(names) == 1 else ', '.join(names)
+    labels = {og: web_utils.wrap_label(label, LABEL_WRAP) for og, label in full_labels.items()}
     dots['group'] = dots['taxid1_label'].map(lambda p: groups.get(p, UNKNOWN_GROUP))
-    dots['parasites'] = dots['target_name'].map(counts)
-    dots['degree'] = pd.MultiIndex.from_frame(dots[['taxid1_label', 'target_name']]).map(degree)
+    dots['parasites'] = dots['group2'].map(ranked['parasites'])
     dots['parasite'] = dots['taxid1_label'].map(lambda p: f'{p[0]}. {p.split(" ")[1]}')
-    full_labels = label_proteins(df_pred, annotations)
-    labels = {name: web_utils.wrap_label(label, LABEL_WRAP)
-              for name, label in full_labels.items()}
-    dots['protein'] = dots['target_name'].map(labels)
-    dots['protein_full'] = dots['target_name'].map(full_labels)
-    surface = summarise_localisations(df_pred, localisations)
+    dots['protein'] = dots['group2'].map(labels)
+    dots['protein_full'] = dots['group2'].map(full_labels)
+    surface = summarise_og_localisations(members, localisations)
     if surface is not None:
-        dots = dots.join(surface, on='target_name')
+        dots = dots.join(surface, on='group2')
         dots['surface'] = dots['surface'].fillna(NO_LOCALISATION)
-        dots['localizations'] = dots['localizations'].fillna('')
+        dots['band'] = dots['band'].fillna(NO_LOCALISATION)
     order = parasite_order(dots['taxid1_label'].unique(), groups, group_order, niches,
                            order_by)
     dots['niche'] = dots['taxid1_label'].map(niches).fillna(web_utils.UNKNOWN_NICHE)
 
-    return (dots, [labels[p] for p in proteins],
-            [f'{p[0]}. {p.split(" ")[1]}' for p in order], len(counts))
+    return (dots, [labels[og] for og in ogs],
+            [f'{p[0]}. {p.split(" ")[1]}' for p in order], len(ranked))
 
 
 @st.cache_data(show_spinner=False)
@@ -462,11 +505,13 @@ def get_shared_protein_table(df_pred, annotations=None, localisations=None):
     counts = degree.groupby(level='target_name').size()
     counts = counts[counts > 1].sort_values(ascending=False, kind='stable')
     ids = edges.groupby('target_name')['target'].agg(lambda t: ', '.join(sorted(set(t))))
+    ogs = df_pred.groupby('target_name')['group2'].agg(lambda g: ', '.join(sorted(set(g))))
     labels = label_proteins(df_pred, annotations)
 
     table = pd.DataFrame({
         'Host protein': counts.index,
         'STRING id': [ids[p] for p in counts.index],
+        'Orthologous group': [ogs[p] for p in counts.index],
         'Description': [labels[p].partition(' · ')[2] for p in counts.index],
         'Parasites': counts.values,
         'Parasites (interacting parasite proteins)': [
@@ -477,26 +522,6 @@ def get_shared_protein_table(df_pred, annotations=None, localisations=None):
         table['DeepLoc'] = [surface['surface'].get(p, NO_LOCALISATION) for p in counts.index]
 
     return table
-
-
-def localisation_labels(dots, proteins):
-    '''
-    What the band beside a row of the dot plot says when it is hovered: the class of the
-    host protein, and for a protein called for more than one, which classes those are.
-    '''
-    called = dots.drop_duplicates('protein').set_index('protein')
-    scores = {c: web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
-              if web_utils.DEEPLOC_SCORES[c] in called}
-    labels = []
-    for protein in proteins:
-        row = called.loc[protein]
-        crossed = [c for c, column in scores.items()
-                   if row[column] > web_utils.DEEPLOC_CUTOFFS[c]]
-        # a protein of one class is named by it, one with no localisation by what the legend
-        # calls it
-        labels.append(' + '.join(crossed) if len(crossed) > 1 else row['surface'])
-
-    return labels
 
 
 def add_parasite_strips(figure, dots, parasites, palette):
@@ -532,8 +557,9 @@ def strip_width(parasites, rows, height, room):
 
 
 def add_localisation_strip(figure, dots, proteins, ys, width):
-    '''Where DeepLoc puts each host protein, as a band beside its row.'''
+    '''Where DeepLoc puts each host orthologous group, as a band beside its row.'''
     surface_of = dict(zip(dots['protein'], dots['surface']))
+    band_of = dict(zip(dots['protein'], dots['band']))
     localisations = [surface_of.get(p, NO_LOCALISATION) for p in proteins]
     shown = [c for c in LOCALISATION_ORDER if c in set(localisations)]
     scale, codes = similarity_heatmap.flat_colour_scale(localisations,
@@ -541,8 +567,7 @@ def add_localisation_strip(figure, dots, proteins, ys, width):
     # the band is `width` x units across, an x unit being a parasite
     figure.add_trace(go.Heatmap(z=[[code] for code in codes], x0=-0.5 - width, dx=width,
                                 y=ys,
-                                text=[[label] for label in
-                                      localisation_labels(dots, proteins)],
+                                text=[[band_of.get(p, NO_LOCALISATION)] for p in proteins],
                                 ygap=1, **scale))
 
     return shown
@@ -595,11 +620,12 @@ def add_dot_legend(figure, groups, localisations, niches, palette, width, height
 
 
 @st.cache_data(show_spinner=False)
-def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
+def generate_shared_og_dots(dots, proteins, parasites, palette, column):
     '''
-    A dot wherever a parasite is predicted to interact with one of the proteins, the
-    parasites in the order the other figures use so the taxonomic groups stay together,
-    and the proteins ordered by how many parasites reach them.
+    A dot wherever a parasite is predicted to interact with a protein of one of the host
+    orthologous groups, the parasites in the order the other figures use so the
+    taxonomic groups stay together, and the groups ordered by how many parasites reach
+    them.
     '''
     localised = 'surface' in dots.columns
     # a wrapped name opens its row up
@@ -611,17 +637,10 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
 
     # written out: `parasites` and `degree` are two different counts, and the parasite is
     # named from the row rather than the x
-    hover_columns = ['protein_full', 'parasites', 'degree', 'taxid1_label']
+    hover_columns = ['protein_full', 'parasites', 'degree', 'taxid1_label', 'targets']
     hover_lines = ['%{customdata[0]}', 'parasites reaching it: %{customdata[1]}',
-                   'proteins of %{customdata[3]} reaching it: %{customdata[2]}']
-    if localised:
-        # the probabilities behind the band, two to a line
-        scores = [web_utils.DEEPLOC_SCORES[c] for c in web_utils.HOST_CLASSES
-                  if web_utils.DEEPLOC_SCORES[c] in dots]
-        parts = [f'{DEEPLOC_LABELS[name]} %{{customdata[{len(hover_columns) + i}]:.2f}}'
-                 for i, name in enumerate(scores)]
-        hover_columns += scores
-        hover_lines += [', '.join(parts[i:i + 2]) for i in range(0, len(parts), 2)]
+                   'proteins of %{customdata[3]} reaching it: %{customdata[2]}',
+                   'host proteins reached: %{customdata[4]}']
 
     size = dot_size(parasites, proteins, column)
     # the area of the largest dot stands for the largest degree
@@ -654,7 +673,7 @@ def generate_shared_protein_dots(dots, proteins, parasites, palette, column):
                          # the legends are placed against the foot of the figure, under the
                          # plot; no pad, so the names sit against the strips
                          margin=dict(l=0, r=right, t=10, b=legends, pad=0),
-                         xaxis_title=None, yaxis_title='host protein')
+                         xaxis_title=None, yaxis_title='host orthologous group')
     # every parasite is named at the size a column has room for; the range runs back past
     # the band beside the rows
     figure.update_xaxes(range=[-0.5 - 1.5 * band, len(parasites) - 0.5],
@@ -830,7 +849,7 @@ def generate_go_dots(enriched, terms, parasites, groups, niches, palette, width)
 # them; the title heads the column of figures
 nav = section_nav.SectionNav('parasites_of_host', [
     ('Overlap of the host interactors', 'overlap'),
-    ('Most common host interactors', 'shared'),
+    ('Most common host orthologous groups', 'shared'),
     ('Interactions per tissue', 'tissues'),
     ('Interactions per cell type', 'cell-types'),
     ('Enriched biological processes', 'processes')])
@@ -923,12 +942,17 @@ with nav.body:
 
     # the description counts what the tissue below leaves but sits above it
     heading = st.empty()
-    shared_help = ("A dot wherever a parasite is predicted to interact with one, sized "
-                   "by the number of that parasite's proteins reaching it. The band "
-                   'beside each row gives the DeepLoc 2 localization of the host '
-                   'protein; hover a dot for the probabilities behind it. Above the '
-                   'columns run the taxonomic group of the parasite and whether it lives '
-                   'inside a host cell or outside one.')
+    shared_help = ('Each row is the EggNOG orthologous group of the host proteins, which '
+                   'can hold several paralogues, all reached through the same group link. '
+                   'A group of one protein is named by it, a larger one by the gene '
+                   'symbols of its proteins. A dot wherever a parasite is predicted to '
+                   'interact with a protein of the group, sized by the number of that '
+                   "parasite's proteins reaching it; hover a dot for the host proteins "
+                   'behind it. The band beside each row gives the DeepLoc 2 localization '
+                   'of the group, the class most of its proteins are called for, or Several '
+                   'on a tie; hover it for the classes of each protein. Above the columns run '
+                   'the taxonomic group of the parasite and whether it lives inside a host '
+                   'cell or outside one.')
     # offered whatever the tissue leaves, so an emptying choice can be changed back
     shared_tissue = st.selectbox(
         'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320,
@@ -939,11 +963,10 @@ with nav.body:
                           get_tissue_expressed_predictions(data_dir, config,
                                                            selected_taxids, score,
                                                            shared_tissue))
-    top_shared = get_top_shared_proteins(shared_predictions, parasite_groups, group_order,
-                                         niches, order_by,
-                                         web_utils.load_protein_annotations(data_dir),
-                                         web_utils.load_deeploc_localisations(data_dir),
-                                         top=SHARED_PROTEINS)
+    top_shared = get_top_shared_ogs(shared_predictions, parasite_groups, group_order,
+                                    niches, order_by,
+                                    web_utils.load_protein_annotations(data_dir),
+                                    web_utils.load_deeploc_localisations(data_dir))
     where = '' if shared_tissue == ALL_TISSUES else f' in {shared_tissue}'
     if top_shared is not None:
         # the count of what the rows were taken from belongs to the caption
@@ -951,33 +974,34 @@ with nav.body:
         shown = len(figure_arguments[1])
         # a truncated figure says what it is a top of
         if shareable > shown:
-            shared_help = (f'The {shown} host proteins{where} reached by the most '
-                           f'parasites are shown, of the {shareable} reached by more '
+            shared_help = (f'The {shown} host orthologous groups{where} reached by the '
+                           f'most parasites are shown, of the {shareable} reached by more '
                            'than one. ' + shared_help)
-            selection = f'The {shown} host proteins{where} targeted by the most parasites.'
+            selection = (f'The {shown} host orthologous groups{where} targeted by the most '
+                         'parasites.')
         else:
-            selection = (f'The {shown} host proteins{where} targeted by more than one '
-                         'parasite, most first.')
-        nav.subheader("Most common host interactors", 'shared', help=shared_help,
+            selection = (f'The {shown} host orthologous groups{where} targeted by more than '
+                         'one parasite, most first.')
+        nav.subheader("Most common host orthologous groups", 'shared', help=shared_help,
                       slot=heading)
         st.caption(selection)
         st.plotly_chart(
-            generate_shared_protein_dots(*figure_arguments,
-                                         config.get('parasite_groups', {}), column),
+            generate_shared_og_dots(*figure_arguments,
+                                    config.get('parasite_groups', {}), column),
             width='stretch')
         shared_table = get_shared_protein_table(
             shared_predictions, web_utils.load_protein_annotations(data_dir),
             web_utils.load_deeploc_localisations(data_dir))
         tissue_suffix = '' if shared_tissue == ALL_TISSUES else f'_{shared_tissue}'
-        st.download_button(f'Download all {shareable} shared host interactors',
+        st.download_button(f'Download all {len(shared_table)} shared host proteins',
                            data=utils.convert_df(shared_table),
                            file_name=f'{selected_host}_shared_host_interactors'
                                      f'{tissue_suffix}.tsv',
                            mime='text/csv')
     else:
-        nav.subheader("Most common host interactors", 'shared', help=shared_help,
+        nav.subheader("Most common host orthologous groups", 'shared', help=shared_help,
                       slot=heading)
-        st.info(f'No host protein{where} is reached by more than one parasite at this '
+        st.info(f'No host orthologous group{where} is reached by more than one parasite at this '
                 'confidence.')
 
     nav.subheader(

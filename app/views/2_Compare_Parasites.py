@@ -963,8 +963,7 @@ with nav.body:
                    'cell or outside one.')
     # offered whatever the tissue leaves, so an emptying choice can be changed back
     shared_tissue = st.selectbox(
-        'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320,
-        help='Applies only to the parasites known to infect this tissue.')
+        'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320)
     # narrowed to one tissue where one is chosen; the heatmap keeps every tissue
     shared_predictions = (counted if shared_tissue == ALL_TISSUES else
                           get_tissue_expressed_predictions(data_dir, config,

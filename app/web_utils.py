@@ -545,14 +545,10 @@ def keep_expressed_cell_types(df, cutoff=CELL_TYPE_CUTOFF):
     return df[df['nCPM'] > cutoff]
 
 
-def expression_slider(key, help=None):
+def expression_slider(key):
     '''The nCPM a host protein must exceed in a cell type to count as expressed there.'''
     return st.slider('Cell-type expression (nCPM)', CELL_TYPE_CUTOFF, CELL_TYPE_MAX_CUTOFF,
-                     CELL_TYPE_CUTOFF, key=key,
-                     help=help or 'A host protein counts towards a cell type when its '
-                                  'expression there is above this. 1 nCPM is HPA\'s own '
-                                  'detection threshold; the mouse and pig atlases are put on '
-                                  'the same scale.')
+                     CELL_TYPE_CUTOFF, key=key)
 
 
 def expression_phrase(cutoff):

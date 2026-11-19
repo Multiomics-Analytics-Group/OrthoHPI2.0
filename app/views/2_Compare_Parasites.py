@@ -963,7 +963,7 @@ with nav.body:
                    'cell or outside one.')
     # offered whatever the tissue leaves, so an emptying choice can be changed back
     shared_tissue = st.selectbox(
-        'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=320)
+        'Tissue', [ALL_TISSUES] + choices, index=0, key='shared_tissue', width=220)
     # narrowed to one tissue where one is chosen; the heatmap keeps every tissue
     shared_predictions = (counted if shared_tissue == ALL_TISSUES else
                           get_tissue_expressed_predictions(data_dir, config,
@@ -1034,11 +1034,10 @@ with nav.body:
         # the description follows the expression slider but sits above it
         heading = st.empty()
         st.caption('How many interactions take place in each cell type of a tissue.')
-        tissue_column, expression_column, _ = st.columns(3)
-        with tissue_column:
-            tissue = st.selectbox('Tissue', choices, index=0)
-        with expression_column:
-            expression = web_utils.expression_slider('compare_expression')
+        with st.container(horizontal=True, gap='large'):
+            tissue = st.selectbox('Tissue', choices, index=0, width=220)
+            with st.container(width=320):
+                expression = web_utils.expression_slider('compare_expression')
         # written above the selectors once the slider has been read
         nav.subheader(
             "Interactions per cell type", 'cell-types', slot=heading,

@@ -426,10 +426,20 @@ def download_name(parasite, filters, suffix):
     return f'{slug}_{suffix}'
 
 
-def generate_tissue_filters(df):
-    options = df['Tissue'].unique().tolist()
+def generate_tissue_filters(df, score):
+    '''
+    The tissues on offer, the one holding the most host proteins at the score first, and
+    how many each holds. A tissue the score empties stays on offer with none.
+    '''
+    tissues = df['Tissue'].dropna()
+    counts = (df[df['weight'] >= score].groupby('Tissue')['target_name'].nunique()
+                .reindex(tissues.unique(), fill_value=0))
 
-    return options
+    return counts.sort_index().sort_values(ascending=False, kind='stable')
+
+def protein_count_label(option, proteins):
+    '''A filter option with the number of host proteins it holds.'''
+    return f'{option} ({proteins} protein{"" if proteins == 1 else "s"})'
 
 def generate_cell_type_filters(df, score, expression):
     '''
@@ -1067,14 +1077,17 @@ if not surface_calls.empty:
 with nav.side:
     score = web_utils.score_slider()
 
-    tissues_options = generate_tissue_filters(df_select)
-    if len(tissues_options) > 0:
+    tissue_counts = generate_tissue_filters(df_select, score)
+    if len(tissue_counts) > 0:
+        tissues_options = list(tissue_counts.index)
         # a click on the body figure is read here, on the run after it, before the
         # filter is created
         body_figure.apply_organ_click(config, selected_taxids, tissues_options,
                                       TISSUE_FILTER_KEY)
-        selected_tissues = st.multiselect('Tissues', tissues_options,
-                                          key=TISSUE_FILTER_KEY)
+        selected_tissues = st.multiselect(
+            'Tissues', tissues_options,
+            format_func=lambda t: protein_count_label(t, tissue_counts[t]),
+            key=TISSUE_FILTER_KEY, placeholder='All tissues')
         if len(selected_tissues) > 0:
             df_select = df_select[df_select['Tissue'].isin(selected_tissues)]
 
@@ -1082,11 +1095,6 @@ with nav.side:
     expression = web_utils.expression_slider('net_expression')
     cell_type_counts = generate_cell_type_filters(df_select, score, expression)
     if len(cell_type_counts) > 0:
-        def cell_type_label(cell_type):
-            proteins = cell_type_counts[cell_type]
-
-            return f'{cell_type} ({proteins} protein{"" if proteins == 1 else "s"})'
-
         # a cell type the new score or expression leaves empty drops out of the choice
         if CELL_TYPE_FILTER_KEY in st.session_state:
             st.session_state[CELL_TYPE_FILTER_KEY] = [
@@ -1095,7 +1103,8 @@ with nav.side:
 
         selected_cell_types = st.multiselect(
             'Cell types', list(cell_type_counts.index),
-            format_func=cell_type_label, key=CELL_TYPE_FILTER_KEY,
+            format_func=lambda c: protein_count_label(c, cell_type_counts[c]),
+            key=CELL_TYPE_FILTER_KEY, placeholder='All cell types',
             help='Available for human (HPA), mouse (Tabula Muris Senis) and pig '
                  '(Pig Cell Atlas).')
         if len(selected_cell_types) > 0:

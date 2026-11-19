@@ -131,3 +131,31 @@ header[data-testid="stHeader"] div:has(> div > [data-testid="stTopNavLinkContain
     min-height: 0;
     padding: 0;
 }
+
+/* the dropdowns drawn as the cards are, white with a thin border, rather than in the
+   theme's widget fill; picked options of a multiselect are pale chips like the host pills */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+    background-color: #ffffff;
+    border: 1px solid #d5dbe5;
+}
+
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within,
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
+    border-color: #110b7a;
+}
+
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background-color: #e6ebf5;
+    color: #110b7a;
+}
+
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg {
+    fill: #110b7a;
+}
+
+/* a long pick scrolls inside the box instead of stretching the column */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:first-child {
+    max-height: 7.5rem;
+    overflow-y: auto;
+}

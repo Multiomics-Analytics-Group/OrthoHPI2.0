@@ -84,28 +84,12 @@ with nav.body:
         reasons = explain_host_specific(links, all_hosts, data_dir, config,
                                         edges['taxid1'].iloc[0], hosts_taxids)
         if reasons is not None and not reasons.empty:
-            counts = reasons['Why'].value_counts()
-            # `none` rather than `0`: a nought in bold reads as a value the page failed
-            # to fill in
-            absent = counts.get(ABSENT_GROUP, 0) or 'none'
-            lead = (f'**Of the {len(reasons)} host–link combinations missing from a '
-                    f'host, {absent} are missing because the host lacks the orthologous group.**')
-            clauses = []
-            if counts.get(NOT_EXPRESSED):
-                clauses.append(f'in {counts[NOT_EXPRESSED]} the group is not annotated '
-                               'to a tissue the parasite infects')
-            if counts.get(OUT_OF_REACH):
-                clauses.append(f'in {counts[OUT_OF_REACH]} it is expressed there, but '
-                               'DeepLoc places it in compartments the parasite cannot '
-                               'reach')
-            if counts.get(NOT_TRANSFERRED):
-                clauses.append(f'{counts[NOT_TRANSFERRED]} have a member that passes '
-                               'every filter, yet no interaction is recorded — a '
-                               'mismatch between the predictions and the data directory')
-            if clauses:
-                rest = '; '.join(clauses)
-                lead += ' ' + rest[0].upper() + rest[1:] + '.'
-            st.markdown(lead)
+            # the reasons in the order the filters are applied, leaving out those with no links
+            counts = reasons['Reason'].value_counts().reindex(
+                [ABSENT_GROUP, NOT_EXPRESSED, OUT_OF_REACH, NOT_TRANSFERRED], fill_value=0)
+            counts = counts[counts > 0]
+            st.dataframe(counts.rename('Missing links').rename_axis('Reason').reset_index(),
+                         width='content', hide_index=True)
             with st.expander(f'Missing links ({len(reasons)})'):
                 st.dataframe(reasons, width='stretch', height=400, hide_index=True)
         elif reasons is None:

@@ -24,9 +24,9 @@ SPECIES_TINT = 0.45
 ABSENT_COLOR = '#e0e0e0'
 # why a host missed a link, in the order explain_host_specific tests them; the paragraph
 # under the bars counts the rows of each
-ABSENT_GROUP = 'orthologous group absent from this host'
-NOT_EXPRESSED = 'not expressed in an infected tissue'
-OUT_OF_REACH = 'not in a reachable subcellular location'
+ABSENT_GROUP = 'orthologous group absent from the host'
+NOT_EXPRESSED = 'removed by the tissue expression filter'
+OUT_OF_REACH = 'removed by the subcellular localisation filter'
 NOT_TRANSFERRED = 'available, but not transferred'
 # most gene symbols in an orthologous group label before the rest are left to the hover
 SYMBOLS_IN_LABEL = 3
@@ -500,4 +500,4 @@ def explain_host_specific(links, all_hosts, data_dir, config, parasite_taxid, ho
                             short_name(host), reason])
 
     return pd.DataFrame(missing, columns=['Host orthologous group', 'Parasite proteins',
-                                          'Predicted in', 'Missing from', 'Why'])
+                                          'Predicted in', 'Missing from', 'Reason'])

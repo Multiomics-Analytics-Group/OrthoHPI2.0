@@ -944,20 +944,6 @@ def fasta_header(protein, name, species, uniprot):
     return ' | '.join(parts)
 
 
-def network_fasta(G, df, sequences):
-    '''FASTA text of every protein drawn in the network, parasite proteins first.'''
-    records = []
-    for prefix, taxid_col in [('source', 'taxid1_label'), ('target', 'taxid2_label')]:
-        cols = [prefix, f'{prefix}_name', taxid_col, f'{prefix}_uniprot']
-        for protein, name, species, uniprot in df[cols].drop_duplicates(subset=prefix).values:
-            if protein in G and protein in sequences:
-                header = fasta_header(protein, name, species,
-                                      uniprot if pd.notna(uniprot) else None)
-                records.append((header, sequences[protein]))
-
-    return web_utils.to_fasta(records)
-
-
 def graphml_bytes(G):
     '''The network as GraphML, for its download button.'''
     out = io.BytesIO()
@@ -1210,7 +1196,7 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
             if interaction is not None:
                 show_structures_dialog(interaction)
         with st.container():
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3 = st.columns(3)
 
             with c1:
                 st.download_button(
@@ -1234,15 +1220,6 @@ def render_network_panel(host_taxid, host_label, host_df, G, net):
                     data=functools.partial(cytoscape_json, G),
                     file_name=download_name(selected_parasite, page_filters,
                                             f'{host_taxid}_network.json'),
-                    mime='text/plain',
-                )
-            with c4:
-                st.download_button(
-                    label="Download Sequences as FASTA",
-                    data=functools.partial(network_fasta, G, host_df,
-                                           web_utils.load_protein_sequences(data_dir)),
-                    file_name=download_name(selected_parasite, page_filters,
-                                            f'{host_taxid}_network.fasta'),
                     mime='text/plain',
                 )
 

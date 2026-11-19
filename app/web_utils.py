@@ -18,8 +18,8 @@ ABOUT = 'views/3_About.py'
 PAGES = [('Start', START),
          ('General analysis', GENERAL),
          ('View network', NETWORK),
-         ('Compare parasites of a host', PARASITES_OF_HOST),
-         ('Compare hosts of a parasite', HOSTS_OF_PARASITE),
+         ('Compare parasites', PARASITES_OF_HOST),
+         ('Compare hosts', HOSTS_OF_PARASITE),
          ('About', ABOUT)]
 
 # pixels one line of a wrapped axis name takes, at plotly's default font
@@ -496,13 +496,18 @@ def page_header(title, host=None, parasite=None, back=None):
 def require_selection(title, host=False, parasite=False, back=None):
     '''
     The selection an analysis page needs, named under its title; a page opened without
-    it, from a bookmark or after the session expired, goes back to the start page.
+    it, from a bookmark or after the session expired, goes back to the start page. A
+    title given as a function of the host and parasite names them itself, and the line
+    under it is left out.
     '''
     selected_host, selected_parasite = get_selection()
     if (host and not selected_host) or (parasite and not selected_parasite):
         st.switch_page(START)
-    page_header(title, selected_host if host else None, selected_parasite if parasite else None,
-                back)
+    if callable(title):
+        page_header(title(selected_host, selected_parasite), back=back)
+    else:
+        page_header(title, selected_host if host else None,
+                    selected_parasite if parasite else None, back)
 
     return selected_host, selected_parasite
 

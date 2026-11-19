@@ -22,8 +22,8 @@ nav = section_nav.SectionNav('hosts_of_parasite', [
     ('Shared and host-specific interactions', 'sets'),
     ('Interactions per parasite and host orthologous group', 'links')])
 with nav.body:
-    _, parasite = web_utils.require_selection('Hosts of a parasite', parasite=True,
-                                              back=nav.back)
+    _, parasite = web_utils.require_selection(
+        lambda _, parasite: f'Hosts of *{parasite}*', parasite=True, back=nav.back)
     st.caption('Compare the hosts the selected parasite is predicted against.')
 with nav.side:
     score = web_utils.score_slider()

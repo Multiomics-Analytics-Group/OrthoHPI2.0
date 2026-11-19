@@ -4,6 +4,7 @@ import utils
 import web_utils
 import similarity_heatmap
 import section_nav
+from multi_host import common_name
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -868,8 +869,8 @@ nav = section_nav.SectionNav('parasites_of_host', [
     ('Interactions per cell type', 'cell-types'),
     ('Enriched biological processes', 'processes')])
 with nav.body:
-    selected_host, _ = web_utils.require_selection('Parasites of a host', host=True,
-                                                    back=nav.back)
+    selected_host, _ = web_utils.require_selection(
+        lambda host, _: f'Parasites of {common_name(host)}', host=True, back=nav.back)
 selected_taxids = web_utils.host_taxids(config, selected_host)
 
 # the heatmap and dot matrix read the same filtered interactions

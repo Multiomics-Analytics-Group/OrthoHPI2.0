@@ -34,10 +34,10 @@ general, of_host, of_parasite, network = st.columns(4)
 card(general, 'general', 'General analysis',
      'Every prediction, across all hosts and parasites.',
      web_utils.GENERAL, True, '')
-card(of_host, 'of_host', 'Compare parasites of this host',
+card(of_host, 'of_host', 'Compare parasites',
      f'Compare the parasites of {common(host)}.' if host else '',
      web_utils.PARASITES_OF_HOST, bool(host), 'Pick a host below.')
-card(of_parasite, 'of_parasite', 'Compare hosts of this parasite',
+card(of_parasite, 'of_parasite', 'Compare hosts',
      f'Compare *{parasite}* across {", ".join(common(h) for h in parasite_hosts)}.'
      if parasite else '',
      web_utils.HOSTS_OF_PARASITE, len(parasite_hosts) > 1,

@@ -132,16 +132,23 @@ header[data-testid="stHeader"] div:has(> div > [data-testid="stTopNavLinkContain
     padding: 0;
 }
 
-/* the dropdowns drawn as the cards are, white with a thin border, rather than in the
+/* the dropdowns and text boxes drawn as the cards are, white with a thin border, rather than in the
    theme's widget fill; picked options of a multiselect are pale chips like the host pills */
 [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+[data-testid="stTextInput"] [data-baseweb="input"] {
     background-color: #ffffff;
     border: 1px solid #d5dbe5;
 }
 
+[data-testid="stTextInput"] [data-baseweb="input"] > div,
+[data-testid="stTextInput"] input {
+    background-color: #ffffff;
+}
+
 [data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within,
+[data-testid="stTextInput"] [data-baseweb="input"]:focus-within {
     border-color: #110b7a;
 }
 

@@ -106,7 +106,7 @@ with nav.body:
                 rest = '; '.join(clauses)
                 lead += ' ' + rest[0].upper() + rest[1:] + '.'
             st.markdown(lead)
-            with st.expander(f'The {len(reasons)} missing links, one row each'):
+            with st.expander(f'Missing links ({len(reasons)})'):
                 st.dataframe(reasons, width='stretch', height=400, hide_index=True)
         elif reasons is None:
             st.caption('Run `python scripts/build_host_orthologs.py` to add the check '

@@ -1301,7 +1301,8 @@ with nav.body:
             search = st.text_input(
                 "Search the table",
                 key='table_search',
-                placeholder="Protein name, identifier, tissue ...")
+                placeholder="Protein name, identifier, tissue ...",
+                icon=':material/search:', label_visibility='collapsed', width=340)
             table = search_table(table, search)
             if search.strip() and table.empty:
                 st.info(f"No interaction holds '{search}'.")
